@@ -1,0 +1,203 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom Font Styles */
+@layer base {
+  /* Headings use Chillax SemiBold */
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Chillax', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    color: #000000;
+    font-weight: 600; /* Chillax SemiBold weight */
+  }
+
+  /* Body text uses Chillax Regular */
+  body, p {
+    font-family: 'Chillax', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    color: #000000;
+    font-weight: 400; /* Chillax Regular weight */
+  }
+
+  /* Main heading */
+  h1 {
+    font-size: 64px;
+    line-height: 64px;
+  }
+
+  /* Large headings */
+  h2 {
+    font-size: 48px;
+    line-height: 48px;
+  }
+
+  /* Medium headings */
+  h3 {
+    font-size: 32px;
+    line-height: 36px;
+  }
+
+  /* Small headings */
+  h4, h5, h6 {
+    font-size: 24px;
+    line-height: 28px;
+  }
+
+  /* Ensure buttons, inputs, and other elements use Chillax Regular */
+  button, input, textarea, select {
+    font-family: 'Chillax', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-weight: 400; /* Chillax Regular weight */
+  }
+}
+
+/* Animation Delay Utilities */
+.animation-delay-500 {
+  animation-delay: 500ms;
+}
+
+.animation-delay-1000 {
+  animation-delay: 1000ms;
+}
+
+.animation-delay-1500 {
+  animation-delay: 1500ms;
+}
+
+.animation-delay-2000 {
+  animation-delay: 2000ms;
+}
+
+.animation-delay-3000 {
+  animation-delay: 3000ms;
+}
+
+.animation-delay-4000 {
+  animation-delay: 4000ms;
+}
+
+/* Smooth transitions for all interactive elements */
+* {
+  transition: all 0.2s ease-in-out;
+}
+
+/* Hover animations for buttons */
+button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(6, 71, 161, 0.15);
+}
+
+/* Card hover animations */
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(6, 71, 161, 0.1);
+}
+
+/* Input focus animations */
+input:focus, textarea:focus, select:focus {
+  transform: scale(1.02);
+  box-shadow: 0 0 0 3px rgba(6, 71, 161, 0.1);
+}
+
+.react-calendar {
+  width: 100% !important;
+  border: none !important;
+  font-family: "Inter", sans-serif !important;
+}
+
+.react-calendar__navigation__label__labelText {
+  font-weight: 600;
+}
+
+.react-calendar__tile--active {
+  background-color: #c3ebfa !important;
+  color: black !important;
+}
+
+.rbc-btn-group:first-child {
+  display: none !important;
+}
+
+.rbc-toolbar-label {
+  text-align: right !important;
+  padding: 0px 20px !important;
+}
+
+.rbc-btn-group:last-child {
+  font-size: 13px !important;
+}
+
+.rbc-btn-group:last-child button {
+  border: none !important;
+  background-color: #f1f0ff !important;
+  margin-left: 2px !important;
+}
+
+.rbc-toolbar button.rbc-active {
+  background-color: #dbdafe !important;
+  box-shadow: none !important;
+}
+
+.rbc-time-view {
+  border-color: #eee !important;
+}
+
+.rbc-time-header {
+  display: none !important;
+}
+
+.rbc-time-content {
+  border: none !important;
+}
+
+.rbc-time-gutter.rbc-time-column {
+  font-size: 12px !important;
+}
+
+.rbc-time-gutter.rbc-time-column .rbc-timeslot-group {
+  padding: 0px 20px !important;
+}
+
+.rbc-timeslot-group {
+  background-color: #f7fdff !important;
+}
+
+.rbc-day-slot {
+  font-size: 14px !important;
+}
+
+.rbc-event {
+  border: none !important;
+  color: black !important;
+  padding: 10px !important;
+  margin: 10px !important;
+  width: 99% !important;
+}
+
+.rbc-event:nth-child(1) {
+  background-color: #e2f8ff !important;
+}
+.rbc-event:nth-child(2) {
+  background-color: #fefce8 !important;
+}
+.rbc-event:nth-child(3) {
+  background-color: #f2f1ff !important;
+}
+.rbc-event:nth-child(4) {
+  background-color: #fdf2fb !important;
+}
+.rbc-event:nth-child(5) {
+  background-color: #e2f8ff !important;
+}
+.rbc-event:nth-child(6) {
+  background-color: #fefce8 !important;
+}
+.rbc-event:nth-child(7) {
+  background-color: #f2f1ff !important;
+}
+.rbc-event:nth-child(8) {
+  background-color: #fdf2fb !important;
+}
+
+.rbc-event-label{
+  color: gray !important;
+  margin-bottom: 5px;
+}
