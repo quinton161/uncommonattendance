@@ -1,35 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
-// Import User model
-import User from '../../../models/User.js';
-
-// MongoDB connection
-let isConnected = false;
-
-const connectToDatabase = async () => {
-  if (isConnected) {
-    return;
-  }
-
-  try {
-    const mongoUri = process.env.MONGODB_URI || 'mongodb+srv://quinton:1307@cluster0.cyjo4zp.mongodb.net/attendance_system?retryWrites=true&w=majority&appName=Cluster0';
-    
-    await mongoose.connect(mongoUri, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-      serverSelectionTimeoutMS: 5000,
-      socketTimeoutMS: 45000,
-    });
-    
-    isConnected = true;
-  } catch (error) {
-    console.error('❌ MongoDB connection error:', error);
-    throw error;
-  }
-};
+// Import database connection and User model
+import { connectToDatabase } from '../../../lib/mongodb.js';
+import User from '../../../lib/models/User.js';
 
 export async function POST(request) {
   try {
