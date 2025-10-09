@@ -108,7 +108,7 @@ export default function LiveAttendance({ currentlyCheckedIn, todayAttendance }: 
         {/* Today's Summary */}
         <div className="mt-6 pt-6 border-t border-gray-200">
           <div className="text-sm font-medium text-gray-700 mb-3">
-            Today's Summary
+            Today&apos;s Summary
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="bg-blue-50 rounded-lg p-3">

@@ -125,7 +125,7 @@ export default function RegisterPage() {
             Create Account
           </h2>
           <p className="font-avenir text-body-md text-gray-600">
-            Join Uncommon's attendance tracking system
+            Join Uncommon&apos;s attendance tracking system
           </p>
         </div>
 

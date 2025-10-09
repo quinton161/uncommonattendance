@@ -55,7 +55,7 @@ export default function AttendanceCard({ attendanceStatus }: AttendanceCardProps
     <div className="bg-white rounded-lg shadow">
       <div className="px-6 py-4 border-b border-gray-200">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-gray-900">Today's Attendance</h2>
+          <h2 className="text-xl font-semibold text-gray-900">Today&apos;s Attendance</h2>
           <div className="flex items-center space-x-2">
             {getStatusIcon()}
             <span className={`text-sm font-medium ${getStatusColor()}`}>
@@ -139,7 +139,7 @@ export default function AttendanceCard({ attendanceStatus }: AttendanceCardProps
               <div className="bg-yellow-50 rounded-lg p-4">
                 <div className="flex items-center text-sm text-yellow-700">
                   <Clock className="h-4 w-4 mr-1" />
-                  <span>Currently checked in - Don't forget to check out when leaving!</span>
+                  <span>Currently checked in - Don&apos;t forget to check out when leaving!</span>
                 </div>
               </div>
             )}

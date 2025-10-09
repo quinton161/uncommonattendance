@@ -131,7 +131,7 @@ export default function StudentDashboard() {
                   Day Complete!
                 </h3>
                 <p className="text-sm text-green-700">
-                  You've successfully checked in and out today.
+                  You&apos;ve successfully checked in and out today.
                 </p>
                 {attendanceStatus?.totalHours && (
                   <p className="text-sm font-medium text-green-800 mt-2">
