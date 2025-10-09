@@ -8,12 +8,8 @@ const nextConfig = {
   },
   // Optimize for production
   swcMinify: true,
-  // Enable experimental features for better performance
-  experimental: {
-    optimizeCss: true,
-  },
-  // Output configuration for deployment
-  output: 'standalone',
+  // Remove experimental features that cause build issues
+  experimental: {},
 };
 
 export default nextConfig;
