@@ -1,10 +1,48 @@
 import { NextRequest, NextResponse } from 'next/server';
+import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
-// Import database connection and User model
-import { connectToDatabase } from '../../../lib/mongodb.js';
-import User from '../../../lib/models/User.js';
+// MongoDB connection
+let isConnected = false;
+
+const connectToDatabase = async () => {
+  if (isConnected) {
+    return;
+  }
+
+  try {
+    const mongoUri = process.env.MONGODB_URI || 'mongodb+srv://quinton:1307@cluster0.cyjo4zp.mongodb.net/attendance_system?retryWrites=true&w=majority&appName=Cluster0';
+    
+    await mongoose.connect(mongoUri, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
+    });
+    
+    isConnected = true;
+    console.log('✅ Connected to MongoDB Atlas');
+  } catch (error) {
+    console.error('❌ MongoDB connection error:', error);
+    throw error;
+  }
+};
+
+// User Schema
+const userSchema = new mongoose.Schema({
+  name: { type: String, required: true, trim: true },
+  email: { type: String, required: true, unique: true, lowercase: true },
+  password: { type: String, required: true, select: false },
+  profilePicture: { type: String, default: null },
+  role: { type: String, enum: ['student', 'admin'], default: 'student' },
+  isActive: { type: Boolean, default: true },
+  lastLogin: { type: Date, default: null },
+  createdAt: { type: Date, default: Date.now }
+}, { timestamps: true });
+
+// Prevent re-compilation during development
+const User = mongoose.models.User || mongoose.model('User', userSchema);
 
 export async function POST(request) {
   try {
