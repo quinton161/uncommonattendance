@@ -35,8 +35,9 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Connect to MongoDB
 if (!mongoose.connection.readyState) {
-  mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/attendance_system')
-    .then(() => console.log('✅ Connected to MongoDB'))
+  const mongoUri = process.env.MONGODB_URI || 'mongodb+srv://quinton:1307@cluster0.cyjo4zp.mongodb.net/attendance_system?retryWrites=true&w=majority&appName=Cluster0';
+  mongoose.connect(mongoUri)
+    .then(() => console.log('✅ Connected to MongoDB Atlas'))
     .catch((error) => console.error('❌ MongoDB connection error:', error));
 }
 
