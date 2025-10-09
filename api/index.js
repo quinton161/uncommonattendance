@@ -33,13 +33,35 @@ app.use(limiter);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Connect to MongoDB
-if (!mongoose.connection.readyState) {
-  const mongoUri = process.env.MONGODB_URI || 'mongodb+srv://quinton:1307@cluster0.cyjo4zp.mongodb.net/attendance_system?retryWrites=true&w=majority&appName=Cluster0';
-  mongoose.connect(mongoUri)
-    .then(() => console.log('✅ Connected to MongoDB Atlas'))
-    .catch((error) => console.error('❌ MongoDB connection error:', error));
-}
+// MongoDB connection with better error handling
+let isConnected = false;
+
+const connectToDatabase = async () => {
+  if (isConnected) {
+    return;
+  }
+
+  try {
+    const mongoUri = process.env.MONGODB_URI || 'mongodb+srv://quinton:1307@cluster0.cyjo4zp.mongodb.net/attendance_system?retryWrites=true&w=majority&appName=Cluster0';
+    
+    console.log('🔄 Attempting to connect to MongoDB...');
+    console.log('📍 MongoDB URI:', mongoUri.replace(/\/\/([^:]+):([^@]+)@/, '//***:***@')); // Hide credentials in logs
+    
+    await mongoose.connect(mongoUri, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+      serverSelectionTimeoutMS: 5000, // Timeout after 5s instead of 30s
+      socketTimeoutMS: 45000, // Close sockets after 45s of inactivity
+    });
+    
+    isConnected = true;
+    console.log('✅ Connected to MongoDB Atlas successfully');
+  } catch (error) {
+    console.error('❌ MongoDB connection error:', error.message);
+    console.error('🔍 Full error:', error);
+    throw error;
+  }
+};
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -47,13 +69,38 @@ app.use('/api/attendance', attendanceRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/user', userRoutes);
 
-// Health check endpoint
-app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'OK', 
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime()
-  });
+// Health check endpoint with database connection test
+app.get('/api/health', async (req, res) => {
+  try {
+    await connectToDatabase();
+    res.json({ 
+      status: 'OK', 
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      database: 'Connected'
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'ERROR',
+      timestamp: new Date().toISOString(),
+      database: 'Disconnected',
+      error: error.message
+    });
+  }
+});
+
+// Middleware to ensure database connection for all API routes
+app.use('/api/*', async (req, res, next) => {
+  try {
+    await connectToDatabase();
+    next();
+  } catch (error) {
+    console.error('Database connection failed:', error);
+    res.status(500).json({
+      message: 'Database connection failed',
+      error: error.message
+    });
+  }
 });
 
 // Error handling middleware
