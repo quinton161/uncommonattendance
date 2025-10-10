@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Calendar, Clock, MapPin, ChevronLeft, ChevronRight } from 'lucide-react';
 import InlineSpinner from '@/components/ui/InlineSpinner';
@@ -39,11 +39,7 @@ export default function AttendanceHistory() {
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
 
-  useEffect(() => {
-    fetchAttendanceHistory(currentPage);
-  }, [currentPage, token]);
-
-  const fetchAttendanceHistory = async (page: number) => {
+  const fetchAttendanceHistory = useCallback(async (page: number) => {
     try {
       setLoading(true);
       const response = await fetch(
@@ -65,7 +61,11 @@ export default function AttendanceHistory() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
+
+  useEffect(() => {
+    fetchAttendanceHistory(currentPage);
+  }, [currentPage, fetchAttendanceHistory]);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {

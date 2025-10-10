@@ -2,7 +2,7 @@
 
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import InlineSpinner from '@/components/ui/InlineSpinner';
 import StudentNavbar from '@/components/student/StudentNavbar';
 import AttendanceCard from '@/components/student/AttendanceCard';
@@ -25,18 +25,7 @@ export default function StudentDashboard() {
   const [attendanceStatus, setAttendanceStatus] = useState<AttendanceStatus | null>(null);
   const [isLoadingStatus, setIsLoadingStatus] = useState(true);
 
-  useEffect(() => {
-    if (!loading && (!user || user.role !== 'student')) {
-      router.push('/auth/login');
-      return;
-    }
-
-    if (user && token) {
-      fetchAttendanceStatus();
-    }
-  }, [user, loading, token, router]);
-
-  const fetchAttendanceStatus = async () => {
+  const fetchAttendanceStatus = useCallback(async () => {
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'}/attendance/status`, {
         headers: {
@@ -54,7 +43,18 @@ export default function StudentDashboard() {
     } finally {
       setIsLoadingStatus(false);
     }
-  };
+  }, [token]);
+
+  useEffect(() => {
+    if (!loading && (!user || user.role !== 'student')) {
+      router.push('/auth/login');
+      return;
+    }
+
+    if (user && token) {
+      fetchAttendanceStatus();
+    }
+  }, [user, loading, token, router, fetchAttendanceStatus]);
 
   const handleAttendanceUpdate = () => {
     fetchAttendanceStatus();

@@ -2,7 +2,7 @@
 
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import InlineSpinner from '@/components/ui/InlineSpinner';
 import AdminNavbar from '@/components/admin/AdminNavbar';
 import StatsCards from '@/components/admin/StatsCards';
@@ -32,18 +32,7 @@ export default function AdminDashboard() {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [isLoadingData, setIsLoadingData] = useState(true);
 
-  useEffect(() => {
-    if (!loading && (!user || user.role !== 'admin')) {
-      router.push('/auth/login');
-      return;
-    }
-
-    if (user && token) {
-      fetchDashboardData();
-    }
-  }, [user, loading, token, router]);
-
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async () => {
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'}/admin/dashboard`, {
         headers: {
@@ -61,7 +50,18 @@ export default function AdminDashboard() {
     } finally {
       setIsLoadingData(false);
     }
-  };
+  }, [token]);
+
+  useEffect(() => {
+    if (!loading && (!user || user.role !== 'admin')) {
+      router.push('/auth/login');
+      return;
+    }
+
+    if (user && token) {
+      fetchDashboardData();
+    }
+  }, [user, loading, token, router, fetchDashboardData]);
 
   if (loading || isLoadingData) {
     return (

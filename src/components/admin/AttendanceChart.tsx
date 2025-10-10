@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend } from 'recharts';
 import { Calendar, TrendingUp } from 'lucide-react';
@@ -20,13 +20,7 @@ export default function AttendanceChart() {
   const [error, setError] = useState<string | null>(null);
   const [chartType, setChartType] = useState<'bar' | 'line'>('bar');
 
-  useEffect(() => {
-    if (token) {
-      fetchChartData();
-    }
-  }, [token]);
-
-  const fetchChartData = async () => {
+  const fetchChartData = useCallback(async () => {
     try {
       setError(null);
       // Get last 14 days of data to ensure we capture 5 weekdays
@@ -61,7 +55,13 @@ export default function AttendanceChart() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
+
+  useEffect(() => {
+    if (token) {
+      fetchChartData();
+    }
+  }, [token, fetchChartData]);
 
   const processChartData = (attendanceData: any[]) => {
     // Group data by date

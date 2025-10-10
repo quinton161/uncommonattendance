@@ -2,7 +2,7 @@
 
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import AdminNavbar from '@/components/admin/AdminNavbar';
 import InlineSpinner from '@/components/ui/InlineSpinner';
 import { Calendar, Download, Filter, MapPin, Clock, User } from 'lucide-react';
@@ -37,18 +37,7 @@ export default function AttendancePage() {
     userId: ''
   });
 
-  useEffect(() => {
-    if (!loading && (!user || user.role !== 'admin')) {
-      router.push('/auth/login');
-      return;
-    }
-
-    if (user && token) {
-      fetchAttendance();
-    }
-  }, [user, loading, token, router, filters]);
-
-  const fetchAttendance = async () => {
+  const fetchAttendance = useCallback(async () => {
     try {
       const params = new URLSearchParams();
       if (filters.startDate) params.append('startDate', filters.startDate);
@@ -75,7 +64,18 @@ export default function AttendancePage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [filters, token]);
+
+  useEffect(() => {
+    if (!loading && (!user || user.role !== 'admin')) {
+      router.push('/auth/login');
+      return;
+    }
+
+    if (user && token) {
+      fetchAttendance();
+    }
+  }, [user, loading, token, router, fetchAttendance]);
 
   const handleExport = async () => {
     try {

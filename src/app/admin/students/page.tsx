@@ -2,7 +2,7 @@
 
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import AdminNavbar from '@/components/admin/AdminNavbar';
 import StudentManagement from '@/components/admin/StudentManagement';
 import InlineSpinner from '@/components/ui/InlineSpinner';
@@ -30,18 +30,7 @@ export default function StudentsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterActive, setFilterActive] = useState<boolean | null>(null);
 
-  useEffect(() => {
-    if (!loading && (!user || user.role !== 'admin')) {
-      router.push('/auth/login');
-      return;
-    }
-
-    if (user && token) {
-      fetchStudents();
-    }
-  }, [user, loading, token, router, searchTerm, filterActive]);
-
-  const fetchStudents = async () => {
+  const fetchStudents = useCallback(async () => {
     try {
       const params = new URLSearchParams();
       if (searchTerm) params.append('search', searchTerm);
@@ -66,7 +55,18 @@ export default function StudentsPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [searchTerm, filterActive, token]);
+
+  useEffect(() => {
+    if (!loading && (!user || user.role !== 'admin')) {
+      router.push('/auth/login');
+      return;
+    }
+
+    if (user && token) {
+      fetchStudents();
+    }
+  }, [user, loading, token, router, fetchStudents]);
 
   if (loading) {
     return (

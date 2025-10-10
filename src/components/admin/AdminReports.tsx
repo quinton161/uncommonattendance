@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { toast } from 'react-toastify';
 import { 
   BarChart, 
@@ -83,11 +83,7 @@ export default function AdminReports({ token }: AdminReportsProps) {
 
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
-  useEffect(() => {
-    fetchReportsData();
-  }, [startDate, endDate]);
-
-  const fetchReportsData = async () => {
+  const fetchReportsData = useCallback(async () => {
     try {
       setIsLoading(true);
       const params = new URLSearchParams({
@@ -126,7 +122,11 @@ export default function AdminReports({ token }: AdminReportsProps) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [startDate, endDate, token]);
+
+  useEffect(() => {
+    fetchReportsData();
+  }, [fetchReportsData]);
 
   const exportAttendanceData = async (format: 'csv' | 'json') => {
     try {
