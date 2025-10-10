@@ -1,3 +1,11 @@
 {
-  "version": 2
+  "version": 2,
+  "env": {
+    "NEXT_PUBLIC_API_URL": "https://uncommonattendance-backend.onrender.com/api"
+  },
+  "build": {
+    "env": {
+      "NEXT_PUBLIC_API_URL": "https://uncommonattendance-backend.onrender.com/api"
+    }
+  }
 }
