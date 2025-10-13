@@ -10,7 +10,7 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "cloudinary": "^2.2.0",
+    "cloudinary": "^1.21.0",
     "multer-storage-cloudinary": "^4.0.0",
     "@vendia/serverless-express": "^4.10.3",
     "bcryptjs": "^2.4.3",
