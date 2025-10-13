@@ -49,8 +49,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const savedToken = localStorage.getItem('token');
         if (savedToken) {
+          // Removed automatic user profile fetch
+          // setToken(savedToken);
+          // await fetchUserProfile(savedToken);
+          // If a token is saved, just set it, but don't auto-fetch user. 
+          // User will be null, requiring explicit login.
           setToken(savedToken);
-          await fetchUserProfile(savedToken);
         }
       } catch (error) {
         console.error('Auth initialization error:', error);
@@ -80,6 +84,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     } catch (error) {
       console.error('Fetch user profile error:', error);
+      // If token is invalid/expired, remove it
+      localStorage.removeItem('token');
+      setToken(null);
+      setUser(null);
       throw error;
     }
   };
@@ -107,6 +115,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(userData);
         localStorage.setItem('token', authToken);
         toast.success('Login successful!');
+        // After successful login, explicitly fetch the user profile to ensure state is consistent
+        await fetchUserProfile(authToken);
       } else {
         console.error('Login failed:', data);
         throw new Error(data.message || 'Login failed');
