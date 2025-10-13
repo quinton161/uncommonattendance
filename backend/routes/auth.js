@@ -2,27 +2,29 @@ const express = require('express');
 const jwt = require('jsonwebtoken');
 const { body, validationResult } = require('express-validator');
 const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
+const { CloudinaryStorage } = require('multer-storage-cloudinary');
+const cloudinary = require('cloudinary').v2;
 
 const User = require('../models/User');
 const { auth } = require('../middleware/auth');
 
 const router = express.Router();
 
-// Configure multer for profile picture uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadPath = 'uploads/profiles';
-    if (!fs.existsSync(uploadPath)) {
-      fs.mkdirSync(uploadPath, { recursive: true });
-    }
-    cb(null, uploadPath);
+// Configure Cloudinary
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+// Configure multer-storage-cloudinary for profile picture uploads
+const storage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: 'uncommon-attendance/profiles',
+    format: async (req, file) => 'png', // supports promises as well
+    public_id: (req, file) => `profile-${Date.now()}-${Math.round(Math.random() * 1E9)}`,
   },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, 'profile-' + uniqueSuffix + path.extname(file.originalname));
-  }
 });
 
 const upload = multer({
@@ -32,7 +34,7 @@ const upload = multer({
   },
   fileFilter: (req, file, cb) => {
     const allowedTypes = /jpeg|jpg|png|gif/;
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const extname = allowedTypes.test(file.originalname.toLowerCase());
     const mimetype = allowedTypes.test(file.mimetype);
 
     if (mimetype && extname) {
@@ -101,9 +103,9 @@ router.post('/register',
         role
       };
 
-      // Add profile picture if uploaded
-      if (req.file) {
-        userData.profilePicture = `/uploads/profiles/${req.file.filename}`;
+      // Add profile picture if uploaded to Cloudinary
+      if (req.file && req.file.path) {
+        userData.profilePicture = req.file.path; // Cloudinary URL
       }
 
       // Create new user
@@ -280,16 +282,14 @@ router.put('/profile',
       // Update fields
       if (req.body.name) user.name = req.body.name;
       
-      // Update profile picture if uploaded
-      if (req.file) {
-        // Delete old profile picture if exists
-        if (user.profilePicture) {
-          const oldPath = path.join(__dirname, '..', user.profilePicture);
-          if (fs.existsSync(oldPath)) {
-            fs.unlinkSync(oldPath);
-          }
-        }
-        user.profilePicture = `/uploads/profiles/${req.file.filename}`;
+      // Update profile picture if uploaded to Cloudinary
+      if (req.file && req.file.path) {
+        // Optional: Delete old image from Cloudinary
+        // if (user.profilePicture) {
+        //   const publicId = user.profilePicture.split('/').pop().split('.')[0];
+        //   await cloudinary.uploader.destroy(`uncommon-attendance/profiles/${publicId}`);
+        // }
+        user.profilePicture = req.file.path; // Cloudinary URL
       }
 
       await user.save();

@@ -28,7 +28,7 @@ app.use(cors({
     const allowedOrigins = [
       'http://localhost:3000',
       'http://localhost:3001',
-      process.env.CORS_ORIGIN,
+      ...(process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',').map(s => s.trim()) : []),
       process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined
     ].filter(Boolean);
     if (!origin || allowedOrigins.includes(origin)) {
@@ -44,9 +44,6 @@ app.use(limiter);
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-
-// Static files (note: not persistent on serverless)
-app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/attendance', attendanceRoutes);

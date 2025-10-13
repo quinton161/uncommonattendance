@@ -203,6 +203,11 @@ This repository is configured to deploy both the frontend and backend to Vercel.
 3. Get connection string
 4. Update `MONGODB_URI` in backend environment
 
+### Cloudinary (for image uploads)
+1. Create a Cloudinary account
+2. Go to your Dashboard and get your API Environment variables
+3. Update `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` in your Vercel environment variables
+
 ## 🤝 Contributing
 
 1. Fork the repository
