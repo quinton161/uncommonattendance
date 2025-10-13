@@ -2,14 +2,16 @@
 const nextConfig = {
   images: {
     remotePatterns: [
-      { hostname: "images.pexels.com" },
-      { hostname: "localhost" },
+      {
+        protocol: 'https',
+        hostname: "images.pexels.com"
+      },
+      {
+        protocol: 'http',
+        hostname: "localhost"
+      },
     ],
   },
-  // Optimize for production
-  swcMinify: true,
-  // Remove experimental features that cause build issues
-  experimental: {},
 };
 
 export default nextConfig;
