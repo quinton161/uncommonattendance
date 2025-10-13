@@ -3,17 +3,13 @@ export const API_CONFIG = {
   // Prefer explicit env; else use localhost in development; else production backend
   BASE_URL:
     process.env.NEXT_PUBLIC_API_URL ||
-    (process.env.NODE_ENV !== 'production'
-      ? 'http://localhost:5000/api'
-      : 'https://uncommonattendance-backend.onrender.com/api'),
+    (process.env.NODE_ENV !== 'production' ? 'http://localhost:5000/api' : '/api'),
   
   // Helper function to get full API URL
   getApiUrl: (endpoint: string) => {
     const baseUrl =
       process.env.NEXT_PUBLIC_API_URL ||
-      (process.env.NODE_ENV !== 'production'
-        ? 'http://localhost:5000/api'
-        : 'https://uncommonattendance-backend.onrender.com/api');
+      (process.env.NODE_ENV !== 'production' ? 'http://localhost:5000/api' : '/api');
     return `${baseUrl}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
   },
   
@@ -21,9 +17,7 @@ export const API_CONFIG = {
   getAssetUrl: (path: string) => {
     const baseUrl =
       process.env.NEXT_PUBLIC_API_URL ||
-      (process.env.NODE_ENV !== 'production'
-        ? 'http://localhost:5000'
-        : 'https://uncommonattendance-backend.onrender.com');
+      (process.env.NODE_ENV !== 'production' ? 'http://localhost:5000' : '/');
     // Remove /api from base URL for assets
     const assetBaseUrl = baseUrl.replace('/api', '');
     return `${assetBaseUrl}${path.startsWith('/') ? path : `/${path}`}`;

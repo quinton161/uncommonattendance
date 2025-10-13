@@ -180,17 +180,22 @@ For testing purposes, you can create accounts or use these demo credentials:
 
 ## 📦 Deployment
 
-### Backend Deployment (Render/Railway)
-1. Create account on Render or Railway
-2. Connect your GitHub repository
-3. Set environment variables
-4. Deploy the backend folder
+### Vercel (Next.js + Serverless API)
+This repository is configured to deploy both the frontend and backend to Vercel.
 
-### Frontend Deployment (Vercel)
-1. Create account on Vercel
-2. Connect your GitHub repository
-3. Set `NEXT_PUBLIC_API_URL` environment variable
-4. Deploy
+1) Environment Variables (Vercel Project → Settings → Environment Variables):
+   - `MONGODB_URI`
+   - `JWT_SECRET`
+   - `CORS_ORIGIN` (optional; e.g., https://your-project.vercel.app)
+
+2) Routing/Build:
+   - Serverless API at `/api/*` handled by `api/index.js`
+   - Next.js app at root; `vercel.json` wires routes automatically
+   - Vercel uses `npm run vercel-build` (alias of `next build`)
+
+3) Notes:
+   - Files under `/uploads` are not persistent on serverless. Use cloud storage in production.
+   - Frontend defaults to calling relative `/api` in production. Override with `NEXT_PUBLIC_API_URL` if needed.
 
 ### Database (MongoDB Atlas)
 1. Create MongoDB Atlas account
