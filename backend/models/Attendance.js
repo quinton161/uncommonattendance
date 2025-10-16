@@ -1,20 +1,5 @@
 const mongoose = require('mongoose');
 
-const locationSchema = new mongoose.Schema({
-  lat: {
-    type: Number,
-    required: true,
-    min: [-90, 'Latitude must be between -90 and 90'],
-    max: [90, 'Latitude must be between -90 and 90']
-  },
-  lng: {
-    type: Number,
-    required: true,
-    min: [-180, 'Longitude must be between -180 and 180'],
-    max: [180, 'Longitude must be between -180 and 180']
-  }
-}, { _id: false });
-
 const attendanceSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -23,40 +8,45 @@ const attendanceSchema = new mongoose.Schema({
   },
   date: {
     type: String, // Format: YYYY-MM-DD
-    required: [true, 'Date is required'],
-    match: [/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format']
+    required: [true, 'Date is required']
   },
   checkInTime: {
     type: String, // Format: HH:MM
-    required: [true, 'Check-in time is required'],
-    match: [/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, 'Check-in time must be in HH:MM format']
+    default: null
   },
   checkOutTime: {
     type: String, // Format: HH:MM
-    default: null,
-    match: [/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, 'Check-out time must be in HH:MM format']
+    default: null
   },
   checkInLocation: {
-    type: locationSchema,
-    required: [true, 'Check-in location is required']
+    lat: {
+      type: Number,
+      default: null
+    },
+    lng: {
+      type: Number,
+      default: null
+    }
   },
   checkOutLocation: {
-    type: locationSchema,
-    default: null
+    lat: {
+      type: Number,
+      default: null
+    },
+    lng: {
+      type: Number,
+      default: null
+    }
   },
   status: {
     type: String,
-    enum: ['checked-in', 'checked-out'],
-    default: 'checked-in'
-  },
-  isLate: {
-    type: Boolean,
-    default: false
+    enum: ['checked-in', 'checked-out', 'absent'],
+    default: 'absent'
   },
   notes: {
     type: String,
-    maxlength: [500, 'Notes cannot exceed 500 characters'],
-    default: ''
+    default: null,
+    maxlength: [500, 'Notes cannot exceed 500 characters']
   },
   createdAt: {
     type: Date,
@@ -66,64 +56,71 @@ const attendanceSchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   }
-}, {
-  timestamps: true
 });
 
 // Compound index to ensure one attendance record per user per date
 attendanceSchema.index({ userId: 1, date: 1 }, { unique: true });
 
-// Index for better query performance
-attendanceSchema.index({ date: 1 });
-attendanceSchema.index({ status: 1 });
-attendanceSchema.index({ createdAt: -1 });
-
-// Virtual for total hours (if both check-in and check-out exist)
-attendanceSchema.virtual('totalHours').get(function() {
-  if (!this.checkOutTime) return null;
-  
-  const checkIn = new Date(`1970-01-01T${this.checkInTime}:00`);
-  const checkOut = new Date(`1970-01-01T${this.checkOutTime}:00`);
-  
-  // Handle case where checkout is next day
-  if (checkOut < checkIn) {
-    checkOut.setDate(checkOut.getDate() + 1);
-  }
-  
-  const diffMs = checkOut - checkIn;
-  const diffHours = diffMs / (1000 * 60 * 60);
-  
-  return Math.round(diffHours * 100) / 100; // Round to 2 decimal places
-});
-
-// Static method to get today's attendance
-attendanceSchema.statics.getTodayAttendance = function() {
-  const today = new Date().toISOString().split('T')[0];
-  return this.find({ date: today }).populate('userId', 'name email profilePicture');
-};
-
-// Static method to get currently checked-in users
-attendanceSchema.statics.getCurrentlyCheckedIn = function() {
-  const today = new Date().toISOString().split('T')[0];
-  return this.find({ 
-    date: today, 
-    status: 'checked-in' 
-  }).populate('userId', 'name email profilePicture');
-};
-
-// Instance method to check out
-attendanceSchema.methods.checkOut = function(location, time) {
-  this.checkOutTime = time || new Date().toTimeString().slice(0, 5);
-  this.checkOutLocation = location;
-  this.status = 'checked-out';
-  this.updatedAt = new Date();
-  return this.save();
-};
-
-// Pre-save middleware to update timestamp
+// Update the updatedAt field before saving
 attendanceSchema.pre('save', function(next) {
-  this.updatedAt = new Date();
+  this.updatedAt = Date.now();
   next();
 });
 
-module.exports = mongoose.model('Attendance', attendanceSchema);
+// Static method to find attendance by user and date
+attendanceSchema.statics.findByUserAndDate = function(userId, date) {
+  return this.findOne({ userId, date });
+};
+
+// Static method to get attendance stats for a user
+attendanceSchema.statics.getStatsForUser = async function(userId) {
+  const stats = await this.aggregate([
+    { $match: { userId: new mongoose.Types.ObjectId(userId) } },
+    {
+      $group: {
+        _id: null,
+        totalDays: { $sum: 1 },
+        presentDays: {
+          $sum: {
+            $cond: [{ $ne: ['$status', 'absent'] }, 1, 0]
+          }
+        },
+        absentDays: {
+          $sum: {
+            $cond: [{ $eq: ['$status', 'absent'] }, 1, 0]
+          }
+        }
+      }
+    }
+  ]);
+
+  if (stats.length === 0) {
+    return { totalDays: 0, presentDays: 0, absentDays: 0, attendanceRate: 0 };
+  }
+
+  const result = stats[0];
+  result.attendanceRate = result.totalDays > 0 
+    ? Math.round((result.presentDays / result.totalDays) * 100) 
+    : 0;
+
+  return result;
+};
+
+const Attendance = mongoose.model('Attendance', attendanceSchema);
+
+module.exports = Attendance;
+
+// Additional static helpers used by admin routes
+Attendance.getTodayAttendance = async function() {
+  const today = new Date().toISOString().split('T')[0];
+  return this.find({ date: today, status: { $ne: 'absent' } })
+    .populate('userId', 'name email profilePicture role')
+    .sort({ createdAt: -1 });
+};
+
+Attendance.getCurrentlyCheckedIn = async function() {
+  const today = new Date().toISOString().split('T')[0];
+  return this.find({ date: today, status: 'checked-in' })
+    .populate('userId', 'name email profilePicture role')
+    .sort({ createdAt: -1 });
+};

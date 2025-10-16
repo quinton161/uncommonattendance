@@ -1,9 +1,31 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
 const User = require('../models/User');
-const { auth, adminAuth } = require('../middleware/auth');
+const Attendance = require('../models/Attendance');
+const { auth, adminAuth, studentAuth } = require('../middleware/auth');
 
 const router = express.Router();
+
+// @route   GET /api/user/stats
+// @desc    Get attendance statistics for logged-in user
+// @access  Private (Student)
+router.get('/stats', auth, studentAuth, async (req, res) => {
+  try {
+    const stats = await Attendance.getStatsForUser(req.user.userId);
+    
+    res.json({
+      success: true,
+      data: stats
+    });
+  } catch (error) {
+    console.error('Get user stats error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get user statistics',
+      error: error.message
+    });
+  }
+});
 
 // @route   PUT /api/user/:id/status
 // @desc    Update user active status (admin only)

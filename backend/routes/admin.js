@@ -1,5 +1,5 @@
 const express = require('express');
-const { query, validationResult } = require('express-validator');
+const { query, param, validationResult } = require('express-validator');
 const Attendance = require('../models/Attendance');
 const User = require('../models/User');
 const { auth, adminAuth } = require('../middleware/auth');
@@ -388,11 +388,21 @@ router.get('/attendance/export', [
 router.put('/students/:id', [
   auth,
   adminAuth,
-  query('id')
+  param('id')
     .isMongoId()
     .withMessage('Student ID must be a valid MongoDB ObjectId')
 ], async (req, res) => {
   try {
+    // Check for validation errors
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: errors.array()
+      });
+    }
+
     const { id } = req.params;
     const { name, email, isActive } = req.body;
 
@@ -450,11 +460,21 @@ router.put('/students/:id', [
 router.delete('/students/:id', [
   auth,
   adminAuth,
-  query('id')
+  param('id')
     .isMongoId()
     .withMessage('Student ID must be a valid MongoDB ObjectId')
 ], async (req, res) => {
   try {
+    // Check for validation errors
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: errors.array()
+      });
+    }
+
     const { id } = req.params;
     const { permanent = false } = req.query;
 

@@ -124,7 +124,7 @@ router.post('/register',
         message: 'User registered successfully',
         data: {
           token,
-          user: user.getPublicProfile()
+          user: user.toJSON()
         }
       });
 
@@ -202,7 +202,7 @@ router.post('/login', [
       message: 'Login successful',
       data: {
         token,
-        user: user.getPublicProfile()
+        user: user.toJSON()
       }
     });
 
@@ -232,7 +232,7 @@ router.get('/me', auth, async (req, res) => {
     res.json({
       success: true,
       data: {
-        user: user.getPublicProfile()
+        user: user.toJSON()
       }
     });
 
@@ -298,7 +298,7 @@ router.put('/profile',
         success: true,
         message: 'Profile updated successfully',
         data: {
-          user: user.getPublicProfile()
+          user: user.toJSON()
         }
       });
 

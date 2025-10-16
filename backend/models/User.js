@@ -13,22 +13,23 @@ const userSchema = new mongoose.Schema({
     required: [true, 'Email is required'],
     unique: true,
     lowercase: true,
+    trim: true,
     match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Please enter a valid email']
   },
   password: {
     type: String,
     required: [true, 'Password is required'],
-    minlength: [6, 'Password must be at least 6 characters'],
+    minlength: [6, 'Password must be at least 6 characters long'],
     select: false // Don't include password in queries by default
-  },
-  profilePicture: {
-    type: String,
-    default: null
   },
   role: {
     type: String,
     enum: ['student', 'admin'],
     default: 'student'
+  },
+  profilePicture: {
+    type: String,
+    default: null
   },
   isActive: {
     type: Boolean,
@@ -46,12 +47,7 @@ const userSchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   }
-}, {
-  timestamps: true
 });
-
-// Index for better query performance (email index is already created by unique: true)
-userSchema.index({ role: 1 });
 
 // Hash password before saving
 userSchema.pre('save', async function(next) {
@@ -68,21 +64,29 @@ userSchema.pre('save', async function(next) {
   }
 });
 
+// Update the updatedAt field before saving
+userSchema.pre('save', function(next) {
+  this.updatedAt = Date.now();
+  next();
+});
+
 // Instance method to check password
 userSchema.methods.comparePassword = async function(candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
 };
 
-// Instance method to get public profile
-userSchema.methods.getPublicProfile = function() {
+// Instance method to get user without password
+userSchema.methods.toJSON = function() {
   const userObject = this.toObject();
   delete userObject.password;
   return userObject;
 };
 
-// Static method to find active users
-userSchema.statics.findActive = function() {
-  return this.find({ isActive: true });
+// Static method to find user by email with password
+userSchema.statics.findByEmailWithPassword = function(email) {
+  return this.findOne({ email }).select('+password');
 };
 
-module.exports = mongoose.model('User', userSchema);
+const User = mongoose.model('User', userSchema);
+
+module.exports = User;

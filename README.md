@@ -1,6 +1,6 @@
 # 🎯 Uncommon Attendance System
 
-A modern, full-stack attendance tracking system built with Next.js, Node.js, Express, and MongoDB. Features real-time check-in/out with GPS location tracking, role-based dashboards, and comprehensive attendance analytics.
+A modern, full-stack attendance tracking system built with React, Node.js, Express, and MongoDB. Features real-time check-in/out with GPS location tracking, role-based dashboards, and comprehensive attendance analytics.
 
 ## ✨ Features
 
@@ -28,8 +28,9 @@ A modern, full-stack attendance tracking system built with Next.js, Node.js, Exp
 ## 🛠️ Tech Stack
 
 ### Frontend
-- **Next.js 14** - React framework with App Router
-- **TypeScript** - Type-safe development
+- **React 18** - JavaScript library for building user interfaces
+- **Create React App** - React development environment
+- **React Router** - Client-side routing
 - **Tailwind CSS** - Utility-first CSS framework
 - **Lucide React** - Beautiful icons
 - **Recharts** - Data visualization
@@ -58,10 +59,15 @@ git clone <repository-url>
 cd uncommonattendance
 ```
 
-### 2. Backend Setup
+### 2. Install All Dependencies
+```bash
+# Install all dependencies for root, backend, and client
+npm run install-all
+```
+
+### 3. Backend Setup
 ```bash
 cd backend
-npm install
 
 # Create environment file
 cp .env.example .env
@@ -70,24 +76,30 @@ cp .env.example .env
 # MONGODB_URI=mongodb://localhost:27017/attendance_system
 # JWT_SECRET=your_super_secret_jwt_key
 # PORT=5000
-
-# Start the backend server
-npm run dev
 ```
 
-### 3. Frontend Setup
+### 4. Client Setup
 ```bash
-# In the root directory
-npm install
+cd client
 
-# Create environment file
-echo "NEXT_PUBLIC_API_URL=http://localhost:5000/api" > .env.local
-
-# Start the frontend
-npm run dev
+# Create environment file (optional - defaults to localhost:5000)
+echo "REACT_APP_API_URL=http://localhost:5000/api" > .env
 ```
 
-### 4. Access the Application
+### 5. Start the Application
+```bash
+# Option 1: Start both frontend and backend together (from root)
+npm run dev
+
+# Option 2: Start separately
+# Terminal 1 - Backend
+npm run server
+
+# Terminal 2 - Frontend  
+npm run client
+```
+
+### 6. Access the Application
 - **Frontend**: [http://localhost:3000](http://localhost:3000)
 - **Backend API**: [http://localhost:5000](http://localhost:5000)
 
@@ -180,22 +192,60 @@ For testing purposes, you can create accounts or use these demo credentials:
 
 ## 📦 Deployment
 
-### Vercel (Next.js + Serverless API)
-This repository is configured to deploy both the frontend and backend to Vercel.
+### Frontend Deployment (React on Netlify/Vercel)
 
-1) Environment Variables (Vercel Project → Settings → Environment Variables):
+#### Option 1: Netlify
+1. Build the React app:
+   ```bash
+   cd client
+   npm run build
+   ```
+
+2. Deploy to Netlify:
+   - Connect your GitHub repository to Netlify
+   - Set build command: `cd client && npm run build`
+   - Set publish directory: `client/build`
+   - Add environment variable: `REACT_APP_API_URL=https://your-backend-url.com/api`
+
+#### Option 2: Vercel
+1. Install Vercel CLI: `npm i -g vercel`
+2. Deploy from client directory:
+   ```bash
+   cd client
+   vercel --prod
+   ```
+3. Set environment variable in Vercel dashboard: `REACT_APP_API_URL`
+
+### Backend Deployment (Express on Railway/Render)
+
+#### Option 1: Railway
+1. Install Railway CLI: `npm i -g @railway/cli`
+2. Deploy from backend directory:
+   ```bash
+   cd backend
+   railway login
+   railway init
+   railway up
+   ```
+3. Add environment variables in Railway dashboard:
    - `MONGODB_URI`
    - `JWT_SECRET`
-   - `CORS_ORIGIN` (optional; e.g., https://your-project.vercel.app)
+   - `PORT` (Railway sets this automatically)
+   - `CORS_ORIGIN` (your frontend URL)
 
-2) Routing/Build:
-   - Serverless API at `/api/*` handled by `api/index.js`
-   - Next.js app at root; `vercel.json` wires routes automatically
-   - Vercel uses `npm run vercel-build` (alias of `next build`)
+#### Option 2: Render
+1. Connect your GitHub repository to Render
+2. Create a new Web Service
+3. Set build command: `cd backend && npm install`
+4. Set start command: `cd backend && npm start`
+5. Add environment variables in Render dashboard
 
-3) Notes:
-   - Files under `/uploads` are not persistent on serverless. Use cloud storage in production.
-   - Frontend defaults to calling relative `/api` in production. Override with `NEXT_PUBLIC_API_URL` if needed.
+### Full-Stack Deployment Notes
+- Frontend and backend are deployed separately
+- Update `REACT_APP_API_URL` in frontend to point to deployed backend
+- Update `CORS_ORIGIN` in backend to allow requests from deployed frontend
+- Use MongoDB Atlas for production database
+- Consider using Cloudinary for file uploads in production
 
 ### Database (MongoDB Atlas)
 1. Create MongoDB Atlas account

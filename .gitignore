@@ -2,6 +2,7 @@
 
 # dependencies
 /node_modules
+/client/node_modules
 /backend/node_modules
 /.pnp
 .pnp.js
@@ -9,13 +10,11 @@
 
 # testing
 /coverage
+/client/coverage
 
-# next.js
-/.next/
-/out/
-
-# production
-/build
+# production builds
+/client/build
+/backend/dist
 
 # misc
 .DS_Store
@@ -29,14 +28,8 @@ yarn-error.log*
 # local env files
 .env*.local
 .env
+/client/.env
 /backend/.env
-
-# vercel
-.vercel
-
-# typescript
-*.tsbuildinfo
-next-env.d.ts
 
 # uploads
 /backend/uploads/
@@ -44,3 +37,10 @@ next-env.d.ts
 # logs
 logs
 *.log
+
+# IDE
+.vscode/settings.json
+.idea/
+
+# OS
+Thumbs.db
