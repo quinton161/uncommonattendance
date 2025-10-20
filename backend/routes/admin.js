@@ -587,6 +587,126 @@ router.post('/students/bulk-action', [
   }
 });
 
+// @route   GET /api/admin/attendance/late-today
+// @desc    Get students who arrived late today
+// @access  Private (Admin)
+router.get('/attendance/late-today', auth, adminAuth, async (req, res) => {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    
+    const lateStudents = await Attendance.find({
+      date: today,
+      isLate: true,
+      status: { $in: ['checked-in', 'checked-out'] }
+    })
+    .populate('userId', 'name email profilePicture')
+    .sort({ checkInTime: -1 });
+
+    res.json({
+      success: true,
+      data: {
+        late: lateStudents,
+        count: lateStudents.length,
+        date: today
+      }
+    });
+
+  } catch (error) {
+    console.error('Get late students error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get late students',
+      error: error.message
+    });
+  }
+});
+
+// @route   GET /api/admin/attendance/early-today
+// @desc    Get students who arrived early today
+// @access  Private (Admin)
+router.get('/attendance/early-today', auth, adminAuth, async (req, res) => {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    
+    // Students who checked in before 9:00 AM (not late)
+    const earlyStudents = await Attendance.find({
+      date: today,
+      isLate: false,
+      status: { $in: ['checked-in', 'checked-out'] }
+    })
+    .populate('userId', 'name email profilePicture')
+    .sort({ checkInTime: 1 });
+
+    res.json({
+      success: true,
+      data: {
+        early: earlyStudents,
+        count: earlyStudents.length,
+        date: today
+      }
+    });
+
+  } catch (error) {
+    console.error('Get early students error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get early students',
+      error: error.message
+    });
+  }
+});
+
+// @route   POST /api/admin/notifications/warn
+// @desc    Send warning notification to a student
+// @access  Private (Admin)
+router.post('/notifications/warn', auth, adminAuth, async (req, res) => {
+  try {
+    const { userId, message } = req.body;
+
+    if (!userId || !message) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID and message are required'
+      });
+    }
+
+    // Find the student
+    const student = await User.findOne({ _id: userId, role: 'student' });
+    if (!student) {
+      return res.status(404).json({
+        success: false,
+        message: 'Student not found'
+      });
+    }
+
+    // For now, we'll just log the warning since we don't have a notification system
+    // In a real app, you'd send an email, push notification, or store in a notifications collection
+    console.log(`Warning sent to ${student.name} (${student.email}): ${message}`);
+
+    res.json({
+      success: true,
+      message: `Warning sent to ${student.name}`,
+      data: {
+        recipient: {
+          id: student._id,
+          name: student.name,
+          email: student.email
+        },
+        message: message,
+        sentAt: new Date().toISOString()
+      }
+    });
+
+  } catch (error) {
+    console.error('Send warning error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to send warning',
+      error: error.message
+    });
+  }
+});
+
 // @route   GET /api/admin/reports/attendance-summary
 // @desc    Get attendance summary report
 // @access  Private (Admin)

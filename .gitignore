@@ -11,14 +11,20 @@
 # testing
 /coverage
 /client/coverage
+/backend/coverage
 
 # production builds
 /client/build
 /backend/dist
+/backend/build
 
 # misc
 .DS_Store
 *.pem
+.eslintcache
+*.tsbuildinfo
+.vercel/
+.npm
 
 # debug
 npm-debug.log*
@@ -39,8 +45,15 @@ logs
 *.log
 
 # IDE
-.vscode/settings.json
+.vscode/
 .idea/
+.fleet/
+*.iml
 
 # OS
 Thumbs.db
+desktop.ini
+
+# client/backend build caches
+/client/.cache
+/client/.parcel-cache

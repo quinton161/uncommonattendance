@@ -2,17 +2,32 @@
   "name": "uncommonattendance",
   "version": "1.0.0",
   "private": true,
+  "description": "React-based Student Attendance System with Node.js Backend",
+  "main": "client/src/index.js",
   "scripts": {
     "dev": "concurrently \"npm run server\" \"npm run client\"",
     "server": "cd backend && npm run dev",
     "client": "cd client && npm start",
-    "build": "cd client && npm run build",
+    "build": "cd client && npm run build && cd ../backend && npm install",
     "install-client": "cd client && npm install",
     "start": "cd backend && npm start",
     "install-all": "npm install && cd backend && npm install && cd ../client && npm install",
-    "postinstall": "cd client && npm install"
+    "postinstall": "cd backend && npm install && cd ../client && npm install"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
+  },
+  "dependencies": {
+    "mongodb": "^6.20.0"
+  },
+  "keywords": [
+    "react",
+    "attendance",
+    "student-management",
+    "nodejs",
+    "mongodb"
+  ],
+  "engines": {
+    "node": ">=16.0.0"
   }
 }

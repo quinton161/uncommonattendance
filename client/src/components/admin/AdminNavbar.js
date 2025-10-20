@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { toast } from 'react-toastify';
+import apiService from '../../services/api';
 import { 
   LayoutDashboard, 
   Users, 
@@ -18,7 +20,12 @@ import {
 export default function AdminNavbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const [lateStudents, setLateStudents] = useState([]);
+  const [loadingLate, setLoadingLate] = useState(false);
+  const [earlyStudents, setEarlyStudents] = useState([]);
   const { user, logout } = useAuth();
+  const { token } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -26,16 +33,51 @@ export default function AdminNavbar() {
   useEffect(() => {
     setIsOpen(false);
     setIsProfileOpen(false);
+    setIsNotifOpen(false);
   }, [location]);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = () => {
       setIsProfileOpen(false);
+      setIsNotifOpen(false);
     };
     document.addEventListener('click', handleClickOutside);
     return () => document.removeEventListener('click', handleClickOutside);
   }, []);
+
+  // Fetch early/late students (admin only)
+  useEffect(() => {
+    if (user?.role !== 'admin' || !token) return;
+    let intervalId;
+    const fetchLists = async () => {
+      try {
+        setLoadingLate(true);
+        const [late, early] = await Promise.all([
+          apiService.getLateToday(token),
+          apiService.getEarlyToday(token)
+        ]);
+        setLateStudents(late);
+        setEarlyStudents(early);
+      } catch (e) {
+        // silent fail on navbar
+      } finally {
+        setLoadingLate(false);
+      }
+    };
+    fetchLists();
+    intervalId = setInterval(fetchLists, 60_000);
+    return () => clearInterval(intervalId);
+  }, [user?.role, token]);
+
+  const handleSendWarning = async (student, message = 'You arrived late today. Please be on time.') => {
+    try {
+      await apiService.sendLateWarning(student.userId._id, message, token);
+      toast.success(`Warning sent to ${student.userId.name}`);
+    } catch (e) {
+      toast.error(e.message || 'Failed to send warning');
+    }
+  };
 
   const handleLogout = () => {
     logout();
@@ -105,12 +147,73 @@ export default function AdminNavbar() {
             </button>
 
             {/* Notifications */}
-            <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors duration-200 relative">
-              <Bell className="w-5 h-5" />
-              <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full flex items-center justify-center">
-                <span className="w-1.5 h-1.5 bg-white rounded-full"></span>
-              </span>
-            </button>
+            <div className="relative">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsNotifOpen(!isNotifOpen);
+                }}
+                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors duration-200 relative"
+              >
+                <Bell className="w-5 h-5" />
+                {((lateStudents?.length || 0) + (earlyStudents?.length || 0)) > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 bg-red-500 text-white text-[10px] leading-4 rounded-full flex items-center justify-center">
+                    {(lateStudents?.length || 0) + (earlyStudents?.length || 0)}
+                  </span>
+                )}
+              </button>
+              {isNotifOpen && (
+                <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-50">
+                  <div className="px-4 py-2 border-b border-gray-100 flex items-center justify-between">
+                    <div className="text-sm font-medium text-gray-900">Notifications</div>
+                    {loadingLate && <div className="animate-spin h-4 w-4 border-2 border-gray-400 border-t-transparent rounded-full" />}
+                  </div>
+                  <div className="max-h-80 overflow-auto">
+                    {/* Early section */}
+                    <div className="px-4 pt-3 pb-1 text-xs font-semibold text-gray-500 uppercase tracking-wide">Early today</div>
+                    {(earlyStudents?.length || 0) === 0 ? (
+                      <div className="px-4 py-2 text-xs text-gray-400">No early arrivals</div>
+                    ) : (
+                      earlyStudents.map((rec) => (
+                        <div key={`early-${rec._id}`} className="px-4 py-3 hover:bg-gray-50 flex items-start gap-3">
+                          <div className="h-8 w-8 rounded-full bg-green-600 text-white flex items-center justify-center text-sm font-medium">
+                            {rec.userId?.name?.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium text-gray-900 truncate">{rec.userId?.name}</div>
+                            <div className="text-xs text-gray-500 truncate">Checked in early at {rec.checkInTime}</div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+
+                    {/* Late section */}
+                    <div className="px-4 pt-3 pb-1 text-xs font-semibold text-gray-500 uppercase tracking-wide">Late today</div>
+                    {(lateStudents?.length || 0) === 0 ? (
+                      <div className="px-4 py-2 text-xs text-gray-400">No late students today</div>
+                    ) : (
+                      lateStudents.map((rec) => (
+                        <div key={`late-${rec._id}`} className="px-4 py-3 hover:bg-gray-50 flex items-start gap-3">
+                          <div className="h-8 w-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-medium">
+                            {rec.userId?.name?.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium text-gray-900 truncate">{rec.userId?.name}</div>
+                            <div className="text-xs text-gray-500 truncate">Checked in late at {rec.checkInTime}</div>
+                          </div>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleSendWarning(rec); }}
+                            className="text-xs px-2 py-1 bg-red-50 text-red-600 rounded hover:bg-red-100"
+                          >
+                            Send warning
+                          </button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* Profile Dropdown */}
             <div className="relative">

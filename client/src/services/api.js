@@ -185,14 +185,33 @@ const apiService = {
     return data.data;
   },
 
-  // Admin: Dashboard
-  async getAdminDashboard(token) {
-    const res = await fetch(`${API_BASE_URL}/api/admin/dashboard`, {
+  async getLateToday(token) {
+    const res = await fetch(`${API_BASE_URL}/api/admin/attendance/late-today`, {
       headers: { ...getAuthHeaders(token) }
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.message || 'Failed to fetch dashboard data');
-    return data.data;
+    if (!res.ok) throw new Error(data.message || 'Failed to fetch late students');
+    return data.data.late || [];
+  },
+
+  async sendLateWarning(userId, message, token) {
+    const res = await fetch(`${API_BASE_URL}/api/admin/notifications/warn`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
+      body: JSON.stringify({ userId, message })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Failed to send warning');
+    return data;
+  },
+
+  async getEarlyToday(token) {
+    const res = await fetch(`${API_BASE_URL}/api/admin/attendance/early-today`, {
+      headers: { ...getAuthHeaders(token) }
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Failed to fetch early students');
+    return data.data.early || [];
   },
 
   // Admin: Attendance

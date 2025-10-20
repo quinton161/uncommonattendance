@@ -3,7 +3,7 @@
 @import 'tailwindcss/utilities';
 
 /* Chillax Font Import */
-@import url('https://fonts.googleapis.com/css2?family=Chillax:wght@200;300;400;500;600;700&display=swap');
+@import url('https://api.fontshare.com/v2/css?f[]=chillax@300,400,500,600,700&display=swap');
 
 /* Using Chillax font for better design */
 

@@ -18,6 +18,10 @@ const attendanceSchema = new mongoose.Schema({
     type: String, // Format: HH:MM
     default: null
   },
+  isLate: {
+    type: Boolean,
+    default: false
+  },
   checkInLocation: {
     lat: {
       type: Number,
