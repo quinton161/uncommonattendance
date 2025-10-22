@@ -727,7 +727,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
 
     try {
       console.log('Auto check-in triggered by WiFi detection');
-      uniqueToast.info('Uncommon WiFi detected - Auto checking in...', { autoClose: 3000 });
       
       // Call the check-in function with automatic flag
       await handleCheckInInternal(true);

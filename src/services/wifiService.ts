@@ -227,9 +227,6 @@ export class WiFiService {
         
         if (isUncommon) {
           console.log('Uncommon WiFi network detected on login!');
-          uniqueToast.success('Connected to Uncommon WiFi - Auto check-in available!', {
-            autoClose: 5000
-          });
           onUncommonNetworkDetected();
         } else {
           console.log('Not connected to Uncommon WiFi on login');
