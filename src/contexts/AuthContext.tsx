@@ -31,26 +31,41 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    console.log('🔐 AuthContext: Setting up auth state listener...');
+    
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      console.log('🔐 AuthContext: Auth state changed:', firebaseUser ? 'User logged in' : 'User logged out');
+      
       if (firebaseUser) {
-        // Get user data from Firestore
-        const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-        if (userDoc.exists()) {
-          const userData = userDoc.data();
-          setUser({
-            uid: firebaseUser.uid,
-            email: firebaseUser.email!,
-            displayName: firebaseUser.displayName || userData.displayName,
-            photoUrl: firebaseUser.photoURL || userData.photoUrl,
-            userType: userData.userType || 'attendee',
-            bio: userData.bio,
-            createdAt: userData.createdAt?.toDate() || new Date(),
-          });
+        try {
+          console.log('🔐 AuthContext: Fetching user data from Firestore...');
+          // Get user data from Firestore
+          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            console.log('🔐 AuthContext: User data loaded:', userData.displayName, userData.userType);
+            setUser({
+              uid: firebaseUser.uid,
+              email: firebaseUser.email!,
+              displayName: firebaseUser.displayName || userData.displayName,
+              photoUrl: firebaseUser.photoURL || userData.photoUrl,
+              userType: userData.userType || 'attendee',
+              bio: userData.bio,
+              createdAt: userData.createdAt?.toDate() || new Date(),
+            });
+          } else {
+            console.warn('🔐 AuthContext: User document not found in Firestore');
+            setUser(null);
+          }
+        } catch (error) {
+          console.error('🔐 AuthContext: Error fetching user data:', error);
+          setUser(null);
         }
       } else {
         setUser(null);
       }
       setLoading(false);
+      console.log('🔐 AuthContext: Auth initialization complete');
     });
 
     return unsubscribe;
@@ -62,17 +77,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     displayName: string,
     userType: 'organizer' | 'attendee' | 'admin'
   ) => {
+    console.log('🔐 AuthContext: Starting registration for:', email, userType);
     try {
+      console.log('🔐 AuthContext: Creating Firebase user...');
       const { user: firebaseUser } = await createUserWithEmailAndPassword(
         auth,
         email,
         password
       );
+      console.log('🔐 AuthContext: Firebase user created:', firebaseUser.uid);
 
       // Update Firebase Auth profile
+      console.log('🔐 AuthContext: Updating Firebase profile...');
       await updateProfile(firebaseUser, { displayName });
 
       // Create user document in Firestore
+      console.log('🔐 AuthContext: Creating Firestore user document...');
       const userData = {
         uid: firebaseUser.uid,
         email: firebaseUser.email!,
@@ -84,17 +104,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       };
 
       await setDoc(doc(db, 'users', firebaseUser.uid), userData);
+      console.log('🔐 AuthContext: Registration complete!');
       uniqueToast.success('Account created successfully! Welcome!', { autoClose: 4000 });
     } catch (error) {
-      console.error('Registration error:', error);
+      console.error('🔐 AuthContext: Registration error:', error);
       uniqueToast.error('Failed to create account. Please try again.', { autoClose: 4000 });
       throw error;
     }
   };
 
   const login = async (email: string, password: string) => {
+    console.log('🔐 AuthContext: Starting login for:', email);
     try {
+      console.log('🔐 AuthContext: Attempting Firebase sign in...');
       await signInWithEmailAndPassword(auth, email, password);
+      console.log('🔐 AuthContext: Login successful!');
       uniqueToast.success('Welcome back! Successfully logged in.', { autoClose: 3000 });
     } catch (error: any) {
       console.error('Login error:', error);

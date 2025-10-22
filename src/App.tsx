@@ -8,12 +8,12 @@ import { StudentDashboard } from './components/Dashboard/StudentDashboard';
 import { AdminDashboard } from './components/Dashboard/AdminDashboard';
 import { ProfilePage } from './components/Student/ProfilePage';
 import { SimpleSplash } from './components/Common/SimpleSplash';
+import { DirectAuthTest } from './components/Auth/DirectAuthTest';
 import { GlobalStyles } from './styles/GlobalStyles';
 import { theme } from './styles/theme';
 import { ToastContainer } from 'react-toastify';
 import { uniqueToast } from './utils/toastUtils';
 import DataService from './services/DataService';
-import './utils/attendanceVerification'; // Import attendance verification tools
 import 'react-toastify/dist/ReactToastify.css';
 
 const AppRoutes: React.FC = () => {
@@ -92,13 +92,26 @@ const AppWithProviders: React.FC = () => {
 
 function App() {
   const [showSplash, setShowSplash] = useState(true);
+  const [showAuthTest, setShowAuthTest] = useState(false);
 
   useEffect(() => {
-    // Test Firebase connection on app startup
+    // Add keyboard shortcut to show auth test (Ctrl+Shift+T)
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.shiftKey && e.key === 'T') {
+        setShowAuthTest(true);
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyPress);
+    
+    // Test Firebase connection on app startup (delayed to ensure Firebase is initialized)
     const initializeBackend = async () => {
       console.log('App initialized with Firebase configuration');
       
       try {
+        // Add a small delay to ensure Firebase is fully initialized
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
         const dataService = DataService.getInstance();
         const isConnected = await dataService.testConnection();
         
@@ -109,11 +122,13 @@ function App() {
         }
       } catch (error) {
         console.error('❌ Backend initialization error:', error);
-        uniqueToast.error('Backend connection failed. Using offline mode.', { autoClose: 5000 });
+        // Don't show error toast immediately as it might interfere with auth
+        console.warn('Backend connection will be retried when needed');
       }
     };
     
-    initializeBackend();
+    // Delay initialization to avoid interfering with auth
+    const timer = setTimeout(initializeBackend, 2000);
     
     // Set up periodic cleanup of old toast entries
     const cleanupInterval = setInterval(() => {
@@ -121,6 +136,8 @@ function App() {
     }, 60000); // Clean up every minute
     
     return () => {
+      window.removeEventListener('keydown', handleKeyPress);
+      clearTimeout(timer);
       clearInterval(cleanupInterval);
     };
   }, []);
@@ -139,6 +156,7 @@ function App() {
           <AppWithProviders />
         </AuthProvider>
       )}
+      {showAuthTest && <DirectAuthTest />}
       <ToastContainer
         position="top-right"
         autoClose={3000}

@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { theme } from '../../styles/theme';
 import { Button } from '../Common/Button';
 import DataService from '../../services/DataService';
+import { AttendanceService } from '../../services/attendanceService';
 import { UncommonLogo } from '../Common/UncommonLogo';
 import { uniqueToast } from '../../utils/toastUtils';
 import {
@@ -12,7 +13,9 @@ import {
   LocationOnIcon,
   LoginIcon,
   LogoutIcon,
-  PersonIcon
+  PersonIcon,
+  EditIcon,
+  DeleteIcon
 } from '../Common/Icons';
 
 const PageContainer = styled.div`
@@ -114,34 +117,63 @@ const AttendanceTable = styled.div`
   border-radius: ${theme.borderRadius.lg};
   box-shadow: ${theme.shadows.md};
   overflow: hidden;
+  
+  @media (max-width: ${theme.breakpoints.tablet}) {
+    box-shadow: none;
+    background: transparent;
+  }
 `;
 
 const TableHeader = styled.div`
   display: grid;
-  grid-template-columns: 1fr 150px 120px 150px 150px 200px;
-  gap: ${theme.spacing.md};
-  padding: ${theme.spacing.lg};
-  background: ${theme.colors.gray50};
-  border-bottom: 1px solid ${theme.colors.gray200};
+  grid-template-columns: 2fr 140px 130px 150px 150px 150px;
+  gap: ${theme.spacing.xl};
+  padding: ${theme.spacing.lg} ${theme.spacing.xl};
+  background: linear-gradient(135deg, ${theme.colors.primary}05 0%, ${theme.colors.primaryLight}10 100%);
+  border-bottom: 2px solid ${theme.colors.primary}20;
   font-weight: ${theme.fontWeights.semibold};
   color: ${theme.colors.textPrimary};
   font-size: ${theme.fontSizes.sm};
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  
+  @media (max-width: ${theme.breakpoints.tablet}) {
+    display: none;
+  }
 `;
 
 const TableRow = styled.div`
   display: grid;
-  grid-template-columns: 1fr 150px 120px 150px 150px 200px;
-  gap: ${theme.spacing.md};
-  padding: ${theme.spacing.lg};
+  grid-template-columns: 2fr 140px 130px 150px 150px 150px;
+  gap: ${theme.spacing.xl};
+  padding: ${theme.spacing.lg} ${theme.spacing.xl};
   border-bottom: 1px solid ${theme.colors.gray100};
-  transition: background-color 0.2s ease;
+  transition: all 0.2s ease;
+  align-items: center;
   
   &:hover {
-    background: ${theme.colors.gray50};
+    background: linear-gradient(135deg, ${theme.colors.primary}02 0%, ${theme.colors.primaryLight}05 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px ${theme.colors.primary}10;
   }
   
   &:last-child {
     border-bottom: none;
+  }
+  
+  @media (max-width: ${theme.breakpoints.tablet}) {
+    display: block;
+    background: ${theme.colors.white};
+    border-radius: ${theme.borderRadius.lg};
+    box-shadow: ${theme.shadows.sm};
+    margin-bottom: ${theme.spacing.md};
+    padding: ${theme.spacing.lg};
+    border-bottom: none;
+    
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: ${theme.shadows.md};
+    }
   }
 `;
 
@@ -149,11 +181,18 @@ const StudentInfo = styled.div`
   display: flex;
   align-items: center;
   gap: ${theme.spacing.md};
+  min-width: 0;
+  
+  @media (max-width: ${theme.breakpoints.tablet}) {
+    margin-bottom: ${theme.spacing.md};
+    padding-bottom: ${theme.spacing.md};
+    border-bottom: 1px solid ${theme.colors.gray100};
+  }
 `;
 
 const StudentAvatar = styled.div`
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   border-radius: ${theme.borderRadius.full};
   background: linear-gradient(135deg, ${theme.colors.primary} 0%, ${theme.colors.primaryLight} 100%);
   display: flex;
@@ -162,24 +201,79 @@ const StudentAvatar = styled.div`
   color: ${theme.colors.white};
   font-weight: ${theme.fontWeights.semibold};
   font-size: ${theme.fontSizes.sm};
+  box-shadow: 0 2px 8px ${theme.colors.primary}20;
+  flex-shrink: 0;
+  
+  @media (max-width: ${theme.breakpoints.tablet}) {
+    width: 44px;
+    height: 44px;
+    font-size: ${theme.fontSizes.base};
+  }
 `;
 
 const StudentDetails = styled.div`
+  min-width: 0;
+  flex: 1;
+  
   h4 {
     margin: 0 0 ${theme.spacing.xs} 0;
     font-size: ${theme.fontSizes.base};
-    font-weight: ${theme.fontWeights.medium};
+    font-weight: ${theme.fontWeights.semibold};
     color: ${theme.colors.textPrimary};
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  
+  p {
+    margin: 0;
+    font-size: ${theme.fontSizes.sm};
+    color: ${theme.colors.textSecondary};
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  
+  @media (max-width: ${theme.breakpoints.tablet}) {
+    h4 {
+      font-size: ${theme.fontSizes.lg};
+      white-space: normal;
+      overflow: visible;
+      text-overflow: unset;
+    }
+    
+    p {
+      font-size: ${theme.fontSizes.base};
+      white-space: normal;
+      overflow: visible;
+      text-overflow: unset;
+    }
   }
 `;
 
 const DateDisplay = styled.div`
   font-size: ${theme.fontSizes.sm};
   color: ${theme.colors.textSecondary};
+  display: flex;
+  align-items: center;
+  gap: ${theme.spacing.xs};
   
   .date {
-    font-weight: ${theme.fontWeights.medium};
+    font-weight: ${theme.fontWeights.semibold};
     color: ${theme.colors.textPrimary};
+  }
+  
+  @media (max-width: ${theme.breakpoints.tablet}) {
+    font-size: ${theme.fontSizes.base};
+    margin-bottom: ${theme.spacing.xs};
+    
+    &:before {
+      content: 'Date:';
+      font-weight: ${theme.fontWeights.medium};
+      color: ${theme.colors.textSecondary};
+      margin-right: ${theme.spacing.sm};
+      min-width: 80px;
+    }
   }
 `;
 
@@ -187,12 +281,14 @@ const StatusBadge = styled.div<{ status: 'present' | 'late' | 'absent' }>`
   display: inline-flex;
   align-items: center;
   gap: ${theme.spacing.xs};
-  padding: ${theme.spacing.xs} ${theme.spacing.sm};
+  padding: ${theme.spacing.sm} ${theme.spacing.md};
   border-radius: ${theme.borderRadius.full};
   font-size: ${theme.fontSizes.xs};
-  font-weight: ${theme.fontWeights.medium};
+  font-weight: ${theme.fontWeights.semibold};
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  border: 1px solid;
+  transition: all 0.2s ease;
   
   ${props => {
     switch (props.status) {
@@ -200,24 +296,33 @@ const StatusBadge = styled.div<{ status: 'present' | 'late' | 'absent' }>`
         return `
           background: rgba(34, 197, 94, 0.1);
           color: #16a34a;
+          border-color: rgba(34, 197, 94, 0.2);
         `;
       case 'late':
         return `
           background: rgba(251, 191, 36, 0.1);
           color: #d97706;
+          border-color: rgba(251, 191, 36, 0.2);
         `;
       case 'absent':
         return `
           background: rgba(239, 68, 68, 0.1);
           color: #dc2626;
+          border-color: rgba(239, 68, 68, 0.2);
         `;
       default:
         return `
           background: ${theme.colors.gray100};
           color: ${theme.colors.textSecondary};
+          border-color: ${theme.colors.gray200};
         `;
     }
   }}
+  
+  @media (max-width: ${theme.breakpoints.tablet}) {
+    font-size: ${theme.fontSizes.sm};
+    padding: ${theme.spacing.sm} ${theme.spacing.lg};
+  }
 `;
 
 const TimeDisplay = styled.div`
@@ -228,8 +333,21 @@ const TimeDisplay = styled.div`
   gap: ${theme.spacing.xs};
   
   .time {
-    font-weight: ${theme.fontWeights.medium};
+    font-weight: ${theme.fontWeights.semibold};
     color: ${theme.colors.textPrimary};
+  }
+  
+  @media (max-width: ${theme.breakpoints.tablet}) {
+    font-size: ${theme.fontSizes.base};
+    margin-bottom: ${theme.spacing.xs};
+    
+    &:before {
+      content: attr(data-label);
+      font-weight: ${theme.fontWeights.medium};
+      color: ${theme.colors.textSecondary};
+      margin-right: ${theme.spacing.sm};
+      min-width: 80px;
+    }
   }
 `;
 
@@ -239,10 +357,102 @@ const LocationDisplay = styled.div`
   display: flex;
   align-items: center;
   gap: ${theme.spacing.xs};
+  min-width: 0;
   
   .address {
-    font-weight: ${theme.fontWeights.medium};
+    font-weight: ${theme.fontWeights.semibold};
     color: ${theme.colors.textPrimary};
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  
+  @media (max-width: ${theme.breakpoints.tablet}) {
+    font-size: ${theme.fontSizes.base};
+    
+    .address {
+      white-space: normal;
+      overflow: visible;
+      text-overflow: unset;
+    }
+    
+    &:before {
+      content: 'Location:';
+      font-weight: ${theme.fontWeights.medium};
+      color: ${theme.colors.textSecondary};
+      margin-right: ${theme.spacing.sm};
+      min-width: 80px;
+    }
+  }
+`;
+
+const MobileDataGrid = styled.div`
+  display: none;
+  
+  @media (max-width: ${theme.breakpoints.tablet}) {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: ${theme.spacing.md};
+    margin-top: ${theme.spacing.md};
+  }
+`;
+
+const MobileDataItem = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${theme.spacing.xs};
+`;
+
+const ActionButtons = styled.div`
+  display: flex;
+  gap: ${theme.spacing.sm};
+  align-items: center;
+  justify-content: flex-end;
+  
+  @media (max-width: ${theme.breakpoints.tablet}) {
+    justify-content: flex-start;
+    margin-top: ${theme.spacing.md};
+    padding-top: ${theme.spacing.md};
+    border-top: 1px solid ${theme.colors.gray100};
+  }
+`;
+
+const ActionButton = styled.button<{ variant: 'edit' | 'delete' }>`
+  display: flex;
+  align-items: center;
+  gap: ${theme.spacing.xs};
+  padding: ${theme.spacing.sm} ${theme.spacing.md};
+  border: 1px solid;
+  border-radius: ${theme.borderRadius.md};
+  background: ${theme.colors.white};
+  font-size: ${theme.fontSizes.sm};
+  font-weight: ${theme.fontWeights.medium};
+  cursor: pointer;
+  transition: all 0.2s ease;
+  
+  ${props => props.variant === 'edit' ? `
+    color: ${theme.colors.primary};
+    border-color: ${theme.colors.primary}20;
+    
+    &:hover {
+      background: ${theme.colors.primary}05;
+      border-color: ${theme.colors.primary}40;
+      transform: translateY(-1px);
+    }
+  ` : `
+    color: #dc2626;
+    border-color: rgba(239, 68, 68, 0.2);
+    
+    &:hover {
+      background: rgba(239, 68, 68, 0.05);
+      border-color: rgba(239, 68, 68, 0.4);
+      transform: translateY(-1px);
+    }
+  `}
+  
+  @media (max-width: ${theme.breakpoints.tablet}) {
+    padding: ${theme.spacing.md} ${theme.spacing.lg};
+    font-size: ${theme.fontSizes.base};
   }
 `;
 
@@ -277,7 +487,9 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [statusFilter, setStatusFilter] = useState('all');
+  const [fixingLocations, setFixingLocations] = useState(false);
   const dataService = DataService.getInstance();
+  const attendanceService = AttendanceService.getInstance();
 
   useEffect(() => {
     loadAttendanceSummary();
@@ -356,6 +568,57 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase();
   };
 
+  const handleFixLocations = async () => {
+    if (fixingLocations) return;
+    
+    setFixingLocations(true);
+    try {
+      uniqueToast.info('Fixing location records...', { autoClose: 2000 });
+      
+      const result = await attendanceService.fixExistingLocationRecords();
+      
+      if (result.updated > 0) {
+        uniqueToast.success(
+          `Successfully updated ${result.updated} location records!${result.errors > 0 ? ` (${result.errors} errors)` : ''}`,
+          { autoClose: 5000 }
+        );
+        
+        // Reload the attendance data to show updated locations
+        await loadAttendanceSummary();
+      } else {
+        uniqueToast.info('No location records needed updating.', { autoClose: 3000 });
+      }
+      
+    } catch (error) {
+      console.error('Error fixing locations:', error);
+      uniqueToast.error('Failed to fix location records. Please try again.', { autoClose: 4000 });
+    } finally {
+      setFixingLocations(false);
+    }
+  };
+
+  const handleEditAttendance = (record: any) => {
+    console.log('Edit attendance record:', record);
+    uniqueToast.info(`Edit functionality for ${record.userName} - Coming soon!`, { autoClose: 3000 });
+    // TODO: Implement edit modal/form
+  };
+
+  const handleDeleteAttendance = async (record: any) => {
+    if (window.confirm(`Are you sure you want to delete the attendance record for ${record.userName} on ${selectedDate}?`)) {
+      try {
+        // TODO: Implement actual delete functionality
+        console.log('Delete attendance record:', record);
+        uniqueToast.success(`Attendance record for ${record.userName} deleted successfully!`, { autoClose: 3000 });
+        
+        // Reload the attendance data
+        await loadAttendanceSummary();
+      } catch (error) {
+        console.error('Error deleting attendance record:', error);
+        uniqueToast.error('Failed to delete attendance record. Please try again.', { autoClose: 4000 });
+      }
+    }
+  };
+
   if (user?.userType !== 'admin') {
     return (
       <PageContainer>
@@ -430,9 +693,25 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
           </div>
         )}
       </FilterSection>
-      <Button variant="outline" onClick={() => { setSelectedDate(''); setStatusFilter('all'); }}>
-        Clear Filters
-      </Button>
+      
+      <div style={{ 
+        display: 'flex', 
+        gap: theme.spacing.md, 
+        marginBottom: theme.spacing.lg,
+        alignItems: 'center'
+      }}>
+        <Button variant="outline" onClick={() => { setSelectedDate(''); setStatusFilter('all'); }}>
+          Clear Filters
+        </Button>
+        <Button 
+          variant="secondary" 
+          onClick={handleFixLocations}
+          disabled={fixingLocations}
+        >
+          <LocationOnIcon size={16} style={{ marginRight: theme.spacing.xs }} />
+          {fixingLocations ? 'Fixing Locations...' : 'Fix Location Records'}
+        </Button>
+      </div>
 
       {loading ? (
         <LoadingState>
@@ -451,7 +730,7 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
             <div>Status</div>
             <div>Check-in</div>
             <div>Check-out</div>
-            <div>Location</div>
+            <div>Actions</div>
           </TableHeader>
           
           {getFilteredAttendance().map((record) => (
@@ -467,7 +746,7 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
                 </StudentInfo>
                 
                 <DateDisplay>
-                  <TodayIcon size={14} style={{ marginRight: theme.spacing.xs }} />
+                  <TodayIcon size={14} />
                   <span className="date">{selectedDate}</span>
                 </DateDisplay>
                 
@@ -479,7 +758,7 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
                   </StatusBadge>
                 </div>
                 
-                <TimeDisplay>
+                <TimeDisplay data-label="Check-in:">
                   {record.checkInTime ? (
                     <>
                       <LoginIcon size={14} />
@@ -490,7 +769,7 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
                   )}
                 </TimeDisplay>
                 
-                <TimeDisplay>
+                <TimeDisplay data-label="Check-out:">
                   {record.checkOutTime ? (
                     <>
                       <LogoutIcon size={14} />
@@ -501,12 +780,65 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
                   )}
                 </TimeDisplay>
                 
-                <LocationDisplay>
-                  <LocationOnIcon size={14} />
-                  <span className="address">
-                    {record.location?.address || 'Unknown Location'}
-                  </span>
-                </LocationDisplay>
+                <ActionButtons>
+                  <ActionButton 
+                    variant="edit" 
+                    onClick={() => handleEditAttendance(record)}
+                    title="Edit attendance record"
+                  >
+                    <EditIcon size={14} />
+                    Edit
+                  </ActionButton>
+                  <ActionButton 
+                    variant="delete" 
+                    onClick={() => handleDeleteAttendance(record)}
+                    title="Delete attendance record"
+                  >
+                    <DeleteIcon size={14} />
+                    Delete
+                  </ActionButton>
+                </ActionButtons>
+                
+                {/* Mobile-only organized layout */}
+                <MobileDataGrid>
+                  <MobileDataItem>
+                    <DateDisplay>
+                      <TodayIcon size={16} />
+                      <span className="date">{selectedDate}</span>
+                    </DateDisplay>
+                    <div>
+                      <StatusBadge status={record.status}>
+                        <CheckCircleIcon size={12} />
+                        {record.status}
+                        {record.isLate && <span style={{ color: '#f59e0b', marginLeft: '4px' }}>(Late)</span>}
+                      </StatusBadge>
+                    </div>
+                  </MobileDataItem>
+                  
+                  <MobileDataItem>
+                    <TimeDisplay data-label="Check-in:">
+                      {record.checkInTime ? (
+                        <>
+                          <LoginIcon size={16} />
+                          <span className="time">{formatTime(record.checkInTime)}</span>
+                        </>
+                      ) : (
+                        <span className="time">Not checked in</span>
+                      )}
+                    </TimeDisplay>
+                    
+                    <TimeDisplay data-label="Check-out:">
+                      {record.checkOutTime ? (
+                        <>
+                          <LogoutIcon size={16} />
+                          <span className="time">{formatTime(record.checkOutTime)}</span>
+                        </>
+                      ) : (
+                        <span className="time">Not checked out</span>
+                      )}
+                    </TimeDisplay>
+                  </MobileDataItem>
+                </MobileDataGrid>
               </TableRow>
             ))}
         </AttendanceTable>

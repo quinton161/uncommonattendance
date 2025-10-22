@@ -65,3 +65,44 @@ I1022 09:40:25.458993    8280 load.go:109] Finished reloading
 [debug] [2025-10-22T07:44:29.104Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects [omitted]
 [debug] [2025-10-22T07:44:29.106Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects 200
 [debug] [2025-10-22T07:44:29.106Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects [omitted]
+[info] [Firebase Plugin] Stopping Data Connect toolkit
+[warn] !  Data Connect Emulator has exited upon receiving signal: SIGKILL 
+[debug] [2025-10-22T09:26:16.328Z] [Firebase Plugin] Activating Firebase extension.
+[info] [Firebase Plugin] Checked firebase-tools, is up to date!
+[debug] [2025-10-22T09:26:19.488Z] [Firebase Plugin] requireAuthWrapper
+[debug] [2025-10-22T09:26:19.489Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-10-22T09:26:19.490Z] > authorizing via signed-in user (quintonndlovu161@gmail.com)
+[debug] [2025-10-22T09:26:19.492Z] Checked if tokens are valid: false, expires at: 1761125155370
+[debug] [2025-10-22T09:26:19.492Z] Checked if tokens are valid: false, expires at: 1761125155370
+[debug] [2025-10-22T09:26:19.493Z] > refreshing access token with scopes: []
+[debug] [2025-10-22T09:26:19.494Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2025-10-22T09:26:19.494Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-10-22T09:26:19.501Z] [Firebase Plugin] VSCode notification server listening on port 40001
+[info] [Firebase Plugin] Starting Data Connect toolkit (version 2.15.0) on port 50001
+[debug] [2025-10-22T09:26:19.885Z] I1022 11:26:19.859615    1728 control.go:94] [/emulator/uncommonattendance 4898] UpdateResources(): done
+Main schema: sources: schema\schema.gql [997B] 
+ {"metadata":{"emulator":{"name":"dataconnect"},"message":"I1022 11:26:19.859615    1728 control.go:94] [/emulator/uncommonattendance 4898] UpdateResources(): done\nMain schema: sources: schema\\schema.gql [997B] \n"}}
+[debug] [2025-10-22T09:26:19.886Z] Ignoring unsupported arg: auto_download {"metadata":{"emulator":{"name":"dataconnect"},"message":"Ignoring unsupported arg: auto_download"}}
+[debug] [2025-10-22T09:26:19.886Z] Ignoring unsupported arg: port {"metadata":{"emulator":{"name":"dataconnect"},"message":"Ignoring unsupported arg: port"}}
+[debug] [2025-10-22T09:26:19.887Z] Starting Data Connect Emulator with command {"binary":"C:\\Users\\Quinton\\.cache\\firebase\\emulators\\dataconnect-emulator-2.15.0.exe","args":["--logtostderr","-v=2","dev","--listen=localhost:50001","--config_dir=c:\\Users\\Quinton\\Desktop\\uncommonattendance\\dataconnect","--enable_output_schema_extensions=true","--enable_output_generated_sdk=true"],"optionalArgs":["listen","config_dir","enable_output_schema_extensions","enable_output_generated_sdk"],"joinArgs":true,"shell":false,"port":9399} {"metadata":{"emulator":{"name":"dataconnect"},"message":"Starting Data Connect Emulator with command {\"binary\":\"C:\\\\Users\\\\Quinton\\\\.cache\\\\firebase\\\\emulators\\\\dataconnect-emulator-2.15.0.exe\",\"args\":[\"--logtostderr\",\"-v=2\",\"dev\",\"--listen=localhost:50001\",\"--config_dir=c:\\\\Users\\\\Quinton\\\\Desktop\\\\uncommonattendance\\\\dataconnect\",\"--enable_output_schema_extensions=true\",\"--enable_output_generated_sdk=true\"],\"optionalArgs\":[\"listen\",\"config_dir\",\"enable_output_schema_extensions\",\"enable_output_generated_sdk\"],\"joinArgs\":true,\"shell\":false,\"port\":9399}"}}
+[info] i  dataconnect: Data Connect Emulator logging to dataconnect-debug.log {"metadata":{"emulator":{"name":"dataconnect"},"message":"Data Connect Emulator logging to \u001b[1mdataconnect-debug.log\u001b[22m"}}
+[debug] [2025-10-22T09:26:19.921Z] I1022 11:26:19.914228   14752 load.go:31] Reloading schema and connectors...
+ {"metadata":{"emulator":{"name":"dataconnect"},"message":"I1022 11:26:19.914228   14752 load.go:31] Reloading schema and connectors...\n"}}
+[debug] [2025-10-22T09:26:19.962Z] I1022 11:26:19.962211   14752 control.go:94] [/emulator/uncommonattendance a25e] UpdateResources(): done
+Main schema: sources: schema\schema.gql [997B] 
+ {"metadata":{"emulator":{"name":"dataconnect"},"message":"I1022 11:26:19.962211   14752 control.go:94] [/emulator/uncommonattendance a25e] UpdateResources(): done\nMain schema: sources: schema\\schema.gql [997B] \n"}}
+[debug] [2025-10-22T09:26:20.005Z] I1022 11:26:20.004191   14752 collector.go:107] schema extensions wrote into "c:\\Users\\Quinton\\Desktop\\uncommonattendance\\dataconnect\\.dataconnect\\schema"
+Generated sources: main\mutation.gql [20785B] main\implicit.gql [3521B] main\input.gql [66632B] main\relation.gql [33623B] prelude.gql [73219B] main\query.gql [7682B] 
+I1022 11:26:20.004191   14752 load.go:109] Finished reloading
+ {"metadata":{"emulator":{"name":"dataconnect"},"message":"I1022 11:26:20.004191   14752 collector.go:107] schema extensions wrote into \"c:\\\\Users\\\\Quinton\\\\Desktop\\\\uncommonattendance\\\\dataconnect\\\\.dataconnect\\\\schema\"\nGenerated sources: main\\mutation.gql [20785B] main\\implicit.gql [3521B] main\\input.gql [66632B] main\\relation.gql [33623B] prelude.gql [73219B] main\\query.gql [7682B] \nI1022 11:26:20.004191   14752 load.go:109] Finished reloading\n"}}
+[debug] [2025-10-22T09:26:20.012Z] I1022 11:26:20.011848   14752 dev.go:102] Listening on address (HTTP + gRPC): 127.0.0.1:50001
+ {"metadata":{"emulator":{"name":"dataconnect"},"message":"I1022 11:26:20.011848   14752 dev.go:102] Listening on address (HTTP + gRPC): 127.0.0.1:50001\n"}}
+[error] [Firebase Plugin] error:  {}
+[debug] [2025-10-22T09:26:20.322Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[debug] [2025-10-22T09:26:20.322Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-10-22T09:26:20.336Z] [Firebase Plugin] User found:  quintonndlovu161@gmail.com
+[info] [Firebase Plugin] (Core:Project) New user detected, fetching projects
+[debug] [2025-10-22T09:26:20.337Z] Checked if tokens are valid: true, expires at: 1761128779322
+[debug] [2025-10-22T09:26:20.338Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects pageSize=1000
+[debug] [2025-10-22T09:26:21.207Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects 200
+[debug] [2025-10-22T09:26:21.207Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects [omitted]

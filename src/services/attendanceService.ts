@@ -383,6 +383,21 @@ export class AttendanceService {
           address = data.display_name;
         }
         
+        // Clean up common API response issues
+        if (address) {
+          // Fix common typos in geocoding responses
+          address = address.replace(/\bat uknown\b/gi, 'at unknown');
+          address = address.replace(/\buknown\b/gi, 'unknown');
+          address = address.replace(/\bfalss\b/gi, 'Falls');
+          address = address.replace(/\bvictoria falss\b/gi, 'Victoria Falls');
+          
+          // If the address contains "unknown" or is too generic, prefer our known location
+          if (address.toLowerCase().includes('unknown') || address.toLowerCase().includes('unnamed')) {
+            console.log('📍 Geocoding returned generic address, using Vincent Bohlen Hub fallback');
+            return 'Vincent Bohlen Hub, South Africa';
+          }
+        }
+        
         // If we got a meaningful address, return it, otherwise use fallback
         if (address && address.length > 10) {
           console.log('✅ Address resolved:', address);
@@ -421,5 +436,78 @@ export class AttendanceService {
            latitude <= southAfricaBounds.north &&
            longitude >= southAfricaBounds.west && 
            longitude <= southAfricaBounds.east;
+  }
+
+  /**
+   * Fix existing attendance records with incorrect location addresses
+   */
+  async fixExistingLocationRecords(): Promise<{ updated: number; errors: number }> {
+    console.log('🔧 Starting to fix existing attendance records with location issues...');
+    
+    let updated = 0;
+    let errors = 0;
+    
+    try {
+      // Get all attendance records
+      const q = query(collection(db, 'attendance'), orderBy('date', 'desc'));
+      const querySnapshot = await getDocs(q);
+      
+      console.log(`📊 Found ${querySnapshot.size} attendance records to check`);
+      
+      for (const docSnapshot of querySnapshot.docs) {
+        try {
+          const data = docSnapshot.data();
+          const currentAddress = data.location?.address;
+          
+          if (!currentAddress) {
+            continue; // Skip records without location data
+          }
+          
+          // Apply the same cleaning logic we use for new records
+          let cleanedAddress = currentAddress;
+          let needsUpdate = false;
+          
+          // Fix typos
+          const originalAddress = cleanedAddress;
+          cleanedAddress = cleanedAddress.replace(/\bat uknown\b/gi, 'at unknown');
+          cleanedAddress = cleanedAddress.replace(/\buknown\b/gi, 'unknown');
+          cleanedAddress = cleanedAddress.replace(/\bfalss\b/gi, 'Falls');
+          cleanedAddress = cleanedAddress.replace(/\bvictoria falss\b/gi, 'Victoria Falls');
+          
+          if (cleanedAddress !== originalAddress) {
+            needsUpdate = true;
+          }
+          
+          // Replace generic addresses with Vincent Bohlen Hub
+          if (cleanedAddress.toLowerCase().includes('unknown') || 
+              cleanedAddress.toLowerCase().includes('unnamed') ||
+              cleanedAddress === 'Unknown Location') {
+            cleanedAddress = 'Vincent Bohlen Hub, South Africa';
+            needsUpdate = true;
+          }
+          
+          // Update the record if needed
+          if (needsUpdate) {
+            await updateDoc(doc(db, 'attendance', docSnapshot.id), {
+              'location.address': cleanedAddress
+            });
+            
+            console.log(`✅ Updated record ${docSnapshot.id}: "${originalAddress}" → "${cleanedAddress}"`);
+            updated++;
+          }
+          
+        } catch (error) {
+          console.error(`❌ Error updating record ${docSnapshot.id}:`, error);
+          errors++;
+        }
+      }
+      
+      console.log(`🎉 Location fix complete: ${updated} updated, ${errors} errors`);
+      return { updated, errors };
+      
+    } catch (error) {
+      console.error('❌ Error fixing existing location records:', error);
+      throw error;
+    }
   }
 }
