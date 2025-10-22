@@ -13,6 +13,7 @@ import { theme } from './styles/theme';
 import { ToastContainer } from 'react-toastify';
 import { uniqueToast } from './utils/toastUtils';
 import DataService from './services/DataService';
+import './utils/attendanceVerification'; // Import attendance verification tools
 import 'react-toastify/dist/ReactToastify.css';
 
 const AppRoutes: React.FC = () => {

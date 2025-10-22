@@ -12,6 +12,7 @@ import {
 } from '../../styles/animations';
 import DataService from '../../services/DataService';
 import { AttendanceService } from '../../services/attendanceService';
+import { DailyAttendanceService, DailyAttendanceStats } from '../../services/dailyAttendanceService';
 import { EventsPage } from '../Events/EventsPage';
 import { MyAttendancePage } from '../Student/MyAttendancePage';
 import { SchedulePage } from '../Student/SchedulePage';
@@ -509,9 +510,19 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
     todayStatus: 'Not Checked In',
     lastCheckIn: null as Date | null
   });
+  const [dailyStats, setDailyStats] = useState<DailyAttendanceStats>({
+    totalDays: 0,
+    presentDays: 0,
+    absentDays: 0,
+    currentStreak: 0,
+    longestStreak: 0,
+    attendanceRate: 0,
+    lastAttendanceDate: null,
+  });
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
   const dataService = DataService.getInstance();
   const attendanceService = AttendanceService.getInstance();
+  const dailyAttendanceService = DailyAttendanceService.getInstance();
 
   // useEffect hooks will be moved after function declarations
 
@@ -572,19 +583,25 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
         lastCheckIn: prevStats.lastCheckIn // Keep current check-in time
       }));
 
-      // Set recent activity
-      setRecentActivity([
-        {
-          id: '1',
-          type: 'checkin',
-          checkInTime: new Date(),
-          studentName: user.displayName
-        }
-      ]);
+      // Load daily attendance stats
+      const dailyStatsData = await dailyAttendanceService.getAttendanceStats(user.uid, 30);
+      setDailyStats(dailyStatsData);
+
+      // Load recent attendance activity
+      const recentAttendanceActivity = await dailyAttendanceService.getRecentActivity(user.uid, 5);
+      setRecentActivity(recentAttendanceActivity.map((activity, index) => ({
+        id: `activity_${index}`,
+        type: activity.type,
+        description: activity.description,
+        date: activity.date,
+        time: activity.markedAt,
+        studentName: user.displayName
+      })));
+
     } catch (error) {
       console.error('Error loading student data:', error);
     }
-  }, [user, dataService]);
+  }, [user, dataService, dailyAttendanceService]);
 
   const calculateStreak = (attendanceDocs: any[]): number => {
     // Simple streak calculation - consecutive days with attendance
@@ -662,14 +679,31 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
       
       // Use AttendanceService to check in
       console.log('Calling attendanceService.checkIn...');
-      await attendanceService.checkIn(user.uid, user.displayName || 'Student', {
+      uniqueToast.info('Recording your attendance...', { autoClose: 2000 });
+      
+      const attendanceRecord = await attendanceService.checkIn(user.uid, user.displayName || 'Student', {
         latitude,
         longitude,
         accuracy: accuracy || 0,
         timestamp: position.timestamp
       });
       
-      console.log('Check-in successful!');
+      console.log('✅ Attendance recorded successfully:', {
+        id: attendanceRecord.id,
+        studentId: attendanceRecord.studentId,
+        date: attendanceRecord.date,
+        checkInTime: attendanceRecord.checkInTime,
+        location: attendanceRecord.location.address
+      });
+      
+      // Verify the attendance was recorded by checking if we can retrieve it
+      const verifyRecord = await attendanceService.getTodayAttendance(user.uid);
+      if (verifyRecord) {
+        console.log('✅ Attendance verification successful - record exists in database');
+      } else {
+        console.warn('⚠️ Attendance verification failed - record not found');
+        throw new Error('Failed to verify attendance record');
+      }
 
       // Update local state
       setCheckedIn(true);
@@ -964,14 +998,20 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
           
           <StatCard variant="secondary">
             <StatIcon><AssignmentIcon size={32} /></StatIcon>
-            <StatValue>{stats.totalCheckIns}</StatValue>
-            <StatLabel>Total Check-ins</StatLabel>
+            <StatValue>{dailyStats.presentDays}/{dailyStats.totalDays}</StatValue>
+            <StatLabel>Days Present</StatLabel>
           </StatCard>
           
           <StatCard variant="accent">
             <StatIcon><TrendingUpIcon size={32} /></StatIcon>
-            <StatValue>{stats.currentStreak}</StatValue>
+            <StatValue>{dailyStats.currentStreak}</StatValue>
             <StatLabel>Current Streak</StatLabel>
+          </StatCard>
+          
+          <StatCard variant="primary">
+            <StatIcon><CheckCircleIcon size={32} /></StatIcon>
+            <StatValue>{dailyStats.attendanceRate.toFixed(1)}%</StatValue>
+            <StatLabel>Attendance Rate</StatLabel>
           </StatCard>
         </StatsGrid>
 
@@ -999,12 +1039,69 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
           </Card>
 
           <Card>
-            <CardTitle>Recent Activity</CardTitle>
+            <CardTitle>Attendance Summary</CardTitle>
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(2, 1fr)', 
+              gap: theme.spacing.md,
+              marginBottom: theme.spacing.md 
+            }}>
+              <div style={{ textAlign: 'center', padding: theme.spacing.sm }}>
+                <div style={{ 
+                  fontSize: theme.fontSizes.xl, 
+                  fontWeight: theme.fontWeights.bold,
+                  color: theme.colors.success 
+                }}>
+                  {dailyStats.longestStreak}
+                </div>
+                <div style={{ 
+                  fontSize: theme.fontSizes.xs, 
+                  color: theme.colors.textSecondary 
+                }}>
+                  Longest Streak
+                </div>
+              </div>
+              <div style={{ textAlign: 'center', padding: theme.spacing.sm }}>
+                <div style={{ 
+                  fontSize: theme.fontSizes.xl, 
+                  fontWeight: theme.fontWeights.bold,
+                  color: theme.colors.warning 
+                }}>
+                  {dailyStats.absentDays}
+                </div>
+                <div style={{ 
+                  fontSize: theme.fontSizes.xs, 
+                  color: theme.colors.textSecondary 
+                }}>
+                  Days Absent
+                </div>
+              </div>
+            </div>
+            {dailyStats.lastAttendanceDate && (
+              <div style={{ 
+                textAlign: 'center', 
+                padding: theme.spacing.sm,
+                backgroundColor: theme.colors.gray50,
+                borderRadius: theme.borderRadius.md,
+                fontSize: theme.fontSizes.sm,
+                color: theme.colors.textSecondary
+              }}>
+                Last attended: {new Date(dailyStats.lastAttendanceDate).toLocaleDateString('en-US', { 
+                  weekday: 'long', 
+                  month: 'long', 
+                  day: 'numeric' 
+                })}
+              </div>
+            )}
+          </Card>
+
+          <Card>
+            <CardTitle>Recent Attendance</CardTitle>
             <ActivityList>
               {recentActivity.map((activity: any) => (
                 <ActivityItem key={activity.id}>
                   <ActivityIcon type={activity.type}>
-                    {activity.type === 'checkin' ? '✓' : '📅'}
+                    {activity.type === 'present' ? '✅' : activity.type === 'absent' ? '❌' : '📅'}
                   </ActivityIcon>
                   <div style={{ flex: 1 }}>
                     <div style={{ 
@@ -1012,20 +1109,28 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
                       color: theme.colors.textPrimary,
                       fontSize: theme.fontSizes.sm
                     }}>
-                      {activity.type === 'checkin' ? 'Checked In' : 'Event Activity'}
+                      {activity.description || 'Attendance Record'}
                     </div>
                     <div style={{ 
                       color: theme.colors.textSecondary,
                       fontSize: theme.fontSizes.xs
                     }}>
-                      {activity.checkInTime?.toLocaleDateString()}
+                      {activity.date ? new Date(activity.date).toLocaleDateString('en-US', { 
+                        weekday: 'short', 
+                        month: 'short', 
+                        day: 'numeric' 
+                      }) : 'Unknown date'}
+                      {activity.time && ` • ${activity.time.toLocaleTimeString('en-US', { 
+                        hour: '2-digit', 
+                        minute: '2-digit' 
+                      })}`}
                     </div>
                   </div>
                 </ActivityItem>
               ))}
               {recentActivity.length === 0 && (
                 <p style={{ color: theme.colors.textSecondary, textAlign: 'center', padding: theme.spacing.lg }}>
-                  No recent activity
+                  No recent attendance records
                 </p>
               )}
             </ActivityList>

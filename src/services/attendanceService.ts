@@ -12,6 +12,8 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { AttendanceRecord, LocationData } from '../types';
+import { DailyAttendanceService } from './dailyAttendanceService';
+import { findKnownLocation, getLocationDisplayName } from '../config/locationConfig';
 
 export class AttendanceService {
   private static instance: AttendanceService;
@@ -65,14 +67,48 @@ export class AttendanceService {
       isPresent: true,
     };
 
-    console.log('Saving attendance record to Firebase:', attendanceRecord);
+    console.log('📝 Saving detailed attendance record to Firebase:', {
+      collection: 'attendance',
+      documentId: attendanceId,
+      studentId,
+      studentName,
+      date: today,
+      location: attendanceRecord.location.address
+    });
     
+    // Save detailed attendance record
     await setDoc(doc(db, 'attendance', attendanceId), {
       ...attendanceRecord,
       checkInTime: Timestamp.fromDate(attendanceRecord.checkInTime),
     });
+    console.log('✅ Detailed attendance record saved to Firebase');
 
-    console.log('Attendance record saved successfully');
+    // Mark student as present for today in daily attendance tracking
+    console.log('📊 Marking student as present in daily attendance tracking...');
+    const dailyService = DailyAttendanceService.getInstance();
+    await dailyService.markPresentToday(studentId, studentName);
+    console.log('✅ Daily attendance record saved');
+
+    // Verify both records were saved
+    const savedDetailedRecord = await getDoc(doc(db, 'attendance', attendanceId));
+    const isPresentToday = await dailyService.isPresentToday(studentId);
+    
+    if (savedDetailedRecord.exists() && isPresentToday) {
+      console.log('🎉 ATTENDANCE RECORDING COMPLETE:', {
+        detailedRecord: '✅ Saved',
+        dailyRecord: '✅ Saved',
+        studentMarkedPresent: '✅ Yes',
+        attendanceId,
+        date: today
+      });
+    } else {
+      console.error('❌ ATTENDANCE RECORDING VERIFICATION FAILED:', {
+        detailedRecord: savedDetailedRecord.exists() ? '✅' : '❌',
+        dailyRecord: isPresentToday ? '✅' : '❌'
+      });
+      throw new Error('Failed to verify attendance records were saved properly');
+    }
+
     return attendanceRecord;
   }
 
@@ -315,21 +351,75 @@ export class AttendanceService {
     latitude: number,
     longitude: number
   ): Promise<string> {
+    console.log('🗺️ Resolving address for coordinates:', { latitude, longitude });
+
+    // Check if coordinates match any known location (Vincent Bohlen Hub, etc.)
+    const knownLocation = findKnownLocation(latitude, longitude);
+    if (knownLocation) {
+      const locationName = getLocationDisplayName(knownLocation);
+      console.log('📍 Location identified as known location:', locationName);
+      return locationName;
+    }
+
     try {
-      // Using a simple reverse geocoding approach
-      // In a production app, you might want to use Google Maps API or similar
+      // Using reverse geocoding API
+      console.log('🌐 Fetching address from geocoding service...');
       const response = await fetch(
         `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`
       );
       
       if (response.ok) {
         const data = await response.json();
-        return data.display_name || `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+        console.log('📍 Geocoding response:', data);
+        
+        // Extract meaningful address components
+        let address = '';
+        if (data.locality || data.city) {
+          address = data.locality || data.city;
+          if (data.principalSubdivision) {
+            address += `, ${data.principalSubdivision}`;
+          }
+        } else if (data.display_name) {
+          address = data.display_name;
+        }
+        
+        // If we got a meaningful address, return it, otherwise use fallback
+        if (address && address.length > 10) {
+          console.log('✅ Address resolved:', address);
+          return address;
+        }
       }
     } catch (error) {
-      console.error('Failed to get address:', error);
+      console.error('❌ Failed to get address from geocoding service:', error);
     }
     
-    return `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+    // Fallback: Check if coordinates suggest it's in South Africa (Vincent Bohlen Hub area)
+    if (this.isInSouthAfrica(latitude, longitude)) {
+      console.log('📍 Coordinates suggest South Africa location, using Vincent Bohlen Hub');
+      return 'Vincent Bohlen Hub, South Africa';
+    }
+    
+    // Final fallback
+    console.log('📍 Using coordinate fallback');
+    return `Location: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+  }
+
+
+  /**
+   * Check if coordinates are in South Africa (rough bounds)
+   */
+  private isInSouthAfrica(latitude: number, longitude: number): boolean {
+    // South Africa approximate bounds
+    const southAfricaBounds = {
+      north: -22.0,
+      south: -35.0,
+      east: 33.0,
+      west: 16.0
+    };
+    
+    return latitude >= southAfricaBounds.south && 
+           latitude <= southAfricaBounds.north &&
+           longitude >= southAfricaBounds.west && 
+           longitude <= southAfricaBounds.east;
   }
 }
