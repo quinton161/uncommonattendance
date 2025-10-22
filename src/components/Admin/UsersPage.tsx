@@ -5,17 +5,11 @@ import { theme } from '../../styles/theme';
 import { Button } from '../Common/Button';
 import DataService from '../../services/DataService';
 import { UncommonLogo } from '../Common/UncommonLogo';
-import { EditUserModal } from './EditUserModal';
-import { DeleteUserModal } from './DeleteUserModal';
 import { toast } from 'react-toastify';
 import {
-  PeopleIcon,
   PersonIcon,
   CheckCircleIcon,
-  TodayIcon,
-  LocationOnIcon,
-  LoginIcon,
-  LogoutIcon
+  TodayIcon
 } from '../Common/Icons';
 
 const PageContainer = styled.div`
@@ -102,39 +96,37 @@ const TableWrapper = styled.div`
 
 const TableHeader = styled.div`
   display: grid;
-  grid-template-columns: 1fr 150px 150px 200px 200px 150px;
-  gap: ${theme.spacing.md};
-  padding: ${theme.spacing.lg};
-  background: ${theme.colors.gray50};
-  border-bottom: 1px solid ${theme.colors.gray200};
+  grid-template-columns: 2fr 150px 150px;
+  gap: ${theme.spacing.xl};
+  padding: ${theme.spacing.lg} ${theme.spacing.xl};
+  background: linear-gradient(135deg, ${theme.colors.primary}05 0%, ${theme.colors.primaryLight}10 100%);
+  border-bottom: 2px solid ${theme.colors.primary}20;
   font-weight: ${theme.fontWeights.semibold};
   color: ${theme.colors.textPrimary};
   font-size: ${theme.fontSizes.sm};
-  min-width: 800px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  min-width: 500px;
   
   @media (max-width: ${theme.breakpoints.tablet}) {
-    padding: ${theme.spacing.md};
-    gap: ${theme.spacing.sm};
-    font-size: ${theme.fontSizes.xs};
-  }
-  
-  @media (max-width: ${theme.breakpoints.mobile}) {
-    grid-template-columns: 2fr 100px 100px 150px 150px 120px;
-    padding: ${theme.spacing.sm};
+    display: none;
   }
 `;
 
 const TableRow = styled.div`
   display: grid;
-  grid-template-columns: 1fr 150px 150px 200px 200px 150px;
-  gap: ${theme.spacing.md};
-  padding: ${theme.spacing.lg};
+  grid-template-columns: 2fr 150px 150px;
+  gap: ${theme.spacing.xl};
+  padding: ${theme.spacing.lg} ${theme.spacing.xl};
   border-bottom: 1px solid ${theme.colors.gray100};
-  transition: background-color 0.2s ease;
-  min-width: 800px;
+  transition: all 0.2s ease;
+  align-items: center;
+  min-width: 500px;
   
   &:hover {
-    background: ${theme.colors.gray50};
+    background: linear-gradient(135deg, ${theme.colors.primary}02 0%, ${theme.colors.primaryLight}05 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px ${theme.colors.primary}10;
   }
   
   &:last-child {
@@ -142,13 +134,18 @@ const TableRow = styled.div`
   }
   
   @media (max-width: ${theme.breakpoints.tablet}) {
-    padding: ${theme.spacing.md};
-    gap: ${theme.spacing.sm};
-  }
-  
-  @media (max-width: ${theme.breakpoints.mobile}) {
-    grid-template-columns: 2fr 100px 100px 150px 150px 120px;
-    padding: ${theme.spacing.sm};
+    display: block;
+    background: ${theme.colors.white};
+    border-radius: ${theme.borderRadius.lg};
+    box-shadow: ${theme.shadows.sm};
+    margin-bottom: ${theme.spacing.md};
+    padding: ${theme.spacing.lg};
+    border-bottom: none;
+    
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: ${theme.shadows.md};
+    }
   }
 `;
 
@@ -465,8 +462,6 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack }) => {
   const [users, setUsers] = useState<any[]>([]);
   const [attendance, setAttendance] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [editingUser, setEditingUser] = useState<any>(null);
-  const [deletingUser, setDeletingUser] = useState<any>(null);
   const dataService = DataService.getInstance();
 
   useEffect(() => {
@@ -521,23 +516,6 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack }) => {
     }).format(date);
   };
 
-  const handleEditUser = (userData: any) => {
-    setEditingUser(userData);
-  };
-
-  const handleDeleteUser = (userData: any) => {
-    setDeletingUser(userData);
-  };
-
-  const handleSaveUser = async (userData: any) => {
-    await dataService.updateUser(editingUser.id, userData);
-    await loadData(); // Refresh the data
-  };
-
-  const handleConfirmDelete = async () => {
-    await dataService.deleteUser(deletingUser.id);
-    await loadData(); // Refresh the data
-  };
 
   const getInitials = (name: string) => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase();
@@ -627,9 +605,6 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack }) => {
                   <div>User</div>
                   <div>Type</div>
                   <div>Status</div>
-                  <div>Check In</div>
-                  <div>Check Out</div>
-                  <div>Actions</div>
                 </TableHeader>
           
           {users.filter(userData => userData.userType !== 'admin').map((userData) => {
@@ -672,49 +647,6 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack }) => {
                       </>
                     )}
                   </AttendanceStatus>
-                </div>
-                
-                <TimeDisplay>
-                  {todayAttendance?.checkInTime ? (
-                    <div>
-                      <LoginIcon size={14} style={{ marginRight: theme.spacing.xs }} />
-                      <span className="time">
-                        {formatTime(todayAttendance.checkInTime)}
-                      </span>
-                    </div>
-                  ) : (
-                    '-'
-                  )}
-                </TimeDisplay>
-                
-                <TimeDisplay>
-                  {todayAttendance?.checkOutTime ? (
-                    <div>
-                      <LogoutIcon size={14} style={{ marginRight: theme.spacing.xs }} />
-                      <span className="time">
-                        {formatTime(todayAttendance.checkOutTime)}
-                      </span>
-                    </div>
-                  ) : (
-                    '-'
-                  )}
-                </TimeDisplay>
-                
-                <div style={{ display: 'flex', gap: theme.spacing.xs }}>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => handleEditUser(userData)}
-                  >
-                    Edit
-                  </Button>
-                  <DeleteButton 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => handleDeleteUser(userData)}
-                  >
-                    Delete
-                  </DeleteButton>
                 </div>
               </TableRow>
             );
@@ -766,53 +698,12 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack }) => {
                         {isCheckedIn ? 'Checked In' : 'Not Present'}
                       </StatusBadge>
                     </div>
-                    <div>
-                      <strong>Check In:</strong><br />
-                      {todayAttendance?.checkInTime ? formatTime(todayAttendance.checkInTime) : '-'}
-                    </div>
-                    <div>
-                      <strong>Check Out:</strong><br />
-                      {todayAttendance?.checkOutTime ? formatTime(todayAttendance.checkOutTime) : '-'}
-                    </div>
                   </MobileUserDetails>
-                  
-                  <MobileUserActions>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => handleEditUser(userData)}
-                    >
-                      Edit
-                    </Button>
-                    <DeleteButton 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => handleDeleteUser(userData)}
-                    >
-                      Delete
-                    </DeleteButton>
-                  </MobileUserActions>
                 </MobileUserCard>
               );
             })}
           </div>
         </>
-      )}
-
-      {editingUser && (
-        <EditUserModal
-          user={editingUser}
-          onClose={() => setEditingUser(null)}
-          onSave={handleSaveUser}
-        />
-      )}
-
-      {deletingUser && (
-        <DeleteUserModal
-          user={deletingUser}
-          onClose={() => setDeletingUser(null)}
-          onConfirm={handleConfirmDelete}
-        />
       )}
     </PageContainer>
   );
