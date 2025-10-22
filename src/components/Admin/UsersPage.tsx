@@ -14,14 +14,12 @@ import {
 
 const PageContainer = styled.div`
   padding: ${theme.spacing.xl};
-  max-width: 1200px;
-  margin: 0 auto;
+  width: 100%;
   min-height: 100vh;
   background: ${theme.colors.backgroundSecondary};
   
   @media (max-width: ${theme.breakpoints.tablet}) {
     padding: ${theme.spacing.lg};
-    max-width: 100%;
   }
   
   @media (max-width: ${theme.breakpoints.mobile}) {
