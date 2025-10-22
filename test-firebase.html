@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Firebase Test</title>
+</head>
+<body>
+    <h1>Firebase Connection Test</h1>
+    <div id="status">Testing...</div>
+    <div id="error" style="color: red;"></div>
+    
+    <script type="module">
+        // Import Firebase
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js';
+        import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js';
+        
+        const firebaseConfig = {
+            apiKey: "AIzaSyDlyRXx3aUhmsFx0iON1xDE1qGWorsdztc",
+            authDomain: "uncommonattendance.firebaseapp.com",
+            projectId: "uncommonattendance",
+            storageBucket: "uncommonattendance.firebasestorage.app",
+            messagingSenderId: "28326821265",
+            appId: "1:28326821265:web:5b44ada2b7cba9a83bae30",
+            measurementId: "G-6XGF42V4MH"
+        };
+        
+        try {
+            const app = initializeApp(firebaseConfig);
+            const auth = getAuth(app);
+            
+            document.getElementById('status').innerHTML = '✅ Firebase initialized successfully!';
+            
+            // Test anonymous sign in
+            signInAnonymously(auth).then(() => {
+                document.getElementById('status').innerHTML += '<br>✅ Anonymous authentication works!';
+            }).catch((error) => {
+                document.getElementById('error').innerHTML = 'Auth error: ' + error.message;
+            });
+            
+        } catch (error) {
+            document.getElementById('error').innerHTML = 'Firebase error: ' + error.message;
+            document.getElementById('status').innerHTML = '❌ Firebase failed to initialize';
+        }
+    </script>
+</body>
+</html>
