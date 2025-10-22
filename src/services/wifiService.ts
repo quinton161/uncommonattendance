@@ -212,52 +212,44 @@ export class WiFiService {
 
   /**
    * Start monitoring WiFi connection for automatic check-in
+   * Only checks once on login, then stops continuous monitoring
    */
   startWiFiMonitoring(onUncommonNetworkDetected: () => void): () => void {
     let isMonitoring = true;
-    let lastNetworkState = false;
     let hasCheckedOnLogin = false;
 
-    const checkNetwork = async () => {
-      if (!isMonitoring) return;
+    const checkNetworkOnce = async () => {
+      if (!isMonitoring || hasCheckedOnLogin) return;
 
       try {
+        console.log('Performing one-time WiFi check on login...');
         const isUncommon = await this.isConnectedToUncommonWiFi();
         
-        // Only trigger if we just connected to Uncommon network
-        if (isUncommon && !lastNetworkState) {
-          console.log('Uncommon WiFi network detected!');
+        if (isUncommon) {
+          console.log('Uncommon WiFi network detected on login!');
           uniqueToast.success('Connected to Uncommon WiFi - Auto check-in available!', {
             autoClose: 5000
           });
           onUncommonNetworkDetected();
+        } else {
+          console.log('Not connected to Uncommon WiFi on login');
         }
         
-        lastNetworkState = isUncommon;
+        hasCheckedOnLogin = true;
+        console.log('WiFi check completed. No further automatic checks will be performed.');
       } catch (error) {
-        console.error('WiFi monitoring error:', error);
+        console.error('WiFi login check error:', error);
+        hasCheckedOnLogin = true;
       }
     };
 
-    // Check immediately
-    checkNetwork();
-    
-    // Check every 2 minutes (less frequent)
-    const interval = setInterval(checkNetwork, 120000);
+    // Check only once immediately on login
+    checkNetworkOnce();
 
-    // Listen for online/offline events
-    const handleOnline = () => {
-      console.log('Network connection restored');
-      setTimeout(checkNetwork, 2000); // Check after 2 seconds
-    };
-
-    window.addEventListener('online', handleOnline);
-
-    // Return cleanup function
+    // Return cleanup function (no intervals to clean up)
     return () => {
       isMonitoring = false;
-      clearInterval(interval);
-      window.removeEventListener('online', handleOnline);
+      console.log('WiFi monitoring cleanup completed');
     };
   }
 }

@@ -745,16 +745,14 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
     
     const cleanup = wifiService.startWiFiMonitoring(handleAutoCheckIn);
     
-    // Update network info immediately and then periodically
+    // Update network info only once on login
     updateNetworkInfo();
-    const networkInfoInterval = setInterval(updateNetworkInfo, 300000); // Every 5 minutes
 
     // Return cleanup function
     return () => {
       console.log('Stopping WiFi monitoring...');
       setWifiMonitoring(false);
       cleanup();
-      clearInterval(networkInfoInterval);
     };
   }, [wifiMonitoring, wifiService, handleAutoCheckIn, updateNetworkInfo]);
 
