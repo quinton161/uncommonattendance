@@ -14,20 +14,30 @@ import {
   CheckCircleIcon
 } from '../Common/Icons';
 
-const PageContainer = styled.div`
-  padding: ${theme.spacing.xl};
-  max-width: 1200px;
-  margin: 0 auto;
+const PageContainer = styled.div<{ isEmbedded?: boolean }>`
+  padding: ${props => props.isEmbedded ? '0' : theme.spacing.xl};
+  width: 100%;
   min-height: 100vh;
   background: ${theme.colors.backgroundSecondary};
   
   @media (max-width: ${theme.breakpoints.tablet}) {
-    padding: ${theme.spacing.lg};
-    max-width: 100%;
+    padding: ${props => props.isEmbedded ? '0' : theme.spacing.lg};
   }
   
   @media (max-width: ${theme.breakpoints.mobile}) {
-    padding: ${theme.spacing.md};
+    padding: ${props => props.isEmbedded ? '0' : theme.spacing.md};
+  }
+`;
+
+const ContentWrapper = styled.div<{ isEmbedded?: boolean }>`
+  padding: ${props => props.isEmbedded ? theme.spacing.lg : '0'};
+  
+  @media (max-width: ${theme.breakpoints.tablet}) {
+    padding: ${props => props.isEmbedded ? theme.spacing.md : '0'};
+  }
+  
+  @media (max-width: ${theme.breakpoints.mobile}) {
+    padding: ${props => props.isEmbedded ? theme.spacing.sm : '0'};
   }
 `;
 
@@ -175,9 +185,10 @@ const EmptyState = styled.div`
 
 interface SchedulePageProps {
   onBack?: () => void;
+  isEmbedded?: boolean;
 }
 
-export const SchedulePage: React.FC<SchedulePageProps> = ({ onBack }) => {
+export const SchedulePage: React.FC<SchedulePageProps> = ({ onBack, isEmbedded = true }) => {
   const { user } = useAuth();
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -194,7 +205,7 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({ onBack }) => {
       const eventsData = await dataService.getEvents();
       
       // Filter for upcoming events and add mock schedule data
-      const upcomingEvents = eventsData.filter(event => 
+      const upcomingEvents = eventsData.filter((event) => 
         new Date(event.startDate) >= new Date()
       ).slice(0, 6);
       
@@ -229,7 +240,8 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({ onBack }) => {
   };
 
   return (
-    <PageContainer>
+    <PageContainer isEmbedded={isEmbedded}>
+      <ContentWrapper isEmbedded={isEmbedded}>
       <Header>
         <HeaderTitle>
           <h1 style={{ 
@@ -243,11 +255,6 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({ onBack }) => {
           </h1>
           <p>Your upcoming events and activities</p>
         </HeaderTitle>
-        {onBack && (
-          <Button variant="outline" onClick={onBack}>
-            Back to Dashboard
-          </Button>
-        )}
       </Header>
 
       {loading ? (
@@ -300,6 +307,7 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({ onBack }) => {
           )}
         </ScheduleGrid>
       )}
+      </ContentWrapper>
     </PageContainer>
   );
 };

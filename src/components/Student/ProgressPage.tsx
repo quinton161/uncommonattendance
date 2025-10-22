@@ -13,20 +13,30 @@ import {
   BarChartIcon
 } from '../Common/Icons';
 
-const PageContainer = styled.div`
-  padding: ${theme.spacing.xl};
-  max-width: 1200px;
-  margin: 0 auto;
+const PageContainer = styled.div<{ isEmbedded?: boolean }>`
+  padding: ${props => props.isEmbedded ? '0' : theme.spacing.xl};
+  width: 100%;
   min-height: 100vh;
   background: ${theme.colors.backgroundSecondary};
   
   @media (max-width: ${theme.breakpoints.tablet}) {
-    padding: ${theme.spacing.lg};
-    max-width: 100%;
+    padding: ${props => props.isEmbedded ? '0' : theme.spacing.lg};
   }
   
   @media (max-width: ${theme.breakpoints.mobile}) {
-    padding: ${theme.spacing.md};
+    padding: ${props => props.isEmbedded ? '0' : theme.spacing.md};
+  }
+`;
+
+const ContentWrapper = styled.div<{ isEmbedded?: boolean }>`
+  padding: ${props => props.isEmbedded ? theme.spacing.lg : '0'};
+  
+  @media (max-width: ${theme.breakpoints.tablet}) {
+    padding: ${props => props.isEmbedded ? theme.spacing.md : '0'};
+  }
+  
+  @media (max-width: ${theme.breakpoints.mobile}) {
+    padding: ${props => props.isEmbedded ? theme.spacing.sm : '0'};
   }
 `;
 
@@ -205,9 +215,10 @@ const AchievementInfo = styled.div`
 
 interface ProgressPageProps {
   onBack?: () => void;
+  isEmbedded?: boolean;
 }
 
-export const ProgressPage: React.FC<ProgressPageProps> = ({ onBack }) => {
+export const ProgressPage: React.FC<ProgressPageProps> = ({ onBack, isEmbedded = true }) => {
   const { user } = useAuth();
   const [stats, setStats] = useState({
     attendanceRate: 85,
@@ -278,7 +289,8 @@ export const ProgressPage: React.FC<ProgressPageProps> = ({ onBack }) => {
   ];
 
   return (
-    <PageContainer>
+    <PageContainer isEmbedded={isEmbedded}>
+      <ContentWrapper isEmbedded={isEmbedded}>
       <Header>
         <HeaderTitle>
           <h1 style={{ 
@@ -292,11 +304,6 @@ export const ProgressPage: React.FC<ProgressPageProps> = ({ onBack }) => {
           </h1>
           <p>Track your attendance progress and achievements</p>
         </HeaderTitle>
-        {onBack && (
-          <Button variant="outline" onClick={onBack}>
-            Back to Dashboard
-          </Button>
-        )}
       </Header>
 
       {loading ? (
@@ -371,6 +378,7 @@ export const ProgressPage: React.FC<ProgressPageProps> = ({ onBack }) => {
           </AchievementsList>
         </>
       )}
+      </ContentWrapper>
     </PageContainer>
   );
 };

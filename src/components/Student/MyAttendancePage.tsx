@@ -15,20 +15,30 @@ import {
   TrendingUpIcon
 } from '../Common/Icons';
 
-const PageContainer = styled.div`
-  padding: ${theme.spacing.xl};
-  max-width: 1200px;
-  margin: 0 auto;
+const PageContainer = styled.div<{ isEmbedded?: boolean }>`
+  padding: ${props => props.isEmbedded ? '0' : theme.spacing.xl};
+  width: 100%;
   min-height: 100vh;
   background: ${theme.colors.backgroundSecondary};
   
   @media (max-width: ${theme.breakpoints.tablet}) {
-    padding: ${theme.spacing.lg};
-    max-width: 100%;
+    padding: ${props => props.isEmbedded ? '0' : theme.spacing.lg};
   }
   
   @media (max-width: ${theme.breakpoints.mobile}) {
-    padding: ${theme.spacing.md};
+    padding: ${props => props.isEmbedded ? '0' : theme.spacing.md};
+  }
+`;
+
+const ContentWrapper = styled.div<{ isEmbedded?: boolean }>`
+  padding: ${props => props.isEmbedded ? theme.spacing.lg : '0'};
+  
+  @media (max-width: ${theme.breakpoints.tablet}) {
+    padding: ${props => props.isEmbedded ? theme.spacing.md : '0'};
+  }
+  
+  @media (max-width: ${theme.breakpoints.mobile}) {
+    padding: ${props => props.isEmbedded ? theme.spacing.sm : '0'};
   }
 `;
 
@@ -39,6 +49,18 @@ const Header = styled.div`
   margin-bottom: ${theme.spacing.xl};
   padding-bottom: ${theme.spacing.lg};
   border-bottom: 2px solid ${theme.colors.primary};
+  gap: ${theme.spacing.md};
+  
+  @media (max-width: ${theme.breakpoints.tablet}) {
+    flex-direction: column;
+    align-items: stretch;
+    gap: ${theme.spacing.lg};
+  }
+  
+  @media (max-width: ${theme.breakpoints.mobile}) {
+    margin-bottom: ${theme.spacing.lg};
+    padding-bottom: ${theme.spacing.md};
+  }
 `;
 
 const HeaderTitle = styled.div`
@@ -185,9 +207,10 @@ const EmptyState = styled.div`
 
 interface MyAttendancePageProps {
   onBack?: () => void;
+  isEmbedded?: boolean;
 }
 
-export const MyAttendancePage: React.FC<MyAttendancePageProps> = ({ onBack }) => {
+export const MyAttendancePage: React.FC<MyAttendancePageProps> = ({ onBack, isEmbedded = true }) => {
   const { user } = useAuth();
   const [attendanceHistory, setAttendanceHistory] = useState<any[]>([]);
   const [stats, setStats] = useState({
@@ -247,8 +270,9 @@ export const MyAttendancePage: React.FC<MyAttendancePageProps> = ({ onBack }) =>
   };
 
   return (
-    <PageContainer>
-      <Header>
+    <PageContainer isEmbedded={isEmbedded}>
+      <ContentWrapper isEmbedded={isEmbedded}>
+        <Header>
         <HeaderTitle>
           <h1 style={{ 
             display: 'flex', 
@@ -261,11 +285,6 @@ export const MyAttendancePage: React.FC<MyAttendancePageProps> = ({ onBack }) =>
           </h1>
           <p>Track your attendance history and patterns</p>
         </HeaderTitle>
-        {onBack && (
-          <Button variant="outline" onClick={onBack}>
-            Back to Dashboard
-          </Button>
-        )}
       </Header>
 
       <StatsGrid>
@@ -330,6 +349,7 @@ export const MyAttendancePage: React.FC<MyAttendancePageProps> = ({ onBack }) =>
           </HistoryList>
         )}
       </AttendanceHistory>
+      </ContentWrapper>
     </PageContainer>
   );
 };

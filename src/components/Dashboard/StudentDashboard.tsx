@@ -13,6 +13,7 @@ import {
 import DataService from '../../services/DataService';
 import { AttendanceService } from '../../services/attendanceService';
 import { DailyAttendanceService, DailyAttendanceStats } from '../../services/dailyAttendanceService';
+import WiFiService, { NetworkInfo } from '../../services/wifiService';
 import { EventsPage } from '../Events/EventsPage';
 import { MyAttendancePage } from '../Student/MyAttendancePage';
 import { SchedulePage } from '../Student/SchedulePage';
@@ -31,7 +32,8 @@ import {
   LocationOnIcon,
   AssignmentIcon,
   BarChartIcon,
-  LoginIcon
+  LoginIcon,
+  WiFiIcon
 } from '../Common/Icons';
 
 const DashboardContainer = styled.div`
@@ -310,6 +312,70 @@ const AttendanceCard = styled(StatCard)`
   }
 `;
 
+const WiFiStatusCard = styled(StatCard)`
+  grid-column: span 2;
+  
+  @media (max-width: 768px) {
+    grid-column: span 1;
+  }
+`;
+
+const WiFiInfo = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: ${theme.spacing.md};
+  
+  @media (max-width: ${theme.breakpoints.tablet}) {
+    flex-direction: column;
+    gap: ${theme.spacing.sm};
+    align-items: stretch;
+  }
+`;
+
+const NetworkStatus = styled.div<{ isUncommon: boolean }>`
+  display: flex;
+  align-items: center;
+  gap: ${theme.spacing.xs};
+  padding: ${theme.spacing.xs} ${theme.spacing.sm};
+  border-radius: ${theme.borderRadius.full};
+  font-size: ${theme.fontSizes.sm};
+  font-weight: ${theme.fontWeights.medium};
+  
+  ${props => props.isUncommon ? `
+    background: rgba(34, 197, 94, 0.1);
+    color: #16a34a;
+  ` : `
+    background: rgba(107, 114, 128, 0.1);
+    color: #6b7280;
+  `}
+`;
+
+const AutoCheckInToggle = styled.button`
+  display: flex;
+  align-items: center;
+  gap: ${theme.spacing.xs};
+  padding: ${theme.spacing.xs} ${theme.spacing.sm};
+  border: 1px solid ${theme.colors.gray300};
+  border-radius: ${theme.borderRadius.md};
+  background: ${theme.colors.white};
+  color: ${theme.colors.textSecondary};
+  font-size: ${theme.fontSizes.sm};
+  cursor: pointer;
+  transition: all 0.2s ease;
+  
+  &:hover {
+    border-color: ${theme.colors.primary};
+    color: ${theme.colors.primary};
+  }
+  
+  &.enabled {
+    background: ${theme.colors.primary};
+    color: ${theme.colors.white};
+    border-color: ${theme.colors.primary};
+  }
+`;
+
 const AttendanceControls = styled.div`
   display: flex;
   align-items: center;
@@ -520,9 +586,13 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
     lastAttendanceDate: null,
   });
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
+  const [networkInfo, setNetworkInfo] = useState<NetworkInfo | null>(null);
+  const [wifiMonitoring, setWifiMonitoring] = useState(false);
+  const [autoCheckInEnabled, setAutoCheckInEnabled] = useState(true);
   const dataService = DataService.getInstance();
   const attendanceService = AttendanceService.getInstance();
   const dailyAttendanceService = DailyAttendanceService.getInstance();
+  const wifiService = WiFiService.getInstance();
 
   // useEffect hooks will be moved after function declarations
 
@@ -638,16 +708,74 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
     });
   };
 
-  const handleCheckIn = async () => {
-    console.log('handleCheckIn called - user:', !!user, 'canCheckIn:', canCheckIn);
+  // WiFi monitoring functions
+  const updateNetworkInfo = useCallback(async () => {
+    try {
+      const info = await wifiService.getNetworkInfo();
+      setNetworkInfo(info);
+      console.log('Network info updated:', info);
+    } catch (error) {
+      console.error('Failed to get network info:', error);
+    }
+  }, [wifiService]);
+
+  const handleAutoCheckIn = useCallback(async () => {
+    if (!autoCheckInEnabled || !canCheckIn || checkedIn) {
+      console.log('Auto check-in skipped:', { autoCheckInEnabled, canCheckIn, checkedIn });
+      return;
+    }
+
+    try {
+      console.log('Auto check-in triggered by WiFi detection');
+      uniqueToast.info('Uncommon WiFi detected - Auto checking in...', { autoClose: 3000 });
+      
+      // Call the check-in function with automatic flag
+      await handleCheckInInternal(true);
+    } catch (error) {
+      console.error('Auto check-in failed:', error);
+      uniqueToast.error('Auto check-in failed. Please check in manually.', { autoClose: 5000 });
+    }
+  }, [autoCheckInEnabled, canCheckIn, checkedIn]);
+
+  const startWiFiMonitoring = useCallback(() => {
+    if (wifiMonitoring) return;
+
+    console.log('Starting WiFi monitoring...');
+    setWifiMonitoring(true);
+    
+    const cleanup = wifiService.startWiFiMonitoring(handleAutoCheckIn);
+    
+    // Update network info immediately and then periodically
+    updateNetworkInfo();
+    const networkInfoInterval = setInterval(updateNetworkInfo, 60000); // Every minute
+
+    // Return cleanup function
+    return () => {
+      console.log('Stopping WiFi monitoring...');
+      setWifiMonitoring(false);
+      cleanup();
+      clearInterval(networkInfoInterval);
+    };
+  }, [wifiMonitoring, wifiService, handleAutoCheckIn, updateNetworkInfo]);
+
+  const toggleAutoCheckIn = () => {
+    setAutoCheckInEnabled(!autoCheckInEnabled);
+    uniqueToast.info(
+      `Auto check-in ${!autoCheckInEnabled ? 'enabled' : 'disabled'}`, 
+      { autoClose: 3000 }
+    );
+  };
+
+  const handleCheckInInternal = async (isAutomatic: boolean = false) => {
+    console.log('handleCheckInInternal called - user:', !!user, 'canCheckIn:', canCheckIn, 'isAutomatic:', isAutomatic);
     if (!user) {
       console.error('No user found');
-      uniqueToast.error('Please log in first');
+      if (!isAutomatic) uniqueToast.error('Please log in first');
       return;
     }
     if (!canCheckIn) {
       console.error('Cannot check in - canCheckIn is false');
-      uniqueToast.error('You cannot check in right now');
+      if (!isAutomatic) uniqueToast.error('You cannot check in right now');
       return;
     }
 
@@ -740,7 +868,10 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
           position: 'top-center'
         });
       } else {
-        uniqueToast.success('Checked in successfully! You are on time.', { autoClose: 3000 });
+        const message = isAutomatic 
+          ? 'Auto check-in successful! You are on time.' 
+          : 'Checked in successfully! You are on time.';
+        uniqueToast.success(message, { autoClose: 3000 });
       }
       
     } catch (error) {
@@ -769,6 +900,11 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
     }
   };
 
+  // Manual check-in wrapper
+  const handleCheckIn = async () => {
+    await handleCheckInInternal(false);
+  };
+
   const handleNavClick = (navItem: string) => {
     setActiveNav(navItem);
     setMobileMenuOpen(false); // Close mobile menu when navigating
@@ -783,11 +919,11 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
       case 'events':
         return <EventsPage onBack={() => setActiveNav('dashboard')} />;
       case 'attendance':
-        return <MyAttendancePage onBack={() => setActiveNav('dashboard')} />;
+        return <MyAttendancePage onBack={() => setActiveNav('dashboard')} isEmbedded={true} />;
       case 'schedule':
-        return <SchedulePage onBack={() => setActiveNav('dashboard')} />;
+        return <SchedulePage onBack={() => setActiveNav('dashboard')} isEmbedded={true} />;
       case 'progress':
-        return <ProgressPage onBack={() => setActiveNav('dashboard')} />;
+        return <ProgressPage onBack={() => setActiveNav('dashboard')} isEmbedded={true} />;
       default:
         return null; // Will render the main dashboard
     }
@@ -856,6 +992,16 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
       todayStatus: stats.todayStatus
     });
   }, [checkedIn, canCheckIn, canCheckOut, checkInTime, stats.todayStatus]);
+
+  // WiFi monitoring effect
+  useEffect(() => {
+    if (!user || user.userType !== 'attendee') return;
+
+    console.log('Starting WiFi monitoring for automatic check-in...');
+    const cleanup = startWiFiMonitoring();
+    
+    return cleanup;
+  }, [user, startWiFiMonitoring]);
 
   return (
     <DashboardContainer>
@@ -995,6 +1141,23 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
               )}
             </AttendanceControls>
           </AttendanceCard>
+          
+          <WiFiStatusCard variant="accent">
+            <StatIcon><WiFiIcon size={32} /></StatIcon>
+            <StatLabel>WiFi Auto Check-in</StatLabel>
+            <WiFiInfo>
+              <NetworkStatus isUncommon={networkInfo?.isUncommonNetwork || false}>
+                {networkInfo?.isUncommonNetwork ? '✓ Uncommon WiFi' : '○ Other Network'}
+              </NetworkStatus>
+              <AutoCheckInToggle 
+                className={autoCheckInEnabled ? 'enabled' : ''}
+                onClick={toggleAutoCheckIn}
+                title={`${autoCheckInEnabled ? 'Disable' : 'Enable'} automatic check-in when connected to Uncommon WiFi`}
+              >
+                {autoCheckInEnabled ? '✓ Auto Check-in ON' : '○ Auto Check-in OFF'}
+              </AutoCheckInToggle>
+            </WiFiInfo>
+          </WiFiStatusCard>
           
           <StatCard variant="secondary">
             <StatIcon><AssignmentIcon size={32} /></StatIcon>
