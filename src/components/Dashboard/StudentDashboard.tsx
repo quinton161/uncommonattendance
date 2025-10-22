@@ -747,7 +747,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
     
     // Update network info immediately and then periodically
     updateNetworkInfo();
-    const networkInfoInterval = setInterval(updateNetworkInfo, 60000); // Every minute
+    const networkInfoInterval = setInterval(updateNetworkInfo, 300000); // Every 5 minutes
 
     // Return cleanup function
     return () => {

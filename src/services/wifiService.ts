@@ -216,6 +216,7 @@ export class WiFiService {
   startWiFiMonitoring(onUncommonNetworkDetected: () => void): () => void {
     let isMonitoring = true;
     let lastNetworkState = false;
+    let hasCheckedOnLogin = false;
 
     const checkNetwork = async () => {
       if (!isMonitoring) return;
@@ -241,8 +242,8 @@ export class WiFiService {
     // Check immediately
     checkNetwork();
     
-    // Check every 30 seconds
-    const interval = setInterval(checkNetwork, 30000);
+    // Check every 2 minutes (less frequent)
+    const interval = setInterval(checkNetwork, 120000);
 
     // Listen for online/offline events
     const handleOnline = () => {

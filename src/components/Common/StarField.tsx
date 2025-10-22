@@ -158,9 +158,9 @@ export const StarField: React.FC<StarFieldProps> = ({
 
   const getSpeedMultiplier = () => {
     switch (speed) {
-      case 'slow': return 1.5;
-      case 'fast': return 0.7;
-      default: return 1;
+      case 'slow': return 3.0;
+      case 'fast': return 1.5;
+      default: return 2.0;
     }
   };
 
@@ -180,7 +180,7 @@ export const StarField: React.FC<StarFieldProps> = ({
           left={Math.random() * 100}
           top={Math.random() * 100}
           delay={Math.random() * 5}
-          duration={(Math.random() * 3 + 2) * speedMultiplier}
+          duration={(Math.random() * 8 + 6) * speedMultiplier}
           type="twinkle"
         />
       );
@@ -195,7 +195,7 @@ export const StarField: React.FC<StarFieldProps> = ({
           left={Math.random() * 100}
           top={Math.random() * 100}
           delay={Math.random() * 8}
-          duration={(Math.random() * 6 + 4) * speedMultiplier}
+          duration={(Math.random() * 12 + 8) * speedMultiplier}
           type="float"
         />
       );
@@ -210,7 +210,7 @@ export const StarField: React.FC<StarFieldProps> = ({
           left={-10}
           top={Math.random() * 100}
           delay={Math.random() * 10}
-          duration={(Math.random() * 15 + 10) * speedMultiplier}
+          duration={(Math.random() * 25 + 20) * speedMultiplier}
           type="drift"
         />
       );
@@ -224,7 +224,7 @@ export const StarField: React.FC<StarFieldProps> = ({
           left={-10}
           top={Math.random() * 50}
           delay={Math.random() * 20 + 5}
-          duration={(Math.random() * 3 + 2) * speedMultiplier}
+          duration={(Math.random() * 8 + 5) * speedMultiplier}
         />
       );
     }
