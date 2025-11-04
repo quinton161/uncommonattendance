@@ -31,6 +31,14 @@ const PageContainer = styled.div`
   @media (max-width: ${theme.breakpoints.mobile}) {
     padding: ${theme.spacing.md};
   }
+  
+  @media (max-width: 420px) {
+    padding: ${theme.spacing.sm};
+  }
+  
+  @media (max-width: 360px) {
+    padding: ${theme.spacing.xs};
+  }
 `;
 
 const Header = styled.div`
@@ -52,6 +60,17 @@ const Header = styled.div`
     margin-bottom: ${theme.spacing.lg};
     padding-bottom: ${theme.spacing.md};
   }
+  
+  @media (max-width: 420px) {
+    margin-bottom: ${theme.spacing.md};
+    padding-bottom: ${theme.spacing.sm};
+    gap: ${theme.spacing.md};
+  }
+  
+  @media (max-width: 360px) {
+    margin-bottom: ${theme.spacing.sm};
+    gap: ${theme.spacing.sm};
+  }
 `;
 
 const HeaderTitle = styled.div`
@@ -64,12 +83,32 @@ const HeaderTitle = styled.div`
     display: flex;
     align-items: center;
     gap: ${theme.spacing.md};
+    
+    @media (max-width: 420px) {
+      font-size: ${theme.fontSizes['2xl']};
+      gap: ${theme.spacing.sm};
+    }
+    
+    @media (max-width: 360px) {
+      font-size: ${theme.fontSizes.xl};
+      flex-direction: column;
+      align-items: flex-start;
+      gap: ${theme.spacing.xs};
+    }
   }
   
   p {
     color: ${theme.colors.textSecondary};
     margin: 0;
     font-size: ${theme.fontSizes.lg};
+    
+    @media (max-width: 420px) {
+      font-size: ${theme.fontSizes.base};
+    }
+    
+    @media (max-width: 360px) {
+      font-size: ${theme.fontSizes.sm};
+    }
   }
 `;
 
@@ -82,19 +121,51 @@ const FilterSection = styled.div`
   
   display: flex;
   gap: ${theme.spacing.md};
-  align-items: center;
+  align-items: flex-end;
   flex-wrap: wrap;
+  
+  @media (max-width: ${theme.breakpoints.tablet}) {
+    flex-direction: column;
+    align-items: stretch;
+    gap: ${theme.spacing.lg};
+    padding: ${theme.spacing.md};
+  }
+  
+  @media (max-width: ${theme.breakpoints.mobile}) {
+    padding: ${theme.spacing.sm};
+    gap: ${theme.spacing.md};
+  }
+  
+  @media (max-width: 420px) {
+    padding: ${theme.spacing.xs};
+    gap: ${theme.spacing.sm};
+    border-radius: ${theme.borderRadius.md};
+  }
+  
+  @media (max-width: 360px) {
+    margin-bottom: ${theme.spacing.md};
+  }
 `;
 
 const FilterGroup = styled.div`
   display: flex;
   flex-direction: column;
   gap: ${theme.spacing.xs};
+  min-width: 140px;
+  
+  @media (max-width: ${theme.breakpoints.tablet}) {
+    min-width: unset;
+    width: 100%;
+  }
   
   label {
     font-size: ${theme.fontSizes.sm};
     font-weight: ${theme.fontWeights.medium};
     color: ${theme.colors.textPrimary};
+    
+    @media (max-width: ${theme.breakpoints.mobile}) {
+      font-size: ${theme.fontSizes.xs};
+    }
   }
   
   select, input {
@@ -102,11 +173,99 @@ const FilterGroup = styled.div`
     border: 1px solid ${theme.colors.gray300};
     border-radius: ${theme.borderRadius.md};
     font-size: ${theme.fontSizes.sm};
+    background: ${theme.colors.white};
+    width: 100%;
+    box-sizing: border-box;
+    
+    @media (max-width: ${theme.breakpoints.mobile}) {
+      padding: ${theme.spacing.md};
+      font-size: ${theme.fontSizes.base};
+      min-height: 44px;
+    }
+    
+    @media (max-width: 420px) {
+      padding: ${theme.spacing.md} ${theme.spacing.sm};
+      font-size: ${theme.fontSizes.base};
+      min-height: 48px;
+    }
+    
+    @media (max-width: 360px) {
+      padding: ${theme.spacing.lg} ${theme.spacing.sm};
+      font-size: ${theme.fontSizes.lg};
+      min-height: 52px;
+    }
     
     &:focus {
       outline: none;
       border-color: ${theme.colors.primary};
+      box-shadow: 0 0 0 2px ${theme.colors.primary}20;
     }
+  }
+`;
+
+const StatsContainer = styled.div`
+  display: flex;
+  gap: ${theme.spacing.lg};
+  align-items: center;
+  font-size: ${theme.fontSizes.sm};
+  color: ${theme.colors.textSecondary};
+  
+  @media (max-width: ${theme.breakpoints.tablet}) {
+    flex-direction: column;
+    align-items: stretch;
+    gap: ${theme.spacing.sm};
+    width: 100%;
+  }
+  
+  @media (max-width: ${theme.breakpoints.mobile}) {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: ${theme.spacing.sm};
+  }
+  
+  @media (max-width: 420px) {
+    grid-template-columns: 1fr;
+    gap: ${theme.spacing.xs};
+  }
+`;
+
+const StatItem = styled.span`
+  font-weight: ${theme.fontWeights.medium};
+  padding: ${theme.spacing.xs} ${theme.spacing.sm};
+  background: ${theme.colors.gray50};
+  border-radius: ${theme.borderRadius.md};
+  
+  @media (max-width: ${theme.breakpoints.tablet}) {
+    text-align: center;
+    padding: ${theme.spacing.sm};
+  }
+  
+  @media (max-width: 420px) {
+    padding: ${theme.spacing.md};
+    font-size: ${theme.fontSizes.base};
+    font-weight: ${theme.fontWeights.semibold};
+  }
+  
+  @media (max-width: 360px) {
+    padding: ${theme.spacing.lg} ${theme.spacing.md};
+    font-size: ${theme.fontSizes.lg};
+  }
+`;
+
+const ActionButtonsContainer = styled.div`
+  display: flex;
+  gap: ${theme.spacing.md};
+  margin-bottom: ${theme.spacing.lg};
+  align-items: center;
+  
+  @media (max-width: ${theme.breakpoints.tablet}) {
+    flex-direction: column;
+    align-items: stretch;
+    gap: ${theme.spacing.sm};
+  }
+  
+  @media (max-width: ${theme.breakpoints.mobile}) {
+    gap: ${theme.spacing.xs};
   }
 `;
 
@@ -124,8 +283,8 @@ const AttendanceTable = styled.div`
 
 const TableHeader = styled.div`
   display: grid;
-  grid-template-columns: 2fr 140px 130px 150px 150px 150px;
-  gap: ${theme.spacing.xl};
+  grid-template-columns: 2fr 140px 130px 150px;
+  gap: ${theme.spacing.md};
   padding: ${theme.spacing.lg} ${theme.spacing.xl};
   background: linear-gradient(135deg, ${theme.colors.primary}05 0%, ${theme.colors.primaryLight}10 100%);
   border-bottom: 2px solid ${theme.colors.primary}20;
@@ -135,6 +294,13 @@ const TableHeader = styled.div`
   text-transform: uppercase;
   letter-spacing: 0.5px;
   
+  @media (max-width: ${theme.breakpoints.desktop}) {
+    grid-template-columns: 2fr 120px 110px 120px;
+    gap: ${theme.spacing.sm};
+    padding: ${theme.spacing.md} ${theme.spacing.lg};
+    font-size: ${theme.fontSizes.xs};
+  }
+  
   @media (max-width: ${theme.breakpoints.tablet}) {
     display: none;
   }
@@ -142,8 +308,8 @@ const TableHeader = styled.div`
 
 const TableRow = styled.div`
   display: grid;
-  grid-template-columns: 2fr 140px 130px 150px 150px 150px;
-  gap: ${theme.spacing.xl};
+  grid-template-columns: 2fr 140px 130px 150px;
+  gap: ${theme.spacing.md};
   padding: ${theme.spacing.lg} ${theme.spacing.xl};
   border-bottom: 1px solid ${theme.colors.gray100};
   transition: all 0.2s ease;
@@ -157,6 +323,12 @@ const TableRow = styled.div`
   
   &:last-child {
     border-bottom: none;
+  }
+  
+  @media (max-width: ${theme.breakpoints.desktop}) {
+    grid-template-columns: 2fr 120px 110px 120px;
+    gap: ${theme.spacing.sm};
+    padding: ${theme.spacing.md} ${theme.spacing.lg};
   }
   
   @media (max-width: ${theme.breakpoints.tablet}) {
@@ -173,6 +345,21 @@ const TableRow = styled.div`
       box-shadow: ${theme.shadows.md};
     }
   }
+  
+  @media (max-width: ${theme.breakpoints.mobile}) {
+    padding: ${theme.spacing.md};
+    margin-bottom: ${theme.spacing.sm};
+  }
+  
+  @media (max-width: 420px) {
+    padding: ${theme.spacing.sm};
+    margin-bottom: ${theme.spacing.xs};
+    border-radius: ${theme.borderRadius.md};
+  }
+  
+  @media (max-width: 360px) {
+    padding: ${theme.spacing.xs};
+  }
 `;
 
 const StudentInfo = styled.div`
@@ -185,6 +372,16 @@ const StudentInfo = styled.div`
     margin-bottom: ${theme.spacing.md};
     padding-bottom: ${theme.spacing.md};
     border-bottom: 1px solid ${theme.colors.gray100};
+  }
+  
+  @media (max-width: 420px) {
+    gap: ${theme.spacing.sm};
+    margin-bottom: ${theme.spacing.sm};
+    padding-bottom: ${theme.spacing.sm};
+  }
+  
+  @media (max-width: 360px) {
+    gap: ${theme.spacing.xs};
   }
 `;
 
@@ -206,6 +403,18 @@ const StudentAvatar = styled.div`
     width: 44px;
     height: 44px;
     font-size: ${theme.fontSizes.base};
+  }
+  
+  @media (max-width: 420px) {
+    width: 48px;
+    height: 48px;
+    font-size: ${theme.fontSizes.lg};
+  }
+  
+  @media (max-width: 360px) {
+    width: 52px;
+    height: 52px;
+    font-size: ${theme.fontSizes.xl};
   }
 `;
 
@@ -401,6 +610,16 @@ const MobileDataItem = styled.div`
   gap: ${theme.spacing.xs};
 `;
 
+const InfoNote = styled.div`
+  text-align: center;
+  color: ${theme.colors.textSecondary};
+  font-size: ${theme.fontSizes.sm};
+  font-style: italic;
+  padding: ${theme.spacing.sm};
+  background: ${theme.colors.gray50};
+  border-radius: ${theme.borderRadius.md};
+`;
+
 const ActionButtons = styled.div`
   display: flex;
   gap: ${theme.spacing.sm};
@@ -413,11 +632,20 @@ const ActionButtons = styled.div`
     padding-top: ${theme.spacing.md};
     border-top: 1px solid ${theme.colors.gray100};
   }
+  
+  @media (max-width: 420px) {
+    flex-direction: column;
+    align-items: stretch;
+    gap: ${theme.spacing.xs};
+    margin-top: ${theme.spacing.sm};
+    padding-top: ${theme.spacing.sm};
+  }
 `;
 
 const ActionButton = styled.button<{ variant: 'edit' | 'delete' }>`
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: ${theme.spacing.xs};
   padding: ${theme.spacing.sm} ${theme.spacing.md};
   border: 1px solid;
@@ -427,6 +655,7 @@ const ActionButton = styled.button<{ variant: 'edit' | 'delete' }>`
   font-weight: ${theme.fontWeights.medium};
   cursor: pointer;
   transition: all 0.2s ease;
+  min-height: 36px;
   
   ${props => props.variant === 'edit' ? `
     color: ${theme.colors.primary};
@@ -451,6 +680,20 @@ const ActionButton = styled.button<{ variant: 'edit' | 'delete' }>`
   @media (max-width: ${theme.breakpoints.tablet}) {
     padding: ${theme.spacing.md} ${theme.spacing.lg};
     font-size: ${theme.fontSizes.base};
+    min-height: 44px;
+  }
+  
+  @media (max-width: 420px) {
+    padding: ${theme.spacing.lg};
+    font-size: ${theme.fontSizes.lg};
+    min-height: 48px;
+    font-weight: ${theme.fontWeights.semibold};
+  }
+  
+  @media (max-width: 360px) {
+    padding: ${theme.spacing.xl} ${theme.spacing.lg};
+    font-size: ${theme.fontSizes.xl};
+    min-height: 52px;
   }
 `;
 
@@ -677,27 +920,16 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
           </select>
         </FilterGroup>
         {attendanceSummary && (
-          <div style={{ 
-            display: 'flex', 
-            gap: theme.spacing.lg, 
-            alignItems: 'center',
-            fontSize: theme.fontSizes.sm,
-            color: theme.colors.textSecondary
-          }}>
-            <span>Total: {attendanceSummary.totalUsers}</span>
-            <span>Present: {attendanceSummary.presentCount}</span>
-            <span>Absent: {attendanceSummary.absentCount}</span>
-            <span>Late: {attendanceSummary.lateCount}</span>
-          </div>
+          <StatsContainer>
+            <StatItem>Total: {attendanceSummary.totalUsers}</StatItem>
+            <StatItem>Present: {attendanceSummary.presentCount}</StatItem>
+            <StatItem>Absent: {attendanceSummary.absentCount}</StatItem>
+            <StatItem>Late: {attendanceSummary.lateCount}</StatItem>
+          </StatsContainer>
         )}
       </FilterSection>
       
-      <div style={{ 
-        display: 'flex', 
-        gap: theme.spacing.md, 
-        marginBottom: theme.spacing.lg,
-        alignItems: 'center'
-      }}>
+      <ActionButtonsContainer>
         <Button variant="outline" onClick={() => { setSelectedDate(''); setStatusFilter('all'); }}>
           Clear Filters
         </Button>
@@ -709,7 +941,7 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
           <LocationOnIcon size={16} style={{ marginRight: theme.spacing.xs }} />
           {fixingLocations ? 'Fixing Locations...' : 'Fix Location Records'}
         </Button>
-      </div>
+      </ActionButtonsContainer>
 
       {loading ? (
         <LoadingState>
@@ -726,8 +958,6 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
             <div>Student</div>
             <div>Date</div>
             <div>Status</div>
-            <div>Check-in</div>
-            <div>Check-out</div>
             <div>Actions</div>
           </TableHeader>
           
@@ -755,28 +985,6 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
                     {record.isLate && <span style={{ color: '#f59e0b', marginLeft: '4px' }}>(Late)</span>}
                   </StatusBadge>
                 </div>
-                
-                <TimeDisplay data-label="Check-in:">
-                  {record.checkInTime ? (
-                    <>
-                      <LoginIcon size={14} />
-                      <span className="time">{formatTime(record.checkInTime)}</span>
-                    </>
-                  ) : (
-                    '-'
-                  )}
-                </TimeDisplay>
-                
-                <TimeDisplay data-label="Check-out:">
-                  {record.checkOutTime ? (
-                    <>
-                      <LogoutIcon size={14} />
-                      <span className="time">{formatTime(record.checkOutTime)}</span>
-                    </>
-                  ) : (
-                    '-'
-                  )}
-                </TimeDisplay>
                 
                 <ActionButtons>
                   <ActionButton 
@@ -814,27 +1022,9 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
                   </MobileDataItem>
                   
                   <MobileDataItem>
-                    <TimeDisplay data-label="Check-in:">
-                      {record.checkInTime ? (
-                        <>
-                          <LoginIcon size={16} />
-                          <span className="time">{formatTime(record.checkInTime)}</span>
-                        </>
-                      ) : (
-                        <span className="time">Not checked in</span>
-                      )}
-                    </TimeDisplay>
-                    
-                    <TimeDisplay data-label="Check-out:">
-                      {record.checkOutTime ? (
-                        <>
-                          <LogoutIcon size={16} />
-                          <span className="time">{formatTime(record.checkOutTime)}</span>
-                        </>
-                      ) : (
-                        <span className="time">Not checked out</span>
-                      )}
-                    </TimeDisplay>
+                    <InfoNote>
+                      Check-in/out times available in Daily Tracker
+                    </InfoNote>
                   </MobileDataItem>
                 </MobileDataGrid>
               </TableRow>

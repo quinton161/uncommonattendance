@@ -82,7 +82,7 @@ export interface AttendanceRecord {
   studentName: string;
   checkInTime: Date;
   checkOutTime?: Date;
-  location: {
+  location?: {
     latitude: number;
     longitude: number;
     address?: string;

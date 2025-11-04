@@ -7,6 +7,7 @@ import { Layout, Container, AppHeader } from '../Common/Layout';
 import { Button } from '../Common/Button';
 import { Input } from '../Common/Input';
 import { Card } from '../Common/Card';
+import { ArrowBackIcon } from '../Common/Icons';
 import { theme } from '../../styles/theme';
 
 const ProfileContainer = styled.div`
@@ -124,7 +125,37 @@ const SuccessMessage = styled.div`
 `;
 
 const BackButton = styled(Button)`
-  margin-right: auto;
+  display: flex;
+  align-items: center;
+  gap: ${theme.spacing.xs};
+  background: ${theme.colors.white};
+  border: 2px solid ${theme.colors.primary};
+  color: ${theme.colors.primary};
+  font-weight: ${theme.fontWeights.semibold};
+  box-shadow: ${theme.shadows.sm};
+  transition: all 0.2s ease;
+  
+  &:hover {
+    background: ${theme.colors.primary};
+    color: ${theme.colors.white};
+    transform: translateY(-1px);
+    box-shadow: ${theme.shadows.md};
+  }
+  
+  &:active {
+    transform: translateY(0);
+  }
+  
+  @media (max-width: ${theme.breakpoints.mobile}) {
+    font-size: ${theme.fontSizes.sm};
+    padding: ${theme.spacing.sm} ${theme.spacing.md};
+  }
+  
+  @media (max-width: 420px) {
+    padding: ${theme.spacing.md};
+    font-size: ${theme.fontSizes.base};
+    min-height: 44px;
+  }
 `;
 
 interface ProfilePageProps {
@@ -227,8 +258,9 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onBack }) => {
   return (
     <Layout>
       <AppHeader title="Profile Settings">
-        <BackButton variant="outline" onClick={onBack}>
-          ← Back to Dashboard
+        <BackButton onClick={onBack}>
+          <ArrowBackIcon size={16} />
+          Back to Dashboard
         </BackButton>
       </AppHeader>
       

@@ -28,9 +28,9 @@ export class AttendanceService {
   async checkIn(
     studentId: string,
     studentName: string,
-    location: LocationData
+    location?: LocationData
   ): Promise<AttendanceRecord> {
-    console.log('AttendanceService.checkIn called with:', { studentId, studentName, location });
+    console.log('AttendanceService.checkIn called with:', { studentId, studentName });
     
     const today = new Date().toISOString().split('T')[0];
     const attendanceId = `${studentId}_${today}`;
@@ -46,23 +46,12 @@ export class AttendanceService {
       throw new Error('Already checked in today');
     }
 
-    console.log('Getting address from coordinates...');
-    const address = await this.getAddressFromCoordinates(
-      location.latitude,
-      location.longitude
-    );
-    console.log('Address obtained:', address);
 
     const attendanceRecord: AttendanceRecord = {
       id: attendanceId,
       studentId,
       studentName,
       checkInTime: new Date(),
-      location: {
-        latitude: location.latitude,
-        longitude: location.longitude,
-        address: address,
-      },
       date: today,
       isPresent: true,
     };
@@ -72,8 +61,7 @@ export class AttendanceService {
       documentId: attendanceId,
       studentId,
       studentName,
-      date: today,
-      location: attendanceRecord.location.address
+      date: today
     });
     
     // Save detailed attendance record

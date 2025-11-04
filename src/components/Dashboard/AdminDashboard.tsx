@@ -7,6 +7,7 @@ import { CreateEventForm } from '../Events/CreateEventForm';
 import { EventsPage } from '../Events/EventsPage';
 import { UsersPage } from '../Admin/UsersPage';
 import { AttendancePage } from '../Admin/AttendancePage';
+import { DailyAttendanceTracker } from '../Admin/DailyAttendanceTracker';
 import { UncommonLogo } from '../Common/UncommonLogo';
 import { UncommonCard } from '../Common/UncommonCard';
 import { StarField } from '../Common/StarField';
@@ -56,21 +57,32 @@ const Sidebar = styled.div<{ isOpen?: boolean }>`
   display: flex;
   flex-direction: column;
   box-shadow: ${theme.shadows.lg};
-  position: relative;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  flex-shrink: 0;
   
   @media (max-width: ${theme.breakpoints.tablet}) {
-    width: 100%;
     position: fixed;
     top: 0;
     left: ${props => props.isOpen ? '0' : '-100%'};
     height: 100vh;
     z-index: ${theme.zIndex.modal};
     transition: left 0.3s ease;
-    overflow-y: auto;
+    width: 100%;
   }
   
   @media (max-width: ${theme.breakpoints.mobile}) {
     padding: ${theme.spacing.md};
+  }
+  
+  @media (max-width: 420px) {
+    padding: ${theme.spacing.sm};
+  }
+  
+  @media (max-width: 360px) {
+    padding: ${theme.spacing.xs};
   }
 `;
 
@@ -107,17 +119,24 @@ const NavItem = styled.div<{ active?: boolean }>`
 const MainContent = styled.div`
   flex: 1;
   padding: ${theme.spacing.lg};
-  overflow-y: auto;
+  min-height: 100vh;
+  overflow-x: hidden;
   ${containerAnimation}
   ${respectMotionPreference}
   
   @media (max-width: ${theme.breakpoints.tablet}) {
     padding: ${theme.spacing.md};
-    margin-top: 60px;
+    padding-top: calc(${theme.spacing.md} + 60px);
   }
   
   @media (max-width: ${theme.breakpoints.mobile}) {
     padding: ${theme.spacing.sm};
+    padding-top: calc(${theme.spacing.sm} + 60px);
+  }
+  
+  @media (max-width: 420px) {
+    padding: ${theme.spacing.xs};
+    padding-top: calc(${theme.spacing.xs} + 60px);
   }
 `;
 
@@ -133,22 +152,63 @@ const Header = styled.div`
     align-items: stretch;
     gap: ${theme.spacing.lg};
   }
+  
+  @media (max-width: 420px) {
+    margin-bottom: ${theme.spacing.lg};
+    gap: ${theme.spacing.md};
+  }
+  
+  @media (max-width: 360px) {
+    margin-bottom: ${theme.spacing.md};
+    gap: ${theme.spacing.sm};
+  }
 `;
 
 const HeaderTitle = styled.div`
   h1 {
-    font-size: ${theme.fontSizes['2xl']};
+    font-size: ${theme.fontSizes['3xl']};
     font-weight: ${theme.fontWeights.bold};
     color: ${theme.colors.textPrimary};
-    margin: 0 0 ${theme.spacing.md} 0;
+    margin: 0 0 ${theme.spacing.sm} 0;
     line-height: 1.2;
+    display: flex;
+    align-items: center;
+    gap: ${theme.spacing.lg};
+    
+    @media (max-width: ${theme.breakpoints.tablet}) {
+      font-size: ${theme.fontSizes['2xl']};
+      gap: ${theme.spacing.md};
+    }
+    
+    @media (max-width: 420px) {
+      font-size: ${theme.fontSizes.xl};
+      gap: ${theme.spacing.sm};
+    }
+    
+    @media (max-width: 360px) {
+      font-size: ${theme.fontSizes.lg};
+      flex-direction: column;
+      align-items: flex-start;
+      gap: ${theme.spacing.xs};
+    }
   }
   
   p {
     color: ${theme.colors.textSecondary};
     margin: 0;
-    font-size: ${theme.fontSizes.base};
-    margin-top: ${theme.spacing.sm};
+    font-size: ${theme.fontSizes.lg};
+    
+    @media (max-width: ${theme.breakpoints.tablet}) {
+      font-size: ${theme.fontSizes.base};
+    }
+    
+    @media (max-width: 420px) {
+      font-size: ${theme.fontSizes.sm};
+    }
+    
+    @media (max-width: 360px) {
+      font-size: ${theme.fontSizes.xs};
+    }
   }
 `;
 
@@ -156,6 +216,17 @@ const HeaderActions = styled.div`
   display: flex;
   gap: ${theme.spacing.md};
   align-items: center;
+  
+  @media (max-width: ${theme.breakpoints.tablet}) {
+    flex-direction: column;
+    align-items: stretch;
+    gap: ${theme.spacing.sm};
+    width: 100%;
+  }
+  
+  @media (max-width: 420px) {
+    gap: ${theme.spacing.xs};
+  }
 `;
 
 const StatsGrid = styled.div`
@@ -170,8 +241,14 @@ const StatsGrid = styled.div`
   }
   
   @media (max-width: ${theme.breakpoints.mobile}) {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr 1fr;
     gap: ${theme.spacing.sm};
+  }
+  
+  @media (max-width: 420px) {
+    grid-template-columns: 1fr;
+    gap: ${theme.spacing.xs};
+    margin-bottom: ${theme.spacing.lg};
   }
 `;
 
@@ -459,6 +536,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProf
         return <EventsPage onBack={() => setActiveNav('dashboard')} />;
       case 'attendance':
         return <AttendancePage onBack={() => setActiveNav('dashboard')} />;
+      case 'daily-tracker':
+        return <DailyAttendanceTracker onBack={() => setActiveNav('dashboard')} isEmbedded={true} />;
       case 'users':
         return <UsersPage onBack={() => setActiveNav('dashboard')} />;
       default:
@@ -512,6 +591,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProf
         <NavItem active={activeNav === 'attendance'} onClick={() => handleNavClick('attendance')}>
           <CheckCircleIcon size={20} />
           Attendance
+        </NavItem>
+        <NavItem active={activeNav === 'daily-tracker'} onClick={() => handleNavClick('daily-tracker')}>
+          <TodayIcon size={20} />
+          Daily Tracker
         </NavItem>
         <NavItem active={activeNav === 'users'} onClick={() => handleNavClick('users')}>
           <PeopleIcon size={20} />

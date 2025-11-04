@@ -52,22 +52,22 @@ const getVariantStyles = (variant: string) => {
     case 'outline':
       return css`
         background-color: transparent;
-        color: ${theme.colors.primary};
-        border: 1px solid ${theme.colors.primary};
+        color: ${theme.colors.white};
+        border: 1px solid ${theme.colors.white};
 
         &:hover:not(:disabled) {
-          background-color: ${theme.colors.primary};
-          color: ${theme.colors.white};
+          background-color: ${theme.colors.white};
+          color: ${theme.colors.primary};
         }
       `;
     case 'ghost':
       return css`
         background-color: transparent;
-        color: ${theme.colors.primary};
+        color: ${theme.colors.white};
         border: 1px solid transparent;
 
         &:hover:not(:disabled) {
-          background-color: ${theme.colors.gray100};
+          background-color: rgba(255, 255, 255, 0.1);
         }
       `;
     default:

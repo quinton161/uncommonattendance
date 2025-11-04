@@ -121,3 +121,27 @@ export const WiFiIcon: React.FC<IconProps> = ({ size = 24, style, className }) =
     <path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.07 2.93 1 9zm8 8l3 3 3-3c-1.65-1.66-4.34-1.66-6 0zm-4-4l2 2c2.76-2.76 7.24-2.76 10 0l2-2C15.14 9.14 8.87 9.14 5 13z"/>
   </svg>
 );
+
+export const CancelIcon: React.FC<IconProps> = ({ size = 24, style, className }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" style={style} className={className}>
+    <path d="M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2zm5 13.59L15.59 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12 17 15.59z"/>
+  </svg>
+);
+
+export const CalendarIcon: React.FC<IconProps> = ({ size = 24, style, className }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" style={style} className={className}>
+    <path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11z"/>
+  </svg>
+);
+
+export const ArrowBackIcon: React.FC<IconProps> = ({ size = 24, style, className }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" style={style} className={className}>
+    <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
+  </svg>
+);
+
+export const ArrowForwardIcon: React.FC<IconProps> = ({ size = 24, style, className }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" style={style} className={className}>
+    <path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z"/>
+  </svg>
+);

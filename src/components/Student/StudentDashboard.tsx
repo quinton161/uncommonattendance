@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { useAuth } from '../../contexts/AuthContext';
 import { AttendanceService } from '../../services/attendanceService';
-import { useGeolocation } from '../../hooks/useGeolocation';
 import { Layout, Container, AppHeader } from '../Common/Layout';
 import { Button } from '../Common/Button';
 import { Card } from '../Common/Card';
@@ -75,27 +74,15 @@ const StatusIcon = styled.div<{ status: 'checked-in' | 'checked-out' }>`
 
 const StatusText = styled.h3`
   margin-bottom: ${theme.spacing.sm};
-  color: ${theme.colors.textPrimary};
+  color: ${theme.colors.white};
 `;
 
 const StatusTime = styled.p`
-  color: ${theme.colors.textSecondary};
+  color: ${theme.colors.white};
   font-size: ${theme.fontSizes.sm};
   margin-bottom: ${theme.spacing.md};
 `;
 
-const LocationInfo = styled.div`
-  background-color: ${theme.colors.gray50};
-  padding: ${theme.spacing.sm};
-  border-radius: ${theme.borderRadius.md};
-  margin-bottom: ${theme.spacing.md};
-`;
-
-const LocationText = styled.p`
-  font-size: ${theme.fontSizes.xs};
-  color: ${theme.colors.textSecondary};
-  margin: 0;
-`;
 
 const ErrorMessage = styled.div`
   background-color: ${theme.colors.danger}10;
@@ -163,7 +150,6 @@ interface StudentDashboardProps {
 
 export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateToProfile }) => {
   const { user, logout } = useAuth();
-  const { getCurrentLocation, loading: locationLoading, error: locationError } = useGeolocation();
   const [todayAttendance, setTodayAttendance] = useState<AttendanceRecord | null>(null);
   const [attendanceHistory, setAttendanceHistory] = useState<AttendanceRecord[]>([]);
   const [loading, setLoading] = useState(false);
@@ -205,11 +191,9 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
     setError('');
 
     try {
-      const location = await getCurrentLocation();
       const attendance = await attendanceService.checkIn(
         user.uid,
-        user.displayName,
-        location
+        user.displayName
       );
       setTodayAttendance(attendance);
       await loadAttendanceHistory();
@@ -300,7 +284,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
           </WelcomeSection>
 
           {error && <ErrorMessage>{error}</ErrorMessage>}
-          {locationError && <ErrorMessage>{locationError}</ErrorMessage>}
 
           <ActionSection>
             <StatusCard status={status}>
@@ -321,14 +304,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
                 </StatusTime>
               )}
 
-              {todayAttendance?.location && (
-                <LocationInfo>
-                  <LocationText>
-                    📍 {todayAttendance.location.address || 
-                        `${todayAttendance.location.latitude.toFixed(6)}, ${todayAttendance.location.longitude.toFixed(6)}`}
-                  </LocationText>
-                </LocationInfo>
-              )}
 
               {status === 'checked-out' ? (
                 <Button
@@ -336,8 +311,8 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
                   size="lg"
                   fullWidth
                   onClick={handleCheckIn}
-                  loading={loading || locationLoading}
-                  disabled={loading || locationLoading}
+                  loading={loading}
+                  disabled={loading}
                 >
                   Check In
                 </Button>
