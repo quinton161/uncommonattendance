@@ -85,53 +85,73 @@ export class DailyAttendanceService {
    * Get attendance statistics for a student
    */
   async getAttendanceStats(studentId: string, daysToCheck: number = 30): Promise<DailyAttendanceStats> {
-    const endDate = new Date();
-    const startDate = new Date();
-    startDate.setDate(endDate.getDate() - daysToCheck);
+    try {
+      console.log('📊 Getting attendance stats for:', studentId, 'days:', daysToCheck);
+      
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(endDate.getDate() - daysToCheck);
 
-    const startDateStr = startDate.toISOString().split('T')[0];
-    const endDateStr = endDate.toISOString().split('T')[0];
+      const startDateStr = startDate.toISOString().split('T')[0];
+      const endDateStr = endDate.toISOString().split('T')[0];
 
-    const q = query(
-      collection(db, 'dailyAttendance'),
-      where('studentId', '==', studentId),
-      where('date', '>=', startDateStr),
-      where('date', '<=', endDateStr),
-      orderBy('date', 'desc')
-    );
+      console.log('📅 Date range:', startDateStr, 'to', endDateStr);
 
-    const querySnapshot = await getDocs(q);
-    const records: any[] = [];
+      const q = query(
+        collection(db, 'dailyAttendance'),
+        where('studentId', '==', studentId),
+        where('date', '>=', startDateStr),
+        where('date', '<=', endDateStr),
+        orderBy('date', 'desc')
+      );
 
-    querySnapshot.forEach((doc) => {
-      const data = doc.data();
-      records.push({
-        date: data.date,
-        isPresent: data.isPresent,
-        markedAt: data.markedAt?.toDate(),
+      const querySnapshot = await getDocs(q);
+      const records: any[] = [];
+
+      console.log('📋 Found', querySnapshot.size, 'attendance records');
+
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        records.push({
+          date: data.date,
+          isPresent: data.isPresent,
+          markedAt: data.markedAt?.toDate(),
+        });
       });
-    });
 
-    // Calculate stats
-    const presentDays = records.filter(r => r.isPresent).length;
-    const totalDays = Math.min(daysToCheck, this.getBusinessDaysCount(startDate, endDate));
-    const absentDays = totalDays - presentDays;
-    const attendanceRate = totalDays > 0 ? (presentDays / totalDays) * 100 : 0;
+      // Calculate stats
+      const presentDays = records.filter(r => r.isPresent).length;
+      const totalDays = Math.min(daysToCheck, this.getBusinessDaysCount(startDate, endDate));
+      const absentDays = totalDays - presentDays;
+      const attendanceRate = totalDays > 0 ? (presentDays / totalDays) * 100 : 0;
 
-    // Calculate streaks
-    const { currentStreak, longestStreak } = this.calculateStreaks(records);
+      // Calculate streaks
+      const { currentStreak, longestStreak } = this.calculateStreaks(records);
 
-    const lastAttendanceDate = records.find(r => r.isPresent)?.date || null;
+      const lastAttendanceDate = records.find(r => r.isPresent)?.date || null;
 
-    return {
-      totalDays,
-      presentDays,
-      absentDays,
-      currentStreak,
-      longestStreak,
-      attendanceRate: Math.round(attendanceRate * 100) / 100,
-      lastAttendanceDate,
-    };
+      console.log('📊 Calculated stats:', {
+        totalDays,
+        presentDays,
+        absentDays,
+        attendanceRate: Math.round(attendanceRate * 100) / 100,
+        currentStreak,
+        longestStreak
+      });
+
+      return {
+        totalDays,
+        presentDays,
+        absentDays,
+        currentStreak,
+        longestStreak,
+        attendanceRate: Math.round(attendanceRate * 100) / 100,
+        lastAttendanceDate,
+      };
+    } catch (error: any) {
+      console.error('❌ Error getting attendance stats:', error);
+      throw error;
+    }
   }
 
   /**
