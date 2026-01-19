@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import styled, { keyframes, css } from 'styled-components';
 import { LoginForm } from './LoginForm';
 import { RegisterForm } from './RegisterForm';
-import { Layout, Container } from '../Common/Layout';
 import { UncommonLogo } from '../Common/UncommonLogo';
 import { theme } from '../../styles/theme';
 

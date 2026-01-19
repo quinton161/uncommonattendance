@@ -36,6 +36,8 @@ export const EventProvider: React.FC<EventProviderProps> = ({ children, user }) 
 
   // Load public events on mount
   useEffect(() => {
+    // Intentionally run only once on mount; loadPublicEvents handles its own dependencies.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     loadPublicEvents();
   }, []);
 

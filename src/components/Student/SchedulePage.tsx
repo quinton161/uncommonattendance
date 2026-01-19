@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { useAuth } from '../../contexts/AuthContext';
 import { theme } from '../../styles/theme';
-import { Button } from '../Common/Button';
 import { UncommonLogo } from '../Common/UncommonLogo';
 import DataService from '../../services/DataService';
 import { uniqueToast } from '../../utils/toastUtils';
@@ -195,6 +194,8 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({ onBack, isEmbedded =
   const dataService = DataService.getInstance();
 
   useEffect(() => {
+    // Intentionally run only once on mount; loadScheduleData handles its own dependencies.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     loadScheduleData();
   }, []);
 

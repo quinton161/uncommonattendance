@@ -5,7 +5,6 @@ import { Button } from '../Common/Button';
 import { UncommonLogo } from '../Common/UncommonLogo';
 import { AttendanceService } from '../../services/attendanceService';
 import DataService from '../../services/DataService';
-import { DailyAttendanceService } from '../../services/dailyAttendanceService';
 import {
   CheckCircleIcon,
   CancelIcon,
@@ -503,8 +502,9 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({ 
   };
 
   useEffect(() => {
-    loadDailyAttendance();
+    // Intentionally only depend on selectedDate; services are singletons.
     // eslint-disable-next-line react-hooks/exhaustive-deps
+    loadDailyAttendance();
   }, [selectedDate]);
 
   const navigateDate = (direction: 'prev' | 'next') => {

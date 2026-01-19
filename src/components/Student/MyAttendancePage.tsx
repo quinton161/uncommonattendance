@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { useAuth } from '../../contexts/AuthContext';
 import { theme } from '../../styles/theme';
-import { Button } from '../Common/Button';
 import { UncommonLogo } from '../Common/UncommonLogo';
 import DataService from '../../services/DataService';
 import { uniqueToast } from '../../utils/toastUtils';
@@ -224,6 +223,8 @@ export const MyAttendancePage: React.FC<MyAttendancePageProps> = ({ onBack, isEm
   const dataService = DataService.getInstance();
 
   useEffect(() => {
+    // Intentionally run only once on mount; loadAttendanceData handles its own dependencies.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     loadAttendanceData();
   }, []);
 

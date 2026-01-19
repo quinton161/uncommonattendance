@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { useAuth } from '../../contexts/AuthContext';
 import { theme } from '../../styles/theme';
-import { Button } from '../Common/Button';
 import { UncommonLogo } from '../Common/UncommonLogo';
 import { DailyAttendanceService, AttendanceCalendarDay, DailyAttendanceStats } from '../../services/dailyAttendanceService';
 import { uniqueToast } from '../../utils/toastUtils';
@@ -366,6 +365,8 @@ export const AttendanceRegister: React.FC<AttendanceRegisterProps> = ({ onBack, 
   const dailyAttendanceService = DailyAttendanceService.getInstance();
 
   useEffect(() => {
+    // Intentionally only depend on month/year; service instance is stable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     loadAttendanceData();
   }, [currentMonth, currentYear]);
 
@@ -467,10 +468,7 @@ export const AttendanceRegister: React.FC<AttendanceRegisterProps> = ({ onBack, 
     return new Date(year, month, 0).getDate();
   };
 
-  const getFirstDayOfMonth = (month: number, year: number) => {
-    return new Date(year, month - 1, 1).getDay();
-  };
-
+// getFirstDayOfMonth was previously defined but unused.
   const renderCalendar = (): React.ReactNode[] => {
     const daysInMonth = getDaysInMonth(currentMonth, currentYear);
     const today = new Date().toISOString().split('T')[0];

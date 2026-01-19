@@ -525,66 +525,8 @@ const StatusBadge = styled.div<{ status: 'present' | 'late' | 'absent' }>`
   }
 `;
 
-const TimeInfo = styled.div`
-  font-size: ${theme.fontSizes.sm};
-  color: ${theme.colors.textSecondary};
-  display: flex;
-  align-items: center;
-  gap: ${theme.spacing.xs};
-  
-  .time {
-    font-weight: ${theme.fontWeights.semibold};
-    color: ${theme.colors.textPrimary};
-  }
-  
-  @media (max-width: ${theme.breakpoints.tablet}) {
-    font-size: ${theme.fontSizes.base};
-    margin-bottom: ${theme.spacing.xs};
-    
-    &:before {
-      content: attr(data-label);
-      font-weight: ${theme.fontWeights.medium};
-      color: ${theme.colors.textSecondary};
-      margin-right: ${theme.spacing.sm};
-      min-width: 80px;
-    }
-  }
-`;
-
-const LocationInfo = styled.div`
-  font-size: ${theme.fontSizes.sm};
-  color: ${theme.colors.textSecondary};
-  display: flex;
-  align-items: center;
-  gap: ${theme.spacing.xs};
-  min-width: 0;
-  
-  .address {
-    font-weight: ${theme.fontWeights.semibold};
-    color: ${theme.colors.textPrimary};
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  
-  @media (max-width: ${theme.breakpoints.tablet}) {
-    font-size: ${theme.fontSizes.base};
-    
-    .address {
-      white-space: normal;
-      overflow: visible;
-      text-overflow: unset;
-    }
-    
-    &:before {
-      content: 'Location:';
-      font-weight: ${theme.fontWeights.medium};
-      color: ${theme.colors.textSecondary};
-      margin-right: ${theme.spacing.sm};
-      min-width: 80px;
-    }
-  }
-`;
+// NOTE: TimeInfo and LocationInfo were previously defined styled components
+// that are no longer used. They have been removed to satisfy CI lint rules.
 
 const MobileDataGrid = styled.div`
   display: none;
@@ -743,6 +685,8 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
   };
 
   useEffect(() => {
+    // Intentionally only depend on selectedDate; loadAttendanceSummary closes over services.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     loadAttendanceSummary();
   }, [selectedDate]);
 

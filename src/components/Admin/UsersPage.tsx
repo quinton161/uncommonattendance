@@ -466,6 +466,8 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack }) => {
   const dataService = DataService.getInstance();
 
   useEffect(() => {
+    // Intentionally run only once on mount; loadData handles its own dependencies.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     loadData();
   }, []);
 
@@ -494,30 +496,8 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack }) => {
     return attendance.find(a => a.studentId === userId && a.date === today);
   };
 
-  const getUserStats = () => {
-    const totalUsers = users.length;
-    const studentsCount = users.filter(u => u.userType === 'attendee').length;
-    const today = new Date().toISOString().split('T')[0];
-    const todayCheckedIn = attendance.filter(a => a.date === today && a.isPresent).length;
-    
-    return {
-      totalUsers,
-      studentsCount,
-      todayCheckedIn,
-      adminsCount: users.filter(u => u.userType === 'admin').length
-    };
-  };
-
-  const formatTime = (date: Date | null) => {
-    if (!date) return '-';
-    return new Intl.DateTimeFormat('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true
-    }).format(date);
-  };
-
-
+  // getUserStats and formatTime were previously defined but unused helpers.
+  // They have been removed to keep CI linting happy.
   const getInitials = (name: string) => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase();
   };
@@ -538,7 +518,7 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack }) => {
     );
   }
 
-  const stats = getUserStats();
+  // const stats = getUserStats(); // no longer used
 
   const handleOpenDelete = (user: any) => {
     setUserToDelete(user);

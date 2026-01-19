@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useRef } from 'react';
 import styled, { keyframes, css } from 'styled-components';
 import { theme } from '../../styles/theme';
 
