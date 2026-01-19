@@ -853,7 +853,13 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
 
   const renderCurrentPage = () => {
     switch (activeNav) {
+<<<<<<< HEAD
             case 'attendance':
+=======
+      case 'events':
+        return <EventsPage onBack={() => setActiveNav('dashboard')} />;
+      case 'attendance':
+>>>>>>> 19c97aaf4bf2b565d9a3c1263babdd6b5b3edcc0
         return <MyAttendancePage onBack={() => setActiveNav('dashboard')} isEmbedded={true} />;
       case 'register':
         return <AttendanceRegister onBack={() => setActiveNav('dashboard')} isEmbedded={true} />;
@@ -953,7 +959,15 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
           <DashboardIcon size={20} />
           Dashboard
         </NavItem>
+<<<<<<< HEAD
                 <NavItem active={activeNav === 'attendance'} onClick={() => handleNavClick('attendance')}>
+=======
+        <NavItem active={activeNav === 'events'} onClick={() => handleNavClick('events')}>
+          <EventIcon size={20} />
+          Events
+        </NavItem>
+        <NavItem active={activeNav === 'attendance'} onClick={() => handleNavClick('attendance')}>
+>>>>>>> 19c97aaf4bf2b565d9a3c1263babdd6b5b3edcc0
           <CheckCircleIcon size={20} />
           My Attendance
         </NavItem>
@@ -1087,7 +1101,32 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
         </StatsGrid>
 
         <ContentGrid>
+<<<<<<< HEAD
           
+=======
+          <Card>
+            <CardTitle>Available Events</CardTitle>
+            <EventsList>
+              {events.filter(event => event.isPublic && event.eventStatus === 'published').slice(0, 5).map((event) => (
+                <EventItem key={event.id}>
+                  <EventInfo>
+                    <h4>{event.title}</h4>
+                    <p>{new Date(event.startDate).toLocaleDateString()} • {event.location}</p>
+                  </EventInfo>
+                  <Button size="sm" variant="primary">
+                    Register
+                  </Button>
+                </EventItem>
+              ))}
+              {events.filter(event => event.isPublic && event.eventStatus === 'published').length === 0 && (
+                <p style={{ color: theme.colors.textSecondary, textAlign: 'center', padding: theme.spacing.lg }}>
+                  No events available at the moment
+                </p>
+              )}
+            </EventsList>
+          </Card>
+
+>>>>>>> 19c97aaf4bf2b565d9a3c1263babdd6b5b3edcc0
           <Card>
             <CardTitle>Attendance Summary</CardTitle>
             <div style={{ 
