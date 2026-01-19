@@ -8,7 +8,6 @@ import { uniqueToast } from '../../utils/toastUtils';
 import {
   CheckCircleIcon,
   CancelIcon,
-  TodayIcon,
   CalendarIcon,
   TrendingUpIcon,
   BarChartIcon,

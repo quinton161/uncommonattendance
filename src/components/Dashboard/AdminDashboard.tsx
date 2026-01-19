@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../Common/Button';
@@ -503,7 +503,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProf
     }
   };
 
-  
+  useEffect(() => {
+    // Load dashboard stats on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    loadDashboardData();
+  }, []);
+
   const handleNavClick = (navItem: string) => {
     setActiveNav(navItem);
     setMobileMenuOpen(false); // Close mobile menu when navigating

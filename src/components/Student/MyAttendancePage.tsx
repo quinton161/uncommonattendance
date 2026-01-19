@@ -8,10 +8,8 @@ import { uniqueToast } from '../../utils/toastUtils';
 import {
   CheckCircleIcon,
   TodayIcon,
-  LocationOnIcon,
   LoginIcon,
   LogoutIcon,
-  TrendingUpIcon
 } from '../Common/Icons';
 
 const PageContainer = styled.div<{ isEmbedded?: boolean }>`

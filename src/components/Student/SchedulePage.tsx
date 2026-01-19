@@ -9,7 +9,6 @@ import {
   ScheduleIcon,
   TodayIcon,
   LocationOnIcon,
-  EventIcon,
   CheckCircleIcon
 } from '../Common/Icons';
 

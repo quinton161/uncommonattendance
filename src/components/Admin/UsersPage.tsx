@@ -231,16 +231,6 @@ const AttendanceStatus = styled.div<{ isCheckedIn: boolean }>`
   `}
 `;
 
-const TimeDisplay = styled.div`
-  font-size: ${theme.fontSizes.sm};
-  color: ${theme.colors.textSecondary};
-  
-  .time {
-    font-weight: ${theme.fontWeights.medium};
-    color: ${theme.colors.textPrimary};
-  }
-`;
-
 const LoadingState = styled.div`
   display: flex;
   justify-content: center;
@@ -318,16 +308,7 @@ const MobileUserDetails = styled.div`
   }
 `;
 
-const MobileUserActions = styled.div`
-  display: flex;
-  gap: ${theme.spacing.sm};
-  justify-content: flex-end;
-  
-  @media (max-width: ${theme.breakpoints.mobile}) {
-    flex-direction: column;
-    gap: ${theme.spacing.xs};
-  }
-`;
+// MobileUserActions styled component removed (unused) to satisfy CI linting.
 
 const DesktopTable = styled.div`
   @media (max-width: ${theme.breakpoints.tablet}) {
