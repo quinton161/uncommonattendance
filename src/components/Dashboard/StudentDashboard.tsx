@@ -853,13 +853,9 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
 
   const renderCurrentPage = () => {
     switch (activeNav) {
-<<<<<<< HEAD
-            case 'attendance':
-=======
       case 'events':
         return <EventsPage onBack={() => setActiveNav('dashboard')} />;
       case 'attendance':
->>>>>>> 19c97aaf4bf2b565d9a3c1263babdd6b5b3edcc0
         return <MyAttendancePage onBack={() => setActiveNav('dashboard')} isEmbedded={true} />;
       case 'register':
         return <AttendanceRegister onBack={() => setActiveNav('dashboard')} isEmbedded={true} />;
@@ -959,15 +955,11 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
           <DashboardIcon size={20} />
           Dashboard
         </NavItem>
-<<<<<<< HEAD
-                <NavItem active={activeNav === 'attendance'} onClick={() => handleNavClick('attendance')}>
-=======
         <NavItem active={activeNav === 'events'} onClick={() => handleNavClick('events')}>
           <EventIcon size={20} />
           Events
         </NavItem>
         <NavItem active={activeNav === 'attendance'} onClick={() => handleNavClick('attendance')}>
->>>>>>> 19c97aaf4bf2b565d9a3c1263babdd6b5b3edcc0
           <CheckCircleIcon size={20} />
           My Attendance
         </NavItem>
@@ -1101,9 +1093,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
         </StatsGrid>
 
         <ContentGrid>
-<<<<<<< HEAD
-          
-=======
           <Card>
             <CardTitle>Available Events</CardTitle>
             <EventsList>
@@ -1126,7 +1115,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
             </EventsList>
           </Card>
 
->>>>>>> 19c97aaf4bf2b565d9a3c1263babdd6b5b3edcc0
           <Card>
             <CardTitle>Attendance Summary</CardTitle>
             <div style={{ 

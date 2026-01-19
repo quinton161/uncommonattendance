@@ -23,11 +23,8 @@ import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import DataService from '../../services/DataService';
 import { uniqueToast } from '../../utils/toastUtils';
-<<<<<<< HEAD
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
-=======
->>>>>>> 19c97aaf4bf2b565d9a3c1263babdd6b5b3edcc0
 import {
   DashboardIcon,
   EventIcon,
@@ -457,9 +454,6 @@ interface AdminDashboardProps {
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) => {
-<<<<<<< HEAD
-  // ...existing state and hooks...
-
   const handleDownloadAttendancePDF = async () => {
     try {
       uniqueToast.info('Preparing PDF for download...', { autoClose: 2000 });
@@ -490,8 +484,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProf
       uniqueToast.error('Failed to generate PDF');
     }
   };
-=======
->>>>>>> 19c97aaf4bf2b565d9a3c1263babdd6b5b3edcc0
   const { user, logout } = useAuth();
   const { events } = useEvent();
   const [activeNav, setActiveNav] = useState('dashboard');
@@ -572,13 +564,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProf
 
   const renderCurrentPage = () => {
     switch (activeNav) {
-<<<<<<< HEAD
-            case 'attendance':
-=======
       case 'events':
         return <EventsPage onBack={() => setActiveNav('dashboard')} />;
       case 'attendance':
->>>>>>> 19c97aaf4bf2b565d9a3c1263babdd6b5b3edcc0
         return <AttendancePage onBack={() => setActiveNav('dashboard')} />;
       case 'daily-tracker':
         return <DailyAttendanceTracker onBack={() => setActiveNav('dashboard')} isEmbedded={true} />;
@@ -628,15 +616,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProf
           <DashboardIcon size={20} />
           Dashboard
         </NavItem>
-<<<<<<< HEAD
-                <NavItem active={activeNav === 'attendance'} onClick={() => handleNavClick('attendance')}>
-=======
         <NavItem active={activeNav === 'events'} onClick={() => handleNavClick('events')}>
           <EventIcon size={20} />
           Events
         </NavItem>
         <NavItem active={activeNav === 'attendance'} onClick={() => handleNavClick('attendance')}>
->>>>>>> 19c97aaf4bf2b565d9a3c1263babdd6b5b3edcc0
           <CheckCircleIcon size={20} />
           Attendance
         </NavItem>
@@ -679,16 +663,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProf
               <p>Welcome back, {user?.displayName}!</p>
             </HeaderTitle>
             <HeaderActions>
-<<<<<<< HEAD
-  <Button variant="primary" onClick={handleDownloadAttendancePDF}>
-    Download Attendance PDF
-  </Button>
-</HeaderActions>
-          </Header>
-
-        <StatsGrid>
-                    
-=======
+              <Button variant="primary" onClick={handleDownloadAttendancePDF}>
+                Download Attendance PDF
+              </Button>
               <Button variant="primary" onClick={() => setShowCreateForm(true)}>
                 <AddIcon size={20} style={{ marginRight: theme.spacing.xs }} />
                 Create Event
@@ -696,103 +673,98 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProf
             </HeaderActions>
           </Header>
 
-        <StatsGrid>
-          <StatCard variant="primary">
-            <StatIcon><EventAvailableIcon size={32} /></StatIcon>
-            <StatValue>{stats.totalEvents}</StatValue>
-            <StatLabel>Total Events</StatLabel>
-            <StatChange positive>
-              <TrendingUpIcon size={16} /> +{stats.activeEvents} active
-            </StatChange>
-          </StatCard>
-          
->>>>>>> 19c97aaf4bf2b565d9a3c1263babdd6b5b3edcc0
-          <StatCard variant="secondary">
-            <StatIcon><GroupIcon size={32} /></StatIcon>
-            <StatValue>{stats.totalAttendees}</StatValue>
-            <StatLabel>Total Attendees</StatLabel>
-            <StatChange positive>
-              <TrendingUpIcon size={16} /> All registered users
-            </StatChange>
-          </StatCard>
-          
-          <StatCard variant="accent">
-            <StatIcon><TodayIcon size={32} /></StatIcon>
-            <StatValue>{stats.todayAttendance}</StatValue>
-            <StatLabel>Today's Attendance</StatLabel>
-            <StatChange positive>
-              <CheckCircleIcon size={16} /> Checked in today
-            </StatChange>
-          </StatCard>
-        </StatsGrid>
+          <StatsGrid>
+            <StatCard variant="primary">
+              <StatIcon><EventAvailableIcon size={32} /></StatIcon>
+              <StatValue>{stats.totalEvents}</StatValue>
+              <StatLabel>Total Events</StatLabel>
+              <StatChange positive>
+                <TrendingUpIcon size={16} /> +{stats.activeEvents} active
+              </StatChange>
+            </StatCard>
+            
+            <StatCard variant="secondary">
+              <StatIcon><GroupIcon size={32} /></StatIcon>
+              <StatValue>{stats.totalAttendees}</StatValue>
+              <StatLabel>Total Attendees</StatLabel>
+              <StatChange positive>
+                <TrendingUpIcon size={16} /> All registered users
+              </StatChange>
+            </StatCard>
+            
+            <StatCard variant="accent">
+              <StatIcon><TodayIcon size={32} /></StatIcon>
+              <StatValue>{stats.todayAttendance}</StatValue>
+              <StatLabel>Today's Attendance</StatLabel>
+              <StatChange positive>
+                <CheckCircleIcon size={16} /> Checked in today
+              </StatChange>
+            </StatCard>
+          </StatsGrid>
 
-        <ContentGrid>
-<<<<<<< HEAD
-          
-=======
-          <Card>
-            <CardTitle>Recent Events</CardTitle>
-            <RecentEventsList>
-              {events.slice(0, 5).map((event) => (
-                <EventItem key={event.id}>
-                  <EventInfo>
-                    <h4>{event.title}</h4>
-                    <p>{new Date(event.startDate).toLocaleDateString()}</p>
-                  </EventInfo>
-                  <Button size="sm" variant="outline">
-                    View
-                  </Button>
-                </EventItem>
-              ))}
-              {events.length === 0 && (
-                <p style={{ color: theme.colors.textSecondary, textAlign: 'center', padding: theme.spacing.lg }}>
-                  No events created yet
-                </p>
-              )}
-            </RecentEventsList>
-          </Card>
+          <ContentGrid>
+            <Card>
+              <CardTitle>Recent Events</CardTitle>
+              <RecentEventsList>
+                {events.slice(0, 5).map((event) => (
+                  <EventItem key={event.id}>
+                    <EventInfo>
+                      <h4>{event.title}</h4>
+                      <p>{new Date(event.startDate).toLocaleDateString()}</p>
+                    </EventInfo>
+                    <Button size="sm" variant="outline">
+                      View
+                    </Button>
+                  </EventItem>
+                ))}
+                {events.length === 0 && (
+                  <p style={{ color: theme.colors.textSecondary, textAlign: 'center', padding: theme.spacing.lg }}>
+                    No events created yet
+                  </p>
+                )}
+              </RecentEventsList>
+            </Card>
 
->>>>>>> 19c97aaf4bf2b565d9a3c1263babdd6b5b3edcc0
-          <Card>
-            <CardTitle>Recent Check-ins</CardTitle>
-            <AttendanceList>
-              {recentAttendance.map((attendance: any) => (
-                <AttendanceItem key={attendance.id}>
-                  <UserAvatar>
-                    {getInitials(attendance.studentName || 'User')}
-                  </UserAvatar>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ 
-                      fontWeight: theme.fontWeights.medium,
-                      color: theme.colors.textPrimary,
-                      fontSize: theme.fontSizes.sm
-                    }}>
-                      {attendance.studentName}
+            <Card>
+              <CardTitle>Recent Check-ins</CardTitle>
+              <AttendanceList>
+                {recentAttendance.map((attendance: any) => (
+                  <AttendanceItem key={attendance.id}>
+                    <UserAvatar>
+                      {getInitials(attendance.studentName || 'User')}
+                    </UserAvatar>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ 
+                        fontWeight: theme.fontWeights.medium,
+                        color: theme.colors.textPrimary,
+                        fontSize: theme.fontSizes.sm
+                      }}>
+                        {attendance.studentName}
+                      </div>
+                      <div style={{ 
+                        color: theme.colors.textSecondary,
+                        fontSize: theme.fontSizes.xs
+                      }}>
+                        {attendance.checkInTime?.toLocaleTimeString()}
+                      </div>
                     </div>
                     <div style={{ 
-                      color: theme.colors.textSecondary,
-                      fontSize: theme.fontSizes.xs
-                    }}>
-                      {attendance.checkInTime?.toLocaleTimeString()}
-                    </div>
-                  </div>
-                  <div style={{ 
-                    width: '8px',
-                    height: '8px',
-                    borderRadius: '50%',
-                    background: theme.colors.success
-                  }} />
-                </AttendanceItem>
-              ))}
-              {recentAttendance.length === 0 && (
-                <p style={{ color: theme.colors.textSecondary, textAlign: 'center', padding: theme.spacing.lg }}>
-                  No recent check-ins
-                </p>
-              )}
-            </AttendanceList>
-          </Card>
-        </ContentGrid>
-        </MainContent>
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      background: theme.colors.success
+                    }} />
+                  </AttendanceItem>
+                ))}
+                {recentAttendance.length === 0 && (
+                  <p style={{ color: theme.colors.textSecondary, textAlign: 'center', padding: theme.spacing.lg }}>
+                    No recent check-ins
+                  </p>
+                )}
+              </AttendanceList>
+            </Card>
+          </ContentGrid>
+      </MainContent>
       )}
     </DashboardContainer>
   );

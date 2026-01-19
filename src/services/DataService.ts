@@ -9,12 +9,8 @@ import {
   orderBy, 
   limit,
   addDoc,
-<<<<<<< HEAD
   Timestamp, 
   deleteDoc 
-=======
-  Timestamp 
->>>>>>> 19c97aaf4bf2b565d9a3c1263babdd6b5b3edcc0
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { uniqueToast } from '../utils/toastUtils';
@@ -339,11 +335,7 @@ class DataService {
 
     try {
       // Delete user document
-<<<<<<< HEAD
       await deleteDoc(doc(db, 'users', userId));
-=======
-      await updateDoc(doc(db, 'users', userId), { deleted: true, deletedAt: Timestamp.now() });
->>>>>>> 19c97aaf4bf2b565d9a3c1263babdd6b5b3edcc0
       
       // Note: In a real app, you might want to also delete related attendance records
       // or mark them as deleted rather than actually deleting the user document

@@ -4,14 +4,9 @@ import { useAuth } from '../../contexts/AuthContext';
 import { theme } from '../../styles/theme';
 import { Button } from '../Common/Button';
 import DataService from '../../services/DataService';
-<<<<<<< HEAD
 import { DeleteUserModal } from './DeleteUserModal';
 import { uniqueToast } from '../../utils/toastUtils';
 import { UncommonLogo } from '../Common/UncommonLogo';
-=======
-import { UncommonLogo } from '../Common/UncommonLogo';
-import { toast } from 'react-toastify';
->>>>>>> 19c97aaf4bf2b565d9a3c1263babdd6b5b3edcc0
 import {
   PersonIcon,
   CheckCircleIcon,
@@ -462,11 +457,8 @@ interface UsersPageProps {
 }
 
 export const UsersPage: React.FC<UsersPageProps> = ({ onBack }) => {
-<<<<<<< HEAD
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [userToDelete, setUserToDelete] = useState<any>(null);
-=======
->>>>>>> 19c97aaf4bf2b565d9a3c1263babdd6b5b3edcc0
   const { user } = useAuth();
   const [users, setUsers] = useState<any[]>([]);
   const [attendance, setAttendance] = useState<any[]>([]);
@@ -491,11 +483,7 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack }) => {
       setAttendance(attendanceData);
     } catch (error) {
       console.error('Error loading data:', error);
-<<<<<<< HEAD
       uniqueToast.error('Failed to load user data');
-=======
-      toast.error('Failed to load user data');
->>>>>>> 19c97aaf4bf2b565d9a3c1263babdd6b5b3edcc0
     } finally {
       setLoading(false);
     }
@@ -552,7 +540,6 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack }) => {
 
   const stats = getUserStats();
 
-<<<<<<< HEAD
   const handleOpenDelete = (user: any) => {
     setUserToDelete(user);
     setShowDeleteModal(true);
@@ -574,8 +561,6 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack }) => {
     }
   };
 
-=======
->>>>>>> 19c97aaf4bf2b565d9a3c1263babdd6b5b3edcc0
   return (
     <PageContainer>
       <Header>
@@ -685,17 +670,12 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack }) => {
                     )}
                   </AttendanceStatus>
                 </div>
-<<<<<<< HEAD
                     {user?.userType === 'admin' && (
         <DeleteButton onClick={() => handleOpenDelete(userData)}>
           Delete
         </DeleteButton>
-      )
-    }
-  </TableRow>
-=======
-              </TableRow>
->>>>>>> 19c97aaf4bf2b565d9a3c1263babdd6b5b3edcc0
+      )}
+    </TableRow>
             );
           })}
               </TableWrapper>
@@ -746,22 +726,17 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack }) => {
                       </StatusBadge>
                     </div>
                   </MobileUserDetails>
-<<<<<<< HEAD
-                {user?.userType === 'admin' && (
-                  <DeleteButton onClick={() => handleOpenDelete(userData)}>
-                    Delete
-                  </DeleteButton>
-                )}
-              </MobileUserCard>
-=======
+                  {user?.userType === 'admin' && (
+                    <DeleteButton onClick={() => handleOpenDelete(userData)}>
+                      Delete
+                    </DeleteButton>
+                  )}
                 </MobileUserCard>
->>>>>>> 19c97aaf4bf2b565d9a3c1263babdd6b5b3edcc0
               );
             })}
           </div>
         </>
       )}
-<<<<<<< HEAD
       {showDeleteModal && userToDelete && (
         <DeleteUserModal
           user={userToDelete}
@@ -769,8 +744,6 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack }) => {
           onConfirm={handleConfirmDelete}
         />
       )}
-=======
->>>>>>> 19c97aaf4bf2b565d9a3c1263babdd6b5b3edcc0
     </PageContainer>
   );
 };
