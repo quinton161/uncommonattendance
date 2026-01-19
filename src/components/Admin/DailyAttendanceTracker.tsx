@@ -6,6 +6,7 @@ import { Button } from '../Common/Button';
 import { UncommonLogo } from '../Common/UncommonLogo';
 import { AttendanceService } from '../../services/attendanceService';
 import DataService from '../../services/DataService';
+import { DailyAttendanceService } from '../../services/dailyAttendanceService';
 import {
   CheckCircleIcon,
   CancelIcon,
@@ -503,7 +504,6 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({ 
 
     } catch (error) {
       console.error('Error loading daily attendance:', error);
-      uniqueToast.error('Failed to load attendance data');
     } finally {
       setLoading(false);
     }

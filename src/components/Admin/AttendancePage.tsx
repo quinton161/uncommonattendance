@@ -768,40 +768,6 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
     return filtered;
   };
 
-   (record: any) => {
-    if (!record.isPresent) return 'absent';
-    
-    // Check if late (after 9 AM)
-    if (record.checkInTime) {
-      const checkInTime = new Date(record.checkInTime);
-      const nineAM = new Date(checkInTime);
-      nineAM.setHours(9, 0, 0, 0);
-      
-      if (checkInTime > nineAM) return 'late';
-    }
-    
-    return 'present';
-  };
-
-   (dateString: string) => {
-    const date = new Date(dateString);
-    return new Intl.DateTimeFormat('en-US', {
-      weekday: 'short',
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    }).format(date);
-  };
-
-   (date: Date | null) => {
-    if (!date) return '-';
-    return new Intl.DateTimeFormat('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true
-    }).format(date);
-  };
-
   const getInitials = (name: string) => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase();
   };
