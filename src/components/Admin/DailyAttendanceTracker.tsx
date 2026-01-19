@@ -5,23 +5,19 @@ import { theme } from '../../styles/theme';
 import { Button } from '../Common/Button';
 import { UncommonLogo } from '../Common/UncommonLogo';
 import { AttendanceService } from '../../services/attendanceService';
-import { DailyAttendanceService } from '../../services/dailyAttendanceService';
 import DataService from '../../services/DataService';
-import { AttendanceRecord } from '../../types';
-import { uniqueToast } from '../../utils/toastUtils';
 import {
   CheckCircleIcon,
   CancelIcon,
   TodayIcon,
   CalendarIcon,
-  TrendingUpIcon,
-  BarChartIcon,
   ArrowBackIcon,
   ArrowForwardIcon,
   PersonIcon,
   LoginIcon,
   LogoutIcon,
-  LocationOnIcon
+  LocationOnIcon,
+  TrendingUpIcon
 } from '../Common/Icons';
 
 const PageContainer = styled.div<{ isEmbedded?: boolean }>`
@@ -428,8 +424,7 @@ interface StudentAttendanceData {
 }
 
 export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({ onBack, isEmbedded = true }) => {
-  const { user } = useAuth();
-  const [selectedDate, setSelectedDate] = useState(new Date());
+    const [selectedDate, setSelectedDate] = useState(new Date());
   const [attendanceData, setAttendanceData] = useState<StudentAttendanceData[]>([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
@@ -451,9 +446,9 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({ 
     try {
       setLoading(true);
 
-      // Get all users (students)
-      const users = await dataService.getUsers();
-      const students = users.filter(u => u.userType === 'attendee');
+      // Get all s (students)
+      const s = await dataService.getUsers();
+      const students = s.filter(u => u.Type === 'attendee');
 
       // Get attendance records for the selected date
       const dateStr = selectedDate.toISOString().split('T')[0];

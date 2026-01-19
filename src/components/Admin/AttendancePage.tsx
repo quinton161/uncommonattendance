@@ -11,9 +11,6 @@ import {
   CheckCircleIcon,
   TodayIcon,
   LocationOnIcon,
-  LoginIcon,
-  LogoutIcon,
-  PersonIcon,
   EditIcon,
   DeleteIcon
 } from '../Common/Icons';
@@ -532,7 +529,7 @@ const StatusBadge = styled.div<{ status: 'present' | 'late' | 'absent' }>`
   }
 `;
 
-const TimeDisplay = styled.div`
+ styled.div`
   font-size: ${theme.fontSizes.sm};
   color: ${theme.colors.textSecondary};
   display: flex;
@@ -558,7 +555,7 @@ const TimeDisplay = styled.div`
   }
 `;
 
-const LocationDisplay = styled.div`
+ styled.div`
   font-size: ${theme.fontSizes.sm};
   color: ${theme.colors.textSecondary};
   display: flex;
@@ -732,10 +729,6 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
   const dataService = DataService.getInstance();
   const attendanceService = AttendanceService.getInstance();
 
-  useEffect(() => {
-    loadAttendanceSummary();
-  }, [selectedDate]);
-
   const loadAttendanceSummary = async () => {
     try {
       setLoading(true);
@@ -749,6 +742,10 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadAttendanceSummary();
+  }, [selectedDate]);
 
   const getFilteredAttendance = () => {
     if (!attendanceSummary) return [];
@@ -771,7 +768,7 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
     return filtered;
   };
 
-  const getAttendanceStatus = (record: any) => {
+   (record: any) => {
     if (!record.isPresent) return 'absent';
     
     // Check if late (after 9 AM)
@@ -786,7 +783,7 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
     return 'present';
   };
 
-  const formatDate = (dateString: string) => {
+   (dateString: string) => {
     const date = new Date(dateString);
     return new Intl.DateTimeFormat('en-US', {
       weekday: 'short',
@@ -796,7 +793,7 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
     }).format(date);
   };
 
-  const formatTime = (date: Date | null) => {
+   (date: Date | null) => {
     if (!date) return '-';
     return new Intl.DateTimeFormat('en-US', {
       hour: '2-digit',
