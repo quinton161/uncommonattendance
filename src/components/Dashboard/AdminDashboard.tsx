@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../Common/Button';
-import { CreateEventForm } from '../Events/CreateEventForm';
 import { UsersPage } from '../Admin/UsersPage';
 import { AttendancePage } from '../Admin/AttendancePage';
 import { DailyAttendanceTracker } from '../Admin/DailyAttendanceTracker';
@@ -484,13 +483,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProf
   };
   const { user, logout } = useAuth();
     const [activeNav, setActiveNav] = useState('dashboard');
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [stats, setStats] = useState({
-    totalEvents: 0,
     totalAttendees: 0,
-    todayAttendance: 0,
-    activeEvents: 0
+    todayAttendance: 0
   });
   const [recentAttendance, setRecentAttendance] = useState<any[]>([]);
   const dataService = DataService.getInstance();
@@ -508,11 +504,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProf
       const dashboardStats = await dataService.getDashboardStats();
       
       setStats({
-        totalEvents: dashboardStats.totalEvents,
-        totalAttendees: dashboardStats.totalAttendees,
+                totalAttendees: dashboardStats.totalAttendees,
         todayAttendance: dashboardStats.todayAttendance,
-        activeEvents: dashboardStats.activeEvents
-      });
+              });
       
       setRecentAttendance(dashboardStats.recentAttendance);
       uniqueToast.success('Dashboard data loaded successfully!', { autoClose: 2000 });
@@ -522,11 +516,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProf
       
       // Fallback data
       setStats({
-        totalEvents: 5,
-        totalAttendees: 25,
+                totalAttendees: 25,
         todayAttendance: 8,
-        activeEvents: 3
-      });
+              });
       
       setRecentAttendance([
         {
@@ -545,11 +537,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProf
     }
   };
 
-  const handleCreateEventSuccess = () => {
-    setShowCreateForm(false);
-    loadDashboardData();
-  };
-
+  
   const handleNavClick = (navItem: string) => {
     setActiveNav(navItem);
     setMobileMenuOpen(false); // Close mobile menu when navigating
@@ -576,18 +564,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProf
     return name.split(' ').map(n => n[0]).join('').toUpperCase();
   };
 
-  if (showCreateForm) {
-    return (
-      <DashboardContainer>
-        <div style={{ flex: 1, padding: theme.spacing.lg }}>
-          <CreateEventForm 
-            onCancel={() => setShowCreateForm(false)}
-            onSuccess={handleCreateEventSuccess}
-          />
-        </div>
-      </DashboardContainer>
-    );
-  }
 
   return (
     <DashboardContainer>
@@ -656,10 +632,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProf
             <HeaderActions>
               <Button variant="primary" onClick={handleDownloadAttendancePDF}>
                 Download Attendance PDF
-              </Button>
-              <Button variant="primary" onClick={() => setShowCreateForm(true)}>
-                <AddIcon size={20} style={{ marginRight: theme.spacing.xs }} />
-                Create Event
               </Button>
             </HeaderActions>
           </Header>
