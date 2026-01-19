@@ -6,32 +6,26 @@ import { UsersPage } from '../Admin/UsersPage';
 import { AttendancePage } from '../Admin/AttendancePage';
 import { DailyAttendanceTracker } from '../Admin/DailyAttendanceTracker';
 import { UncommonLogo } from '../Common/UncommonLogo';
-import { UncommonCard } from '../Common/UncommonCard';
 import { StarField } from '../Common/StarField';
 import { theme } from '../../styles/theme';
 import { 
-  fadeInUp, 
   staggeredAnimation, 
   pageTransition, 
   containerAnimation,
   respectMotionPreference 
 } from '../../styles/animations';
-import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
-import { db } from '../../services/firebase';
 import DataService from '../../services/DataService';
 import { uniqueToast } from '../../utils/toastUtils';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
+
 import {
   DashboardIcon,
-  EventIcon,
   CheckCircleIcon,
   PeopleIcon,
   PersonIcon,
   LogoutIcon,
-  AddIcon,
   TrendingUpIcon,
-  EventAvailableIcon,
   GroupIcon,
   TodayIcon
 } from '../Common/Icons';
@@ -388,36 +382,6 @@ const CardTitle = styled.h3`
   margin: 0 0 ${theme.spacing.lg} 0;
 `;
 
-const RecentEventsList = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: ${theme.spacing.md};
-`;
-
-const EventItem = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: ${theme.spacing.md};
-  border-radius: ${theme.borderRadius.lg};
-  background: ${theme.colors.backgroundSecondary};
-`;
-
-const EventInfo = styled.div`
-  h4 {
-    font-size: ${theme.fontSizes.base};
-    font-weight: ${theme.fontWeights.medium};
-    color: ${theme.colors.textPrimary};
-    margin: 0 0 ${theme.spacing.xs} 0;
-  }
-  
-  p {
-    font-size: ${theme.fontSizes.sm};
-    color: ${theme.colors.textSecondary};
-    margin: 0;
-  }
-`;
-
 const AttendanceList = styled.div`
   display: flex;
   flex-direction: column;
@@ -451,39 +415,9 @@ interface AdminDashboardProps {
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) => {
-  const handleDownloadAttendancePDF = async () => {
-    try {
-      uniqueToast.info('Preparing PDF for download...', { autoClose: 2000 });
-      const users = await dataService.getUsers();
-      const attendance = await dataService.getAttendance();
-      // Join attendance records with user info
-      const attendanceRows = attendance.map((a: any) => {
-        const user = users.find((u: any) => u.id === a.studentId);
-        return [
-          user?.displayName || 'Unknown',
-          user?.email || '',
-          a.checkInTime ? new Date(a.checkInTime).toLocaleString() : '',
-          a.checkOutTime ? new Date(a.checkOutTime).toLocaleString() : ''
-        ];
-      });
-      const doc = new jsPDF();
-      doc.text('Attendance Records', 14, 16);
-      (doc as any).autoTable({
-        head: [['Name', 'Email', 'Check-in Time', 'Check-out Time']],
-        body: attendanceRows,
-        startY: 22,
-        styles: { fontSize: 9 },
-        headStyles: { fillColor: [34, 197, 94] }
-      });
-      doc.save('attendance_records.pdf');
-      uniqueToast.success('PDF downloaded!', { autoClose: 2000 });
-    } catch (error) {
-      uniqueToast.error('Failed to generate PDF');
-    }
-  };
   const { user, logout } = useAuth();
-    const [activeNav, setActiveNav] = useState('dashboard');
-    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [activeNav, setActiveNav] = useState('dashboard');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [stats, setStats] = useState({
     totalAttendees: 0,
     todayAttendance: 0
@@ -491,14 +425,46 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProf
   const [recentAttendance, setRecentAttendance] = useState<any[]>([]);
   const dataService = DataService.getInstance();
 
-  useEffect(() => {
-    loadDashboardData();
-  }, []);
+  const handleDownloadAttendancePDF = async () => {
+    try {
+      // Ensure DataService is configured (and will switch to mock data if Firebase is unavailable)
+      await dataService.testConnection();
+
+      uniqueToast.info('Preparing PDF for download...', { autoClose: 2000 });
+      const users = await dataService.getUsers();
+      const attendance = await dataService.getAttendance();
+
+      // Join attendance records with user info
+      const attendanceRows = attendance.map((a: any) => {
+        const userRecord = users.find((u: any) => u.id === a.studentId || u.uid === a.studentId);
+        return [
+          userRecord?.displayName || a.studentName || 'Unknown',
+          userRecord?.email || '',
+          a.checkInTime ? new Date(a.checkInTime).toLocaleString() : '',
+          a.checkOutTime ? new Date(a.checkOutTime).toLocaleString() : '',
+        ];
+      });
+
+      const doc = new jsPDF();
+      doc.text('Attendance Records', 14, 16);
+      (doc as any).autoTable({
+        head: [['Name', 'Email', 'Check-in Time', 'Check-out Time']],
+        body: attendanceRows,
+        startY: 22,
+        styles: { fontSize: 9 },
+        headStyles: { fillColor: [34, 197, 94] },
+      });
+      doc.save('attendance_records.pdf');
+      uniqueToast.success('PDF downloaded!', { autoClose: 2000 });
+    } catch (error) {
+      console.error('Error generating attendance PDF:', error);
+      uniqueToast.error('Failed to generate PDF');
+    }
+  };
 
   const loadDashboardData = async () => {
     try {
       uniqueToast.info('Loading dashboard data...', { autoClose: 2000 });
-      
       // Test connection and load stats
       await dataService.testConnection();
       const dashboardStats = await dataService.getDashboardStats();

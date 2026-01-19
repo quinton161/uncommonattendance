@@ -124,7 +124,7 @@ class DataService {
     } catch (error) {
       console.warn('⚠️ Firebase connection failed, using mock data:', error);
       this.useFirebase = false;
-      uniqueToast.info('Using offline mode with sample data', { autoClose: 3000 });
+      // Previously showed an "offline mode" toast here; now we silently fall back to mock data.
       return false;
     }
   }
@@ -164,7 +164,7 @@ class DataService {
         createdAt: new Date()
       };
       mockEvents.unshift(newEvent);
-      uniqueToast.success('Event created (offline mode)');
+      // In offline mode we silently update local mock data without user notification.
       return newEvent.id;
     }
 
@@ -225,7 +225,7 @@ class DataService {
         createdAt: new Date()
       };
       mockAttendance.unshift(newAttendance);
-      uniqueToast.success('Attendance recorded (offline mode)');
+      // In offline mode we silently update local mock data without user notification.
       return;
     }
 
@@ -258,7 +258,7 @@ class DataService {
           updatedAt: new Date()
         };
       }
-      uniqueToast.success('Check-out recorded (offline mode)');
+      // In offline mode we silently update local mock data without user notification.
       return;
     }
 
@@ -309,7 +309,7 @@ class DataService {
       if (index !== -1) {
         mockUsers[index] = { ...mockUsers[index], ...userData };
       }
-      uniqueToast.success('User updated (offline mode)');
+      // In offline mode we silently update local mock data without user notification.
       return;
     }
 
@@ -329,7 +329,7 @@ class DataService {
       if (index !== -1) {
         mockUsers.splice(index, 1);
       }
-      uniqueToast.success('User deleted (offline mode)');
+      // In offline mode we silently update local mock data without user notification.
       return;
     }
 

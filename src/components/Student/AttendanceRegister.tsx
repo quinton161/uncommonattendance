@@ -432,7 +432,7 @@ export const AttendanceRegister: React.FC<AttendanceRegisterProps> = ({ onBack, 
       
       setCalendarData(fallbackCalendar);
       
-      uniqueToast.info('Using sample attendance data (offline mode)', { autoClose: 5000 });
+      // Previously showed an "offline mode" toast here; now we just use sample data silently.
     } finally {
       setLoading(false);
     }

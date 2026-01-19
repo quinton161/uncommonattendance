@@ -21,7 +21,6 @@ import { StarField } from '../Common/StarField';
 import { uniqueToast } from '../../utils/toastUtils';
 import {
   DashboardIcon,
-  EventIcon,
   CheckCircleIcon,
   ScheduleIcon,
   TrendingUpIcon,
@@ -327,69 +326,6 @@ const AttendanceCard = styled(StatCard)`
   }
 `;
 
-const WiFiStatusCard = styled(StatCard)`
-  grid-column: span 2;
-  
-  @media (max-width: 768px) {
-    grid-column: span 1;
-  }
-`;
-
-const WiFiInfo = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: ${theme.spacing.md};
-  
-  @media (max-width: ${theme.breakpoints.tablet}) {
-    flex-direction: column;
-    gap: ${theme.spacing.sm};
-    align-items: stretch;
-  }
-`;
-
-const NetworkStatus = styled.div<{ isUncommon: boolean }>`
-  display: flex;
-  align-items: center;
-  gap: ${theme.spacing.xs};
-  padding: ${theme.spacing.xs} ${theme.spacing.sm};
-  border-radius: ${theme.borderRadius.full};
-  font-size: ${theme.fontSizes.sm};
-  font-weight: ${theme.fontWeights.medium};
-  
-  ${props => props.isUncommon ? `
-    background: rgba(34, 197, 94, 0.1);
-    color: #16a34a;
-  ` : `
-    background: rgba(107, 114, 128, 0.1);
-    color: #6b7280;
-  `}
-`;
-
-const AutoCheckInToggle = styled.button`
-  display: flex;
-  align-items: center;
-  gap: ${theme.spacing.xs};
-  padding: ${theme.spacing.xs} ${theme.spacing.sm};
-  border: 1px solid ${theme.colors.gray300};
-  border-radius: ${theme.borderRadius.md};
-  background: ${theme.colors.white};
-  color: ${theme.colors.textSecondary};
-  font-size: ${theme.fontSizes.sm};
-  cursor: pointer;
-  transition: all 0.2s ease;
-  
-  &:hover {
-    border-color: ${theme.colors.primary};
-    color: ${theme.colors.primary};
-  }
-  
-  &.enabled {
-    background: ${theme.colors.primary};
-    color: ${theme.colors.white};
-    border-color: ${theme.colors.primary};
-  }
-`;
 
 const AttendanceControls = styled.div`
   display: flex;
@@ -501,42 +437,6 @@ const CardTitle = styled.h3`
   }
 `;
 
-const EventsList = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: ${theme.spacing.md};
-`;
-
-const EventItem = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: ${theme.spacing.md};
-  border-radius: ${theme.borderRadius.lg};
-  background: ${theme.colors.backgroundSecondary};
-  transition: all 0.2s ease;
-  
-  &:hover {
-    transform: translateY(-2px);
-    box-shadow: ${theme.shadows.sm};
-  }
-`;
-
-const EventInfo = styled.div`
-  h4 {
-    font-size: ${theme.fontSizes.base};
-    font-weight: ${theme.fontWeights.medium};
-    color: ${theme.colors.textPrimary};
-    margin: 0 0 ${theme.spacing.xs} 0;
-  }
-  
-  p {
-    font-size: ${theme.fontSizes.sm};
-    color: ${theme.colors.textSecondary};
-    margin: 0;
-  }
-`;
-
 const ActivityList = styled.div`
   display: flex;
   flex-direction: column;
@@ -585,8 +485,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
   const [canCheckIn, setCanCheckIn] = useState(true);
   const [canCheckOut, setCanCheckOut] = useState(false);
   const [stats, setStats] = useState({
-    evtsAttended: 0,
-    totalCheckIns: 0,
+        totalCheckIns: 0,
     currentStreak: 0,
     todayStatus: 'Not Checked In',
     lastCheckIn: null as Date | null
@@ -644,7 +543,11 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
         }));
       }
     } catch (error) {
-      console.error('Error checking attendance:', error);
+      console.error('Error checking today attendance:', error);
+      uniqueToast.error('Failed to load today\'s attendance status.', {
+        autoClose: 4000,
+        position: 'top-center',
+      });
     }
   }, [user, attendanceService]);
 
@@ -657,14 +560,12 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
       const studentStats = await dataService.getStudentStats(user.uid);
       
       setStats(prevStats => ({
-        evtsAttended: studentStats.evtsAttended,
         totalCheckIns: studentStats.totalCheckIns,
         currentStreak: studentStats.currentStreak,
-        todayStatus: prevStats.todayStatus, // Keep current status
-        lastCheckIn: prevStats.lastCheckIn // Keep current check-in time
+        todayStatus: prevStats.todayStatus,
+        lastCheckIn: prevStats.lastCheckIn
       }));
 
-      // Load daily attendance stats
       const dailyStatsData = await dailyAttendanceService.getAttendanceStats(user.uid, 30);
       setDailyStats(dailyStatsData);
 
@@ -675,61 +576,35 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
         type: activity.type,
         description: activity.description,
         date: activity.date,
-        time: activity.markedAt,
-        studentName: user.displayName
+        time: activity.markedAt as Date | undefined,
+        studentName: user.displayName,
       })));
 
     } catch (error) {
       console.error('Error loading student data:', error);
+      uniqueToast.error('Failed to load your dashboard data.', {
+        autoClose: 4000,
+        position: 'top-center',
+      });
     }
   }, [user, dataService, dailyAttendanceService]);
 
-  const calculateStreak = (attendanceDocs: any[]): number => {
-    // Simple streak calculation - consecutive days with attendance
-    let streak = 0;
-    const today = new Date();
-    
-    for (let i = 0; i < attendanceDocs.length; i++) {
-      const attendanceDate = attendanceDocs[i].data().checkInTime?.toDate();
-      if (!attendanceDate) break;
-      
-      const daysDiff = Math.floor((today.getTime() - attendanceDate.getTime()) / (1000 * 60 * 60 * 24));
-      if (daysDiff === i) {
-        streak++;
-      } else {
-        break;
-      }
-    }
-    
-    return streak;
-  };
-
-  const getCurrentLocation = (): Promise<GeolocationPosition> => {
-    return new Promise((resolve, reject) => {
-      if (!navigator.geolocation) {
-        reject(new Error('Geolocation is not supported by this browser'));
-        return;
-      }
-
-      navigator.geolocation.getCurrentPosition(resolve, reject, {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 60000
-      });
-    });
-  };
-
-
   const handleCheckInInternal = async (isAutomatic: boolean = false) => {
     console.log('handleCheckInInternal called - user:', !!user, 'canCheckIn:', canCheckIn, 'isAutomatic:', isAutomatic);
+
     if (!user) {
-      console.error('No user found');
-      if (!isAutomatic) uniqueToast.error('Please log in first');
+      uniqueToast.error('You must be logged in to check in.', {
+        autoClose: 4000,
+        position: 'top-center',
+      });
       return;
     }
+
     if (!canCheckIn) {
-      console.error('Cannot check in - canCheckIn is false');
-      if (!isAutomatic) uniqueToast.error('You cannot check in right now');
+      uniqueToast.info('You cannot check in right now.', {
+        autoClose: 4000,
+        position: 'top-center',
+      });
       return;
     }
 
@@ -746,8 +621,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
       
       // Use AttendanceService to check in
       console.log('Calling attendanceService.checkIn...');
-      uniqueToast.info('Recording your attendance...', { autoClose: 2000 });
-      
       const attendanceRecord = await attendanceService.checkIn(user.uid, user.displayName || 'Student');
       
       console.log('✅ Attendance recorded successfully:', {
@@ -776,58 +649,56 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
       // Update stats
       setStats(prev => ({
         ...prev,
-        todayStatus: 'Checked In',
+        todayStatus: isLate ? 'Checked In (Late)' : 'Checked In',
         lastCheckIn: now,
-        totalCheckIns: prev.totalCheckIns + 1
       }));
-      
-      loadStudentData(); // Refresh other stats
-      
-      // Show appropriate message based on timing
+
       if (isLate) {
-        const lateMinutes = Math.floor(currentTime - nineAM);
-        const hours = Math.floor(lateMinutes / 60);
-        const minutes = lateMinutes % 60;
-        
-        let lateMessage = 'You are late! ';
-        if (hours > 0) {
-          lateMessage += `${hours} hour${hours > 1 ? 's' : ''} and ${minutes} minute${minutes !== 1 ? 's' : ''}`;
-        } else {
-          lateMessage += `${minutes} minute${minutes !== 1 ? 's' : ''}`;
-        }
-        lateMessage += ' after 9:00 AM.';
-        
-        uniqueToast.warning(lateMessage, { 
+        uniqueToast.warning('You have checked in after 9:00 AM.', {
           autoClose: 6000,
-          position: 'top-center'
+          position: 'top-center',
         });
       } else {
         const message = isAutomatic 
           ? 'Auto check-in successful! You are on time.' 
           : 'Checked in successfully! You are on time.';
-        uniqueToast.success(message, { autoClose: 3000 });
+        uniqueToast.success(message, {
+          autoClose: 4000,
+          position: 'top-center',
+        });
       }
-      
     } catch (error) {
-      console.error('Check-in error details:', error);
-      
+      console.error('Check-in error:', error);
+
       if (error instanceof Error) {
-        console.error('Error message:', error.message);
-        console.error('Error stack:', error.stack);
-        
         if (error.message === 'Already checked in today') {
-          uniqueToast.warning('You have already checked in today!', { autoClose: 4000 });
+          uniqueToast.info('You have already checked in today.', {
+            autoClose: 4000,
+            position: 'top-center',
+          });
           // Refresh state to sync with database
           checkTodayAttendance();
         } else if (error.message.includes('User denied')) {
-          uniqueToast.error('Location permission denied. Please allow location access.', { autoClose: 4000 });
-        } else if (error.message.includes('timeout')) {
-          uniqueToast.error('Location request timed out. Please try again.', { autoClose: 4000 });
+          uniqueToast.error('Location permission denied. Please enable it and try again.', {
+            autoClose: 5000,
+            position: 'top-center',
+          });
+        } else if (error.message.toLowerCase().includes('timeout')) {
+          uniqueToast.error('Location request timed out. Please try again.', {
+            autoClose: 5000,
+            position: 'top-center',
+          });
         } else {
-          uniqueToast.error(`Check-in failed: ${error.message}`, { autoClose: 6000 });
+          uniqueToast.error('Failed to check in. Please try again.', {
+            autoClose: 4000,
+            position: 'top-center',
+          });
         }
       } else {
-        uniqueToast.error('Failed to check in. Please try again.', { autoClose: 4000 });
+        uniqueToast.error('Failed to check in. Please try again.', {
+          autoClose: 4000,
+          position: 'top-center',
+        });
       }
     } finally {
       setAttendanceLoading(false);
@@ -864,11 +735,13 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
   };
 
   const handleCheckOut = async () => {
-    if (!user || !canCheckOut) return;
+    if (!user || !canCheckOut) {
+      return;
+    }
 
     setAttendanceLoading(true);
     try {
-      uniqueToast.info('Recording check-out...', { autoClose: 2000 });
+      uniqueToast.info('Recording check-out...', { autoClose: 2000, position: 'top-center' });
       
       // Use AttendanceService to check out
       await attendanceService.checkOut(user.uid);
@@ -887,20 +760,20 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
       
       loadStudentData(); // Refresh other stats
       
-      uniqueToast.success('Checked out successfully! See you tomorrow.', { autoClose: 3000 });
+      uniqueToast.success('Checked out successfully! See you tomorrow.', { autoClose: 3000, position: 'top-center' });
       
     } catch (error) {
       console.error('Check-out error:', error);
       if (error instanceof Error && error.message === 'Already checked out today') {
-        uniqueToast.warning('You have already checked out today!', { autoClose: 4000 });
+        uniqueToast.info('You have already checked out today!', { autoClose: 4000, position: 'top-center' });
         // Refresh state to sync with database
         checkTodayAttendance();
       } else if (error instanceof Error && error.message === 'No check-in record found for today') {
-        uniqueToast.warning('You need to check in first!', { autoClose: 4000 });
+        uniqueToast.warning('You need to check in first!', { autoClose: 4000, position: 'top-center' });
         // Refresh state to sync with database
         checkTodayAttendance();
       } else {
-        uniqueToast.error('Failed to check out. Please try again.', { autoClose: 4000 });
+        uniqueToast.error('Failed to check out. Please try again.', { autoClose: 4000, position: 'top-center' });
       }
     } finally {
       setAttendanceLoading(false);
@@ -936,16 +809,16 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
           ☰
         </MobileMenuButton>
       </MobileHeader>
-      
+
       <MobileOverlay isOpen={mobileMenuOpen} onClick={() => setMobileMenuOpen(false)} />
-      
+
       <Sidebar isOpen={mobileMenuOpen}>
         <StarField density="low" speed="slow" />
         <Logo>
           <DashboardIcon size={24} style={{ marginRight: theme.spacing.sm }} />
           Student Hub
         </Logo>
-        
+
         <NavItem active={activeNav === 'dashboard'} onClick={() => handleNavClick('dashboard')}>
           <DashboardIcon size={20} />
           Dashboard
@@ -966,7 +839,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
           <BarChartIcon size={20} />
           Progress
         </NavItem>
-        
+
         <div style={{ marginTop: 'auto', paddingTop: theme.spacing.xl }}>
           {onNavigateToProfile && (
             <NavItem onClick={onNavigateToProfile}>
@@ -985,204 +858,245 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
         <MainContent>
           <Header>
             <HeaderTitle>
-              <h1 style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: theme.spacing.lg,
-                margin: 0 
-              }}>
+              <h1
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: theme.spacing.lg,
+                  margin: 0,
+                }}
+              >
                 <UncommonLogo size="lg" showSubtitle={false} />
                 <span>Dashboard</span>
               </h1>
               <p>Welcome back, {user?.displayName}!</p>
             </HeaderTitle>
-          <HeaderActions>
-            <div style={{ 
-              color: theme.colors.textSecondary,
-              fontSize: theme.fontSizes.sm
-            }}>
-              {new Date().toLocaleDateString('en-US', { 
-                weekday: 'long', 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
-              })}
-            </div>
-          </HeaderActions>
-        </Header>
-
-        <StatsGrid>
-          <AttendanceCard variant="primary">
-            <StatIcon><CheckCircleIcon size={32} /></StatIcon>
-            <StatLabel>Daily Attendance</StatLabel>
-            <StatusIndicator isCheckedIn={checkedIn}>
-              {checkedIn ? 'Checked In' : 'Not Checked In'}
-              {checkInTime && (
-                <span style={{ fontSize: theme.fontSizes.sm, opacity: 0.8 }}>
-                  at {checkInTime.toLocaleTimeString()}
-                  {checkInTime.getHours() >= 9 && (
-                    <span style={{ 
-                      color: '#f59e0b', 
-                      fontWeight: theme.fontWeights.medium,
-                      marginLeft: theme.spacing.xs 
-                    }}>
-                      (Late)
-                    </span>
-                  )}
-                </span>
-              )}
-            </StatusIndicator>
-            <AttendanceControls>
-              {checkedIn && canCheckOut ? (
-                <Button 
-                  variant="outline" 
-                  onClick={handleCheckOut}
-                  disabled={attendanceLoading || !canCheckOut}
-                >
-                  <LogoutIcon size={16} style={{ marginRight: theme.spacing.xs }} />
-                  {attendanceLoading ? 'Checking Out...' : 'Check Out'}
-                </Button>
-              ) : canCheckIn ? (
-                <Button 
-                  variant="primary"
-                  onClick={handleCheckIn}
-                  disabled={attendanceLoading || !canCheckIn}
-                >
-                  <LoginIcon size={16} style={{ marginRight: theme.spacing.xs }} />
-                  {attendanceLoading ? 'Checking In...' : 'Check In'}
-                </Button>
-              ) : (
-                <Button 
-                  variant="secondary"
-                  disabled={true}
-                >
-                  <CheckCircleIcon size={16} style={{ marginRight: theme.spacing.xs }} />
-                  {stats.todayStatus}
-                </Button>
-              )}
-            </AttendanceControls>
-          </AttendanceCard>
-          
-          
-          <StatCard variant="secondary">
-            <StatIcon><AssignmentIcon size={32} /></StatIcon>
-            <StatValue>{dailyStats.presentDays}/{dailyStats.totalDays}</StatValue>
-            <StatLabel>Days Present</StatLabel>
-          </StatCard>
-          
-          <StatCard variant="accent">
-            <StatIcon><TrendingUpIcon size={32} /></StatIcon>
-            <StatValue>{dailyStats.currentStreak}</StatValue>
-            <StatLabel>Current Streak</StatLabel>
-          </StatCard>
-          
-          <StatCard variant="primary">
-            <StatIcon><CheckCircleIcon size={32} /></StatIcon>
-            <StatValue>{dailyStats.attendanceRate.toFixed(1)}%</StatValue>
-            <StatLabel>Attendance Rate</StatLabel>
-          </StatCard>
-        </StatsGrid>
-
-        <ContentGrid>
-
-          <Card>
-            <CardTitle>Attendance Summary</CardTitle>
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(2, 1fr)', 
-              gap: theme.spacing.md,
-              marginBottom: theme.spacing.md 
-            }}>
-              <div style={{ textAlign: 'center', padding: theme.spacing.sm }}>
-                <div style={{ 
-                  fontSize: theme.fontSizes.xl, 
-                  fontWeight: theme.fontWeights.bold,
-                  color: theme.colors.success 
-                }}>
-                  {dailyStats.longestStreak}
-                </div>
-                <div style={{ 
-                  fontSize: theme.fontSizes.xs, 
-                  color: theme.colors.textSecondary 
-                }}>
-                  Longest Streak
-                </div>
-              </div>
-              <div style={{ textAlign: 'center', padding: theme.spacing.sm }}>
-                <div style={{ 
-                  fontSize: theme.fontSizes.xl, 
-                  fontWeight: theme.fontWeights.bold,
-                  color: theme.colors.warning 
-                }}>
-                  {dailyStats.absentDays}
-                </div>
-                <div style={{ 
-                  fontSize: theme.fontSizes.xs, 
-                  color: theme.colors.textSecondary 
-                }}>
-                  Days Absent
-                </div>
-              </div>
-            </div>
-            {dailyStats.lastAttendanceDate && (
-              <div style={{ 
-                textAlign: 'center', 
-                padding: theme.spacing.sm,
-                backgroundColor: theme.colors.gray50,
-                borderRadius: theme.borderRadius.md,
-                fontSize: theme.fontSizes.sm,
-                color: theme.colors.textSecondary
-              }}>
-                Last attended: {new Date(dailyStats.lastAttendanceDate).toLocaleDateString('en-US', { 
-                  weekday: 'long', 
-                  month: 'long', 
-                  day: 'numeric' 
+            <HeaderActions>
+              <div
+                style={{
+                  color: theme.colors.textSecondary,
+                  fontSize: theme.fontSizes.sm,
+                }}
+              >
+                {new Date().toLocaleDateString('en-US', {
+                  weekday: 'long',
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
                 })}
               </div>
-            )}
-          </Card>
+            </HeaderActions>
+          </Header>
 
-          <Card>
-            <CardTitle>Recent Attendance</CardTitle>
-            <ActivityList>
-              {recentActivity.map((activity: any) => (
-                <ActivityItem key={activity.id}>
-                  <ActivityIcon type={activity.type}>
-                    {activity.type === 'present' ? '✅' : activity.type === 'absent' ? '❌' : '📅'}
-                  </ActivityIcon>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ 
-                      fontWeight: theme.fontWeights.medium,
-                      color: theme.colors.textPrimary,
-                      fontSize: theme.fontSizes.sm
-                    }}>
-                      {activity.description || 'Attendance Record'}
-                    </div>
-                    <div style={{ 
-                      color: theme.colors.textSecondary,
-                      fontSize: theme.fontSizes.xs
-                    }}>
-                      {activity.date ? new Date(activity.date).toLocaleDateString('en-US', { 
-                        weekday: 'short', 
-                        month: 'short', 
-                        day: 'numeric' 
-                      }) : 'Unknown date'}
-                      {activity.time && ` • ${activity.time.toLocaleTimeString('en-US', { 
-                        hour: '2-digit', 
-                        minute: '2-digit' 
-                      })}`}
-                    </div>
+          <StatsGrid>
+            <AttendanceCard variant="primary">
+              <StatIcon>
+                <CheckCircleIcon size={32} />
+              </StatIcon>
+              <StatLabel>Daily Attendance</StatLabel>
+              <StatusIndicator isCheckedIn={checkedIn}>
+                {checkedIn ? 'Checked In' : 'Not Checked In'}
+                {checkInTime && (
+                  <span style={{ fontSize: theme.fontSizes.sm, opacity: 0.8 }}>
+                    at {checkInTime.toLocaleTimeString()}
+                    {checkInTime.getHours() >= 9 && (
+                      <span
+                        style={{
+                          color: '#f59e0b',
+                          fontWeight: theme.fontWeights.medium,
+                          marginLeft: theme.spacing.xs,
+                        }}
+                      >
+                        (Late)
+                      </span>
+                    )}
+                  </span>
+                )}
+              </StatusIndicator>
+              <AttendanceControls>
+                {checkedIn && canCheckOut ? (
+                  <Button
+                    variant="outline"
+                    onClick={handleCheckOut}
+                    disabled={attendanceLoading || !canCheckOut}
+                  >
+                    <LogoutIcon size={16} style={{ marginRight: theme.spacing.xs }} />
+                    {attendanceLoading ? 'Checking Out...' : 'Check Out'}
+                  </Button>
+                ) : canCheckIn ? (
+                  <Button
+                    variant="primary"
+                    onClick={handleCheckIn}
+                    disabled={attendanceLoading || !canCheckIn}
+                  >
+                    <LoginIcon size={16} style={{ marginRight: theme.spacing.xs }} />
+                    {attendanceLoading ? 'Checking In...' : 'Check In'}
+                  </Button>
+                ) : (
+                  <Button variant="secondary" disabled>
+                    <CheckCircleIcon size={16} style={{ marginRight: theme.spacing.xs }} />
+                    {stats.todayStatus}
+                  </Button>
+                )}
+              </AttendanceControls>
+            </AttendanceCard>
+
+            <StatCard variant="secondary">
+              <StatIcon>
+                <AssignmentIcon size={32} />
+              </StatIcon>
+              <StatValue>
+                {dailyStats.presentDays}/{dailyStats.totalDays}
+              </StatValue>
+              <StatLabel>Days Present</StatLabel>
+            </StatCard>
+
+            <StatCard variant="accent">
+              <StatIcon>
+                <TrendingUpIcon size={32} />
+              </StatIcon>
+              <StatValue>{dailyStats.currentStreak}</StatValue>
+              <StatLabel>Current Streak</StatLabel>
+            </StatCard>
+
+            <StatCard variant="primary">
+              <StatIcon>
+                <CheckCircleIcon size={32} />
+              </StatIcon>
+              <StatValue>{dailyStats.attendanceRate.toFixed(1)}%</StatValue>
+              <StatLabel>Attendance Rate</StatLabel>
+            </StatCard>
+          </StatsGrid>
+
+          <ContentGrid>
+            <Card>
+              <CardTitle>Attendance Summary</CardTitle>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(2, 1fr)',
+                  gap: theme.spacing.md,
+                  marginBottom: theme.spacing.md,
+                }}
+              >
+                <div style={{ textAlign: 'center', padding: theme.spacing.sm }}>
+                  <div
+                    style={{
+                      fontSize: theme.fontSizes.xl,
+                      fontWeight: theme.fontWeights.bold,
+                      color: theme.colors.success,
+                    }}
+                  >
+                    {dailyStats.longestStreak}
                   </div>
-                </ActivityItem>
-              ))}
-              {recentActivity.length === 0 && (
-                <p style={{ color: theme.colors.textSecondary, textAlign: 'center', padding: theme.spacing.lg }}>
-                  No recent attendance records
-                </p>
+                  <div
+                    style={{
+                      fontSize: theme.fontSizes.xs,
+                      color: theme.colors.textSecondary,
+                    }}
+                  >
+                    Longest Streak
+                  </div>
+                </div>
+                <div style={{ textAlign: 'center', padding: theme.spacing.sm }}>
+                  <div
+                    style={{
+                      fontSize: theme.fontSizes.xl,
+                      fontWeight: theme.fontWeights.bold,
+                      color: theme.colors.warning,
+                    }}
+                  >
+                    {dailyStats.absentDays}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: theme.fontSizes.xs,
+                      color: theme.colors.textSecondary,
+                    }}
+                  >
+                    Days Absent
+                  </div>
+                </div>
+              </div>
+              {dailyStats.lastAttendanceDate && (
+                <div
+                  style={{
+                    textAlign: 'center',
+                    padding: theme.spacing.sm,
+                    backgroundColor: theme.colors.gray50,
+                    borderRadius: theme.borderRadius.md,
+                    fontSize: theme.fontSizes.sm,
+                    color: theme.colors.textSecondary,
+                  }}
+                >
+                  Last attended:{' '}
+                  {new Date(dailyStats.lastAttendanceDate).toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    month: 'long',
+                    day: 'numeric',
+                  })}
+                </div>
               )}
-            </ActivityList>
-          </Card>
-        </ContentGrid>
+            </Card>
+
+            <Card>
+              <CardTitle>Recent Attendance</CardTitle>
+              <ActivityList>
+                {recentActivity.map((activity: any) => (
+                  <ActivityItem key={activity.id}>
+                    <ActivityIcon type={activity.type}>
+                      {activity.type === 'present'
+                        ? '✅'
+                        : activity.type === 'absent'
+                        ? '❌'
+                        : '📅'}
+                    </ActivityIcon>
+                    <div style={{ flex: 1 }}>
+                      <div
+                        style={{
+                          fontWeight: theme.fontWeights.medium,
+                          color: theme.colors.textPrimary,
+                          fontSize: theme.fontSizes.sm,
+                        }}
+                      >
+                        {activity.description || 'Attendance Record'}
+                      </div>
+                      <div
+                        style={{
+                          color: theme.colors.textSecondary,
+                          fontSize: theme.fontSizes.xs,
+                        }}
+                      >
+                        {activity.date
+                          ? new Date(activity.date).toLocaleDateString('en-US', {
+                              weekday: 'short',
+                              month: 'short',
+                              day: 'numeric',
+                            })
+                          : 'Unknown date'}
+                        {activity.time &&
+                          ` • ${activity.time.toLocaleTimeString('en-US', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}`}
+                      </div>
+                    </div>
+                  </ActivityItem>
+                ))}
+                {recentActivity.length === 0 && (
+                  <p
+                    style={{
+                      color: theme.colors.textSecondary,
+                      textAlign: 'center',
+                      padding: theme.spacing.lg,
+                    }}
+                  >
+                    No recent attendance records
+                  </p>
+                )}
+              </ActivityList>
+            </Card>
+          </ContentGrid>
         </MainContent>
       )}
     </DashboardContainer>

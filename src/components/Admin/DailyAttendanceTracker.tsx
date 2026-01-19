@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { useAuth } from '../../contexts/AuthContext';
 import { theme } from '../../styles/theme';
 import { Button } from '../Common/Button';
 import { UncommonLogo } from '../Common/UncommonLogo';
@@ -436,39 +435,34 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({ 
   });
 
   const attendanceService = AttendanceService.getInstance();
-  const dailyAttendanceService = DailyAttendanceService.getInstance();
   const dataService = DataService.getInstance();
-
-  useEffect(() => {
-    loadDailyAttendance();
-  }, [selectedDate]);
 
   const loadDailyAttendance = async () => {
     try {
       setLoading(true);
 
-      // Get all s (students)
-      const s = await dataService.getUsers();
-      const students = s.filter(u => u.Type === 'attendee');
+      // Get all users (students)
+      const users = await dataService.getUsers();
+      const students = users.filter((u: any) => u.Type === 'attendee');
 
       // Get attendance records for the selected date
       const dateStr = selectedDate.toISOString().split('T')[0];
       const attendanceRecords = await attendanceService.getAttendanceByDateRange(dateStr, dateStr);
 
       // Build attendance data
-      const attendanceMap = new Map();
-      attendanceRecords.forEach(record => {
+      const attendanceMap = new Map<string, any>();
+      attendanceRecords.forEach((record: any) => {
         attendanceMap.set(record.studentId, record);
       });
 
-      const studentAttendanceData: StudentAttendanceData[] = students.map(student => {
+      const studentAttendanceData: StudentAttendanceData[] = students.map((student: any) => {
         const record = attendanceMap.get(student.uid);
-        
+
         if (record) {
           // Determine if student was late (after 9 AM)
-          const checkInTime = record.checkInTime;
+          const checkInTime: Date | undefined = record.checkInTime;
           const isLate = checkInTime && checkInTime.getHours() >= 9;
-          
+
           return {
             studentId: student.uid,
             studentName: student.displayName || 'Unknown',
@@ -476,14 +470,14 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({ 
             status: isLate ? 'late' : 'present',
             checkInTime: record.checkInTime,
             checkOutTime: record.checkOutTime,
-            location: record.location?.address || 'Unknown'
+            location: record.location?.address || 'Unknown',
           };
         } else {
           return {
             studentId: student.uid,
             studentName: student.displayName || 'Unknown',
             email: student.email || '',
-            status: 'absent'
+            status: 'absent',
           };
         }
       });
@@ -499,15 +493,19 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({ 
         total: students.length,
         present: presentCount,
         late: lateCount,
-        absent: absentCount
+        absent: absentCount,
       });
-
     } catch (error) {
       console.error('Error loading daily attendance:', error);
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadDailyAttendance();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDate]);
 
   const navigateDate = (direction: 'prev' | 'next') => {
     const newDate = new Date(selectedDate);
