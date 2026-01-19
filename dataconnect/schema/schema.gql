@@ -1,0 +1,60 @@
+type User @table {
+  displayName: String!
+  email: String!
+  createdAt: Timestamp!
+  photoUrl: String
+  bio: String
+  userType: String
+}
+
+type Event @table {
+  title: String!
+  startDate: Timestamp!
+  endDate: Timestamp!
+  location: String!
+  description: String!
+  createdAt: Timestamp!
+  organizer: User
+  capacity: Int
+  imageUrl: String
+  isPublic: Boolean
+  eventStatus: String
+}
+
+type TicketType @table {
+  name: String!
+  price: Float!
+  capacity: Int!
+  createdAt: Timestamp!
+  event: Event
+  description: String
+  accessLevel: String
+}
+
+type Registration @table {
+  registrationDate: Timestamp!
+  status: String!
+  createdAt: Timestamp!
+  user: User
+  event: Event
+  ticketType: TicketType
+  notes: String
+}
+
+type EventResource @table {
+  title: String!
+  resourceType: String!
+  url: String!
+  createdAt: Timestamp!
+  event: Event
+  description: String
+  accessLevel: String
+}
+
+type Feedback @table {
+  rating: Int!
+  createdAt: Timestamp!
+  user: User
+  event: Event
+  comment: String
+}

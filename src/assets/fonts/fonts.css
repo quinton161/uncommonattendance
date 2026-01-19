@@ -1,0 +1,29 @@
+/* Chillax Font Family - Using Google Fonts */
+/* Local font files can be added later when available */
+
+/* Utility classes for different weights */
+.chillax-extralight { font-family: 'Chillax', sans-serif; font-weight: 200; }
+.chillax-light { font-family: 'Chillax', sans-serif; font-weight: 300; }
+.chillax-regular { font-family: 'Chillax', sans-serif; font-weight: 400; }
+.chillax-medium { font-family: 'Chillax', sans-serif; font-weight: 500; }
+.chillax-semibold { font-family: 'Chillax', sans-serif; font-weight: 600; }
+.chillax-bold { font-family: 'Chillax', sans-serif; font-weight: 700; }
+
+/* Main Chillax font family with fallbacks */
+.chillax-font {
+  font-family: 'Chillax', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+}
+
+/* 
+  To use local font files, uncomment and add the font files to this directory:
+  
+  @font-face {
+    font-family: 'Chillax';
+    font-style: normal;
+    font-weight: 200;
+    font-display: swap;
+    src: local('Chillax Extralight'), url('./Chillax-Extralight.woff') format('woff');
+  }
+  
+  ... (add other weights as needed)
+*/
