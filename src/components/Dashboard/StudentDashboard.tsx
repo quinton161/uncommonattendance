@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import styled from 'styled-components';
 import { useAuth } from '../../contexts/AuthContext';
-import { useEvent } from '../../contexts/EventContext';
 import { Button } from '../Common/Button';
 import { theme } from '../../styles/theme';
 import { 
@@ -13,7 +12,6 @@ import {
 import DataService from '../../services/DataService';
 import { AttendanceService } from '../../services/attendanceService';
 import { DailyAttendanceService, DailyAttendanceStats } from '../../services/dailyAttendanceService';
-import { EventsPage } from '../Events/EventsPage';
 import { MyAttendancePage } from '../Student/MyAttendancePage';
 import { SchedulePage } from '../Student/SchedulePage';
 import { ProgressPage } from '../Student/ProgressPage';
@@ -554,7 +552,7 @@ const ActivityItem = styled.div`
   background: ${theme.colors.backgroundSecondary};
 `;
 
-const ActivityIcon = styled.div<{ type: 'checkin' | 'checkout' | 'event' }>`
+const ActivityIcon = styled.div<{ type: 'checkin' | 'checkout' | 'evt' }>`
   width: 32px;
   height: 32px;
   border-radius: 50%;
@@ -566,7 +564,7 @@ const ActivityIcon = styled.div<{ type: 'checkin' | 'checkout' | 'event' }>`
     switch (props.type) {
       case 'checkin': return theme.colors.success;
       case 'checkout': return theme.colors.warning;
-      case 'event': return theme.colors.primary;
+      case 'evt': return theme.colors.primary;
       default: return theme.colors.gray400;
     }
   }};
@@ -579,7 +577,6 @@ interface StudentDashboardProps {
 
 export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateToProfile }) => {
   const { user, logout } = useAuth();
-  const { events } = useEvent();
   const [activeNav, setActiveNav] = useState('dashboard');
   const [checkedIn, setCheckedIn] = useState(false);
   const [checkInTime, setCheckInTime] = useState<Date | null>(null);
@@ -588,7 +585,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
   const [canCheckIn, setCanCheckIn] = useState(true);
   const [canCheckOut, setCanCheckOut] = useState(false);
   const [stats, setStats] = useState({
-    eventsAttended: 0,
+    evtsAttended: 0,
     totalCheckIns: 0,
     currentStreak: 0,
     todayStatus: 'Not Checked In',
@@ -660,7 +657,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
       const studentStats = await dataService.getStudentStats(user.uid);
       
       setStats(prevStats => ({
-        eventsAttended: studentStats.eventsAttended,
+        evtsAttended: studentStats.evtsAttended,
         totalCheckIns: studentStats.totalCheckIns,
         currentStreak: studentStats.currentStreak,
         todayStatus: prevStats.todayStatus, // Keep current status
@@ -853,8 +850,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
 
   const renderCurrentPage = () => {
     switch (activeNav) {
-      case 'events':
-        return <EventsPage onBack={() => setActiveNav('dashboard')} />;
       case 'attendance':
         return <MyAttendancePage onBack={() => setActiveNav('dashboard')} isEmbedded={true} />;
       case 'register':
@@ -954,10 +949,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
         <NavItem active={activeNav === 'dashboard'} onClick={() => handleNavClick('dashboard')}>
           <DashboardIcon size={20} />
           Dashboard
-        </NavItem>
-        <NavItem active={activeNav === 'events'} onClick={() => handleNavClick('events')}>
-          <EventIcon size={20} />
-          Events
         </NavItem>
         <NavItem active={activeNav === 'attendance'} onClick={() => handleNavClick('attendance')}>
           <CheckCircleIcon size={20} />
@@ -1093,27 +1084,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
         </StatsGrid>
 
         <ContentGrid>
-          <Card>
-            <CardTitle>Available Events</CardTitle>
-            <EventsList>
-              {events.filter(event => event.isPublic && event.eventStatus === 'published').slice(0, 5).map((event) => (
-                <EventItem key={event.id}>
-                  <EventInfo>
-                    <h4>{event.title}</h4>
-                    <p>{new Date(event.startDate).toLocaleDateString()} • {event.location}</p>
-                  </EventInfo>
-                  <Button size="sm" variant="primary">
-                    Register
-                  </Button>
-                </EventItem>
-              ))}
-              {events.filter(event => event.isPublic && event.eventStatus === 'published').length === 0 && (
-                <p style={{ color: theme.colors.textSecondary, textAlign: 'center', padding: theme.spacing.lg }}>
-                  No events available at the moment
-                </p>
-              )}
-            </EventsList>
-          </Card>
 
           <Card>
             <CardTitle>Attendance Summary</CardTitle>

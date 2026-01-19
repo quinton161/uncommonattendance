@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { useAuth } from '../../contexts/AuthContext';
-import { useEvent } from '../../contexts/EventContext';
 import { Button } from '../Common/Button';
 import { CreateEventForm } from '../Events/CreateEventForm';
-import { EventsPage } from '../Events/EventsPage';
 import { UsersPage } from '../Admin/UsersPage';
 import { AttendancePage } from '../Admin/AttendancePage';
 import { DailyAttendanceTracker } from '../Admin/DailyAttendanceTracker';
@@ -485,8 +483,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProf
     }
   };
   const { user, logout } = useAuth();
-  const { events } = useEvent();
-  const [activeNav, setActiveNav] = useState('dashboard');
+    const [activeNav, setActiveNav] = useState('dashboard');
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [stats, setStats] = useState({
@@ -564,8 +561,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProf
 
   const renderCurrentPage = () => {
     switch (activeNav) {
-      case 'events':
-        return <EventsPage onBack={() => setActiveNav('dashboard')} />;
       case 'attendance':
         return <AttendancePage onBack={() => setActiveNav('dashboard')} />;
       case 'daily-tracker':
@@ -615,10 +610,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProf
         <NavItem active={activeNav === 'dashboard'} onClick={() => handleNavClick('dashboard')}>
           <DashboardIcon size={20} />
           Dashboard
-        </NavItem>
-        <NavItem active={activeNav === 'events'} onClick={() => handleNavClick('events')}>
-          <EventIcon size={20} />
-          Events
         </NavItem>
         <NavItem active={activeNav === 'attendance'} onClick={() => handleNavClick('attendance')}>
           <CheckCircleIcon size={20} />
@@ -674,15 +665,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProf
           </Header>
 
           <StatsGrid>
-            <StatCard variant="primary">
-              <StatIcon><EventAvailableIcon size={32} /></StatIcon>
-              <StatValue>{stats.totalEvents}</StatValue>
-              <StatLabel>Total Events</StatLabel>
-              <StatChange positive>
-                <TrendingUpIcon size={16} /> +{stats.activeEvents} active
-              </StatChange>
-            </StatCard>
-            
             <StatCard variant="secondary">
               <StatIcon><GroupIcon size={32} /></StatIcon>
               <StatValue>{stats.totalAttendees}</StatValue>
@@ -691,40 +673,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProf
                 <TrendingUpIcon size={16} /> All registered users
               </StatChange>
             </StatCard>
-            
-            <StatCard variant="accent">
-              <StatIcon><TodayIcon size={32} /></StatIcon>
-              <StatValue>{stats.todayAttendance}</StatValue>
-              <StatLabel>Today's Attendance</StatLabel>
-              <StatChange positive>
-                <CheckCircleIcon size={16} /> Checked in today
-              </StatChange>
-            </StatCard>
           </StatsGrid>
 
           <ContentGrid>
-            <Card>
-              <CardTitle>Recent Events</CardTitle>
-              <RecentEventsList>
-                {events.slice(0, 5).map((event) => (
-                  <EventItem key={event.id}>
-                    <EventInfo>
-                      <h4>{event.title}</h4>
-                      <p>{new Date(event.startDate).toLocaleDateString()}</p>
-                    </EventInfo>
-                    <Button size="sm" variant="outline">
-                      View
-                    </Button>
-                  </EventItem>
-                ))}
-                {events.length === 0 && (
-                  <p style={{ color: theme.colors.textSecondary, textAlign: 'center', padding: theme.spacing.lg }}>
-                    No events created yet
-                  </p>
-                )}
-              </RecentEventsList>
-            </Card>
-
             <Card>
               <CardTitle>Recent Check-ins</CardTitle>
               <AttendanceList>
