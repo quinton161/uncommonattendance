@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { useAuth } from '../../contexts/AuthContext';
 import { theme } from '../../styles/theme';
 import { UncommonLogo } from '../Common/UncommonLogo';
 import DataService from '../../services/DataService';
@@ -187,7 +186,6 @@ interface SchedulePageProps {
 }
 
 export const SchedulePage: React.FC<SchedulePageProps> = ({ onBack, isEmbedded = true }) => {
-  const { user } = useAuth();
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const dataService = DataService.getInstance();
