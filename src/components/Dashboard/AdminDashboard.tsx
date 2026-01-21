@@ -16,9 +16,8 @@ import {
 } from '../../styles/animations';
 import DataService from '../../services/DataService';
 import { uniqueToast } from '../../utils/toastUtils';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
 import { saveAs } from 'file-saver';
+import 'jspdf-autotable';
 
 import {
   DashboardIcon,

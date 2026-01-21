@@ -6,17 +6,6 @@ import { UncommonLogo } from '../Common/UncommonLogo';
 import { theme } from '../../styles/theme';
 
 // Animations
-const fadeInUp = keyframes`
-  from {
-    opacity: 0;
-    transform: translateY(30px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-`;
-
 const slideIn = keyframes`
   from {
     opacity: 0;
@@ -25,15 +14,6 @@ const slideIn = keyframes`
   to {
     opacity: 1;
     transform: translateX(0);
-  }
-`;
-
-const float = keyframes`
-  0%, 100% {
-    transform: translateY(0px) rotate(0deg);
-  }
-  50% {
-    transform: translateY(-10px) rotate(2deg);
   }
 `;
 
