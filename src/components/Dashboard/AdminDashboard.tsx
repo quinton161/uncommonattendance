@@ -55,7 +55,13 @@ const Sidebar = styled.div<{ isOpen?: boolean }>`
   top: 0;
   height: 100vh;
   overflow: hidden;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
   flex-shrink: 0;
+  
+  &::-webkit-scrollbar {
+    display: none;
+  }
   
   @media (max-width: ${theme.breakpoints.tablet}) {
     position: fixed;
