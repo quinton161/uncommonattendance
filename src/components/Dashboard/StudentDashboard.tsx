@@ -92,6 +92,28 @@ const Logo = styled.div`
   text-align: center;
   position: relative;
   z-index: 20;
+  flex-shrink: 0;
+`;
+
+const SidebarContent = styled.div`
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  
+  &::-webkit-scrollbar {
+    display: none;
+  }
+`;
+
+const SidebarFooter = styled.div`
+  flex-shrink: 0;
+  margin-top: auto;
+  padding-top: ${theme.spacing.xl};
 `;
 
 const NavItem = styled.div<{ active?: boolean }>`
@@ -107,6 +129,7 @@ const NavItem = styled.div<{ active?: boolean }>`
   margin-bottom: ${theme.spacing.sm};
   position: relative;
   z-index: 20;
+  flex-shrink: 0;
   
   &:hover {
     background: rgba(255, 255, 255, 0.1);
@@ -786,20 +809,22 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
           Student Hub
         </Logo>
 
-        <NavItem active={activeNav === 'dashboard'} onClick={() => handleNavClick('dashboard')}>
-          <DashboardIcon size={20} />
-          Dashboard
-        </NavItem>
-        <NavItem active={activeNav === 'attendance'} onClick={() => handleNavClick('attendance')}>
-          <CheckCircleIcon size={20} />
-          My Attendance
-        </NavItem>
-        <NavItem active={activeNav === 'progress'} onClick={() => handleNavClick('progress')}>
-          <BarChartIcon size={20} />
-          Progress
-        </NavItem>
+        <SidebarContent>
+          <NavItem active={activeNav === 'dashboard'} onClick={() => handleNavClick('dashboard')}>
+            <DashboardIcon size={20} />
+            Dashboard
+          </NavItem>
+          <NavItem active={activeNav === 'attendance'} onClick={() => handleNavClick('attendance')}>
+            <CheckCircleIcon size={20} />
+            My Attendance
+          </NavItem>
+          <NavItem active={activeNav === 'progress'} onClick={() => handleNavClick('progress')}>
+            <BarChartIcon size={20} />
+            Progress
+          </NavItem>
+        </SidebarContent>
 
-        <div style={{ marginTop: 'auto', paddingTop: theme.spacing.xl }}>
+        <SidebarFooter>
           {onNavigateToProfile && (
             <NavItem onClick={onNavigateToProfile}>
               <PersonIcon size={20} />
@@ -810,7 +835,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
             <LogoutIcon size={20} />
             Logout
           </NavItem>
-        </div>
+        </SidebarFooter>
       </Sidebar>
 
       {renderCurrentPage() || (
