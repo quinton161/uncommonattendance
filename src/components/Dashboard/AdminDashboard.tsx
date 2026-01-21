@@ -457,42 +457,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
     }
   };
 
-  const handleDownloadAttendancePDF = async () => {
-    try {
-      // Ensure DataService is configured (and will switch to mock data if Firebase is unavailable)
-      await dataService.testConnection();
-
-      uniqueToast.info('Preparing PDF for download...', { autoClose: 2000 });
-      const users = await dataService.getUsers();
-      const attendance = await dataService.getAttendance();
-
-      // Join attendance records with user info
-      const attendanceRows = attendance.map((a: any) => {
-        const userRecord = users.find((u: any) => u.id === a.studentId || u.uid === a.studentId);
-        return [
-          userRecord?.displayName || a.studentName || 'Unknown',
-          userRecord?.email || '',
-          a.checkInTime ? new Date(a.checkInTime).toLocaleString() : '',
-          a.checkOutTime ? new Date(a.checkOutTime).toLocaleString() : '',
-        ];
-      });
-
-      const doc = new jsPDF();
-      doc.text('Attendance Records', 14, 16);
-      (doc as any).autoTable({
-        head: [['Name', 'Email', 'Check-in Time', 'Check-out Time']],
-        body: attendanceRows,
-        startY: 22,
-        styles: { fontSize: 9 },
-        headStyles: { fillColor: [34, 197, 94] },
-      });
-      doc.save('attendance_records.pdf');
-      uniqueToast.success('PDF downloaded!', { autoClose: 2000 });
-    } catch (error) {
-      console.error('Error generating attendance PDF:', error);
-      uniqueToast.error('Failed to generate PDF');
-    }
-  };
+  // Removed unused handleDownloadAttendancePDF function
 
   const loadDashboardData = async () => {
     try {
