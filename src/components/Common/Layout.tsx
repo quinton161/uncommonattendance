@@ -23,6 +23,13 @@ const Main = styled.main`
   flex: 1;
   display: flex;
   flex-direction: column;
+  /* Add top padding to account for the sticky header so content is not hidden behind it */
+  padding-top: 64px;
+
+  @media (max-width: ${theme.breakpoints.tablet}) {
+    /* Mobile/tablet header uses a slightly smaller height in other components */
+    padding-top: 60px;
+  }
 `;
 
 const getMaxWidth = (maxWidth: string) => {

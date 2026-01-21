@@ -20,12 +20,12 @@ import { uniqueToast } from '../../utils/toastUtils';
 import {
   DashboardIcon,
   CheckCircleIcon,
-  TrendingUpIcon,
-  PersonIcon,
-  LogoutIcon,
   AssignmentIcon,
-  BarChartIcon,
+  TrendingUpIcon,
+  LogoutIcon,
   LoginIcon,
+  BarChartIcon,
+  PersonIcon,
 } from '../Common/Icons';
 
 const DashboardContainer = styled.div`
@@ -34,7 +34,8 @@ const DashboardContainer = styled.div`
   background: ${theme.colors.backgroundSecondary};
   ${pageTransition}
   ${respectMotionPreference}
-  
+  width: 100vw;
+  overflow-x: hidden;
   @media (max-width: ${theme.breakpoints.tablet}) {
     flex-direction: column;
   }
@@ -107,30 +108,6 @@ const NavItem = styled.div<{ active?: boolean }>`
   }
 `;
 
-const MainContent = styled.div`
-  flex: 1;
-  padding: ${theme.spacing.lg};
-  min-height: 100vh;
-  overflow-x: hidden;
-  ${containerAnimation}
-  ${respectMotionPreference}
-  
-  @media (max-width: ${theme.breakpoints.tablet}) {
-    padding: ${theme.spacing.md};
-    padding-top: calc(${theme.spacing.md} + 60px);
-  }
-  
-  @media (max-width: ${theme.breakpoints.mobile}) {
-    padding: ${theme.spacing.sm};
-    padding-top: calc(${theme.spacing.sm} + 60px);
-  }
-  
-  @media (max-width: 420px) {
-    padding: ${theme.spacing.xs};
-    padding-top: calc(${theme.spacing.xs} + 60px);
-  }
-`;
-
 const MobileHeader = styled.div`
   display: none;
   
@@ -145,7 +122,7 @@ const MobileHeader = styled.div`
     top: 0;
     left: 0;
     right: 0;
-    z-index: ${theme.zIndex.fixed};
+    z-index: 1000;
     height: 60px;
   }
 `;
@@ -179,76 +156,63 @@ const MobileOverlay = styled.div<{ isOpen: boolean }>`
   }
 `;
 
+const MainContent = styled.div`
+  flex: 1;
+  padding: ${theme.spacing.lg};
+  min-height: 100vh;
+  overflow-x: hidden;
+  box-sizing: border-box;
+  padding-top: 60px;
+  ${containerAnimation}
+  ${respectMotionPreference}
+  @media (max-width: ${theme.breakpoints.tablet}) {
+    padding: ${theme.spacing.md};
+    padding-top: 60px;
+  }
+  @media (max-width: ${theme.breakpoints.mobile}) {
+    padding: ${theme.spacing.sm};
+    padding-top: 60px;
+  }
+  @media (max-width: 420px) {
+    padding: ${theme.spacing.xs};
+    padding-top: 60px;
+  }
+`;
+
 const Header = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
+  z-index: 20;
+  position: relative;
   margin-bottom: ${theme.spacing.xl};
   gap: ${theme.spacing.md};
-  
+
   @media (max-width: ${theme.breakpoints.tablet}) {
     flex-direction: column;
     align-items: stretch;
     gap: ${theme.spacing.lg};
+  }
+
+  @media (max-width: 420px) {
+    margin-bottom: ${theme.spacing.lg};
+    gap: ${theme.spacing.md};
+  }
+
+  @media (max-width: 360px) {
+    margin-bottom: ${theme.spacing.md};
+    gap: ${theme.spacing.sm};
   }
 `;
 
 const HeaderTitle = styled.div`
-  h1 {
-    font-size: ${theme.fontSizes['2xl']};
-    font-weight: ${theme.fontWeights.bold};
-    color: ${theme.colors.textPrimary};
-    margin: 0 0 ${theme.spacing.md} 0;
-    line-height: 1.2;
-    display: flex;
-    align-items: center;
-    gap: ${theme.spacing.lg};
-    
-    @media (max-width: ${theme.breakpoints.tablet}) {
-      font-size: ${theme.fontSizes.xl};
-      gap: ${theme.spacing.md};
-    }
-    
-    @media (max-width: ${theme.breakpoints.mobile}) {
-      font-size: ${theme.fontSizes.lg};
-      flex-direction: column;
-      align-items: flex-start;
-      gap: ${theme.spacing.sm};
-    }
-  }
-  
-  p {
-    color: ${theme.colors.textSecondary};
-    margin: 0;
-    font-size: ${theme.fontSizes.base};
-    margin-top: ${theme.spacing.sm};
-    
-    @media (max-width: ${theme.breakpoints.tablet}) {
-      font-size: ${theme.fontSizes.sm};
-    }
-    
-    @media (max-width: ${theme.breakpoints.mobile}) {
-      font-size: ${theme.fontSizes.xs};
-      margin-top: ${theme.spacing.xs};
-    }
-  }
+  flex: 1;
 `;
 
 const HeaderActions = styled.div`
   display: flex;
-  gap: ${theme.spacing.md};
   align-items: center;
-  
-  @media (max-width: ${theme.breakpoints.tablet}) {
-    flex-direction: column;
-    align-items: stretch;
-    gap: ${theme.spacing.sm};
-    width: 100%;
-  }
-  
-  @media (max-width: ${theme.breakpoints.mobile}) {
-    gap: ${theme.spacing.xs};
-  }
+  gap: ${theme.spacing.md};
 `;
 
 const StatsGrid = styled.div`
@@ -578,10 +542,8 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
 
     } catch (error) {
       console.error('Error loading student data:', error);
-      uniqueToast.error('Failed to load your dashboard data.', {
-        autoClose: 4000,
-        position: 'top-center',
-      });
+      // Suppress user-facing toast for dashboard load failures so UI isn't noisy.
+      // DataService already falls back to mock data when Firebase is unavailable.
     }
   }, [user, dataService, dailyAttendanceService]);
 

@@ -117,19 +117,20 @@ const MainContent = styled.div`
   min-height: 100vh;
   overflow-x: hidden;
   box-sizing: border-box;
+  padding-top: 60px;
   ${containerAnimation}
   ${respectMotionPreference}
   @media (max-width: ${theme.breakpoints.tablet}) {
     padding: ${theme.spacing.md};
-    padding-top: calc(${theme.spacing.md} + 60px);
+    padding-top: 60px;
   }
   @media (max-width: ${theme.breakpoints.mobile}) {
     padding: ${theme.spacing.sm};
-    padding-top: calc(${theme.spacing.sm} + 60px);
+    padding-top: 60px;
   }
   @media (max-width: 420px) {
     padding: ${theme.spacing.xs};
-    padding-top: calc(${theme.spacing.xs} + 60px);
+    padding-top: 60px;
   }
 `;
 
@@ -137,20 +138,22 @@ const Header = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
+  z-index: 20;
+  position: relative;
   margin-bottom: ${theme.spacing.xl};
   gap: ${theme.spacing.md};
-  
+
   @media (max-width: ${theme.breakpoints.tablet}) {
     flex-direction: column;
     align-items: stretch;
     gap: ${theme.spacing.lg};
   }
-  
+
   @media (max-width: 420px) {
     margin-bottom: ${theme.spacing.lg};
     gap: ${theme.spacing.md};
   }
-  
+
   @media (max-width: 360px) {
     margin-bottom: ${theme.spacing.md};
     gap: ${theme.spacing.sm};
@@ -310,7 +313,7 @@ const MobileHeader = styled.div`
     top: 0;
     left: 0;
     right: 0;
-    z-index: ${theme.zIndex.fixed};
+    z-index: 1000;
     height: 60px;
   }
 `;
@@ -614,69 +617,71 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
         </div>
       </Sidebar>
 
-      {renderCurrentPage() || (
-        <MainContent>
-          <Header>
-            <HeaderTitle>
-              <h1 style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: theme.spacing.lg,
-                margin: 0 
-              }}>
-                <UncommonLogo size="lg" showSubtitle={false} />
-                <span>Dashboard</span>
-              </h1>
-              <p>Welcome back, {user?.displayName}!</p>
-            </HeaderTitle>
-            <HeaderActions>
-              <Button variant="primary" onClick={handleDownloadAttendanceCSV}>
-                Download Attendance CSV
-              </Button>
-            </HeaderActions>
-          </Header>
+      <MainContent>
+        {renderCurrentPage() || (
+          <>
+            <Header>
+              <HeaderTitle>
+                <h1 style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: theme.spacing.lg,
+                  margin: 0 
+                }}>
+                  <UncommonLogo size="lg" showSubtitle={false} />
+                  <span>Dashboard</span>
+                </h1>
+                <p>Welcome back, {user?.displayName}!</p>
+              </HeaderTitle>
+              <HeaderActions>
+                <Button variant="primary" onClick={handleDownloadAttendanceCSV}>
+                  Download Attendance CSV
+                </Button>
+              </HeaderActions>
+            </Header>
 
-          <StatsGrid>
-            <StatCard variant="secondary">
-              <StatIcon><GroupIcon size={32} /></StatIcon>
-              <StatValue>{stats.totalAttendees}</StatValue>
-              <StatLabel>Total Attendees</StatLabel>
-              <StatChange positive>
-                <TrendingUpIcon size={16} /> All registered users
-              </StatChange>
-            </StatCard>
-          </StatsGrid>
+            <StatsGrid>
+              <StatCard variant="secondary">
+                <StatIcon><GroupIcon size={32} /></StatIcon>
+                <StatValue>{stats.totalAttendees}</StatValue>
+                <StatLabel>Total Attendees</StatLabel>
+                <StatChange positive>
+                  <TrendingUpIcon size={16} /> All registered users
+                </StatChange>
+              </StatCard>
+            </StatsGrid>
 
-          <ContentGrid>
-            <Card>
-              <CardTitle>Recent Check-ins</CardTitle>
-              <AttendanceList>
-                {recentAttendance.map((attendance: any) => (
-                  <AttendanceItem key={attendance.id}>
-                    <UserAvatar>
-                      {getInitials(attendance.studentName || 'User')}
-                    </UserAvatar>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: theme.fontWeights.medium, color: theme.colors.textPrimary, fontSize: theme.fontSizes.sm }}>
-                        {attendance.studentName}
+            <ContentGrid>
+              <Card>
+                <CardTitle>Recent Check-ins</CardTitle>
+                <AttendanceList>
+                  {recentAttendance.map((attendance: any) => (
+                    <AttendanceItem key={attendance.id}>
+                      <UserAvatar>
+                        {getInitials(attendance.studentName || 'User')}
+                      </UserAvatar>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: theme.fontWeights.medium, color: theme.colors.textPrimary, fontSize: theme.fontSizes.sm }}>
+                          {attendance.studentName}
+                        </div>
+                        <div style={{ color: theme.colors.textSecondary, fontSize: theme.fontSizes.xs }}>
+                          {attendance.checkInTime?.toLocaleTimeString()}
+                        </div>
                       </div>
-                      <div style={{ color: theme.colors.textSecondary, fontSize: theme.fontSizes.xs }}>
-                        {attendance.checkInTime?.toLocaleTimeString()}
-                      </div>
-                    </div>
-                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.colors.success }} />
-                  </AttendanceItem>
-                ))}
-                {recentAttendance.length === 0 && (
-                  <p style={{ color: theme.colors.textSecondary, textAlign: 'center', padding: theme.spacing.lg }}>
-                    No recent check-ins
-                  </p>
-                )}
-              </AttendanceList>
-          </Card>
-        </ContentGrid>
-    </MainContent>
-    )}
+                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.colors.success }} />
+                    </AttendanceItem>
+                  ))}
+                  {recentAttendance.length === 0 && (
+                    <p style={{ color: theme.colors.textSecondary, textAlign: 'center', padding: theme.spacing.lg }}>
+                      No recent check-ins
+                    </p>
+                  )}
+                </AttendanceList>
+            </Card>
+          </ContentGrid>
+          </>
+        )}
+      </MainContent>
   </DashboardContainer>
   );
 };
