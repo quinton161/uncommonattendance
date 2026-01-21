@@ -34,7 +34,7 @@ const DashboardContainer = styled.div`
   background: ${theme.colors.backgroundSecondary};
   ${pageTransition}
   ${respectMotionPreference}
-  width: 100vw;
+  width: 100%;
   overflow-x: hidden;
   @media (max-width: ${theme.breakpoints.tablet}) {
     flex-direction: column;
