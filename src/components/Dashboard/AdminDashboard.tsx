@@ -18,6 +18,7 @@ import DataService from '../../services/DataService';
 import { uniqueToast } from '../../utils/toastUtils';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
+import { saveAs } from 'file-saver';
 
 import {
   DashboardIcon,
@@ -36,7 +37,8 @@ const DashboardContainer = styled.div`
   background: ${theme.colors.backgroundSecondary};
   ${pageTransition}
   ${respectMotionPreference}
-  
+  width: 100vw;
+  overflow-x: hidden;
   @media (max-width: ${theme.breakpoints.tablet}) {
     flex-direction: column;
   }
@@ -114,19 +116,17 @@ const MainContent = styled.div`
   padding: ${theme.spacing.lg};
   min-height: 100vh;
   overflow-x: hidden;
+  box-sizing: border-box;
   ${containerAnimation}
   ${respectMotionPreference}
-  
   @media (max-width: ${theme.breakpoints.tablet}) {
     padding: ${theme.spacing.md};
     padding-top: calc(${theme.spacing.md} + 60px);
   }
-  
   @media (max-width: ${theme.breakpoints.mobile}) {
     padding: ${theme.spacing.sm};
     padding-top: calc(${theme.spacing.sm} + 60px);
   }
-  
   @media (max-width: 420px) {
     padding: ${theme.spacing.xs};
     padding-top: calc(${theme.spacing.xs} + 60px);
@@ -414,7 +414,8 @@ interface AdminDashboardProps {
   onNavigateToProfile?: () => void;
 }
 
-export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) => {
+const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) => {
+
   const { user, logout } = useAuth();
   const [activeNav, setActiveNav] = useState('dashboard');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -424,6 +425,34 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProf
   });
   const [recentAttendance, setRecentAttendance] = useState<any[]>([]);
   const dataService = DataService.getInstance();
+
+  const handleDownloadAttendanceCSV = async () => {
+    try {
+      await dataService.testConnection();
+      const users = await dataService.getUsers();
+      const attendance = await dataService.getAttendance();
+      const todayStr = new Date().toISOString().split('T')[0];
+      // Only today's attendance
+      const todayAttendance = attendance.filter((a: any) => a.date === todayStr);
+      const rows = todayAttendance.map((a: any) => {
+        const userRecord = users.find((u: any) => u.id === a.studentId || u.uid === a.studentId);
+        return [
+          userRecord?.displayName || a.studentName || 'Unknown',
+          a.date || '',
+          a.checkInTime ? new Date(a.checkInTime).toLocaleTimeString() : '',
+          a.checkOutTime ? new Date(a.checkOutTime).toLocaleTimeString() : ''
+        ];
+      });
+      let csv = 'Name,Date,Check-in Time,Check-out Time\n';
+      csv += rows.map(r => r.map(field => `"${field}"`).join(',')).join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      saveAs(blob, `attendance_${todayStr}.csv`);
+      uniqueToast.success('CSV downloaded!', { autoClose: 2000 });
+    } catch (error) {
+      console.error('Error generating attendance CSV:', error);
+      uniqueToast.error('Failed to generate CSV');
+    }
+  };
 
   const handleDownloadAttendancePDF = async () => {
     try {
@@ -601,8 +630,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProf
               <p>Welcome back, {user?.displayName}!</p>
             </HeaderTitle>
             <HeaderActions>
-              <Button variant="primary" onClick={handleDownloadAttendancePDF}>
-                Download Attendance PDF
+              <Button variant="primary" onClick={handleDownloadAttendanceCSV}>
+                Download Attendance CSV
               </Button>
             </HeaderActions>
           </Header>
@@ -628,26 +657,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProf
                       {getInitials(attendance.studentName || 'User')}
                     </UserAvatar>
                     <div style={{ flex: 1 }}>
-                      <div style={{ 
-                        fontWeight: theme.fontWeights.medium,
-                        color: theme.colors.textPrimary,
-                        fontSize: theme.fontSizes.sm
-                      }}>
+                      <div style={{ fontWeight: theme.fontWeights.medium, color: theme.colors.textPrimary, fontSize: theme.fontSizes.sm }}>
                         {attendance.studentName}
                       </div>
-                      <div style={{ 
-                        color: theme.colors.textSecondary,
-                        fontSize: theme.fontSizes.xs
-                      }}>
+                      <div style={{ color: theme.colors.textSecondary, fontSize: theme.fontSizes.xs }}>
                         {attendance.checkInTime?.toLocaleTimeString()}
                       </div>
                     </div>
-                    <div style={{ 
-                      width: '8px',
-                      height: '8px',
-                      borderRadius: '50%',
-                      background: theme.colors.success
-                    }} />
+                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.colors.success }} />
                   </AttendanceItem>
                 ))}
                 {recentAttendance.length === 0 && (
@@ -656,10 +673,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProf
                   </p>
                 )}
               </AttendanceList>
-            </Card>
-          </ContentGrid>
-      </MainContent>
-      )}
-    </DashboardContainer>
+          </Card>
+        </ContentGrid>
+    </MainContent>
+    )}
+  </DashboardContainer>
   );
 };
+
+export default AdminDashboard;

@@ -5,7 +5,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { EventProvider } from './contexts/EventContext';
 import { AuthPage } from './components/Auth/AuthPage';
 import { StudentDashboard } from './components/Dashboard/StudentDashboard';
-import { AdminDashboard } from './components/Dashboard/AdminDashboard';
+import AdminDashboard from './components/Dashboard/AdminDashboard';
 import { ProfilePage } from './components/Student/ProfilePage';
 import { SimpleSplash } from './components/Common/SimpleSplash';
 import { DirectAuthTest } from './components/Auth/DirectAuthTest';
