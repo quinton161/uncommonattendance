@@ -13,23 +13,19 @@ import DataService from '../../services/DataService';
 import { AttendanceService } from '../../services/attendanceService';
 import { DailyAttendanceService, DailyAttendanceStats } from '../../services/dailyAttendanceService';
 import { MyAttendancePage } from '../Student/MyAttendancePage';
-import { SchedulePage } from '../Student/SchedulePage';
 import { ProgressPage } from '../Student/ProgressPage';
-import { AttendanceRegister } from '../Student/AttendanceRegister';
 import { UncommonLogo } from '../Common/UncommonLogo';
 import { StarField } from '../Common/StarField';
 import { uniqueToast } from '../../utils/toastUtils';
 import {
   DashboardIcon,
   CheckCircleIcon,
-  ScheduleIcon,
   TrendingUpIcon,
   PersonIcon,
   LogoutIcon,
   AssignmentIcon,
   BarChartIcon,
   LoginIcon,
-  CalendarIcon,
 } from '../Common/Icons';
 
 const DashboardContainer = styled.div`
@@ -653,6 +649,9 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
         lastCheckIn: now,
       }));
 
+      // Force reload stats and recent activity from backend
+      await loadStudentData();
+
       if (isLate) {
         uniqueToast.warning('You have checked in after 9:00 AM.', {
           autoClose: 6000,
@@ -723,10 +722,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
     switch (activeNav) {
       case 'attendance':
         return <MyAttendancePage onBack={() => setActiveNav('dashboard')} isEmbedded={true} />;
-      case 'register':
-        return <AttendanceRegister onBack={() => setActiveNav('dashboard')} isEmbedded={true} />;
-      case 'schedule':
-        return <SchedulePage onBack={() => setActiveNav('dashboard')} isEmbedded={true} />;
       case 'progress':
         return <ProgressPage onBack={() => setActiveNav('dashboard')} isEmbedded={true} />;
       default:
@@ -764,14 +759,18 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
       
     } catch (error) {
       console.error('Check-out error:', error);
-      if (error instanceof Error && error.message === 'Already checked out today') {
-        uniqueToast.info('You have already checked out today!', { autoClose: 4000, position: 'top-center' });
-        // Refresh state to sync with database
-        checkTodayAttendance();
-      } else if (error instanceof Error && error.message === 'No check-in record found for today') {
-        uniqueToast.warning('You need to check in first!', { autoClose: 4000, position: 'top-center' });
-        // Refresh state to sync with database
-        checkTodayAttendance();
+      if (error instanceof Error) {
+        if (error.message === 'Already checked out today') {
+          uniqueToast.info('You have already checked out today!', { autoClose: 4000, position: 'top-center' });
+          // Refresh state to sync with database
+          checkTodayAttendance();
+        } else if (error.message === 'No check-in record found for today') {
+          uniqueToast.warning('You need to check in first!', { autoClose: 4000, position: 'top-center' });
+          // Refresh state to sync with database
+          checkTodayAttendance();
+        } else {
+          uniqueToast.error('Failed to check out. Please try again.', { autoClose: 4000, position: 'top-center' });
+        }
       } else {
         uniqueToast.error('Failed to check out. Please try again.', { autoClose: 4000, position: 'top-center' });
       }
@@ -826,14 +825,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
         <NavItem active={activeNav === 'attendance'} onClick={() => handleNavClick('attendance')}>
           <CheckCircleIcon size={20} />
           My Attendance
-        </NavItem>
-        <NavItem active={activeNav === 'register'} onClick={() => handleNavClick('register')}>
-          <CalendarIcon size={20} />
-          Register
-        </NavItem>
-        <NavItem active={activeNav === 'schedule'} onClick={() => handleNavClick('schedule')}>
-          <ScheduleIcon size={20} />
-          Schedule
         </NavItem>
         <NavItem active={activeNav === 'progress'} onClick={() => handleNavClick('progress')}>
           <BarChartIcon size={20} />
