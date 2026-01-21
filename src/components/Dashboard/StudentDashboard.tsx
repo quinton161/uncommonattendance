@@ -52,7 +52,7 @@ const Sidebar = styled.div<{ isOpen?: boolean }>`
   position: sticky;
   top: 0;
   height: 100vh;
-  overflow-y: auto;
+  overflow: hidden;
   flex-shrink: 0;
   
   @media (max-width: ${theme.breakpoints.tablet}) {
