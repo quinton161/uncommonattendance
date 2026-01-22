@@ -49,18 +49,18 @@ const Sidebar = styled.div<{ isOpen?: boolean }>`
   display: flex;
   flex-direction: column;
   box-shadow: ${theme.shadows.lg};
-  position: sticky;
+  position: fixed;
   top: 0;
+  left: 0;
   height: 100vh;
+  z-index: 1001;
   overflow: hidden;
   -ms-overflow-style: none;
   scrollbar-width: none;
   flex-shrink: 0;
-  
   &::-webkit-scrollbar {
     display: none;
   }
-  
   @media (max-width: ${theme.breakpoints.tablet}) {
     position: fixed;
     top: 0;
@@ -70,15 +70,12 @@ const Sidebar = styled.div<{ isOpen?: boolean }>`
     transition: left 0.3s ease;
     width: 100%;
   }
-  
   @media (max-width: ${theme.breakpoints.mobile}) {
     padding: ${theme.spacing.md};
   }
-  
   @media (max-width: 420px) {
     padding: ${theme.spacing.sm};
   }
-  
   @media (max-width: 360px) {
     padding: ${theme.spacing.xs};
   }
@@ -192,19 +189,23 @@ const MainContent = styled.div`
   overflow-x: hidden;
   box-sizing: border-box;
   padding-top: 60px;
+  margin-left: 280px;
   ${containerAnimation}
   ${respectMotionPreference}
   @media (max-width: ${theme.breakpoints.tablet}) {
     padding: ${theme.spacing.md};
     padding-top: 60px;
+    margin-left: 0;
   }
   @media (max-width: ${theme.breakpoints.mobile}) {
     padding: ${theme.spacing.sm};
     padding-top: 60px;
+    margin-left: 0;
   }
   @media (max-width: 420px) {
     padding: ${theme.spacing.xs};
     padding-top: 60px;
+    margin-left: 0;
   }
 `;
 
