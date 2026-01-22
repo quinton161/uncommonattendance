@@ -713,13 +713,14 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
   const renderCurrentPage = () => {
     switch (activeNav) {
       case 'attendance':
-        return <MyAttendancePage onBack={() => setActiveNav('dashboard')} isEmbedded={true} />;
+        return <MainContent><MyAttendancePage onBack={() => setActiveNav('dashboard')} isEmbedded={true} /></MainContent>;
       case 'progress':
-        return <ProgressPage onBack={() => setActiveNav('dashboard')} isEmbedded={true} />;
+        return <MainContent><ProgressPage onBack={() => setActiveNav('dashboard')} isEmbedded={true} /></MainContent>;
       default:
         return null; // Will render the main dashboard
     }
   };
+
 
   const handleCheckOut = async () => {
     if (!user || !canCheckOut) {
