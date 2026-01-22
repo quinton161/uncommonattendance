@@ -308,6 +308,13 @@ const StatIcon = styled.div`
   opacity: 0.3;
 `;
 
+const StatChange = styled.div<{ positive?: boolean }>`
+  font-size: ${theme.fontSizes.xs};
+  color: ${({ positive }) => positive ? theme.colors.success : theme.colors.error};
+  margin-top: ${theme.spacing.xs};
+  font-weight: ${theme.fontWeights.medium};
+`;
+
 const AttendanceCard = styled(StatCard)`
   grid-column: span 2;
   
@@ -696,11 +703,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
     }
   };
 
-  // Manual check-in wrapper
-  const handleCheckIn = async () => {
-    await handleCheckInInternal(false);
-  };
-
   const handleNavClick = (navItem: string) => {
     setActiveNav(navItem);
     setMobileMenuOpen(false); // Close mobile menu when navigating
@@ -722,44 +724,80 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
   };
 
 
-  const handleCheckOut = async () => {
-    if (!user || !canCheckOut) {
-      return;
+  // useEffect hooks after function declarations
+  useEffect(() => {
+    console.log('StudentDashboard useEffect - user:', !!user, user?.uid);
+    if (user) {
+      loadStudentData();
+      checkTodayAttendance();
     }
+  }, [user, loadStudentData, checkTodayAttendance]);
 
+  // Calculate total school days (Mon-Fri) in current month
+  const getTotalSchoolDaysInMonth = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    let total = 0;
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    for (let day = 1; day <= daysInMonth; day++) {
+      const d = new Date(year, month, day);
+      const weekday = d.getDay();
+      if (weekday !== 0 && weekday !== 6) total++; // Exclude weekends
+    }
+    return total;
+  };
+
+  // Attendance stats from Firebase
+  const [daysPresent, setDaysPresent] = useState(0);
+  const [attendanceRate, setAttendanceRate] = useState(0);
+  const totalSchoolDays = getTotalSchoolDaysInMonth();
+
+  // Fetch attendance stats from Firebase
+  const fetchAttendanceStats = useCallback(async () => {
+    if (!user) return;
+    const dailyAttendanceService = DailyAttendanceService.getInstance();
+    // Get stats for current month
+    const now = new Date();
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const stats = await dailyAttendanceService.getAttendanceStats(user.uid, daysInMonth);
+    setDaysPresent(stats.presentDays);
+    setAttendanceRate(Math.round(stats.attendanceRate));
+  }, [user]);
+
+  useEffect(() => {
+    fetchAttendanceStats();
+  }, [fetchAttendanceStats]);
+
+  // Update stats after check-in
+  const handleCheckIn = async () => {
+    await handleCheckInInternal(false);
+    await fetchAttendanceStats();
+  };
+
+  // Optionally update on check-out if needed
+  const handleCheckOut = async () => {
+    if (!user || !canCheckOut) return;
     setAttendanceLoading(true);
     try {
       uniqueToast.info('Recording check-out...', { autoClose: 2000, position: 'top-center' });
-      
-      // Use AttendanceService to check out
       await attendanceService.checkOut(user.uid);
-
-      // Update local state
       setCheckedIn(false);
       setCheckInTime(null);
-      setCanCheckIn(false); // Can't check in again today
-      setCanCheckOut(false); // Already checked out
-      
-      // Update stats
-      setStats(prev => ({
-        ...prev,
-        todayStatus: 'Completed for Today'
-      }));
-      
-      loadStudentData(); // Refresh other stats
-      
+      setCanCheckIn(false);
+      setCanCheckOut(false);
+      setStats(prev => ({ ...prev, todayStatus: 'Completed for Today' }));
+      await loadStudentData();
+      await fetchAttendanceStats(); // update stats after check-out
       uniqueToast.success('Checked out successfully! See you tomorrow.', { autoClose: 3000, position: 'top-center' });
-      
     } catch (error) {
       console.error('Check-out error:', error);
       if (error instanceof Error) {
         if (error.message === 'Already checked out today') {
           uniqueToast.info('You have already checked out today!', { autoClose: 4000, position: 'top-center' });
-          // Refresh state to sync with database
           checkTodayAttendance();
         } else if (error.message === 'No check-in record found for today') {
           uniqueToast.warning('You need to check in first!', { autoClose: 4000, position: 'top-center' });
-          // Refresh state to sync with database
           checkTodayAttendance();
         } else {
           uniqueToast.error('Failed to check out. Please try again.', { autoClose: 4000, position: 'top-center' });
@@ -771,15 +809,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
       setAttendanceLoading(false);
     }
   };
-
-  // useEffect hooks after function declarations
-  useEffect(() => {
-    console.log('StudentDashboard useEffect - user:', !!user, user?.uid);
-    if (user) {
-      loadStudentData();
-      checkTodayAttendance();
-    }
-  }, [user, loadStudentData, checkTodayAttendance]);
 
   // Debug current state
   useEffect(() => {
@@ -925,33 +954,14 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
                   </Button>
                 )}
               </AttendanceControls>
-            </AttendanceCard>
-
-            <StatCard variant="secondary">
-              <StatIcon>
-                <AssignmentIcon size={32} />
-              </StatIcon>
               <StatValue>
-                {dailyStats.presentDays}/{dailyStats.totalDays}
+                {daysPresent}/{totalSchoolDays}
               </StatValue>
               <StatLabel>Days Present</StatLabel>
-            </StatCard>
-
-            <StatCard variant="accent">
-              <StatIcon>
-                <TrendingUpIcon size={32} />
-              </StatIcon>
-              <StatValue>{dailyStats.currentStreak}</StatValue>
-              <StatLabel>Current Streak</StatLabel>
-            </StatCard>
-
-            <StatCard variant="primary">
-              <StatIcon>
-                <CheckCircleIcon size={32} />
-              </StatIcon>
-              <StatValue>{dailyStats.attendanceRate.toFixed(1)}%</StatValue>
-              <StatLabel>Attendance Rate</StatLabel>
-            </StatCard>
+              <StatChange positive>
+                Attendance Rate: {attendanceRate}%
+              </StatChange>
+            </AttendanceCard>
           </StatsGrid>
 
           <ContentGrid>
