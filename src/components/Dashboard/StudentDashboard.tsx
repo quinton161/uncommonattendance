@@ -20,8 +20,6 @@ import { uniqueToast } from '../../utils/toastUtils';
 import {
   DashboardIcon,
   CheckCircleIcon,
-  AssignmentIcon,
-  TrendingUpIcon,
   LogoutIcon,
   LoginIcon,
   BarChartIcon,
