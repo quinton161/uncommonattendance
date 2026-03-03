@@ -1,4 +1,3 @@
-import { AttendanceRecord } from '../types';
 import { TimeService } from './timeService';
 
 export interface EmailService {
