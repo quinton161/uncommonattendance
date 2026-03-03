@@ -30,7 +30,19 @@ export class AttendanceService {
     studentName: string,
     location?: LocationData
   ): Promise<AttendanceRecord> {
-    console.log('AttendanceService.checkIn called with:', { studentId, studentName });
+    console.log('AttendanceService.checkIn called with:', { studentId, studentName, location });
+    
+    // Check if user is within school premises
+    if (location) {
+      const knownLocation = findKnownLocation(location.latitude, location.longitude);
+      if (!knownLocation) {
+        console.error('❌ User not within school premises:', { lat: location.latitude, lng: location.longitude });
+        throw new Error('You must be within school premises to check in');
+      }
+      console.log('✅ User is within school premises:', knownLocation.name);
+    } else {
+      console.warn('⚠️ No location provided, proceeding without geolocation check');
+    }
     
     const today = new Date().toISOString().split('T')[0];
     const attendanceId = `${studentId}_${today}`;

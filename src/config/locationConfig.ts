@@ -11,18 +11,17 @@ export interface LocationConfig {
   address?: string;
 }
 
-export const VINCENT_BOHLEN_HUB: LocationConfig = {
-  name: 'Vincent Bohlen Hub',
-  // TODO: Replace these with actual Vincent Bohlen Hub coordinates
-  latitude: -26.2041,  // Example coordinates (Johannesburg area)
-  longitude: 28.0473,  // Example coordinates (Johannesburg area)
-  radius: 0.01,        // ~1km radius - adjust as needed
-  address: 'Vincent Bohlen Hub, South Africa'
+export const SCHOOL_LOCATION: LocationConfig = {
+  name: 'School',
+  latitude: -17.94121,
+  longitude: 25.81941,
+  radius: 0.005, // ~500m radius
+  address: 'School Location'
 };
 
 // You can add multiple locations if needed
 export const KNOWN_LOCATIONS: LocationConfig[] = [
-  VINCENT_BOHLEN_HUB,
+  SCHOOL_LOCATION,
   // Add more locations here if needed
   // {
   //   name: 'Other Campus',
@@ -60,13 +59,13 @@ export function getLocationDisplayName(location: LocationConfig): string {
 
 // Instructions for finding exact coordinates:
 console.log(`
-📍 To set exact Vincent Bohlen Hub coordinates:
+📍 To set exact school coordinates:
 
 1. Go to Google Maps
-2. Search for "Vincent Bohlen Hub" or navigate to the exact location
-3. Right-click on the location and select "What's here?"
-4. Copy the coordinates (latitude, longitude)
-5. Update the VINCENT_BOHLEN_HUB coordinates in src/config/locationConfig.ts
+2. Search for your school location or navigate to the exact location
+3. Right-click on location and select "What's here?"
+4. Copy coordinates (latitude, longitude)
+5. Update SCHOOL_LOCATION coordinates in src/config/locationConfig.ts
 
-Current coordinates: ${VINCENT_BOHLEN_HUB.latitude}, ${VINCENT_BOHLEN_HUB.longitude}
+Current coordinates: ${SCHOOL_LOCATION.latitude}, ${SCHOOL_LOCATION.longitude}
 `);

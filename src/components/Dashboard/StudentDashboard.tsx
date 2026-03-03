@@ -607,6 +607,30 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
     try {
       console.log('Starting check-in process for user:', user.uid);
       
+      // Get user location
+      let location: any = null;
+      try {
+        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 300000 // 5 minutes
+          });
+        });
+        location = {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy
+        };
+        console.log('📍 Got user location:', location);
+      } catch (error) {
+        console.warn('⚠️ Could not get location:', error);
+        uniqueToast.warning('Location access denied. Proceeding without location verification.', {
+          autoClose: 3000,
+          position: 'top-center',
+        });
+      }
+      
       const now = new Date();
       const currentTime = now.getHours() * 60 + now.getMinutes(); // Convert to minutes
       const nineAM = 9 * 60; // 9:00 AM in minutes
@@ -614,9 +638,9 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
       // Check if checking in after 9 AM
       const isLate = currentTime > nineAM;
       
-      // Use AttendanceService to check in
-      console.log('Calling attendanceService.checkIn...');
-      const attendanceRecord = await attendanceService.checkIn(user.uid, user.displayName || 'Student');
+      // Use AttendanceService to check in with location
+      console.log('Calling attendanceService.checkIn with location...');
+      const attendanceRecord = await attendanceService.checkIn(user.uid, user.displayName || 'Student', location);
       
       console.log('✅ Attendance recorded successfully:', {
         id: attendanceRecord.id,
