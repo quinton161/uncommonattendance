@@ -6,6 +6,7 @@ import { UncommonLogo } from '../Common/UncommonLogo';
 import { AttendanceService } from '../../services/attendanceService';
 import { DailyAttendanceService } from '../../services/dailyAttendanceService';
 import DataService from '../../services/DataService';
+import { uniqueToast } from '../../utils/toastUtils';
 import {
   CheckCircleIcon,
   CancelIcon,
@@ -440,23 +441,29 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({ 
   const loadDailyAttendance = async () => {
     try {
       setLoading(true);
+      console.log('🔄 Loading daily attendance for date:', selectedDate.toISOString().split('T')[0]);
 
       // Get all users (students)
       const users = await dataService.getUsers();
-      const students = users.filter((u: any) => u.Type === 'attendee');
+      console.log('👥 Users fetched:', users.length, 'users');
+      console.log('🔍 User sample:', users[0]); // Debug: show first user structure
+      const students = users.filter((u: any) => u.userType === 'attendee');
+      console.log('🎓 Students filtered:', students.length, 'students');
 
       // Get attendance records for the selected date
       const dateStr = selectedDate.toISOString().split('T')[0];
+      console.log('📅 Fetching attendance for date:', dateStr);
       const attendanceRecords = await attendanceService.getAttendanceByDateRange(dateStr, dateStr);
+      console.log('📊 Attendance records fetched:', attendanceRecords.length, 'records');
 
       // Build attendance data
       const attendanceMap = new Map<string, any>();
       attendanceRecords.forEach((record: any) => {
-        attendanceMap.set(record.studentId, record);
+        attendanceMap.set(record.studentId || record.id, record);
       });
 
       const studentAttendanceData: StudentAttendanceData[] = students.map((student: any) => {
-        const record = attendanceMap.get(student.uid);
+        const record = attendanceMap.get(student.id) || attendanceMap.get(student.uid);
 
         if (record) {
           // Determine if student was late (after 9 AM)
@@ -464,7 +471,7 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({ 
           const isLate = checkInTime && checkInTime.getHours() >= 9;
 
           return {
-            studentId: student.uid,
+            studentId: student.id || student.uid,
             studentName: student.displayName || 'Unknown',
             email: student.email || '',
             status: isLate ? 'late' : 'present',
@@ -474,7 +481,7 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({ 
           };
         } else {
           return {
-            studentId: student.uid,
+            studentId: student.id || student.uid,
             studentName: student.displayName || 'Unknown',
             email: student.email || '',
             status: 'absent',
@@ -495,8 +502,10 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({ 
         late: lateCount,
         absent: absentCount,
       });
+      console.log('📈 Stats updated:', { total: students.length, present: presentCount, late: lateCount, absent: absentCount });
     } catch (error) {
-      console.error('Error loading daily attendance:', error);
+      console.error('❌ Error loading daily attendance:', error);
+      uniqueToast.error('Failed to load attendance data');
     } finally {
       setLoading(false);
     }
