@@ -14,6 +14,7 @@ import { AttendanceService } from '../../services/attendanceService';
 import { DailyAttendanceService, DailyAttendanceStats } from '../../services/dailyAttendanceService';
 import { MyAttendancePage } from '../Student/MyAttendancePage';
 import { ProgressPage } from '../Student/ProgressPage';
+import { ProfileUpload } from '../Profile/ProfileUpload';
 import { UncommonLogo } from '../Common/UncommonLogo';
 import { StarField } from '../Common/StarField';
 import { uniqueToast } from '../../utils/toastUtils';
@@ -740,6 +741,8 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
         return <MainContent><MyAttendancePage onBack={() => setActiveNav('dashboard')} isEmbedded={true} /></MainContent>;
       case 'progress':
         return <MainContent><ProgressPage onBack={() => setActiveNav('dashboard')} isEmbedded={true} /></MainContent>;
+      case 'profile':
+        return <MainContent><ProfileUpload /></MainContent>;
       default:
         return null; // Will render the main dashboard
     }
@@ -878,15 +881,13 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
             <BarChartIcon size={20} />
             Progress
           </NavItem>
+          <NavItem active={activeNav === 'profile'} onClick={() => handleNavClick('profile')}>
+            <PersonIcon size={20} />
+            Profile
+          </NavItem>
         </SidebarContent>
 
         <SidebarFooter>
-          {onNavigateToProfile && (
-            <NavItem onClick={onNavigateToProfile}>
-              <PersonIcon size={20} />
-              Profile
-            </NavItem>
-          )}
           <NavItem onClick={logout}>
             <LogoutIcon size={20} />
             Logout

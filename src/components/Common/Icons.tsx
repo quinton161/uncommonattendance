@@ -145,3 +145,9 @@ export const ArrowForwardIcon: React.FC<IconProps> = ({ size = 24, style, classN
     <path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z"/>
   </svg>
 );
+
+export const UploadIcon: React.FC<IconProps> = ({ size = 24, style, className }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" style={style} className={className}>
+    <path d="M19 13v5c0 1.1-.9 2-2 2H7c-1.1 0-2-.9-2-2v-5H3v5c0 2.21 1.79 4 4 4h10c2.21 0 4-1.79 4-4v-5h-1zm-6 .67l2.59-2.58L17 11.5l-5 5-5-5 1.41-1.41L11 13.67V3h2z"/>
+  </svg>
+);
