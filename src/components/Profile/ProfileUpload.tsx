@@ -90,7 +90,7 @@ const ProfileUpload: React.FC = () => {
 
     try {
       setUploading(true);
-      const downloadURL = await profileService.uploadProfilePicture(user.uid, file);
+      await profileService.uploadProfilePicture(user.uid, file);
       
       // Update user context (this would trigger a re-render)
       window.location.reload();
