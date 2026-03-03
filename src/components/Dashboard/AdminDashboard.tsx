@@ -445,14 +445,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
       const todayAttendance = attendance.filter((a: any) => a.date === todayStr);
       const rows = todayAttendance.map((a: any) => {
         const userRecord = users.find((u: any) => u.id === a.studentId || u.uid === a.studentId);
+        const checkInTime = a.checkInTime ? new Date(a.checkInTime) : null;
+        const isLate = checkInTime && checkInTime.getHours() >= 9 && checkInTime.getMinutes() > 0;
         return [
           userRecord?.displayName || a.studentName || 'Unknown',
           a.date || '',
-          a.checkInTime ? new Date(a.checkInTime).toLocaleTimeString() : '',
-          a.checkOutTime ? new Date(a.checkOutTime).toLocaleTimeString() : ''
+          checkInTime ? checkInTime.toLocaleTimeString() : '',
+          a.checkOutTime ? new Date(a.checkOutTime).toLocaleTimeString() : '',
+          isLate ? 'Late' : 'On Time'
         ];
       });
-      let csv = 'Name,Date,Check-in Time,Check-out Time\n';
+      let csv = 'Name,Date,Check-in Time,Check-out Time,Late\n';
       csv += rows.map(r => r.map(field => `"${field}"`).join(',')).join('\n');
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
       saveAs(blob, `attendance_${todayStr}.csv`);
@@ -553,7 +556,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
       <Sidebar isOpen={mobileMenuOpen}>
         <StarField density="low" speed="slow" />
         <Logo>
-          <DashboardIcon size={24} style={{ marginRight: theme.spacing.sm }} />
+          <img src="/shapes.svg" alt="Logo" style={{ width: 24, height: 24, marginRight: theme.spacing.sm }} />
           Admin Panel
         </Logo>
         

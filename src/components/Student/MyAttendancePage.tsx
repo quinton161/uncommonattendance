@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import styled from 'styled-components';
 import { useAuth } from '../../contexts/AuthContext';
 import { theme } from '../../styles/theme';
 import { UncommonLogo } from '../Common/UncommonLogo';
 import DataService from '../../services/DataService';
+import { DailyAttendanceService } from '../../services/dailyAttendanceService';
 import { uniqueToast } from '../../utils/toastUtils';
 import {
   CheckCircleIcon,
@@ -211,45 +212,49 @@ export const MyAttendancePage: React.FC<MyAttendancePageProps> = ({ onBack, isEm
   const { user } = useAuth();
   const [attendanceHistory, setAttendanceHistory] = useState<any[]>([]);
   const [stats, setStats] = useState({
-    totalDays: 0,
+    presentDays: 0,
+    attendanceRate: 0,
     currentStreak: 0,
     averageTime: '9:15 AM',
-    lateCheckIns: 0,
-    attendanceRate: 0
+    lateCheckIns: 0
   });
   const [loading, setLoading] = useState(true);
+  const [statsRange, setStatsRange] = useState<'week' | 'month' | 'custom'>('month');
+  const [customDays, setCustomDays] = useState(7);
   const dataService = DataService.getInstance();
+  const dailyAttendanceService = DailyAttendanceService.getInstance();
 
-  useEffect(() => {
-    // Intentionally run only once on mount; loadAttendanceData handles its own dependencies.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    loadAttendanceData();
-  }, []);
-
-  const loadAttendanceData = async () => {
+  const fetchAttendanceStats = useCallback(async () => {
     if (!user) return;
-
+    setLoading(true);
+    let daysToCheck = 30;
+    if (statsRange === 'week') daysToCheck = 7;
+    else if (statsRange === 'month') daysToCheck = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
+    else if (statsRange === 'custom') daysToCheck = customDays;
     try {
-      setLoading(true);
       await dataService.testConnection();
-      const userAttendance = await dataService.getAttendance(user.uid);
-      const studentStats = await dataService.getStudentStats(user.uid);
-      
-      setAttendanceHistory(userAttendance);
+      const stats = await dailyAttendanceService.getAttendanceStats(user.uid, daysToCheck);
+      const history = await dailyAttendanceService.getRecentActivity(user.uid, daysToCheck);
       setStats({
-        totalDays: studentStats.totalCheckIns,
-        currentStreak: studentStats.currentStreak,
-        averageTime: studentStats.averageCheckInTime || '9:15 AM',
-        lateCheckIns: studentStats.lateCheckIns || 0,
-        attendanceRate: studentStats.attendanceRate || 0
+        presentDays: stats.presentDays,
+        attendanceRate: Math.round(stats.attendanceRate),
+        currentStreak: stats.currentStreak,
+        averageTime: '-', // Not available in stats
+        lateCheckIns: 0 // Not available in stats
       });
+      setAttendanceHistory(history);
     } catch (error) {
       console.error('Error loading attendance data:', error);
       uniqueToast.error('Failed to load attendance data');
     } finally {
       setLoading(false);
     }
-  };
+  }, [user, statsRange, customDays]);
+
+  useEffect(() => {
+    fetchAttendanceStats();
+  }, [fetchAttendanceStats]);
+
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -286,19 +291,48 @@ export const MyAttendancePage: React.FC<MyAttendancePageProps> = ({ onBack, isEm
         </HeaderTitle>
       </Header>
 
+      <div style={{ display: 'flex', gap: 16, alignItems: 'center', marginBottom: 24 }}>
+        <span style={{ fontWeight: 500 }}>Attendance Stats for:</span>
+        <button
+          style={{ padding: '6px 12px', borderRadius: 6, border: 'none', background: statsRange === 'week' ? theme.colors.primary : theme.colors.gray200, color: statsRange === 'week' ? '#fff' : theme.colors.textPrimary, cursor: 'pointer' }}
+          onClick={() => setStatsRange('week')}
+        >
+          This Week
+        </button>
+        <button
+          style={{ padding: '6px 12px', borderRadius: 6, border: 'none', background: statsRange === 'month' ? theme.colors.primary : theme.colors.gray200, color: statsRange === 'month' ? '#fff' : theme.colors.textPrimary, cursor: 'pointer' }}
+          onClick={() => setStatsRange('month')}
+        >
+          This Month
+        </button>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <input
+            type="number"
+            min={1}
+            max={90}
+            value={statsRange === 'custom' ? customDays : ''}
+            onChange={e => { setCustomDays(Number(e.target.value)); setStatsRange('custom'); }}
+            style={{ width: 56, padding: 4, borderRadius: 4, border: '1px solid #ccc' }}
+            placeholder="N"
+          />
+          days
+        </label>
+      </div>
+
       <StatsGrid>
         <StatCard>
-          <StatValue>{stats.totalDays}</StatValue>
-          <StatLabel>Total Days Present</StatLabel>
+          <StatValue>{stats.presentDays}</StatValue>
+          <StatLabel>Days Present</StatLabel>
+        </StatCard>
+        <StatCard>
+          <StatValue>{stats.attendanceRate}%</StatValue>
+          <StatLabel>Attendance Rate</StatLabel>
         </StatCard>
         <StatCard>
           <StatValue>{stats.currentStreak}</StatValue>
           <StatLabel>Current Streak</StatLabel>
         </StatCard>
-        <StatCard>
-          <StatValue>{stats.averageTime}</StatValue>
-          <StatLabel>Average Check-in Time</StatLabel>
-        </StatCard>
+        {/* Average Check-in Time not available in stats, so omitted */}
       </StatsGrid>
 
       <AttendanceHistory>

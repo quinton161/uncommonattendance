@@ -751,19 +751,22 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
   // Attendance stats from Firebase
   const [daysPresent, setDaysPresent] = useState(0);
   const [attendanceRate, setAttendanceRate] = useState(0);
+  const [statsRange, setStatsRange] = useState<'week' | 'month' | 'custom'>('month');
+  const [customDays, setCustomDays] = useState(7);
   const totalSchoolDays = getTotalSchoolDaysInMonth();
 
-  // Fetch attendance stats from Firebase
+  // Fetch attendance stats from Firebase for selected range
   const fetchAttendanceStats = useCallback(async () => {
     if (!user) return;
     const dailyAttendanceService = DailyAttendanceService.getInstance();
-    // Get stats for current month
-    const now = new Date();
-    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-    const stats = await dailyAttendanceService.getAttendanceStats(user.uid, daysInMonth);
+    let daysToCheck = 30;
+    if (statsRange === 'week') daysToCheck = 7;
+    else if (statsRange === 'month') daysToCheck = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
+    else if (statsRange === 'custom') daysToCheck = customDays;
+    const stats = await dailyAttendanceService.getAttendanceStats(user.uid, daysToCheck);
     setDaysPresent(stats.presentDays);
     setAttendanceRate(Math.round(stats.attendanceRate));
-  }, [user]);
+  }, [user, statsRange, customDays]);
 
   useEffect(() => {
     fetchAttendanceStats();
@@ -836,7 +839,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
       <Sidebar isOpen={mobileMenuOpen}>
         <StarField density="low" speed="slow" />
         <Logo>
-          <DashboardIcon size={24} style={{ marginRight: theme.spacing.sm }} />
+          <img src="/shapes.svg" alt="Logo" style={{ width: 24, height: 24, marginRight: theme.spacing.sm }} />
           Student Hub
         </Logo>
 
@@ -903,6 +906,33 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
             </HeaderActions>
           </Header>
 
+          <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing.md, marginBottom: theme.spacing.lg }}>
+            <span style={{ fontWeight: 500 }}>Attendance Stats for:</span>
+            <button
+              style={{ padding: '6px 12px', borderRadius: 6, border: 'none', background: statsRange === 'week' ? theme.colors.primary : theme.colors.gray200, color: statsRange === 'week' ? '#fff' : theme.colors.textPrimary, cursor: 'pointer' }}
+              onClick={() => setStatsRange('week')}
+            >
+              This Week
+            </button>
+            <button
+              style={{ padding: '6px 12px', borderRadius: 6, border: 'none', background: statsRange === 'month' ? theme.colors.primary : theme.colors.gray200, color: statsRange === 'month' ? '#fff' : theme.colors.textPrimary, cursor: 'pointer' }}
+              onClick={() => setStatsRange('month')}
+            >
+              This Month
+            </button>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <input
+                type="number"
+                min={1}
+                max={90}
+                value={statsRange === 'custom' ? customDays : ''}
+                onChange={e => { setCustomDays(Number(e.target.value)); setStatsRange('custom'); }}
+                style={{ width: 56, padding: 4, borderRadius: 4, border: '1px solid #ccc' }}
+                placeholder="N"
+              />
+              days
+            </label>
+          </div>
           <StatsGrid>
             <AttendanceCard variant="primary">
               <StatIcon>
