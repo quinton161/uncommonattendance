@@ -14,15 +14,25 @@ import { db } from './firebase';
 import { AttendanceRecord, LocationData } from '../types';
 import { DailyAttendanceService } from './dailyAttendanceService';
 import { findKnownLocation, getLocationDisplayName } from '../config/locationConfig';
+import DataService from './DataService';
+import { BrowserEmailService } from './emailService';
+import { TimeService } from './timeService';
 
 export class AttendanceService {
   private static instance: AttendanceService;
+  private emailService: BrowserEmailService;
+  private timeService: TimeService;
 
   public static getInstance(): AttendanceService {
     if (!AttendanceService.instance) {
       AttendanceService.instance = new AttendanceService();
     }
     return AttendanceService.instance;
+  }
+
+  constructor() {
+    this.emailService = new BrowserEmailService();
+    this.timeService = TimeService.getInstance();
   }
 
   async checkIn(
@@ -44,7 +54,8 @@ export class AttendanceService {
       console.warn('⚠️ No location provided, proceeding without geolocation check');
     }
     
-    const today = new Date().toISOString().split('T')[0];
+    const harareTime = this.timeService.getCurrentTime();
+    const today = harareTime.toISOString().split('T')[0];
     const attendanceId = `${studentId}_${today}`;
     console.log('Generated attendanceId:', attendanceId);
 
@@ -63,7 +74,7 @@ export class AttendanceService {
       id: attendanceId,
       studentId,
       studentName,
-      checkInTime: new Date(),
+      checkInTime: harareTime,
       date: today,
       isPresent: true,
     };
@@ -101,6 +112,22 @@ export class AttendanceService {
         attendanceId,
         date: today
       });
+      
+      // Send email notification to student's Gmail
+      try {
+        const dataService = DataService.getInstance();
+        const users = await dataService.getUsers();
+        const student = users.find((u: any) => u.uid === studentId);
+        if (student && student.email) {
+          await this.emailService.sendCheckInNotification(
+            student.email,
+            studentName,
+            attendanceRecord.checkInTime
+          );
+        }
+      } catch (emailError) {
+        console.warn('⚠️ Failed to send email notification:', emailError);
+      }
     } else {
       console.error('❌ ATTENDANCE RECORDING VERIFICATION FAILED:', {
         detailedRecord: savedDetailedRecord.exists() ? '✅' : '❌',
