@@ -84,22 +84,49 @@ const mockAttendance = [
 
 const mockUsers = [
   {
-    id: 'user-1',
-    displayName: 'John Doe',
-    email: 'john@example.com',
+    id: 'student-001',
+    displayName: 'Alex Johnson',
+    email: 'alex.johnson@school.edu',
     userType: 'attendee',
     createdAt: new Date(),
     photoUrl: '',
-    bio: 'Student'
+    bio: 'Computer Science Student'
   },
   {
-    id: 'user-2',
-    displayName: 'Jane Smith',
-    email: 'jane@example.com',
+    id: 'student-002',
+    displayName: 'Maria Garcia',
+    email: 'maria.garcia@school.edu',
     userType: 'attendee',
     createdAt: new Date(),
     photoUrl: '',
-    bio: 'Student'
+    bio: 'Engineering Student'
+  },
+  {
+    id: 'student-003',
+    displayName: 'Sam Wilson',
+    email: 'sam.wilson@school.edu',
+    userType: 'attendee',
+    createdAt: new Date(),
+    photoUrl: '',
+    bio: 'Business Student'
+  },
+  {
+    id: 'student-004',
+    displayName: 'Nina Patel',
+    email: 'nina.patel@school.edu',
+    userType: 'attendee',
+    createdAt: new Date(),
+    photoUrl: '',
+    bio: 'Medicine Student'
+  },
+  {
+    id: 'student-005',
+    displayName: 'James Chen',
+    email: 'james.chen@school.edu',
+    userType: 'attendee',
+    createdAt: new Date(),
+    photoUrl: '',
+    bio: 'Arts Student'
   }
 ];
 
@@ -337,8 +364,10 @@ class DataService {
       // Delete user document
       await deleteDoc(doc(db, 'users', userId));
       
-      // Note: In a real app, you might want to also delete related attendance records
-      // or mark them as deleted rather than actually deleting the user document
+      // Note: In a real app with real student accounts, 
+      // you should NOT delete the user document. Instead, consider marking the account as inactive or deleted.
+      // For demo purposes, we allow deletion
+      // You might also want to delete or mark as deleted related attendance records
       
       uniqueToast.success('User deleted successfully!');
     } catch (error) {

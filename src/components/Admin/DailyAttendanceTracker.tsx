@@ -4,6 +4,7 @@ import { theme } from '../../styles/theme';
 import { Button } from '../Common/Button';
 import { UncommonLogo } from '../Common/UncommonLogo';
 import { AttendanceService } from '../../services/attendanceService';
+import { DailyAttendanceService } from '../../services/dailyAttendanceService';
 import DataService from '../../services/DataService';
 import {
   CheckCircleIcon,
