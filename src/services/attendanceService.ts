@@ -15,7 +15,7 @@ import { AttendanceRecord, LocationData } from '../types';
 import { DailyAttendanceService } from './dailyAttendanceService';
 import { findKnownLocation, getLocationDisplayName } from '../config/locationConfig';
 import DataService from './DataService';
-import { BrowserEmailService } from './emailService';
+import { BrowserEmailService } from '../services/emailService';
 import { TimeService } from './timeService';
 
 export class AttendanceService {
@@ -41,15 +41,58 @@ export class AttendanceService {
     location?: LocationData
   ): Promise<AttendanceRecord> {
     console.log('AttendanceService.checkIn called with:', { studentId, studentName, location });
+    console.log('📍 Location data received:', { 
+      hasLocation: !!location,
+      latitude: location?.latitude,
+      longitude: location?.longitude,
+      accuracy: location?.accuracy
+    });
     
     // Check if user is within school premises
     if (location) {
+      console.log('🗺️ Checking location against school coordinates...');
       const knownLocation = findKnownLocation(location.latitude, location.longitude);
-      if (!knownLocation) {
-        console.error('❌ User not within school premises:', { lat: location.latitude, lng: location.longitude });
-        throw new Error('You must be within school premises to check in');
+      if (knownLocation) {
+        console.log('📍 School location:', { 
+          name: knownLocation.name,
+          lat: knownLocation.latitude,
+          lng: knownLocation.longitude,
+          radius: knownLocation.radius
+        });
+        console.log('📏 Distance calculation:', {
+          userLat: location.latitude, 
+          userLng: location.longitude,
+          schoolLat: knownLocation.latitude,
+          schoolLng: knownLocation.longitude,
+          distance: Math.sqrt(
+            Math.pow(location.latitude - knownLocation.latitude, 2) + 
+            Math.pow(location.longitude - knownLocation.longitude, 2)
+          ),
+          threshold: knownLocation.radius
+        });
+        
+        if (Math.sqrt(
+          Math.pow(location.latitude - knownLocation.latitude, 2) + 
+          Math.pow(location.longitude - knownLocation.longitude, 2)
+        ) > knownLocation.radius) {
+          console.error('❌ User not within school premises:', { 
+            userLat: location.latitude, 
+            userLng: location.longitude,
+            schoolLat: knownLocation.latitude,
+            schoolLng: knownLocation.longitude,
+            distance: Math.sqrt(
+              Math.pow(location.latitude - knownLocation.latitude, 2) + 
+              Math.pow(location.longitude - knownLocation.longitude, 2)
+            ),
+            threshold: knownLocation.radius
+          });
+          throw new Error('You must be within school premises to check in');
+        }
+        console.log('✅ User is within school premises:', knownLocation.name);
+      } else {
+        console.error('❌ findKnownLocation returned null for coordinates:', { lat: location.latitude, lng: location.longitude });
+        throw new Error('Unable to verify school location for geolocation check');
       }
-      console.log('✅ User is within school premises:', knownLocation.name);
     } else {
       console.warn('⚠️ No location provided, proceeding without geolocation check');
     }
