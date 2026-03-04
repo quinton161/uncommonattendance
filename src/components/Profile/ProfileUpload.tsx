@@ -54,7 +54,7 @@ const UploadButton = styled(Button)`
 `;
 
 const ProfileUpload: React.FC = () => {
-  const { user } = useAuth();
+  const { user, updateProfile } = useAuth();
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -63,6 +63,7 @@ const ProfileUpload: React.FC = () => {
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
+      console.log('📸 File selected:', file.name, file.type, file.size);
       // Check file type
       if (!file.type.startsWith('image/')) {
         uniqueToast.error('Please select an image file');
@@ -86,19 +87,27 @@ const ProfileUpload: React.FC = () => {
 
   const handleUpload = async () => {
     const file = fileInputRef.current?.files?.[0];
-    if (!file || !user) return;
+    if (!file || !user) {
+      console.warn('⚠️ No file or user for upload');
+      return;
+    }
 
     try {
       setUploading(true);
-      await profileService.uploadProfilePicture(user.uid, file);
+      uniqueToast.info('Uploading profile picture...');
       
-      // Update user context (this would trigger a re-render)
-      window.location.reload();
+      const downloadURL = await profileService.uploadProfilePicture(user.uid, file);
       
+      // Update local auth context without reloading the page
+      if (updateProfile) {
+        await updateProfile({ photoUrl: downloadURL });
+      }
+      
+      setPreview(null);
       uniqueToast.success('Profile picture updated successfully!');
     } catch (error) {
       console.error('Upload error:', error);
-      uniqueToast.error('Failed to upload profile picture');
+      uniqueToast.error('Failed to upload profile picture. Check your connection.');
     } finally {
       setUploading(false);
     }
