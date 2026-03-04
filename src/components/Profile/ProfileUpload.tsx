@@ -94,7 +94,7 @@ const ProfileUpload: React.FC = () => {
 
     try {
       setUploading(true);
-      uniqueToast.info('Uploading profile picture...');
+      uniqueToast.info('Uploading profile picture...', { autoClose: false, toastId: 'uploading-toast' });
       
       const downloadURL = await profileService.uploadProfilePicture(user.uid, file);
       
@@ -104,10 +104,12 @@ const ProfileUpload: React.FC = () => {
       }
       
       setPreview(null);
+      uniqueToast.dismiss('uploading-toast');
       uniqueToast.success('Profile picture updated successfully!');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Upload error:', error);
-      uniqueToast.error('Failed to upload profile picture. Check your connection.');
+      uniqueToast.dismiss('uploading-toast');
+      uniqueToast.error(error.message || 'Failed to upload profile picture. Check your connection.');
     } finally {
       setUploading(false);
     }

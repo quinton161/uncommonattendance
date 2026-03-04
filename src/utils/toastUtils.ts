@@ -81,6 +81,14 @@ export const uniqueToast = {
     toast.dismiss();
     activeToasts.clear();
   },
+
+  // Dismiss a specific toast by ID or key
+  dismiss: (id?: Id) => {
+    toast.dismiss(id);
+    if (typeof id === 'string') {
+      activeToasts.delete(id);
+    }
+  },
   
   // Clean up old toasts (remove entries older than 5 minutes)
   cleanup: () => {
