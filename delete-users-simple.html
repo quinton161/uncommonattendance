@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Delete Users from Firebase</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .warning {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        button {
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background-color: #c82333;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        .log {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+        input[type="email"], input[type="password"] {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+        .user-list {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .user-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .user-item:last-child {
+            border-bottom: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Delete Users from Firebase</h1>
+        
+        <div class="warning">
+            <strong>⚠️ WARNING:</strong> This will permanently delete users and all their data from the database. This action cannot be undone!
+        </div>
+
+        <div id="message"></div>
+
+        <h3>Admin Login</h3>
+        <input type="email" id="adminEmail" placeholder="Admin email">
+        <input type="password" id="adminPassword" placeholder="Admin password">
+        <button onclick="loginAdmin()">Login as Admin</button>
+
+        <h3>Current Users in Database</h3>
+        <button onclick="loadUsers()" id="loadUsersBtn" disabled>Load All Users</button>
+        <div id="userList" class="user-list"></div>
+
+        <h3>Quick Delete - Specific Users</h3>
+        <button onclick="deleteUser('bongelwa')" id="deleteBongelwa" disabled>Delete: bongelwa</button>
+        <button onclick="deleteUser('ashely')" id="deleteAshely" disabled>Delete: ashely</button>
+
+        <div id="log" class="log"></div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+
+    <script>
+        // Firebase configuration - using your existing config
+        const firebaseConfig = {
+            apiKey: "AIzaSyDk8vX7J9Y2Z3W4X5V6U7I8J9K0L1M2N3O",
+            authDomain: "uncommonattendance.firebaseapp.com",
+            projectId: "uncommonattendance",
+            storageBucket: "uncommonattendance.appspot.com",
+            messagingSenderId: "123456789012",
+            appId: "1:123456789012:web:abcdef1234567890abcdef12"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        let adminUser = null;
+
+        function log(message) {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logDiv.textContent += `[${timestamp}] ${message}\n`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function showMessage(message, type = 'info') {
+            const messageDiv = document.getElementById('message');
+            messageDiv.className = type;
+            messageDiv.textContent = message;
+            setTimeout(() => {
+                messageDiv.textContent = '';
+                messageDiv.className = '';
+            }, 5000);
+        }
+
+        async function loginAdmin() {
+            const email = document.getElementById('adminEmail').value;
+            const password = document.getElementById('adminPassword').value;
+
+            if (!email || !password) {
+                showMessage('Please enter admin email and password', 'error');
+                return;
+            }
+
+            try {
+                log('🔐 Attempting admin login...');
+                await auth.signInWithEmailAndPassword(email, password);
+                adminUser = auth.currentUser;
+                log(`✅ Admin logged in: ${adminUser.email}`);
+                
+                // Enable buttons
+                document.getElementById('loadUsersBtn').disabled = false;
+                document.getElementById('deleteBongelwa').disabled = false;
+                document.getElementById('deleteAshely').disabled = false;
+                
+                showMessage('Admin login successful! You can now delete users.', 'success');
+                
+                // Auto-load users
+                loadUsers();
+            } catch (error) {
+                log(`❌ Login failed: ${error.message}`);
+                showMessage(`Login failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function loadUsers() {
+            if (!adminUser) {
+                showMessage('Please login as admin first', 'error');
+                return;
+            }
+
+            try {
+                log('📋 Loading all users from database...');
+                const usersRef = db.collection('users');
+                const snapshot = await usersRef.get();
+                
+                const userListDiv = document.getElementById('userList');
+                userListDiv.innerHTML = '';
+                
+                if (snapshot.empty) {
+                    userListDiv.innerHTML = '<p>No users found in database</p>';
+                    return;
+                }
+
+                snapshot.forEach(doc => {
+                    const userData = doc.data();
+                    const userDiv = document.createElement('div');
+                    userDiv.className = 'user-item';
+                    userDiv.innerHTML = `
+                        <div>
+                            <strong>${userData.displayName || 'No Name'}</strong><br>
+                            <small>${userData.email}</small><br>
+                            <small>Type: ${userData.userType || 'unknown'} | ID: ${doc.id}</small>
+                        </div>
+                        <button onclick="deleteUserById('${doc.id}', '${userData.displayName || userData.email}')" style="background-color: #dc3545; color: white; padding: 8px 16px; font-size: 14px;">
+                            Delete
+                        </button>
+                    `;
+                    userListDiv.appendChild(userDiv);
+                });
+                
+                log(`✅ Loaded ${snapshot.size} users`);
+                showMessage(`Found ${snapshot.size} users in database`, 'success');
+                
+            } catch (error) {
+                log(`❌ Error loading users: ${error.message}`);
+                showMessage(`Error loading users: ${error.message}`, 'error');
+            }
+        }
+
+        async function findUser(username) {
+            log(`🔍 Searching for user: ${username}`);
+            
+            // Try to find user by display name
+            const usersRef = db.collection('users');
+            const displayNameQuery = await usersRef.where('displayName', '==', username).get();
+            
+            if (!displayNameQuery.empty) {
+                const userDoc = displayNameQuery.docs[0];
+                const userData = userDoc.data();
+                log(`👤 Found user by display name: ${userData.displayName} (${userData.email}) - ID: ${userDoc.id}`);
+                return { id: userDoc.id, data: userData };
+            }
+            
+            // Try common email patterns
+            const emailPatterns = [
+                `${username}@example.com`,
+                `${username}@gmail.com`,
+                `${username}@yahoo.com`,
+                `${username}@hotmail.com`,
+                `${username}@outlook.com`
+            ];
+            
+            for (const email of emailPatterns) {
+                const emailQuery = await usersRef.where('email', '==', email).get();
+                if (!emailQuery.empty) {
+                    const userDoc = emailQuery.docs[0];
+                    const userData = userDoc.data();
+                    log(`👤 Found user by email: ${userData.displayName} (${userData.email}) - ID: ${userDoc.id}`);
+                    return { id: userDoc.id, data: userData };
+                }
+            }
+            
+            // Try partial match
+            const allUsersQuery = await usersRef.get();
+            for (const doc of allUsersQuery.docs) {
+                const userData = doc.data();
+                if (userData.displayName && userData.displayName.toLowerCase().includes(username.toLowerCase())) {
+                    log(`👤 Found user by partial match: ${userData.displayName} (${userData.email}) - ID: ${doc.id}`);
+                    return { id: doc.id, data: userData };
+                }
+                if (userData.email && userData.email.toLowerCase().includes(username.toLowerCase())) {
+                    log(`👤 Found user by partial email match: ${userData.displayName} (${userData.email}) - ID: ${doc.id}`);
+                    return { id: doc.id, data: userData };
+                }
+            }
+            
+            log(`⚠️ User ${username} not found`);
+            return null;
+        }
+
+        async function deleteUserFromCollections(userId, username) {
+            const collections = [
+                { name: 'users', fields: ['uid', 'userId'] },
+                { name: 'attendance', fields: ['studentId', 'userId'] },
+                { name: 'dailyAttendance', fields: ['studentId', 'userId'] },
+                { name: 'events', fields: ['organizerId', 'userId'] },
+                { name: 'registrations', fields: ['userId'] },
+                { name: 'ticketTypes', fields: ['organizerId', 'userId'] }
+            ];
+
+            let totalDeleted = 0;
+
+            for (const collection of collections) {
+                try {
+                    const collectionRef = db.collection(collection.name);
+                    
+                    for (const field of collection.fields) {
+                        const query = await collectionRef.where(field, '==', userId).get();
+                        
+                        for (const doc of query.docs) {
+                            await doc.ref.delete();
+                            totalDeleted++;
+                            log(`  🗑️ Deleted from ${collection.name}: ${doc.id}`);
+                        }
+                    }
+                } catch (error) {
+                    log(`  ⚠️ Error processing ${collection.name}: ${error.message}`);
+                }
+            }
+
+            return totalDeleted;
+        }
+
+        async function deleteUser(username) {
+            if (!adminUser) {
+                showMessage('Please login as admin first', 'error');
+                return;
+            }
+
+            if (!confirm(`Are you sure you want to delete user "${username}" and ALL their data? This includes:\n- User profile\n- Attendance records\n- Events they created\n- Registrations\n- All other data\n\nThis action CANNOT be undone!`)) {
+                return;
+            }
+
+            try {
+                log(`\n🔧 Starting deletion for user: ${username}`);
+                
+                const user = await findUser(username);
+                if (!user) {
+                    showMessage(`User ${username} not found`, 'error');
+                    return;
+                }
+
+                log(`👤 Deleting user: ${user.data.displayName} (${user.data.email})`);
+                
+                // Delete from all collections
+                const deletedCount = await deleteUserFromCollections(user.id, username);
+                
+                log(`✅ Completed deletion for ${username}. Total documents deleted: ${deletedCount + 1}`);
+                showMessage(`Successfully deleted user ${username} and all their data`, 'success');
+                
+                // Reload users list
+                loadUsers();
+                
+            } catch (error) {
+                log(`❌ Error deleting user ${username}: ${error.message}`);
+                showMessage(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function deleteUserById(userId, userDisplayName) {
+            if (!adminUser) {
+                showMessage('Please login as admin first', 'error');
+                return;
+            }
+
+            if (!confirm(`Are you sure you want to delete user "${userDisplayName}" (ID: ${userId}) and ALL their data? This action CANNOT be undone!`)) {
+                return;
+            }
+
+            try {
+                log(`\n🔧 Starting deletion for user: ${userDisplayName} (ID: ${userId})`);
+                
+                // Delete from all collections
+                const deletedCount = await deleteUserFromCollections(userId, userDisplayName);
+                
+                log(`✅ Completed deletion for ${userDisplayName}. Total documents deleted: ${deletedCount + 1}`);
+                showMessage(`Successfully deleted user ${userDisplayName} and all their data`, 'success');
+                
+                // Reload users list
+                loadUsers();
+                
+            } catch (error) {
+                log(`❌ Error deleting user ${userDisplayName}: ${error.message}`);
+                showMessage(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        // Initialize
+        log('🚀 User deletion tool ready');
+        log('📝 Please login as admin to proceed');
+    </script>
+</body>
+</html>
