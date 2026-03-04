@@ -16,7 +16,7 @@ import { MyAttendancePage } from '../Student/MyAttendancePage';
 import { ProgressPage } from '../Student/ProgressPage';
 import { ProfileUpload } from '../Profile/ProfileUpload';
 import { ChatWindow } from '../Common/ChatWindow';
-import { chatService, Conversation } from '../../services/chatService';
+import { chatService } from '../../services/chatService';
 import { UncommonLogo } from '../Common/UncommonLogo';
 import { StarField } from '../Common/StarField';
 import TimeSyncStatus from '../Common/TimeSyncStatus';
