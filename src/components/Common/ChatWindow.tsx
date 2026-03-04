@@ -137,6 +137,30 @@ const TimeLabel = styled.div`
   height: 15px;
 `;
 
+const SendButton = styled.button`
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #075e54;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.2s;
+  flex-shrink: 0;
+
+  &:hover {
+    opacity: 0.9;
+  }
+
+  &:disabled {
+    background-color: ${theme.colors.gray300};
+    cursor: not-allowed;
+  }
+`;
+
 interface ChatWindowProps {
   studentId: string;
   studentName: string;
@@ -226,11 +250,11 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
           value={inputText}
           onChange={(e) => setInputText(e.target.value)}
         />
-        <Button type="submit" variant="primary" size="sm" style={{ borderRadius: '50%', width: 40, height: 40, padding: 0, display: 'flex', alignItems: 'center', justifyItems: 'center', backgroundColor: '#075e54', border: 'none' }}>
+        <SendButton type="submit" disabled={!inputText.trim()}>
           <svg viewBox="0 0 24 24" width="24" height="24" fill="white" style={{ margin: 'auto' }}>
             <path d="M1.101 21.757L23.8 12.028 1.101 2.3l.011 7.912 13.623 1.816-13.623 1.817-.011 7.912z" />
           </svg>
-        </Button>
+        </SendButton>
       </InputArea>
     </ChatContainer>
   );
