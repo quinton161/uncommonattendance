@@ -151,3 +151,9 @@ export const UploadIcon: React.FC<IconProps> = ({ size = 24, style, className })
     <path d="M19 13v5c0 1.1-.9 2-2 2H7c-1.1 0-2-.9-2-2v-5H3v5c0 2.21 1.79 4 4 4h10c2.21 0 4-1.79 4-4v-5h-1zm-6 .67l2.59-2.58L17 11.5l-5 5-5-5 1.41-1.41L11 13.67V3h2z"/>
   </svg>
 );
+
+export const WifiOffIcon: React.FC<IconProps> = ({ size = 24, style, className }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" style={style} className={className}>
+    <path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.07 2.93 1 9zm8 8l3 3 3-3c-1.65-1.66-4.34-1.66-6 0zm-4-4l2 2c2.76-2.76 7.24-2.76 10 0l2-2C15.14 9.14 8.87 9.14 5 13z"/>
+  </svg>
+);

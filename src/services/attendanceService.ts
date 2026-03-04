@@ -183,7 +183,8 @@ export class AttendanceService {
   }
 
   async checkOut(studentId: string): Promise<AttendanceRecord> {
-    const today = new Date().toISOString().split('T')[0];
+    const harareTime = this.timeService.getCurrentTime();
+    const today = harareTime.toISOString().split('T')[0];
     const attendanceId = `${studentId}_${today}`;
 
     const attendanceDoc = await getDoc(doc(db, 'attendance', attendanceId));
@@ -198,7 +199,7 @@ export class AttendanceService {
       throw new Error('Already checked out today');
     }
 
-    const checkOutTime = new Date();
+    const checkOutTime = harareTime;
     
     await updateDoc(doc(db, 'attendance', attendanceId), {
       checkOutTime: Timestamp.fromDate(checkOutTime),
@@ -212,7 +213,7 @@ export class AttendanceService {
   }
 
   async getTodayAttendance(studentId?: string): Promise<AttendanceRecord | null> {
-    const today = new Date().toISOString().split('T')[0];
+    const today = this.timeService.getCurrentDateString();
     
     if (studentId) {
       const attendanceId = `${studentId}_${today}`;
@@ -271,7 +272,7 @@ export class AttendanceService {
     }
     
     // Check if the last attendance was from a previous day
-    const today = new Date().toISOString().split('T')[0];
+    const today = this.timeService.getCurrentDateString();
     const attendanceDate = todayAttendance.date || new Date(todayAttendance.checkInTime).toISOString().split('T')[0];
     
     return attendanceDate !== today;
@@ -306,7 +307,7 @@ export class AttendanceService {
   }
 
   async getAllTodayAttendance(): Promise<AttendanceRecord[]> {
-    const today = new Date().toISOString().split('T')[0];
+    const today = this.timeService.getCurrentDateString();
     
     const q = query(
       collection(db, 'attendance'),
@@ -392,7 +393,7 @@ export class AttendanceService {
   }
 
   async getCurrentlyPresentStudents(): Promise<AttendanceRecord[]> {
-    const today = new Date().toISOString().split('T')[0];
+    const today = this.timeService.getCurrentDateString();
     
     const q = query(
       collection(db, 'attendance'),

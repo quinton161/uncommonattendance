@@ -1,5 +1,8 @@
+import { InternetTimeService } from './internetTimeService';
+
 export class TimeService {
   private static instance: TimeService;
+  private internetTimeService: InternetTimeService;
 
   public static getInstance(): TimeService {
     if (!TimeService.instance) {
@@ -8,60 +11,48 @@ export class TimeService {
     return TimeService.instance;
   }
 
+  constructor() {
+    this.internetTimeService = InternetTimeService.getInstance();
+  }
+
   // Get current time in Harare/Pretoria timezone (CAT - Central Africa Time)
   getCurrentTime(): Date {
-    return new Date(new Date().toLocaleString("en-US", { timeZone: "Africa/Harare" }));
+    return this.internetTimeService.getCurrentTimeHarare();
   }
 
   // Format time for display
   formatTime(date: Date): string {
-    return date.toLocaleString("en-US", { 
-      timeZone: "Africa/Harare",
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: true
-    });
+    return this.internetTimeService.formatTime(date);
   }
 
   // Format date for display
   formatDate(date: Date): string {
-    return date.toLocaleDateString("en-US", { 
-      timeZone: "Africa/Harare",
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
+    return this.internetTimeService.formatDate(date);
   }
 
   // Get current date string in Harare timezone
   getCurrentDateString(): string {
-    const now = this.getCurrentTime();
-    return now.toISOString().split('T')[0];
+    return this.internetTimeService.getCurrentDateString();
   }
 
   // Check if it's after 9 AM Harare time
   isLate(checkInTime: Date): boolean {
-    const harareTime = new Date(checkInTime.toLocaleString("en-US", { timeZone: "Africa/Harare" }));
-    const hours = harareTime.getHours();
-    const minutes = harareTime.getMinutes();
-    
-    // Consider late if after 9:00 AM
-    return hours > 9 || (hours === 9 && minutes > 0);
+    return this.internetTimeService.isLate(checkInTime);
   }
 
   // Get time zone info
   getTimeZoneInfo(): string {
-    const now = new Date();
-    const options: Intl.DateTimeFormatOptions = {
-      timeZone: "Africa/Harare",
-      timeZoneName: 'short'
-    };
-    
-    return now.toLocaleString("en-US", options);
+    return this.internetTimeService.getTimeZoneInfo();
+  }
+
+  // Get synchronization status
+  getSyncStatus() {
+    return this.internetTimeService.getSyncStatus();
+  }
+
+  // Force manual sync
+  async forceSync(): Promise<boolean> {
+    return await this.internetTimeService.forceSync();
   }
 }
 

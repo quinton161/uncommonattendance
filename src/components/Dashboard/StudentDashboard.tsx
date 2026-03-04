@@ -17,6 +17,7 @@ import { ProgressPage } from '../Student/ProgressPage';
 import { ProfileUpload } from '../Profile/ProfileUpload';
 import { UncommonLogo } from '../Common/UncommonLogo';
 import { StarField } from '../Common/StarField';
+import TimeSyncStatus from '../Common/TimeSyncStatus';
 import { uniqueToast } from '../../utils/toastUtils';
 import {
   DashboardIcon,
@@ -913,6 +914,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
               <p>Welcome back, {user?.displayName}!</p>
             </HeaderTitle>
             <HeaderActions>
+              <TimeSyncStatus />
               <div
                 style={{
                   color: theme.colors.textSecondary,
