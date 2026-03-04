@@ -7,29 +7,18 @@ import { Button } from './Button';
 const ChatContainer = styled.div`
   display: flex;
   flex-direction: column;
-  height: 600px;
-  background: #e5ddd5; /* WhatsApp background color */
+  height: 100%;
+  min-height: 400px;
+  background: ${theme.colors.gray50};
   border-radius: ${theme.borderRadius.lg};
   overflow: hidden;
   border: 1px solid ${theme.colors.gray200};
   position: relative;
-
-  &::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-image: url("https://web.whatsapp.com/img/bg-chat-tile-dark_a4be512e71a95133d560753066577f51.png");
-    opacity: 0.06;
-    pointer-events: none;
-  }
 `;
 
 const ChatHeader = styled.div`
   padding: ${theme.spacing.sm} ${theme.spacing.md};
-  background: #075e54; /* WhatsApp Green */
+  background: ${theme.colors.primary};
   color: white;
   display: flex;
   align-items: center;
@@ -42,12 +31,12 @@ const Avatar = styled.div`
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: ${theme.colors.gray300};
+  background: rgba(255, 255, 255, 0.2);
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: bold;
-  color: #075e54;
+  color: white;
 `;
 
 const MessageList = styled.div`
@@ -71,34 +60,16 @@ const MessageList = styled.div`
 
 const MessageBubble = styled.div<{ isOwn: boolean }>`
   max-width: 85%;
-  padding: 6px 12px 8px;
-  border-radius: 8px;
-  background: ${props => props.isOwn ? '#dcf8c6' : '#ffffff'};
-  color: #303030;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: ${props => props.isOwn ? theme.colors.primary : theme.colors.white};
+  color: ${props => props.isOwn ? theme.colors.white : theme.colors.textPrimary};
   align-self: ${props => props.isOwn ? 'flex-end' : 'flex-start'};
   font-size: ${theme.fontSizes.sm};
-  box-shadow: 0 1px 0.5px rgba(0, 0, 0, 0.13);
+  box-shadow: ${theme.shadows.sm};
   position: relative;
   line-height: 1.4;
-
-  /* WhatsApp bubble tail */
-  &::after {
-    content: "";
-    position: absolute;
-    top: 0;
-    width: 0;
-    height: 0;
-    border: 8px solid transparent;
-    ${props => props.isOwn ? `
-      right: -8px;
-      border-left-color: #dcf8c6;
-      border-top-color: #dcf8c6;
-    ` : `
-      left: -8px;
-      border-right-color: #ffffff;
-      border-top-color: #ffffff;
-    `}
-  }
+  border: 1px solid ${props => props.isOwn ? 'transparent' : theme.colors.gray200};
 `;
 
 const MessageText = styled.div`
@@ -129,12 +100,11 @@ const Input = styled.input`
   }
 `;
 
-const TimeLabel = styled.div`
-  font-size: 11px;
-  color: rgba(0, 0, 0, 0.45);
-  margin-top: -4px;
+const TimeLabel = styled.div<{ isOwn: boolean }>`
+  font-size: 10px;
+  color: ${props => props.isOwn ? 'rgba(255, 255, 255, 0.7)' : theme.colors.textSecondary};
+  margin-top: 4px;
   text-align: right;
-  height: 15px;
 `;
 
 const SendButton = styled.button`
@@ -145,14 +115,15 @@ const SendButton = styled.button`
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: #075e54;
+  background-color: ${theme.colors.primary};
   border: none;
   cursor: pointer;
-  transition: opacity 0.2s;
+  transition: all 0.2s;
   flex-shrink: 0;
 
   &:hover {
-    opacity: 0.9;
+    background-color: ${theme.colors.primaryDark};
+    transform: scale(1.05);
   }
 
   &:disabled {
@@ -239,7 +210,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         {messages.map((msg, index) => (
           <MessageBubble key={msg.id || index} isOwn={msg.senderId === currentUserUid}>
             <MessageText>{msg.text}</MessageText>
-            <TimeLabel>{formatTime(msg.createdAt)}</TimeLabel>
+            <TimeLabel isOwn={msg.senderId === currentUserUid}>{formatTime(msg.createdAt)}</TimeLabel>
           </MessageBubble>
         ))}
       </MessageList>

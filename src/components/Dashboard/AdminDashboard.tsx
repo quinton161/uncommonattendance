@@ -564,69 +564,119 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
           return timeB.getTime() - timeA.getTime();
         });
 
-        return (selectedConversation ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: theme.spacing.md }}>
-            <div style={{ alignSelf: 'flex-start' }}>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => setSelectedConversation(null)}
-              >
-                ← Back to Students
-              </Button>
-            </div>
-            <h2 style={{ color: theme.colors.textPrimary }}>Chatting with {selectedConversation.studentName}</h2>
-            <ChatWindow 
-              studentId={selectedConversation.studentId}
-              studentName={selectedConversation.studentName}
-              currentUserUid={user?.uid || ''}
-              isAdmin={true}
-            />
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: theme.spacing.md }}>
-            <h2 style={{ color: theme.colors.textPrimary }}>Student Conversations</h2>
-            <ContentGrid style={{ gridTemplateColumns: '1fr' }}>
-              <Card>
-                <AttendanceList>
-                  {displayConversations.map((conv) => (
-                    <AttendanceItem 
-                      key={conv.studentId} 
-                      style={{ cursor: 'pointer', transition: 'background 0.2s' }}
-                      onClick={() => setSelectedConversation(conv as any)}
-                    >
-                      <UserAvatar>{getInitials(conv.studentName)}</UserAvatar>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: theme.fontWeights.semibold, color: theme.colors.textPrimary }}>
-                          {conv.studentName}
+        return (
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: '320px 1fr', 
+            gap: theme.spacing.lg, 
+            height: 'calc(100vh - 140px)',
+            overflow: 'hidden'
+          }}>
+            <div style={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: theme.spacing.md,
+              height: '100%',
+              overflow: 'hidden'
+            }}>
+              <h2 style={{ color: theme.colors.textPrimary, margin: 0 }}>Messages</h2>
+              <Card style={{ 
+                flex: 1, 
+                padding: theme.spacing.sm,
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden'
+              }}>
+                <div style={{ 
+                  flex: 1,
+                  overflowY: 'auto',
+                  paddingRight: '4px'
+                }}>
+                  <AttendanceList>
+                    {displayConversations.map((conv) => (
+                      <AttendanceItem 
+                        key={conv.studentId} 
+                        style={{ 
+                          cursor: 'pointer', 
+                          transition: 'all 0.2s',
+                          background: selectedConversation?.studentId === conv.studentId ? 'rgba(6, 71, 161, 0.1)' : 'transparent',
+                          borderLeft: selectedConversation?.studentId === conv.studentId ? `4px solid ${theme.colors.primary}` : '4px solid transparent',
+                          padding: theme.spacing.md
+                        }}
+                        onClick={() => setSelectedConversation(conv as any)}
+                      >
+                        <UserAvatar>{getInitials(conv.studentName)}</UserAvatar>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: theme.fontWeights.semibold, color: theme.colors.textPrimary, fontSize: theme.fontSizes.sm }}>
+                            {conv.studentName}
+                          </div>
+                          <div style={{ 
+                            fontSize: theme.fontSizes.xs, 
+                            color: theme.colors.textSecondary,
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis'
+                          }}>
+                            {conv.lastMessage}
+                          </div>
                         </div>
-                        <div style={{ 
-                          fontSize: theme.fontSizes.sm, 
-                          color: theme.colors.textSecondary,
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          maxWidth: '200px'
-                        }}>
-                          {conv.lastMessage}
+                        <div style={{ fontSize: '10px', color: theme.colors.textLight }}>
+                          {conv.lastMessageTime?.toDate ? conv.lastMessageTime.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 
+                           conv.lastMessageTime ? new Date(conv.lastMessageTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                         </div>
-                      </div>
-                      <div style={{ fontSize: theme.fontSizes.xs, color: theme.colors.textLight }}>
-                        {conv.lastMessageTime?.toDate ? conv.lastMessageTime.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 
-                         conv.lastMessageTime ? new Date(conv.lastMessageTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
-                      </div>
-                    </AttendanceItem>
-                  ))}
-                  {displayConversations.length === 0 && (
-                    <p style={{ textAlign: 'center', color: theme.colors.textSecondary, padding: theme.spacing.lg }}>
-                      No students found.
-                    </p>
-                  )}
-                </AttendanceList>
+                      </AttendanceItem>
+                    ))}
+                    {displayConversations.length === 0 && (
+                      <p style={{ textAlign: 'center', color: theme.colors.textSecondary, padding: theme.spacing.lg }}>
+                        No students found.
+                      </p>
+                    )}
+                  </AttendanceList>
+                </div>
               </Card>
-            </ContentGrid>
+            </div>
+
+            <div style={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              height: '100%',
+              overflow: 'hidden'
+            }}>
+              {selectedConversation ? (
+                <>
+                  <h2 style={{ 
+                    color: theme.colors.textPrimary, 
+                    margin: `0 0 ${theme.spacing.md} 0`,
+                    fontSize: theme.fontSizes.xl
+                  }}>
+                    Chatting with {selectedConversation.studentName}
+                  </h2>
+                  <div style={{ flex: 1, minHeight: 0 }}>
+                    <ChatWindow 
+                      studentId={selectedConversation.studentId}
+                      studentName={selectedConversation.studentName}
+                      currentUserUid={user?.uid || ''}
+                      isAdmin={true}
+                    />
+                  </div>
+                </>
+              ) : (
+                <div style={{ 
+                  flex: 1, 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  background: theme.colors.white,
+                  borderRadius: theme.borderRadius.lg,
+                  border: `1px solid ${theme.colors.gray200}`,
+                  color: theme.colors.textSecondary
+                }}>
+                  Select a student to start chatting
+                </div>
+              )}
+            </div>
           </div>
-        ));
+        );
       default:
         return null; // Will render the main dashboard
     }
