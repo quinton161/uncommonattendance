@@ -7,7 +7,8 @@ const ChatContainer = styled.div`
   display: flex;
   flex-direction: column;
   flex: 1;
-  min-height: 400px;
+  height: 100%;
+  min-height: 0;
   background: ${theme.colors.gray50};
   border-radius: ${theme.borderRadius.lg};
   overflow: hidden;
@@ -15,7 +16,6 @@ const ChatContainer = styled.div`
   position: relative;
 
   @media (max-width: ${theme.breakpoints.tablet}) {
-    min-height: calc(100vh - 160px);
     border-radius: 0;
     border-left: none;
     border-right: none;
@@ -56,6 +56,7 @@ const AvatarImg = styled.img`
 const MessageList = styled.div`
   flex: 1;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch; /* Momentum scrolling for Safari/iOS */
   padding: ${theme.spacing.md};
   display: flex;
   flex-direction: column;
@@ -97,13 +98,15 @@ const InputArea = styled.form`
   padding: 10px;
   gap: 10px;
   background: #f0f0f0;
-  z-index: 1;
+  z-index: 10;
   align-items: center;
   flex-shrink: 0;
   border-top: 1px solid ${theme.colors.gray200};
+  position: sticky;
+  bottom: 0;
 
   @media (max-width: ${theme.breakpoints.tablet}) {
-    padding-bottom: env(safe-area-inset-bottom, 10px);
+    padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
   }
 `;
 
@@ -111,14 +114,19 @@ const Input = styled.input`
   flex: 1;
   padding: 10px 15px;
   border-radius: 20px;
-  border: none;
+  border: 1px solid ${theme.colors.gray200};
   background: white;
   color: #303030;
   outline: none;
-  font-size: ${theme.fontSizes.sm};
+  font-size: 16px; /* Prevents auto-zoom on iOS Safari */
 
   &:focus {
-    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 0 0 2px ${theme.colors.primary}40;
+    border-color: ${theme.colors.primary};
+  }
+
+  @media (min-width: ${theme.breakpoints.tablet}) {
+    font-size: ${theme.fontSizes.sm};
   }
 `;
 

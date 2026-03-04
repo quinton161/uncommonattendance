@@ -33,12 +33,12 @@ import {
 
 const DashboardContainer = styled.div`
   display: flex;
-  min-height: 100vh;
+  height: 100vh;
   background: ${theme.colors.backgroundSecondary};
   ${pageTransition}
   ${respectMotionPreference}
   width: 100%;
-  overflow-x: hidden;
+  overflow: hidden;
   @media (max-width: ${theme.breakpoints.tablet}) {
     flex-direction: column;
   }
@@ -203,27 +203,23 @@ const MobileOverlay = styled.div<{ isOpen: boolean }>`
 const MainContent = styled.div`
   flex: 1;
   padding: ${theme.spacing.lg};
-  min-height: 100vh;
-  overflow-x: hidden;
+  height: 100vh;
+  height: 100svh; /* Modern mobile browsers */
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   box-sizing: border-box;
   padding-top: 60px;
   margin-left: 280px;
+  display: flex;
+  flex-direction: column;
   ${containerAnimation}
   ${respectMotionPreference}
   @media (max-width: ${theme.breakpoints.tablet}) {
     padding: ${theme.spacing.md};
-    padding-top: 60px;
+    padding-top: 70px;
     margin-left: 0;
-  }
-  @media (max-width: ${theme.breakpoints.mobile}) {
-    padding: ${theme.spacing.sm};
-    padding-top: 60px;
-    margin-left: 0;
-  }
-  @media (max-width: 420px) {
-    padding: ${theme.spacing.xs};
-    padding-top: 60px;
-    margin-left: 0;
+    height: calc(100vh - 60px);
+    height: calc(100svh - 60px);
   }
 `;
 
