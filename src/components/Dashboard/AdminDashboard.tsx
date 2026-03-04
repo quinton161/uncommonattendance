@@ -448,7 +448,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
   });
   const [recentAttendance, setRecentAttendance] = useState<any[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [allStudents, setAllStudents] = useState<any[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [totalUnread, setTotalUnread] = useState(0);
   const dataService = DataService.getInstance();
@@ -457,7 +456,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
     try {
       await dataService.testConnection();
       const users = await dataService.getUsers();
-      setAllStudents(users.filter((u: any) => u.userType === 'attendee'));
       const attendance = await dataService.getAttendance();
       const todayStr = new Date().toISOString().split('T')[0];
       // Only today's attendance
@@ -492,8 +490,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
       uniqueToast.info('Loading dashboard data...', { autoClose: 2000 });
       // Test connection and load stats
       await dataService.testConnection();
-      const users = await dataService.getUsers();
-      setAllStudents(users.filter((u: any) => u.userType === 'attendee'));
       
       const dashboardStats = await dataService.getDashboardStats();
       
