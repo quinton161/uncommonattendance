@@ -3,7 +3,6 @@ import styled from 'styled-components';
 import { chatService, Message } from '../../services/chatService';
 import { theme } from '../../styles/theme';
 import { Button } from './Button';
-import { Card } from './Card';
 
 const ChatContainer = styled.div`
   display: flex;
