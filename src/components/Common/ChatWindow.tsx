@@ -13,6 +13,13 @@ const ChatContainer = styled.div`
   overflow: hidden;
   border: 1px solid ${theme.colors.gray200};
   position: relative;
+
+  @media (max-width: ${theme.breakpoints.tablet}) {
+    height: calc(100vh - 160px);
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+  }
 `;
 
 const ChatHeader = styled.div`
@@ -82,6 +89,12 @@ const InputArea = styled.form`
   background: #f0f0f0;
   z-index: 1;
   align-items: center;
+  flex-shrink: 0;
+  border-top: 1px solid ${theme.colors.gray200};
+
+  @media (max-width: ${theme.breakpoints.tablet}) {
+    padding-bottom: env(safe-area-inset-bottom, 10px);
+  }
 `;
 
 const Input = styled.input`
