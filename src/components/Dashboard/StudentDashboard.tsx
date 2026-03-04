@@ -17,6 +17,7 @@ import { ProgressPage } from '../Student/ProgressPage';
 import { ProfileUpload } from '../Profile/ProfileUpload';
 import { ChatWindow } from '../Common/ChatWindow';
 import { chatService } from '../../services/chatService';
+import { notificationService } from '../../services/notificationService';
 import { UncommonLogo } from '../Common/UncommonLogo';
 import { StarField } from '../Common/StarField';
 import TimeSyncStatus from '../Common/TimeSyncStatus';
@@ -809,6 +810,9 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
   useEffect(() => {
     console.log('StudentDashboard useEffect - user:', !!user, user?.uid);
     if (user) {
+      // Request notification permission
+      notificationService.requestPermission();
+
       loadStudentData();
       checkTodayAttendance();
 
@@ -829,6 +833,12 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
               position: 'top-right',
               autoClose: 5000
             });
+
+            // Send system push notification
+            notificationService.sendNotification(
+              'New Message from Admin',
+              myConv.lastMessage
+            );
           }
           setUnreadCount(newUnread);
         }

@@ -18,6 +18,7 @@ import DataService from '../../services/DataService';
 import { uniqueToast } from '../../utils/toastUtils';
 import { ChatWindow } from '../Common/ChatWindow';
 import { chatService, Conversation } from '../../services/chatService';
+import { notificationService } from '../../services/notificationService';
 import { saveAs } from 'file-saver';
 
 import {
@@ -534,6 +535,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
   };
 
   useEffect(() => {
+    // Request permission for push notifications
+    notificationService.requestPermission();
+
     // Load dashboard stats on mount
     loadDashboardData();
 
@@ -564,6 +568,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
               position: 'top-right',
               autoClose: 5000
             });
+
+            // Send system push notification
+            notificationService.sendNotification(
+              `New message from ${newMsgConv.studentName}`,
+              newMsgConv.lastMessage
+            );
           }
         }
         
