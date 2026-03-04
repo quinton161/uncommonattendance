@@ -170,6 +170,8 @@ interface ChatWindowProps {
   currentUserPhotoUrl?: string;
   isAdmin?: boolean;
   adminUid?: string;
+  adminPhotoUrl?: string;
+  adminName?: string;
 }
 
 export const ChatWindow: React.FC<ChatWindowProps> = ({
@@ -179,7 +181,9 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   studentPhotoUrl,
   currentUserPhotoUrl,
   isAdmin = false,
-  adminUid: providedAdminUid
+  adminUid: providedAdminUid,
+  adminPhotoUrl: providedAdminPhotoUrl,
+  adminName: providedAdminName
 }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
@@ -250,13 +254,22 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     <ChatContainer>
       <ChatHeader>
         <Avatar hasPhoto={!!studentPhotoUrl}>
-          {studentPhotoUrl ? (
-            <AvatarImg src={studentPhotoUrl} alt={studentName} />
+          {isAdmin ? (
+            studentPhotoUrl ? (
+              <AvatarImg src={studentPhotoUrl} alt={studentName} />
+            ) : (
+              getInitials(studentName)
+            )
           ) : (
-            getInitials(studentName)
+            // If student is viewing, show the admin's photo/initials
+            providedAdminPhotoUrl ? (
+              <AvatarImg src={providedAdminPhotoUrl} alt={providedAdminName || "Admin"} />
+            ) : (
+              getInitials(providedAdminName || "Admin")
+            )
           )}
         </Avatar>
-        <div style={{ fontWeight: 'bold' }}>{studentName}</div>
+        <div style={{ fontWeight: 'bold' }}>{isAdmin ? studentName : (providedAdminName || "Admin")}</div>
       </ChatHeader>
       <MessageList ref={scrollRef}>
         {messages.map((msg, index) => {

@@ -19,7 +19,7 @@ import { ChatWindow } from '../Common/ChatWindow';
 import { chatService } from '../../services/chatService';
 import { notificationService } from '../../services/notificationService';
 import { UncommonLogo } from '../Common/UncommonLogo';
-import { StarField } from '../Common/StarField';
+import StarField from '../Common/StarField';
 import TimeSyncStatus from '../Common/TimeSyncStatus';
 import { uniqueToast } from '../../utils/toastUtils';
 import {
@@ -908,7 +908,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
                   {selectedAdmin ? `Chat with ${selectedAdmin.displayName}` : 'Select an Admin'}
                 </h3>
                 <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', height: '100%' }}>
-                  {selectedAdmin && (
+                      {selectedAdmin && (
                     <ChatWindow 
                       studentId={user?.uid || ''} 
                       studentName={user?.displayName || 'Student'} 
@@ -916,6 +916,8 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
                       studentPhotoUrl={user?.photoUrl}
                       currentUserPhotoUrl={user?.photoUrl}
                       adminUid={selectedAdmin.uid}
+                      adminPhotoUrl={selectedAdmin.photoUrl}
+                      adminName={selectedAdmin.displayName}
                     />
                   )}
                 </div>

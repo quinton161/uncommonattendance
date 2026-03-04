@@ -733,6 +733,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
                       currentUserPhotoUrl={user?.photoUrl}
                       currentUserUid={user?.uid || ''}
                       isAdmin={true}
+                      adminUid={user?.uid}
                     />
                   </div>
                 </>
