@@ -717,7 +717,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
           });
           // Refresh state to sync with database
           checkTodayAttendance();
-        } else if (error.message.includes('within school premises')) {
+        } else if (error.message.includes('within school premises') || error.message.includes('school WiFi')) {
           uniqueToast.error(error.message, {
             autoClose: 5000,
             position: 'top-center',
