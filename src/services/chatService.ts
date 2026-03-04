@@ -24,6 +24,7 @@ export interface Message {
 }
 
 export interface Conversation {
+  id?: string;
   studentId: string;
   studentName: string;
   studentPhotoUrl?: string;
@@ -53,7 +54,9 @@ class ChatService {
     adminId: string = 'admin',
     senderPhotoUrl?: string
   ) {
-    const conversationRef = doc(db, 'conversations', studentId);
+    // Each student has a unique conversation with EACH admin
+    const conversationId = `${studentId}_${adminId}`;
+    const conversationRef = doc(db, 'conversations', conversationId);
     const existingDoc = await getDoc(conversationRef);
 
     // Get sender name
@@ -72,12 +75,12 @@ class ChatService {
       adminId,
       lastMessage: text,
       lastMessageTime: serverTimestamp(),
-      unreadCount: senderId === studentId ? (existingDoc.exists() ? (existingDoc.data()?.unreadCount || 0) + 1 : 1) : (senderId === adminId ? 0 : (existingDoc.exists() ? (existingDoc.data()?.unreadCount || 0) + 1 : 1))
+      unreadCount: senderId === studentId ? (existingDoc.exists() ? (existingDoc.data()?.unreadCount || 0) + 1 : 1) : 0
     }, { merge: true });
 
     // Add message to subcollection
     await addDoc(
-      collection(db, 'conversations', studentId, 'messages'),
+      collection(db, 'conversations', conversationId, 'messages'),
       {
         senderId,
         senderName,
@@ -89,17 +92,17 @@ class ChatService {
   }
 
   // Reset unread count for a conversation
-  async markAsRead(studentId: string) {
-    const conversationRef = doc(db, 'conversations', studentId);
+  async markAsRead(conversationId: string) {
+    const conversationRef = doc(db, 'conversations', conversationId);
     await updateDoc(conversationRef, {
       unreadCount: 0
     });
   }
 
   // Listen to messages in a specific conversation
-  subscribeToMessages(studentId: string, callback: (messages: Message[]) => void) {
+  subscribeToMessages(conversationId: string, callback: (messages: Message[]) => void) {
     const q = query(
-      collection(db, 'conversations', studentId, 'messages'),
+      collection(db, 'conversations', conversationId, 'messages'),
       orderBy('createdAt', 'asc')
     );
 
@@ -167,15 +170,24 @@ class ChatService {
     });
   }
 
-  // Get Admin UID (utility to find the admin user)
-  async getAdminId(): Promise<string> {
+  // Get all Admins
+  async getAllAdmins(): Promise<any[]> {
     const q = query(
       collection(db, 'users'),
       where('userType', '==', 'admin')
     );
     const snapshot = await getDocs(q);
-    if (!snapshot.empty) {
-      return snapshot.docs[0].id;
+    return snapshot.docs.map(doc => ({
+      uid: doc.id,
+      ...doc.data()
+    }));
+  }
+
+  // Get Admin UID (utility to find the first admin user)
+  async getAdminId(): Promise<string> {
+    const admins = await this.getAllAdmins();
+    if (admins.length > 0) {
+      return admins[0].uid;
     }
     return 'admin'; // Fallback
   }

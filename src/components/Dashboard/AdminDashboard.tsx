@@ -600,18 +600,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
       case 'users':
         return <UsersPage onBack={() => setActiveNav('dashboard')} />;
       case 'chat':
-        const displayConversations = allStudents.map(student => {
-          const existingConv = conversations.find(c => c.studentId === student.uid || c.studentId === student.id);
+        const displayConversations = conversations.map(conv => {
           return {
-            studentId: student.uid || student.id,
-            studentName: student.displayName || 'Unknown Student',
-            studentPhotoUrl: student.photoUrl || student.photoURL,
-            lastMessage: existingConv?.lastMessage || 'No messages yet',
-            lastMessageTime: existingConv?.lastMessageTime || null,
-            adminId: user?.uid || 'admin',
-            unreadCount: existingConv?.unreadCount || 0
+            ...conv,
+            id: `${conv.studentId}_${conv.adminId}`
           };
-        }).sort((a, b) => {
+        }).filter(conv => conv.adminId === user?.uid) // Only show conversations for the current admin
+        .sort((a, b) => {
           if (!a.lastMessageTime) return 1;
           if (!b.lastMessageTime) return -1;
           const timeA = a.lastMessageTime.toDate ? a.lastMessageTime.toDate() : new Date(a.lastMessageTime);
@@ -650,19 +645,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
                   <AttendanceList>
                     {displayConversations.map((conv) => (
                       <AttendanceItem 
-                        key={conv.studentId} 
+                        key={conv.id} 
                         style={{ 
                           cursor: 'pointer', 
                           transition: 'all 0.2s',
-                          background: selectedConversation?.studentId === conv.studentId ? 'rgba(6, 71, 161, 0.1)' : 'transparent',
-                          borderLeft: selectedConversation?.studentId === conv.studentId ? `4px solid ${theme.colors.primary}` : '4px solid transparent',
+                          background: selectedConversation?.id === conv.id ? 'rgba(6, 71, 161, 0.1)' : 'transparent',
+                          borderLeft: selectedConversation?.id === conv.id ? `4px solid ${theme.colors.primary}` : '4px solid transparent',
                           padding: theme.spacing.md
                         }}
                         onClick={async () => {
                           setSelectedConversation(conv as any);
                           if (conv.unreadCount && conv.unreadCount > 0) {
                             try {
-                              await chatService.markAsRead(conv.studentId);
+                              await chatService.markAsRead(conv.id!);
                             } catch (error) {
                               console.error('Failed to mark as read:', error);
                             }

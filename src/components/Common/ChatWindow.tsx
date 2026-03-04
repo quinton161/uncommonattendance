@@ -169,6 +169,7 @@ interface ChatWindowProps {
   studentPhotoUrl?: string;
   currentUserPhotoUrl?: string;
   isAdmin?: boolean;
+  adminUid?: string;
 }
 
 export const ChatWindow: React.FC<ChatWindowProps> = ({
@@ -177,26 +178,36 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   currentUserUid,
   studentPhotoUrl,
   currentUserPhotoUrl,
-  isAdmin = false
+  isAdmin = false,
+  adminUid: providedAdminUid
 }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
-  const [adminUid, setAdminUid] = useState<string>('');
+  const [adminUid, setAdminUid] = useState<string>(providedAdminUid || '');
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const fetchAdminId = async () => {
-      const id = await chatService.getAdminId();
-      setAdminUid(id);
-    };
-    fetchAdminId();
+    if (!adminUid) return;
 
-    const unsubscribe = chatService.subscribeToMessages(studentId, (msgs) => {
+    if (!providedAdminUid) {
+      const fetchAdminId = async () => {
+        const id = await chatService.getAdminId();
+        setAdminUid(id);
+      };
+      fetchAdminId();
+    } else {
+      setAdminUid(providedAdminUid);
+    }
+
+    // Use composite ID for unique student-admin conversation
+    const conversationId = `${studentId}_${adminUid}`;
+
+    const unsubscribe = chatService.subscribeToMessages(conversationId, (msgs) => {
       setMessages(msgs);
     });
 
     return () => unsubscribe();
-  }, [studentId]);
+  }, [studentId, adminUid, providedAdminUid]);
 
   useEffect(() => {
     if (scrollRef.current) {

@@ -540,11 +540,17 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
   });
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [admins, setAdmins] = useState<any[]>([]);
+  const [selectedAdmin, setSelectedAdmin] = useState<any | null>(null);
   const dataService = DataService.getInstance();
   const attendanceService = AttendanceService.getInstance();
   const dailyAttendanceService = DailyAttendanceService.getInstance();
 
   // useEffect hooks will be moved after function declarations
+
+  const getInitials = (name: string) => {
+    return name.split(' ').map(n => n[0]).join('').toUpperCase();
+  };
 
   const checkTodayAttendance = useCallback(async () => {
     if (!user || user.userType !== 'attendee') return;
@@ -619,6 +625,13 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
         time: activity.markedAt as Date | undefined,
         studentName: user.displayName,
       })));
+
+      // Load all admins for chat
+      const allAdmins = await chatService.getAllAdmins();
+      setAdmins(allAdmins);
+      if (allAdmins.length > 0 && !selectedAdmin) {
+        setSelectedAdmin(allAdmins[0]);
+      }
 
     } catch (error) {
       console.error('Error loading student data:', error);
@@ -841,32 +854,45 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
                     paddingRight: '4px'
                   }}>
                     <AttendanceList>
-                      {/* Admin conversation - the main one for students */}
-                      <AttendanceItem 
-                        style={{ 
-                          cursor: 'pointer', 
-                          transition: 'all 0.2s',
-                          background: 'rgba(6, 71, 161, 0.1)',
-                          borderLeft: `4px solid ${theme.colors.primary}`,
-                          padding: theme.spacing.md
-                        }}
-                      >
-                        <UserAvatar>Admin</UserAvatar>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontWeight: theme.fontWeights.semibold, color: theme.colors.textPrimary, fontSize: theme.fontSizes.sm }}>
-                            Admin
+                      {admins.map((admin) => (
+                        <AttendanceItem 
+                          key={admin.uid}
+                          onClick={() => setSelectedAdmin(admin)}
+                          style={{ 
+                            cursor: 'pointer', 
+                            transition: 'all 0.2s',
+                            background: selectedAdmin?.uid === admin.uid ? 'rgba(6, 71, 161, 0.1)' : 'transparent',
+                            borderLeft: selectedAdmin?.uid === admin.uid ? `4px solid ${theme.colors.primary}` : '4px solid transparent',
+                            padding: theme.spacing.md
+                          }}
+                        >
+                          <UserAvatar>
+                            {admin.photoUrl ? (
+                              <img 
+                                src={admin.photoUrl} 
+                                alt="" 
+                                style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} 
+                              />
+                            ) : (
+                              getInitials(admin.displayName || 'Admin')
+                            )}
+                          </UserAvatar>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontWeight: theme.fontWeights.semibold, color: theme.colors.textPrimary, fontSize: theme.fontSizes.sm }}>
+                              {admin.displayName || 'Admin'}
+                            </div>
+                            <div style={{ 
+                              fontSize: theme.fontSizes.xs, 
+                              color: theme.colors.textSecondary,
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis'
+                            }}>
+                              Chat with {admin.displayName || 'Admin'}
+                            </div>
                           </div>
-                          <div style={{ 
-                            fontSize: theme.fontSizes.xs, 
-                            color: theme.colors.textSecondary,
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis'
-                          }}>
-                            Click to chat with admin
-                          </div>
-                        </div>
-                      </AttendanceItem>
+                        </AttendanceItem>
+                      ))}
                     </AttendanceList>
                   </div>
                 </Card>
@@ -878,15 +904,20 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
                 height: '100%',
                 overflow: 'hidden'
               }}>
-                <h3 style={{ color: theme.colors.textPrimary, margin: `0 0 ${theme.spacing.md} 0` }}>Chat with Admin</h3>
+                <h3 style={{ color: theme.colors.textPrimary, margin: `0 0 ${theme.spacing.md} 0` }}>
+                  {selectedAdmin ? `Chat with ${selectedAdmin.displayName}` : 'Select an Admin'}
+                </h3>
                 <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', height: '100%' }}>
-                  <ChatWindow 
-                    studentId={user?.uid || ''} 
-                    studentName={user?.displayName || 'Student'} 
-                    currentUserUid={user?.uid || ''}
-                    studentPhotoUrl={user?.photoUrl}
-                    currentUserPhotoUrl={user?.photoUrl}
-                  />
+                  {selectedAdmin && (
+                    <ChatWindow 
+                      studentId={user?.uid || ''} 
+                      studentName={user?.displayName || 'Student'} 
+                      currentUserUid={user?.uid || ''}
+                      studentPhotoUrl={user?.photoUrl}
+                      currentUserPhotoUrl={user?.photoUrl}
+                      adminUid={selectedAdmin.uid}
+                    />
+                  )}
                 </div>
               </div>
             </div>
