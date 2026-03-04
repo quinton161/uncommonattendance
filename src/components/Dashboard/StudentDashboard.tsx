@@ -16,6 +16,7 @@ import { MyAttendancePage } from '../Student/MyAttendancePage';
 import { ProgressPage } from '../Student/ProgressPage';
 import { ProfileUpload } from '../Profile/ProfileUpload';
 import { ChatWindow } from '../Common/ChatWindow';
+import { chatService, Conversation } from '../../services/chatService';
 import { UncommonLogo } from '../Common/UncommonLogo';
 import { StarField } from '../Common/StarField';
 import TimeSyncStatus from '../Common/TimeSyncStatus';
@@ -112,6 +113,21 @@ const SidebarFooter = styled.div`
   flex-shrink: 0;
   margin-top: auto;
   padding-top: ${theme.spacing.xl};
+`;
+
+const Badge = styled.div`
+  background-color: ${theme.colors.success};
+  color: white;
+  font-size: 10px;
+  font-weight: bold;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 5px;
+  margin-top: 4px;
 `;
 
 const NavItem = styled.div<{ active?: boolean }>`
@@ -498,6 +514,8 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
     lastAttendanceDate: null,
   });
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [conversation, setConversation] = useState<Conversation | null>(null);
   const dataService = DataService.getInstance();
   const attendanceService = AttendanceService.getInstance();
   const dailyAttendanceService = DailyAttendanceService.getInstance();
@@ -789,12 +807,36 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
   };
 
 
-  // useEffect hooks after function declarations
   useEffect(() => {
     console.log('StudentDashboard useEffect - user:', !!user, user?.uid);
     if (user) {
       loadStudentData();
       checkTodayAttendance();
+
+      // Subscribe to this student's specific conversation
+      const unsubscribe = chatService.subscribeToConversations((conversations) => {
+        const myConv = conversations.find(c => c.studentId === user.uid);
+        if (myConv) {
+          const prevUnread = unreadCount;
+          const newUnread = myConv.unreadCount || 0;
+
+          if (newUnread > prevUnread) {
+            // Play notification sound
+            const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3');
+            audio.play().catch(e => console.log('Audio play failed:', e));
+
+            // Show toast notification
+            uniqueToast.info(`New message from Admin: ${myConv.lastMessage}`, {
+              position: 'top-right',
+              autoClose: 5000
+            });
+          }
+          setConversation(myConv);
+          setUnreadCount(newUnread);
+        }
+      });
+
+      return () => unsubscribe();
     }
   }, [user, loadStudentData, checkTodayAttendance]);
 
@@ -950,9 +992,22 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
             <CheckCircleIcon size={20} />
             Attendance
           </NavItem>
-          <NavItem active={activeNav === 'chat'} onClick={() => handleNavClick('chat')}>
+          <NavItem 
+            active={activeNav === 'chat'} 
+            onClick={async () => {
+              handleNavClick('chat');
+              if (unreadCount > 0 && user) {
+                try {
+                  await chatService.markAsRead(user.uid);
+                } catch (error) {
+                  console.error('Failed to mark as read:', error);
+                }
+              }
+            }}
+          >
             <PersonIcon size={20} />
             Chat with Admin
+            {unreadCount > 0 && <Badge style={{ marginLeft: 'auto' }}>{unreadCount}</Badge>}
           </NavItem>
           <NavItem active={activeNav === 'progress'} onClick={() => handleNavClick('progress')}>
             <BarChartIcon size={20} />

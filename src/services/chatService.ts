@@ -58,7 +58,7 @@ class ChatService {
       adminId,
       lastMessage: text,
       lastMessageTime: serverTimestamp(),
-      unreadCount: senderId === studentId ? (existingDoc.exists() ? (existingDoc.data()?.unreadCount || 0) + 1 : 1) : 0
+      unreadCount: senderId === studentId ? (existingDoc.exists() ? (existingDoc.data()?.unreadCount || 0) + 1 : 1) : (senderId === adminId ? 0 : (existingDoc.exists() ? (existingDoc.data()?.unreadCount || 0) + 1 : 1))
     }, { merge: true });
 
     // Add message to subcollection
