@@ -5,7 +5,7 @@ import { AttendanceService } from '../../services/attendanceService';
 import { Layout, Container, AppHeader } from '../Common/Layout';
 import { Button } from '../Common/Button';
 import { Card } from '../Common/Card';
-import { AttendanceRecord } from '../../types';
+import { AttendanceRecord, LocationData } from '../../types';
 import { theme } from '../../styles/theme';
 
 const DashboardContainer = styled.div`
