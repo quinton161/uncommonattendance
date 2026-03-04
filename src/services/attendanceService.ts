@@ -406,7 +406,7 @@ export class AttendanceService {
     console.log('🗺️ Resolving address for coordinates:', { latitude, longitude });
 
     // Check if coordinates match any known location (Vincent Bohlen Hub, etc.)
-    const knownLocation = findKnownLocation(latitude, longitude);
+    const knownLocation = findKnownLocationWithAccuracy(latitude, longitude, 0);
     if (knownLocation) {
       const locationName = getLocationDisplayName(knownLocation);
       console.log('📍 Location identified as known location:', locationName);
