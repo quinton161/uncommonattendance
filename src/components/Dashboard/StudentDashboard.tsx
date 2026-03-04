@@ -625,10 +625,11 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
         console.log('📍 Got user location:', location);
       } catch (error) {
         console.warn('⚠️ Could not get location:', error);
-        uniqueToast.warning('Location access denied. Proceeding without location verification.', {
-          autoClose: 3000,
+        uniqueToast.error('Location is required to check in. Please enable location and try again at school.', {
+          autoClose: 4000,
           position: 'top-center',
         });
+        return;
       }
       
       const now = new Date();
@@ -810,7 +811,31 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
     setAttendanceLoading(true);
     try {
       uniqueToast.info('Recording check-out...', { autoClose: 2000, position: 'top-center' });
-      await attendanceService.checkOut(user.uid);
+
+      let location: any = null;
+      try {
+        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 300000 // 5 minutes
+          });
+        });
+        location = {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy
+        };
+      } catch (error) {
+        console.warn('⚠️ Could not get location for check-out:', error);
+        uniqueToast.error('Location is required to check out. Please enable location and try again at school.', {
+          autoClose: 4000,
+          position: 'top-center',
+        });
+        return;
+      }
+
+      await attendanceService.checkOut(user.uid, location);
       setCheckedIn(false);
       setCheckInTime(null);
       setCanCheckIn(false);

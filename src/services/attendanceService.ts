@@ -48,54 +48,16 @@ export class AttendanceService {
       accuracy: location?.accuracy
     });
     
-    // Check if user is within school premises
-    if (location) {
-      console.log('🗺️ Checking location against school coordinates...');
-      const knownLocation = findKnownLocation(location.latitude, location.longitude);
-      if (knownLocation) {
-        console.log('📍 School location:', { 
-          name: knownLocation.name,
-          lat: knownLocation.latitude,
-          lng: knownLocation.longitude,
-          radius: knownLocation.radius
-        });
-        console.log('📏 Distance calculation:', {
-          userLat: location.latitude, 
-          userLng: location.longitude,
-          schoolLat: knownLocation.latitude,
-          schoolLng: knownLocation.longitude,
-          distance: Math.sqrt(
-            Math.pow(location.latitude - knownLocation.latitude, 2) + 
-            Math.pow(location.longitude - knownLocation.longitude, 2)
-          ),
-          threshold: knownLocation.radius
-        });
-        
-        if (Math.sqrt(
-          Math.pow(location.latitude - knownLocation.latitude, 2) + 
-          Math.pow(location.longitude - knownLocation.longitude, 2)
-        ) > knownLocation.radius) {
-          console.error('❌ User not within school premises:', { 
-            userLat: location.latitude, 
-            userLng: location.longitude,
-            schoolLat: knownLocation.latitude,
-            schoolLng: knownLocation.longitude,
-            distance: Math.sqrt(
-              Math.pow(location.latitude - knownLocation.latitude, 2) + 
-              Math.pow(location.longitude - knownLocation.longitude, 2)
-            ),
-            threshold: knownLocation.radius
-          });
-          throw new Error('You must be within school premises to check in');
-        }
-        console.log('✅ User is within school premises:', knownLocation.name);
-      } else {
-        console.error('❌ findKnownLocation returned null for coordinates:', { lat: location.latitude, lng: location.longitude });
-        throw new Error('Unable to verify school location for geolocation check');
-      }
-    } else {
-      console.warn('⚠️ No location provided, proceeding without geolocation check');
+    if (!location) {
+      throw new Error('Location is required to check in. Please enable location services and try again at school.');
     }
+
+    console.log('🗺️ Checking location against school coordinates...');
+    const knownLocation = findKnownLocation(location.latitude, location.longitude);
+    if (!knownLocation) {
+      throw new Error('You must be within school premises to check in');
+    }
+    console.log('✅ User is within school premises:', knownLocation.name);
     
     const harareTime = this.timeService.getCurrentTime();
     const today = harareTime.toISOString().split('T')[0];
@@ -120,6 +82,11 @@ export class AttendanceService {
       checkInTime: harareTime,
       date: today,
       isPresent: true,
+      location: {
+        latitude: location.latitude,
+        longitude: location.longitude,
+        address: getLocationDisplayName(knownLocation),
+      },
     };
 
     console.log('📝 Saving detailed attendance record to Firebase:', {
@@ -182,7 +149,16 @@ export class AttendanceService {
     return attendanceRecord;
   }
 
-  async checkOut(studentId: string): Promise<AttendanceRecord> {
+  async checkOut(studentId: string, location?: LocationData): Promise<AttendanceRecord> {
+    if (!location) {
+      throw new Error('Location is required to check out. Please enable location services and try again at school.');
+    }
+
+    const knownLocation = findKnownLocation(location.latitude, location.longitude);
+    if (!knownLocation) {
+      throw new Error('You must be within school premises to check out');
+    }
+
     const harareTime = this.timeService.getCurrentTime();
     const today = harareTime.toISOString().split('T')[0];
     const attendanceId = `${studentId}_${today}`;
@@ -203,6 +179,11 @@ export class AttendanceService {
     
     await updateDoc(doc(db, 'attendance', attendanceId), {
       checkOutTime: Timestamp.fromDate(checkOutTime),
+      location: {
+        latitude: location.latitude,
+        longitude: location.longitude,
+        address: getLocationDisplayName(knownLocation),
+      },
     });
 
     return {

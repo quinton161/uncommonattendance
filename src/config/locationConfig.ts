@@ -13,9 +13,9 @@ export interface LocationConfig {
 
 export const SCHOOL_LOCATION: LocationConfig = {
   name: 'School',
-  latitude: -17.94121,
-  longitude: 25.81941,
-  radius: 0.005, // ~500m radius
+  latitude: -17.9421,
+  longitude: 25.8234,
+  radius: 200,
   address: 'School Location'
 };
 
@@ -32,17 +32,36 @@ export const KNOWN_LOCATIONS: LocationConfig[] = [
   // }
 ];
 
+function toRadians(degrees: number): number {
+  return (degrees * Math.PI) / 180;
+}
+
+function haversineDistanceMeters(a: { latitude: number; longitude: number }, b: { latitude: number; longitude: number }): number {
+  const R = 6371000;
+  const dLat = toRadians(b.latitude - a.latitude);
+  const dLon = toRadians(b.longitude - a.longitude);
+  const lat1 = toRadians(a.latitude);
+  const lat2 = toRadians(b.latitude);
+
+  const sinDLat = Math.sin(dLat / 2);
+  const sinDLon = Math.sin(dLon / 2);
+
+  const h = sinDLat * sinDLat + Math.cos(lat1) * Math.cos(lat2) * sinDLon * sinDLon;
+  const c = 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+  return R * c;
+}
+
 /**
  * Check if coordinates match any known location
  */
 export function findKnownLocation(latitude: number, longitude: number): LocationConfig | null {
   for (const location of KNOWN_LOCATIONS) {
-    const distance = Math.sqrt(
-      Math.pow(latitude - location.latitude, 2) + 
-      Math.pow(longitude - location.longitude, 2)
+    const distanceMeters = haversineDistanceMeters(
+      { latitude, longitude },
+      { latitude: location.latitude, longitude: location.longitude }
     );
-    
-    if (distance <= location.radius) {
+
+    if (distanceMeters <= location.radius) {
       return location;
     }
   }

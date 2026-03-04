@@ -191,9 +191,24 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
     setError('');
 
     try {
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 300000
+        });
+      });
+      const location = {
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+        accuracy: position.coords.accuracy,
+        timestamp: position.timestamp,
+      };
+
       const attendance = await attendanceService.checkIn(
         user.uid,
-        user.displayName
+        user.displayName,
+        location
       );
       setTodayAttendance(attendance);
       await loadAttendanceHistory();
@@ -211,7 +226,21 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
     setError('');
 
     try {
-      const attendance = await attendanceService.checkOut(user.uid);
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 300000
+        });
+      });
+      const location = {
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+        accuracy: position.coords.accuracy,
+        timestamp: position.timestamp,
+      };
+
+      const attendance = await attendanceService.checkOut(user.uid, location);
       setTodayAttendance(attendance);
       await loadAttendanceHistory();
     } catch (err: any) {
