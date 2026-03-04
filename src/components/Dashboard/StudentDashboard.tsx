@@ -515,7 +515,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
   });
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [conversation, setConversation] = useState<Conversation | null>(null);
   const dataService = DataService.getInstance();
   const attendanceService = AttendanceService.getInstance();
   const dailyAttendanceService = DailyAttendanceService.getInstance();
@@ -831,7 +830,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
               autoClose: 5000
             });
           }
-          setConversation(myConv);
           setUnreadCount(newUnread);
         }
       });
