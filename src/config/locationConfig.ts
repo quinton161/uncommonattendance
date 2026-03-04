@@ -51,22 +51,26 @@ function haversineDistanceMeters(a: { latitude: number; longitude: number }, b: 
   return R * c;
 }
 
-/**
- * Check if coordinates match any known location
- */
-export function findKnownLocation(latitude: number, longitude: number): LocationConfig | null {
+export function findKnownLocationWithAccuracy(latitude: number, longitude: number, accuracyMeters: number = 0): LocationConfig | null {
   for (const location of KNOWN_LOCATIONS) {
     const distanceMeters = haversineDistanceMeters(
       { latitude, longitude },
       { latitude: location.latitude, longitude: location.longitude }
     );
 
-    if (distanceMeters <= location.radius) {
+    if (distanceMeters <= location.radius + Math.max(0, accuracyMeters)) {
       return location;
     }
   }
-  
+
   return null;
+}
+
+/**
+ * Check if coordinates match any known location
+ */
+export function findKnownLocation(latitude: number, longitude: number): LocationConfig | null {
+  return findKnownLocationWithAccuracy(latitude, longitude, 0);
 }
 
 /**

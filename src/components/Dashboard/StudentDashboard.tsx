@@ -620,16 +620,36 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
         location = {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
-          accuracy: position.coords.accuracy
+          accuracy: position.coords.accuracy,
+          timestamp: position.timestamp,
         };
         console.log('📍 Got user location:', location);
       } catch (error) {
-        console.warn('⚠️ Could not get location:', error);
-        uniqueToast.error('Location is required to check in. Please enable location and try again at school.', {
-          autoClose: 4000,
-          position: 'top-center',
-        });
-        return;
+        console.warn('⚠️ Could not get location (high accuracy):', error);
+
+        try {
+          const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, {
+              enableHighAccuracy: false,
+              timeout: 20000,
+              maximumAge: 0
+            });
+          });
+          location = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracy: position.coords.accuracy,
+            timestamp: position.timestamp,
+          };
+          console.log('📍 Got user location (fallback):', location);
+        } catch (fallbackError) {
+          console.warn('⚠️ Could not get location (fallback):', fallbackError);
+          uniqueToast.error('Location is required to check in. Please enable location and try again at school.', {
+            autoClose: 4000,
+            position: 'top-center',
+          });
+          return;
+        }
       }
       
       const now = new Date();
@@ -701,6 +721,16 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
           });
           // Refresh state to sync with database
           checkTodayAttendance();
+        } else if (error.message.includes('within school premises')) {
+          uniqueToast.error(error.message, {
+            autoClose: 5000,
+            position: 'top-center',
+          });
+        } else if (error.message.toLowerCase().includes('location is required')) {
+          uniqueToast.error(error.message, {
+            autoClose: 5000,
+            position: 'top-center',
+          });
         } else if (error.message.includes('User denied')) {
           uniqueToast.error('Location permission denied. Please enable it and try again.', {
             autoClose: 5000,

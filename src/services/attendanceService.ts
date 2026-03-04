@@ -13,7 +13,7 @@ import {
 import { db } from './firebase';
 import { AttendanceRecord, LocationData } from '../types';
 import { DailyAttendanceService } from './dailyAttendanceService';
-import { findKnownLocation, getLocationDisplayName } from '../config/locationConfig';
+import { findKnownLocationWithAccuracy, getLocationDisplayName } from '../config/locationConfig';
 import DataService from './DataService';
 import { BrowserEmailService } from '../services/emailService';
 import { TimeService } from './timeService';
@@ -53,7 +53,7 @@ export class AttendanceService {
     }
 
     console.log('🗺️ Checking location against school coordinates...');
-    const knownLocation = findKnownLocation(location.latitude, location.longitude);
+    const knownLocation = findKnownLocationWithAccuracy(location.latitude, location.longitude, location.accuracy);
     if (!knownLocation) {
       throw new Error('You must be within school premises to check in');
     }
@@ -154,7 +154,7 @@ export class AttendanceService {
       throw new Error('Location is required to check out. Please enable location services and try again at school.');
     }
 
-    const knownLocation = findKnownLocation(location.latitude, location.longitude);
+    const knownLocation = findKnownLocationWithAccuracy(location.latitude, location.longitude, location.accuracy);
     if (!knownLocation) {
       throw new Error('You must be within school premises to check out');
     }
