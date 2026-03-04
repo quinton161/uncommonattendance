@@ -17,6 +17,8 @@ import { db } from './firebase';
 export interface Message {
   id?: string;
   senderId: string;
+  senderName?: string;
+  senderPhotoUrl?: string;
   text: string;
   createdAt: any;
 }
@@ -24,7 +26,9 @@ export interface Message {
 export interface Conversation {
   studentId: string;
   studentName: string;
+  studentPhotoUrl?: string;
   adminId: string;
+  adminPhotoUrl?: string;
   lastMessage: string;
   lastMessageTime: any;
   unreadCount?: number;
@@ -46,10 +50,20 @@ class ChatService {
     studentName: string,
     senderId: string,
     text: string,
-    adminId: string = 'admin' // Default admin ID, should be replaced with actual admin UID
+    adminId: string = 'admin',
+    senderPhotoUrl?: string
   ) {
     const conversationRef = doc(db, 'conversations', studentId);
     const existingDoc = await getDoc(conversationRef);
+
+    // Get sender name
+    let senderName = studentName;
+    if (senderId !== studentId) {
+      const senderDoc = await getDoc(doc(db, 'users', senderId));
+      if (senderDoc.exists()) {
+        senderName = senderDoc.data().displayName || 'Admin';
+      }
+    }
 
     // Ensure conversation exists and update last message
     await setDoc(conversationRef, {
@@ -66,6 +80,8 @@ class ChatService {
       collection(db, 'conversations', studentId, 'messages'),
       {
         senderId,
+        senderName,
+        senderPhotoUrl,
         text,
         createdAt: serverTimestamp()
       }
@@ -96,6 +112,19 @@ class ChatService {
     });
   }
 
+  // Get user photo URL by user ID
+  async getUserPhotoUrl(userId: string): Promise<string | undefined> {
+    try {
+      const userDoc = await getDoc(doc(db, 'users', userId));
+      if (userDoc.exists()) {
+        return userDoc.data().photoUrl;
+      }
+    } catch (error) {
+      console.error('Error getting user photo URL:', error);
+    }
+    return undefined;
+  }
+
   // Admin: Listen to all conversations
   subscribeToConversations(callback: (conversations: Conversation[]) => void) {
     const q = query(
@@ -103,12 +132,38 @@ class ChatService {
       orderBy('lastMessageTime', 'desc')
     );
 
-    return onSnapshot(q, (snapshot) => {
-      const conversations = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as unknown as Conversation[];
-      callback(conversations);
+    return onSnapshot(q, async (snapshot) => {
+      // Fetch user data for each conversation to get photo URLs
+      const conversationsWithPhotos = await Promise.all(
+        snapshot.docs.map(async (docSnap) => {
+          const data = docSnap.data() as Conversation;
+          
+          // Get student photo URL
+          try {
+            const studentDocSnap = await getDoc(doc(db, 'users', data.studentId));
+            if (studentDocSnap.exists()) {
+              data.studentPhotoUrl = studentDocSnap.data().photoUrl;
+            }
+          } catch (e) {
+            console.log('Error fetching student photo:', e);
+          }
+          
+          // Get admin photo URL if available
+          if (data.adminId) {
+            try {
+              const adminDocSnap = await getDoc(doc(db, 'users', data.adminId));
+              if (adminDocSnap.exists()) {
+                data.adminPhotoUrl = adminDocSnap.data().photoUrl;
+              }
+            } catch (e) {
+              console.log('Error fetching admin photo:', e);
+            }
+          }
+          
+          return { id: docSnap.id, ...data };
+        })
+      );
+      callback(conversationsWithPhotos);
     });
   }
 

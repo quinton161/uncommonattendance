@@ -486,6 +486,69 @@ const ActivityIcon = styled.div<{ type: 'checkin' | 'checkout' | 'evt' }>`
   color: ${theme.colors.white};
 `;
 
+const ChatList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+`;
+
+const ChatListItem = styled.div<{ selected?: boolean }>`
+  display: flex;
+  align-items: center;
+  gap: ${theme.spacing.md};
+  padding: ${theme.spacing.md};
+  border-radius: ${theme.borderRadius.md};
+  cursor: pointer;
+  transition: all 0.2s;
+  background: ${props => props.selected ? 'rgba(6, 71, 161, 0.1)' : 'transparent'};
+  border-left: ${props => props.selected ? `4px solid ${theme.colors.primary}` : '4px solid transparent'};
+  
+  &:hover {
+    background: rgba(6, 71, 161, 0.05);
+  }
+`;
+
+const ChatAvatar = styled.div`
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: ${theme.colors.primary};
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: ${theme.fontSizes.sm};
+`;
+
+const UserAvatar = styled.div`
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: ${theme.colors.primary};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: ${theme.colors.white};
+  font-weight: ${theme.fontWeights.medium};
+  font-size: ${theme.fontSizes.sm};
+`;
+
+const AttendanceList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${theme.spacing.sm};
+`;
+
+const AttendanceItem = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${theme.spacing.md};
+  padding: ${theme.spacing.sm};
+  border-radius: ${theme.borderRadius.md};
+  background: ${theme.colors.backgroundSecondary};
+`;
+
 interface StudentDashboardProps {
   onNavigateToProfile?: () => void;
 }
@@ -789,12 +852,83 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
       case 'chat':
         return (
           <MainContent>
-            <h2 style={{ marginBottom: theme.spacing.lg, color: theme.colors.textPrimary }}>Chat with Admin</h2>
-            <ChatWindow 
-              studentId={user?.uid || ''} 
-              studentName={user?.displayName || 'Student'} 
-              currentUserUid={user?.uid || ''} 
-            />
+            <h2 style={{ marginBottom: theme.spacing.lg, color: theme.colors.textPrimary }}>Messages</h2>
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: '320px 1fr', 
+              gap: theme.spacing.lg, 
+              height: 'calc(100vh - 200px)',
+              overflow: 'hidden'
+            }}>
+              <div style={{ 
+                display: 'flex', 
+                flexDirection: 'column', 
+                gap: theme.spacing.md,
+                height: '100%',
+                overflow: 'hidden'
+              }}>
+                <Card style={{ 
+                  flex: 1, 
+                  padding: theme.spacing.sm,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  overflow: 'hidden'
+                }}>
+                  <div style={{ 
+                    flex: 1,
+                    overflowY: 'auto',
+                    paddingRight: '4px'
+                  }}>
+                    <AttendanceList>
+                      {/* Admin conversation - the main one for students */}
+                      <AttendanceItem 
+                        style={{ 
+                          cursor: 'pointer', 
+                          transition: 'all 0.2s',
+                          background: 'rgba(6, 71, 161, 0.1)',
+                          borderLeft: `4px solid ${theme.colors.primary}`,
+                          padding: theme.spacing.md
+                        }}
+                      >
+                        <UserAvatar>Admin</UserAvatar>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: theme.fontWeights.semibold, color: theme.colors.textPrimary, fontSize: theme.fontSizes.sm }}>
+                            Admin
+                          </div>
+                          <div style={{ 
+                            fontSize: theme.fontSizes.xs, 
+                            color: theme.colors.textSecondary,
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis'
+                          }}>
+                            Click to chat with admin
+                          </div>
+                        </div>
+                      </AttendanceItem>
+                    </AttendanceList>
+                  </div>
+                </Card>
+              </div>
+
+              <div style={{ 
+                display: 'flex', 
+                flexDirection: 'column', 
+                height: '100%',
+                overflow: 'hidden'
+              }}>
+                <h3 style={{ color: theme.colors.textPrimary, margin: `0 0 ${theme.spacing.md} 0` }}>Chat with Admin</h3>
+                <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', height: '100%' }}>
+                  <ChatWindow 
+                    studentId={user?.uid || ''} 
+                    studentName={user?.displayName || 'Student'} 
+                    currentUserUid={user?.uid || ''}
+                    studentPhotoUrl={user?.photoUrl}
+                    currentUserPhotoUrl={user?.photoUrl}
+                  />
+                </div>
+              </div>
+            </div>
           </MainContent>
         );
       case 'progress':

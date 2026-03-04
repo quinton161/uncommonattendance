@@ -59,6 +59,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               uid: firebaseUser.uid,
               email: firebaseUser.email!,
               displayName: firebaseUser.displayName || userData.displayName,
+              // photoUrl can be either Firebase Auth URL or base64 from Firestore
               photoUrl: firebaseUser.photoURL || userData.photoUrl,
               userType: userData.userType || 'attendee',
               bio: userData.bio,
@@ -225,15 +226,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     if (!user) throw new Error('No user logged in');
 
     try {
-      // Update Firebase Auth profile if displayName or photoUrl changed
-      if (data.displayName || data.photoUrl) {
+      // Only update Firebase Auth profile for displayName (not photoURL for base64)
+      // PhotoURL for base64 images is stored in Firestore only
+      if (data.displayName) {
         await updateProfile(auth.currentUser!, {
-          displayName: data.displayName || auth.currentUser!.displayName,
-          photoURL: data.photoUrl || auth.currentUser!.photoURL,
+          displayName: data.displayName,
         });
       }
 
-      // Update Firestore document
+      // Update Firestore document (this includes base64 photoUrl)
       await updateDoc(doc(db, 'users', user.uid), data);
 
       // Update local state

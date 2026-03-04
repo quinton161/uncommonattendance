@@ -57,6 +57,7 @@ const ProfileUpload: React.FC = () => {
   const { user, updateProfile } = useAuth();
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null); // Store file in state
   const fileInputRef = useRef<HTMLInputElement>(null);
   const profileService = ProfileService.getInstance();
 
@@ -76,34 +77,49 @@ const ProfileUpload: React.FC = () => {
         return;
       }
 
-      // Create preview
+      // Create preview and store file
       const reader = new FileReader();
       reader.onload = (e) => {
         setPreview(e.target?.result as string);
       };
       reader.readAsDataURL(file);
+      setSelectedFile(file); // Store file for upload
+      console.log('📁 File stored in state:', file.name);
     }
   };
 
   const handleUpload = async () => {
-    const file = fileInputRef.current?.files?.[0];
+    // Use stored file from state instead of fileInputRef
+    const file = selectedFile;
     if (!file || !user) {
       console.warn('⚠️ No file or user for upload');
+      uniqueToast.error('Please select a file first');
       return;
     }
+
+    console.log('🚀 Starting upload process...');
+    console.log('👤 User ID:', user.uid);
+    console.log('📄 File:', file.name, file.size, file.type);
 
     try {
       setUploading(true);
       uniqueToast.info('Uploading profile picture...', { autoClose: false, toastId: 'uploading-toast' });
       
+      console.log('📤 Calling profileService.uploadProfilePicture...');
       const downloadURL = await profileService.uploadProfilePicture(user.uid, file);
+      console.log('✅ Upload succeeded, got URL:', downloadURL.substring(0, 50) + '...');
       
-      // Update local auth context without reloading the page
+      // The profileService already updated Firestore, but we need to update local state
       if (updateProfile) {
+        console.log('🔄 Calling updateProfile in AuthContext to refresh local state...');
         await updateProfile({ photoUrl: downloadURL });
+        console.log('✅ AuthContext profile updated');
+      } else {
+        console.warn('⚠️ updateProfile function not available!');
       }
       
       setPreview(null);
+      setSelectedFile(null); // Clear stored file after upload
       uniqueToast.dismiss('uploading-toast');
       uniqueToast.success('Profile picture updated successfully!');
     } catch (error: any) {

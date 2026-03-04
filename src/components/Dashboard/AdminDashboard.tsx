@@ -20,6 +20,7 @@ import { ChatWindow } from '../Common/ChatWindow';
 import { chatService, Conversation } from '../../services/chatService';
 import { notificationService } from '../../services/notificationService';
 import { saveAs } from 'file-saver';
+import { ProfileUpload } from '../Profile/ProfileUpload';
 
 import {
   DashboardIcon,
@@ -726,6 +727,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
                     <ChatWindow 
                       studentId={selectedConversation.studentId}
                       studentName={selectedConversation.studentName}
+                      studentPhotoUrl={selectedConversation.studentPhotoUrl}
+                      currentUserPhotoUrl={user?.photoUrl}
                       currentUserUid={user?.uid || ''}
                       isAdmin={true}
                     />
@@ -747,6 +750,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
               )}
             </div>
           </div>
+        );
+      case 'profile':
+        return (
+          <MainContent>
+            <ProfileUpload />
+          </MainContent>
         );
       default:
         return null; // Will render the main dashboard
@@ -796,6 +805,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
           <PersonIcon size={20} />
           Student Chat
           {totalUnread > 0 && <Badge style={{ marginLeft: 'auto' }}>{totalUnread}</Badge>}
+        </NavItem>
+        <NavItem active={activeNav === 'profile'} onClick={() => handleNavClick('profile')}>
+          <PersonIcon size={20} />
+          My Profile
         </NavItem>
         
         <div style={{ marginTop: 'auto', paddingTop: theme.spacing.xl }}>

@@ -2,11 +2,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import styled from 'styled-components';
 import { chatService, Message } from '../../services/chatService';
 import { theme } from '../../styles/theme';
+import { PersonIcon } from '../Common/Icons';
 
 const ChatContainer = styled.div`
   display: flex;
   flex-direction: column;
-  height: 100%;
+  flex: 1;
   min-height: 400px;
   background: ${theme.colors.gray50};
   border-radius: ${theme.borderRadius.lg};
@@ -15,7 +16,7 @@ const ChatContainer = styled.div`
   position: relative;
 
   @media (max-width: ${theme.breakpoints.tablet}) {
-    height: calc(100vh - 160px);
+    min-height: calc(100vh - 160px);
     border-radius: 0;
     border-left: none;
     border-right: none;
@@ -31,18 +32,26 @@ const ChatHeader = styled.div`
   gap: ${theme.spacing.md};
   z-index: 1;
   box-shadow: ${theme.shadows.sm};
+  flex-shrink: 0;
 `;
 
-const Avatar = styled.div`
+const Avatar = styled.div<{ hasPhoto?: boolean }>`
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.2);
+  background: ${props => props.hasPhoto ? 'transparent' : 'rgba(255, 255, 255, 0.2)'};
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: bold;
   color: white;
+  overflow: hidden;
+`;
+
+const AvatarImg = styled.img`
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 `;
 
 const MessageList = styled.div`
@@ -53,6 +62,8 @@ const MessageList = styled.div`
   flex-direction: column;
   gap: 4px;
   z-index: 1;
+  min-height: 0;
+  overflow-anchor: none;
   
   /* Custom Scrollbar */
   &::-webkit-scrollbar {
@@ -148,6 +159,8 @@ interface ChatWindowProps {
   studentId: string;
   studentName: string;
   currentUserUid: string;
+  studentPhotoUrl?: string;
+  currentUserPhotoUrl?: string;
   isAdmin?: boolean;
 }
 
@@ -155,6 +168,8 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   studentId,
   studentName,
   currentUserUid,
+  studentPhotoUrl,
+  currentUserPhotoUrl,
   isAdmin = false
 }) => {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -195,7 +210,8 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         studentName,
         currentUserUid,
         text,
-        isAdmin ? currentUserUid : adminUid
+        isAdmin ? currentUserUid : adminUid,
+        currentUserPhotoUrl
       );
     } catch (error) {
       console.error('Failed to send message:', error);
@@ -215,16 +231,40 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   return (
     <ChatContainer>
       <ChatHeader>
-        <Avatar>{getInitials(studentName)}</Avatar>
+        <Avatar hasPhoto={!!studentPhotoUrl}>
+          {studentPhotoUrl ? (
+            <AvatarImg src={studentPhotoUrl} alt={studentName} />
+          ) : (
+            getInitials(studentName)
+          )}
+        </Avatar>
         <div style={{ fontWeight: 'bold' }}>{studentName}</div>
       </ChatHeader>
       <MessageList ref={scrollRef}>
-        {messages.map((msg, index) => (
-          <MessageBubble key={msg.id || index} isOwn={msg.senderId === currentUserUid}>
-            <MessageText>{msg.text}</MessageText>
-            <TimeLabel isOwn={msg.senderId === currentUserUid}>{formatTime(msg.createdAt)}</TimeLabel>
-          </MessageBubble>
-        ))}
+        {messages.map((msg, index) => {
+          const isOwn = msg.senderId === currentUserUid;
+          return (
+            <MessageBubble key={msg.id || index} isOwn={isOwn}>
+              {!isOwn && msg.senderPhotoUrl && (
+                <Avatar 
+                  hasPhoto={true} 
+                  style={{ 
+                    width: 24, 
+                    height: 24, 
+                    fontSize: 10,
+                    position: 'absolute',
+                    left: 8,
+                    top: 8
+                  }}
+                >
+                  <AvatarImg src={msg.senderPhotoUrl} alt="" />
+                </Avatar>
+              )}
+              <MessageText>{msg.text}</MessageText>
+              <TimeLabel isOwn={isOwn}>{formatTime(msg.createdAt)}</TimeLabel>
+            </MessageBubble>
+          );
+        })}
       </MessageList>
       <InputArea onSubmit={handleSendMessage}>
         <Input

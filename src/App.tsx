@@ -56,7 +56,7 @@ const AppRoutes: React.FC = () => {
         <ProfilePage onBack={() => setCurrentPage('dashboard')} />
       );
     }
-    return <AdminDashboard onNavigateToProfile={() => setCurrentPage('profile')} />;
+    return <AdminDashboard />;
   }
 
   // Fallback for unknown roles
