@@ -1,9 +1,11 @@
 import {
   doc,
   setDoc,
+  getDoc,
   collection,
   addDoc,
   serverTimestamp,
+  updateDoc,
   query,
   orderBy,
   onSnapshot,
@@ -47,6 +49,7 @@ class ChatService {
     adminId: string = 'admin' // Default admin ID, should be replaced with actual admin UID
   ) {
     const conversationRef = doc(db, 'conversations', studentId);
+    const existingDoc = await getDoc(conversationRef);
 
     // Ensure conversation exists and update last message
     await setDoc(conversationRef, {
@@ -54,7 +57,8 @@ class ChatService {
       studentName,
       adminId,
       lastMessage: text,
-      lastMessageTime: serverTimestamp()
+      lastMessageTime: serverTimestamp(),
+      unreadCount: senderId === studentId ? (existingDoc.exists() ? (existingDoc.data()?.unreadCount || 0) + 1 : 1) : 0
     }, { merge: true });
 
     // Add message to subcollection
@@ -66,6 +70,14 @@ class ChatService {
         createdAt: serverTimestamp()
       }
     );
+  }
+
+  // Reset unread count for a conversation
+  async markAsRead(studentId: string) {
+    const conversationRef = doc(db, 'conversations', studentId);
+    await updateDoc(conversationRef, {
+      unreadCount: 0
+    });
   }
 
   // Listen to messages in a specific conversation

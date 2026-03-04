@@ -306,6 +306,21 @@ const StatIcon = styled.div`
   opacity: 0.3;
 `;
 
+const Badge = styled.div`
+  background-color: ${theme.colors.success};
+  color: white;
+  font-size: 10px;
+  font-weight: bold;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 5px;
+  margin-top: 4px;
+`;
+
 const MobileHeader = styled.div`
   display: none;
   
@@ -554,7 +569,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
             studentName: student.displayName || 'Unknown Student',
             lastMessage: existingConv?.lastMessage || 'No messages yet',
             lastMessageTime: existingConv?.lastMessageTime || null,
-            adminId: user?.uid || 'admin'
+            adminId: user?.uid || 'admin',
+            unreadCount: existingConv?.unreadCount || 0
           };
         }).sort((a, b) => {
           if (!a.lastMessageTime) return 1;
@@ -603,7 +619,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
                           borderLeft: selectedConversation?.studentId === conv.studentId ? `4px solid ${theme.colors.primary}` : '4px solid transparent',
                           padding: theme.spacing.md
                         }}
-                        onClick={() => setSelectedConversation(conv as any)}
+                        onClick={async () => {
+                          setSelectedConversation(conv as any);
+                          if (conv.unreadCount && conv.unreadCount > 0) {
+                            try {
+                              await chatService.markAsRead(conv.studentId);
+                            } catch (error) {
+                              console.error('Failed to mark as read:', error);
+                            }
+                          }
+                        }}
                       >
                         <UserAvatar>{getInitials(conv.studentName)}</UserAvatar>
                         <div style={{ flex: 1, minWidth: 0 }}>
@@ -620,9 +645,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
                             {conv.lastMessage}
                           </div>
                         </div>
-                        <div style={{ fontSize: '10px', color: theme.colors.textLight }}>
-                          {conv.lastMessageTime?.toDate ? conv.lastMessageTime.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 
-                           conv.lastMessageTime ? new Date(conv.lastMessageTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                          <div style={{ fontSize: '10px', color: theme.colors.textLight }}>
+                            {conv.lastMessageTime?.toDate ? conv.lastMessageTime.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 
+                             conv.lastMessageTime ? new Date(conv.lastMessageTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                          </div>
+                          {conv.unreadCount !== undefined && conv.unreadCount > 0 && (
+                            <Badge>{conv.unreadCount}</Badge>
+                          )}
                         </div>
                       </AttendanceItem>
                     ))}
