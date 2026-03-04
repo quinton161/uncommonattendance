@@ -39,8 +39,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (firebaseUser) {
         try {
           console.log('🔐 AuthContext: Fetching user data from Firestore...');
-          // Get user data from Firestore
-          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+          // Get user data from Firestore with retry logic for new users
+          let userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+          let retries = 0;
+          const maxRetries = 3;
+          
+          // Retry if user document not found (might be a race condition for new users)
+          while (!userDoc.exists() && retries < maxRetries) {
+            retries++;
+            console.log(`🔐 AuthContext: User document not found, retrying... (${retries}/${maxRetries})`);
+            await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+            userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+          }
+          
           if (userDoc.exists()) {
             const userData = userDoc.data();
             console.log('🔐 AuthContext: User data loaded:', userData.displayName, userData.userType);
@@ -54,12 +65,49 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               createdAt: userData.createdAt?.toDate() || new Date(),
             });
           } else {
-            console.warn('🔐 AuthContext: User document not found in Firestore');
-            setUser(null);
+            console.warn('🔐 AuthContext: User document not found in Firestore after retries');
+            // For new users, create a basic user document if it doesn't exist
+            console.log('🔐 AuthContext: Creating fallback user document...');
+            const fallbackUserData = {
+              uid: firebaseUser.uid,
+              email: firebaseUser.email!,
+              displayName: firebaseUser.displayName || 'New User',
+              userType: 'attendee',
+              createdAt: new Date(),
+              photoUrl: null,
+              bio: '',
+            };
+            
+            await setDoc(doc(db, 'users', firebaseUser.uid), fallbackUserData);
+            console.log('🔐 AuthContext: Fallback user document created');
+            
+            setUser({
+              uid: firebaseUser.uid,
+              email: firebaseUser.email!,
+              displayName: firebaseUser.displayName || 'New User',
+              photoUrl: firebaseUser.photoURL ?? undefined,
+              userType: 'attendee',
+              bio: '',
+              createdAt: new Date(),
+            });
           }
         } catch (error) {
           console.error('🔐 AuthContext: Error fetching user data:', error);
-          setUser(null);
+          // Don't set user to null on error, try to use basic auth user
+          if (firebaseUser) {
+            console.log('🔐 AuthContext: Using basic Firebase user data as fallback');
+            setUser({
+              uid: firebaseUser.uid,
+              email: firebaseUser.email!,
+              displayName: firebaseUser.displayName || 'User',
+              photoUrl: firebaseUser.photoURL ?? undefined,
+              userType: 'attendee',
+              bio: '',
+              createdAt: new Date(),
+            });
+          } else {
+            setUser(null);
+          }
         }
       } else {
         setUser(null);
@@ -104,6 +152,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       };
 
       await setDoc(doc(db, 'users', firebaseUser.uid), userData);
+      console.log('🔐 AuthContext: Firestore user document created successfully!');
+      
+      // Wait a moment for the auth state to update
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       console.log('🔐 AuthContext: Registration complete!');
       uniqueToast.success('Account created successfully! Welcome!', { autoClose: 4000 });
     } catch (error) {

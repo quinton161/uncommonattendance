@@ -139,9 +139,9 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onToggleMode }) => {
         formData.displayName,
         formData.userType
       );
+      setLoading(false);
     } catch (err: any) {
       setError(err.message || 'Failed to create account');
-    } finally {
       setLoading(false);
     }
   };
