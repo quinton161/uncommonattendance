@@ -15,11 +15,13 @@ const ChatContainer = styled.div`
   overflow: hidden;
   border: 1px solid ${theme.colors.gray200};
   position: relative;
+  touch-action: pagination; /* Prevents accidental zooming/shaking on mobile */
 
   @media (max-width: ${theme.breakpoints.tablet}) {
     border-radius: 0;
-    border-left: none;
-    border-right: none;
+    border: none;
+    height: 100%;
+    width: 100%;
   }
 `;
 
