@@ -609,6 +609,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
           return {
             studentId: student.uid || student.id,
             studentName: student.displayName || 'Unknown Student',
+            studentPhotoUrl: student.photoUrl || student.photoURL,
             lastMessage: existingConv?.lastMessage || 'No messages yet',
             lastMessageTime: existingConv?.lastMessageTime || null,
             adminId: user?.uid || 'admin',
@@ -672,7 +673,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
                           }
                         }}
                       >
-                        <UserAvatar>{getInitials(conv.studentName)}</UserAvatar>
+                        <UserAvatar>
+                          {conv.studentPhotoUrl ? (
+                            <img 
+                              src={conv.studentPhotoUrl} 
+                              alt="" 
+                              style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} 
+                            />
+                          ) : (
+                            getInitials(conv.studentName)
+                          )}
+                        </UserAvatar>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontWeight: theme.fontWeights.semibold, color: theme.colors.textPrimary, fontSize: theme.fontSizes.sm }}>
                             {conv.studentName}
