@@ -583,6 +583,23 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
     setMobileMenuOpen(false); // Close mobile menu when navigating
   };
 
+  // Handle chat initiation from UsersPage
+  const handleChatFromUsers = (studentId: string, studentName: string, studentPhotoUrl?: string) => {
+    // Create a conversation object from the student data
+    const newConversation = {
+      id: `${studentId}_${user?.uid}`,
+      studentId,
+      studentName,
+      studentPhotoUrl,
+      adminId: user?.uid || '',
+      adminName: user?.displayName || 'Admin',
+      lastMessage: '',
+      lastMessageTime: null
+    };
+    setSelectedConversation(newConversation as Conversation);
+    setActiveNav('chat');
+  };
+
   const toggleMobileMenu = () => {
     setMobileMenuOpen(!mobileMenuOpen);
   };
@@ -594,7 +611,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
       case 'daily-tracker':
         return <DailyAttendanceTracker onBack={() => setActiveNav('dashboard')} isEmbedded={true} />;
       case 'users':
-        return <UsersPage onBack={() => setActiveNav('dashboard')} />;
+        return <UsersPage onBack={() => setActiveNav('dashboard')} onChat={handleChatFromUsers} />;
       case 'chat':
         const displayConversations = conversations.map(conv => {
           return {

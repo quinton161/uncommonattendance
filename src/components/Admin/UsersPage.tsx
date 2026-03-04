@@ -10,7 +10,8 @@ import { UncommonLogo } from '../Common/UncommonLogo';
 import {
   PersonIcon,
   CheckCircleIcon,
-  TodayIcon
+  TodayIcon,
+  MessageIcon
 } from '../Common/Icons';
 
 const PageContainer = styled.div`
@@ -263,6 +264,23 @@ const DeleteButton = styled(Button)`
   }
 `;
 
+const ChatButton = styled(Button)`
+  color: ${theme.colors.primary};
+  border-color: ${theme.colors.primary};
+  padding: 6px 12px;
+  font-size: ${theme.fontSizes.xs};
+  
+  &:hover {
+    background: ${theme.colors.primary};
+    color: white;
+  }
+`;
+
+const ActionButtons = styled.div`
+  display: flex;
+  gap: ${theme.spacing.sm};
+`;
+
 const MobileUserCard = styled.div`
   display: none;
   
@@ -435,9 +453,10 @@ const StatLabel = styled.div`
 
 interface UsersPageProps {
   onBack?: () => void;
+  onChat?: (studentId: string, studentName: string, studentPhotoUrl?: string) => void;
 }
 
-export const UsersPage: React.FC<UsersPageProps> = ({ onBack }) => {
+export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [userToDelete, setUserToDelete] = useState<any>(null);
   const { user } = useAuth();
@@ -504,6 +523,12 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack }) => {
   const handleOpenDelete = (user: any) => {
     setUserToDelete(user);
     setShowDeleteModal(true);
+  };
+
+  const handleChat = (studentId: string, studentName: string, studentPhotoUrl?: string) => {
+    if (onChat) {
+      onChat(studentId, studentName, studentPhotoUrl);
+    }
   };
 
   const handleCloseDelete = () => {
@@ -631,12 +656,17 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack }) => {
                     )}
                   </AttendanceStatus>
                 </div>
-                    {user?.userType === 'admin' && (
-        <DeleteButton onClick={() => handleOpenDelete(userData)}>
-          Delete
-        </DeleteButton>
-      )}
-    </TableRow>
+                <ActionButtons>
+                  <ChatButton onClick={() => handleChat(userData.id, userData.displayName || 'Unknown User', userData.photoUrl)}>
+                    <MessageIcon size={14} /> Chat
+                  </ChatButton>
+                  {user?.userType === 'admin' && (
+                    <DeleteButton onClick={() => handleOpenDelete(userData)}>
+                      Delete
+                    </DeleteButton>
+                  )}
+                </ActionButtons>
+              </TableRow>
             );
           })}
               </TableWrapper>
@@ -687,11 +717,16 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack }) => {
                       </StatusBadge>
                     </div>
                   </MobileUserDetails>
-                  {user?.userType === 'admin' && (
-                    <DeleteButton onClick={() => handleOpenDelete(userData)}>
-                      Delete
-                    </DeleteButton>
-                  )}
+                  <ActionButtons style={{ marginTop: theme.spacing.sm }}>
+                    <ChatButton onClick={() => handleChat(userData.id, userData.displayName || 'Unknown User', userData.photoUrl)}>
+                      <MessageIcon size={14} /> Chat
+                    </ChatButton>
+                    {user?.userType === 'admin' && (
+                      <DeleteButton onClick={() => handleOpenDelete(userData)}>
+                        Delete
+                      </DeleteButton>
+                    )}
+                  </ActionButtons>
                 </MobileUserCard>
               );
             })}
