@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import styled from 'styled-components';
 import { chatService, Message } from '../../services/chatService';
+import { notificationService } from '../../services/notificationService';
 import { theme } from '../../styles/theme';
 
 const ChatContainer = styled.div`
@@ -190,6 +191,8 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   const [adminUid, setAdminUid] = useState<string>(providedAdminUid || '');
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  const lastMessageId = useRef<string | null>(null);
+
   useEffect(() => {
     if (!adminUid) return;
 
@@ -208,10 +211,30 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
 
     const unsubscribe = chatService.subscribeToMessages(conversationId, (msgs) => {
       setMessages(msgs);
+      
+      // Notification logic
+      if (msgs.length > 0) {
+        const lastMsg = msgs[msgs.length - 1];
+        // Only notify if it's a new message and NOT sent by the current user
+        if (lastMsg.id !== lastMessageId.current && lastMsg.senderId !== currentUserUid) {
+          notificationService.sendNotification(
+            `New message from ${lastMsg.senderName || (isAdmin ? "Student" : "Admin")}`,
+            lastMsg.text,
+            lastMsg.senderPhotoUrl || '/favicon.ico'
+          );
+          
+          // Play a subtle sound if possible (optional enhancement)
+          try {
+            const audio = new Audio('/notification-ping.mp3');
+            audio.play().catch(() => {}); // Ignore if audio fails to play
+          } catch (e) {}
+        }
+        lastMessageId.current = lastMsg.id || null;
+      }
     });
 
     return () => unsubscribe();
-  }, [studentId, adminUid, providedAdminUid]);
+  }, [studentId, adminUid, providedAdminUid, currentUserUid, isAdmin]);
 
   useEffect(() => {
     if (scrollRef.current) {
