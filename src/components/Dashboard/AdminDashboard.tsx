@@ -539,30 +539,37 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
 
     // Subscribe to conversations
     const unsubscribe = chatService.subscribeToConversations((data) => {
-      const prevTotal = totalUnread;
-      const newTotal = data.reduce((sum, conv) => sum + (conv.unreadCount || 0), 0);
-      
-      if (newTotal > prevTotal) {
-        // Play notification sound
-        const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3');
-        audio.play().catch(e => console.log('Audio play failed:', e));
+      // Use functional state update to ensure we have the most current conversations
+      setConversations(prevConversations => {
+        const prevTotal = prevConversations.reduce((sum, conv) => sum + (conv.unreadCount || 0), 0);
+        const newTotal = data.reduce((sum, conv) => sum + (conv.unreadCount || 0), 0);
         
-        // Find the conversation that got a new message
-        const newMsgConv = data.find(c => {
-          const prevConv = conversations.find(p => p.studentId === c.studentId);
-          return (c.unreadCount || 0) > (prevConv?.unreadCount || 0);
-        });
+        console.log('Chat debug - prevTotal:', prevTotal, 'newTotal:', newTotal);
 
-        if (newMsgConv) {
-          uniqueToast.info(`New message from ${newMsgConv.studentName}: ${newMsgConv.lastMessage}`, {
-            position: 'top-right',
-            autoClose: 5000
+        if (newTotal > prevTotal) {
+          console.log('Chat debug - New message detected!');
+          // Play notification sound
+          const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3');
+          audio.play().catch(e => console.log('Audio play failed:', e));
+          
+          // Find the specific conversation that got a new message
+          const newMsgConv = data.find(c => {
+            const prevConv = prevConversations.find(p => p.studentId === c.studentId);
+            return (c.unreadCount || 0) > (prevConv?.unreadCount || 0);
           });
+
+          if (newMsgConv) {
+            console.log('Chat debug - Showing toast for:', newMsgConv.studentName);
+            uniqueToast.info(`New message from ${newMsgConv.studentName}: ${newMsgConv.lastMessage}`, {
+              position: 'top-right',
+              autoClose: 5000
+            });
+          }
         }
-      }
-      
-      setConversations(data);
-      setTotalUnread(newTotal);
+        
+        setTotalUnread(newTotal);
+        return data;
+      });
     });
 
     return () => unsubscribe();
