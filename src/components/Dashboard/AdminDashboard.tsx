@@ -452,6 +452,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [allStudents, setAllStudents] = useState<any[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
+  const [totalUnread, setTotalUnread] = useState(0);
   const dataService = DataService.getInstance();
 
   const handleDownloadAttendanceCSV = async () => {
@@ -538,7 +539,30 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
 
     // Subscribe to conversations
     const unsubscribe = chatService.subscribeToConversations((data) => {
+      const prevTotal = totalUnread;
+      const newTotal = data.reduce((sum, conv) => sum + (conv.unreadCount || 0), 0);
+      
+      if (newTotal > prevTotal) {
+        // Play notification sound
+        const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3');
+        audio.play().catch(e => console.log('Audio play failed:', e));
+        
+        // Find the conversation that got a new message
+        const newMsgConv = data.find(c => {
+          const prevConv = conversations.find(p => p.studentId === c.studentId);
+          return (c.unreadCount || 0) > (prevConv?.unreadCount || 0);
+        });
+
+        if (newMsgConv) {
+          uniqueToast.info(`New message from ${newMsgConv.studentName}: ${newMsgConv.lastMessage}`, {
+            position: 'top-right',
+            autoClose: 5000
+          });
+        }
+      }
+      
       setConversations(data);
+      setTotalUnread(newTotal);
     });
 
     return () => unsubscribe();
@@ -754,6 +778,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
         <NavItem active={activeNav === 'chat'} onClick={() => handleNavClick('chat')}>
           <PersonIcon size={20} />
           Student Chat
+          {totalUnread > 0 && <Badge style={{ marginLeft: 'auto' }}>{totalUnread}</Badge>}
         </NavItem>
         
         <div style={{ marginTop: 'auto', paddingTop: theme.spacing.xl }}>
