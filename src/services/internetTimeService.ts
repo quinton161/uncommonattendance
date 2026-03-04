@@ -50,21 +50,24 @@ export class InternetTimeService {
       
       // Try multiple time sources for redundancy
       const timeSources = [
-        this.getWorldTimeAPI,
-        this.getTimeAPI,
-        this.getGoogleTime
+        { name: 'TimeAPI', func: this.getTimeAPI },
+        { name: 'Google', func: this.getGoogleTime },
+        { name: 'Simple', func: this.getSimpleTime },
+        { name: 'WorldTimeAPI', func: this.getWorldTimeAPI }
       ];
 
       let internetTime: Date | null = null;
+      let successfulSource = '';
       
       for (const timeSource of timeSources) {
         try {
-          internetTime = await timeSource();
+          internetTime = await timeSource.func();
           if (internetTime) {
+            successfulSource = timeSource.name;
             break;
           }
         } catch (error) {
-          console.warn('⚠️ Time source failed:', error);
+          console.warn(`⚠️ Time source ${timeSource.name} failed:`, error);
           continue;
         }
       }
@@ -82,16 +85,20 @@ export class InternetTimeService {
         this.lastSyncTime = Date.now();
         
         console.log('✅ Time synchronized successfully:', {
+          source: successfulSource,
           internetTime: adjustedTime.toISOString(),
           systemTime: new Date().toISOString(),
           offset: this.timeOffset + 'ms',
           roundTripTime: roundTripTime + 'ms'
         });
       } else {
-        console.warn('⚠️ All time sources failed, using system time');
+        console.warn('⚠️ All time sources failed, using system time with fallback');
+        // If all internet sources fail, use system time but mark as not synced
+        this.lastSyncTime = 0; // Reset to indicate no successful sync
       }
     } catch (error) {
       console.error('❌ Failed to sync time with internet:', error);
+      // Don't update lastSyncTime on error to keep using previous offset if available
     }
   }
 
@@ -161,6 +168,30 @@ export class InternetTimeService {
   }
 
   /**
+   * Get time from a simple HTTP request (most reliable fallback)
+   */
+  private async getSimpleTime(): Promise<Date | null> {
+    try {
+      const response = await fetch('https://httpbin.org/get', {
+        method: 'GET',
+        signal: AbortSignal.timeout(3000)
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        // httpbin returns current time in various formats
+        if (data.headers && data.headers.Date) {
+          return new Date(data.headers.Date);
+        }
+      }
+      return null;
+    } catch (error) {
+      console.warn('Simple time fallback failed:', error);
+      return null;
+    }
+  }
+
+  /**
    * Get current time (internet-synced if available, otherwise system time)
    */
   getCurrentTime(): Date {
@@ -171,14 +202,24 @@ export class InternetTimeService {
       return new Date(now + this.timeOffset);
     }
     
-    // If sync is old, try to sync again
+    // If sync is old or failed, try to sync again but don't wait
     if (this.isOnline && (!this.lastSyncTime || (now - this.lastSyncTime) > this.syncInterval)) {
-      // Don't wait for sync, just trigger it
-      this.syncWithInternetTime();
+      // Trigger async sync without blocking
+      this.syncWithInternetTime().catch(() => {
+        // Silently handle sync errors
+      });
     }
     
-    // Return system time adjusted by last known offset
-    return new Date(now + this.timeOffset);
+    // Return system time adjusted by last known offset (if any)
+    const adjustedTime = new Date(now + this.timeOffset);
+    
+    // If we never synced successfully, just return system time
+    if (this.lastSyncTime === 0) {
+      console.warn('⚠️ Using system time - no internet sync available');
+      return new Date();
+    }
+    
+    return adjustedTime;
   }
 
   /**
