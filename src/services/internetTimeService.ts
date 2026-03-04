@@ -102,7 +102,7 @@ export class InternetTimeService {
     try {
       const response = await fetch('https://worldtimeapi.org/api/timezone/Africa/Harare', {
         method: 'GET',
-        timeout: 5000
+        signal: AbortSignal.timeout(5000)
       });
       
       if (response.ok) {
@@ -123,7 +123,7 @@ export class InternetTimeService {
     try {
       const response = await fetch('https://timeapi.io/api/Time/current/zone?timeZone=Africa/Harare', {
         method: 'GET',
-        timeout: 5000
+        signal: AbortSignal.timeout(5000)
       });
       
       if (response.ok) {
@@ -144,7 +144,7 @@ export class InternetTimeService {
     try {
       const response = await fetch('https://www.google.com', {
         method: 'HEAD',
-        timeout: 5000
+        signal: AbortSignal.timeout(5000)
       });
       
       if (response.ok) {
@@ -247,7 +247,7 @@ export class InternetTimeService {
     usingInternetTime: boolean;
   } {
     const now = Date.now();
-    const usingInternetTime = this.lastSyncTime && (now - this.lastSyncTime) < this.syncInterval;
+    const usingInternetTime = Boolean(this.lastSyncTime && (now - this.lastSyncTime) < this.syncInterval);
     
     return {
       isOnline: this.isOnline,
