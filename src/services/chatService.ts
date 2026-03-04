@@ -149,8 +149,38 @@ class ChatService {
     return undefined;
   }
 
+  // Admin: Listen to all conversations
+  subscribeToAllConversations(callback: (conversations: Conversation[]) => void) {
+    const q = query(
+      collection(db, 'conversations'),
+      orderBy('lastMessageTime', 'desc')
+    );
+
+    return onSnapshot(q, async (snapshot) => {
+      const conversations = await Promise.all(
+        snapshot.docs.map(async (docSnap) => {
+          const data = docSnap.data() as Conversation;
+          
+          // Get student photo URL if missing
+          if (!data.studentPhotoUrl) {
+            try {
+              const studentDoc = await getDoc(doc(db, 'users', data.studentId));
+              if (studentDoc.exists()) {
+                data.studentPhotoUrl = studentDoc.data().photoUrl;
+              }
+            } catch (e) {
+              console.log('Error fetching student photo:', e);
+            }
+          }
+          
+          return { id: docSnap.id, ...data };
+        })
+      );
+      callback(conversations);
+    });
+  }
+
   // Admin: Listen to conversations specific to this admin
-  // This filters conversations so each admin only sees conversations with them
   subscribeToConversationsByAdmin(adminId: string, callback: (conversations: Conversation[]) => void) {
     const q = query(
       collection(db, 'conversations'),

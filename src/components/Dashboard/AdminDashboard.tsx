@@ -534,10 +534,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
     // Load dashboard stats on mount
     loadDashboardData();
 
-    // Subscribe to conversations specific to this admin
-    const unsubscribe = chatService.subscribeToConversationsByAdmin(user?.uid || '', (data) => {
+    // Subscribe to ALL conversations so admins can see messages from any student
+    const unsubscribe = chatService.subscribeToAllConversations((data) => {
       // Use functional state update to ensure we have the most current conversations
       setConversations(prevConversations => {
+        // Calculate unread only for conversations belonging to THIS admin
+        const myConvs = data.filter(c => c.adminId === user?.uid);
         const prevTotal = prevConversations.reduce((sum, conv) => sum + (conv.unreadCount || 0), 0);
         const newTotal = data.reduce((sum, conv) => sum + (conv.unreadCount || 0), 0);
         
@@ -571,7 +573,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
           }
         }
         
-        setTotalUnread(newTotal);
+        // Update total unread based on all conversations this admin is part of
+        const myTotalUnread = myConvs.reduce((sum, conv) => sum + (conv.unreadCount || 0), 0);
+        setTotalUnread(myTotalUnread);
         return data;
       });
     });
@@ -617,10 +621,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
         const displayConversations = conversations.map(conv => {
           return {
             ...conv,
-            id: `${conv.studentId}_${conv.adminId}`
+            id: conv.id || `${conv.studentId}_${conv.adminId}`
           };
-        }).filter(conv => conv.adminId === user?.uid) // Only show conversations for the current admin
-        .sort((a, b) => {
+        }).sort((a, b) => {
           if (!a.lastMessageTime) return 1;
           if (!b.lastMessageTime) return -1;
           const timeA = a.lastMessageTime.toDate ? a.lastMessageTime.toDate() : new Date(a.lastMessageTime);
@@ -747,7 +750,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
                       currentUserPhotoUrl={user?.photoUrl}
                       currentUserUid={user?.uid || ''}
                       isAdmin={true}
-                      adminUid={user?.uid}
+                      adminUid={selectedConversation.adminId || user?.uid}
                     />
                   </div>
                 </>
