@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import styled from 'styled-components';
 import { chatService, Message } from '../../services/chatService';
 import { theme } from '../../styles/theme';
-import { PersonIcon } from '../Common/Icons';
 
 const ChatContainer = styled.div`
   display: flex;

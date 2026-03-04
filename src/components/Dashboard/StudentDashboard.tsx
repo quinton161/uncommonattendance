@@ -486,41 +486,6 @@ const ActivityIcon = styled.div<{ type: 'checkin' | 'checkout' | 'evt' }>`
   color: ${theme.colors.white};
 `;
 
-const ChatList = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-`;
-
-const ChatListItem = styled.div<{ selected?: boolean }>`
-  display: flex;
-  align-items: center;
-  gap: ${theme.spacing.md};
-  padding: ${theme.spacing.md};
-  border-radius: ${theme.borderRadius.md};
-  cursor: pointer;
-  transition: all 0.2s;
-  background: ${props => props.selected ? 'rgba(6, 71, 161, 0.1)' : 'transparent'};
-  border-left: ${props => props.selected ? `4px solid ${theme.colors.primary}` : '4px solid transparent'};
-  
-  &:hover {
-    background: rgba(6, 71, 161, 0.05);
-  }
-`;
-
-const ChatAvatar = styled.div`
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: ${theme.colors.primary};
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: bold;
-  font-size: ${theme.fontSizes.sm};
-`;
-
 const UserAvatar = styled.div`
   width: 40px;
   height: 40px;
