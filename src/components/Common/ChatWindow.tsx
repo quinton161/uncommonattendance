@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import styled from 'styled-components';
 import { chatService, Message } from '../../services/chatService';
-import { notificationService } from '../../services/notificationService';
 import { theme } from '../../styles/theme';
 
 const ChatContainer = styled.div`
@@ -15,13 +14,11 @@ const ChatContainer = styled.div`
   overflow: hidden;
   border: 1px solid ${theme.colors.gray200};
   position: relative;
-  touch-action: pagination; /* Prevents accidental zooming/shaking on mobile */
 
   @media (max-width: ${theme.breakpoints.tablet}) {
     border-radius: 0;
-    border: none;
-    height: 100%;
-    width: 100%;
+    border-left: none;
+    border-right: none;
   }
 `;
 
@@ -193,61 +190,28 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   const [adminUid, setAdminUid] = useState<string>(providedAdminUid || '');
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const lastMessageId = useRef<string | null>(null);
-
-  // Determine the conversation ID based on who is chatting
-  // If student: conversationId = studentId_adminUid
-  // If admin: conversationId = studentId_adminUid (where adminUid is the current admin's ID)
-  const getConversationId = (): string => {
-    if (!studentId || !adminUid) return '';
-    // Always use studentId_adminUid format for consistency
-    return `${studentId}_${adminUid}`;
-  };
-
   useEffect(() => {
-    // For students: adminUid should be provided via props
-    // For admins: adminUid should be provided via props (the current admin's UID)
-    if (providedAdminUid) {
+    if (!adminUid) return;
+
+    if (!providedAdminUid) {
+      const fetchAdminId = async () => {
+        const id = await chatService.getAdminId();
+        setAdminUid(id);
+      };
+      fetchAdminId();
+    } else {
       setAdminUid(providedAdminUid);
-    } else if (!isAdmin && !providedAdminUid) {
-      // Fallback: if no admin is selected yet, don't subscribe
-      return;
     }
-  }, [providedAdminUid, isAdmin]);
 
-  useEffect(() => {
-    // Don't subscribe if we don't have both studentId and adminUid
-    if (!studentId || !adminUid) return;
-
-    const conversationId = getConversationId();
-    if (!conversationId) return;
+    // Use composite ID for unique student-admin conversation
+    const conversationId = `${studentId}_${adminUid}`;
 
     const unsubscribe = chatService.subscribeToMessages(conversationId, (msgs) => {
       setMessages(msgs);
-      
-      // Notification logic - only notify if message is from another person
-      if (msgs.length > 0) {
-        const lastMsg = msgs[msgs.length - 1];
-        // Only notify if it's a new message and NOT sent by the current user
-        if (lastMsg.id !== lastMessageId.current && lastMsg.senderId !== currentUserUid) {
-          notificationService.sendNotification(
-            `New message from ${lastMsg.senderName || (isAdmin ? "Student" : "Admin")}`,
-            lastMsg.text,
-            lastMsg.senderPhotoUrl || '/favicon.ico'
-          );
-          
-          // Play a subtle sound if possible (optional enhancement)
-          try {
-            const audio = new Audio('/notification-ping.mp3');
-            audio.play().catch(() => {}); // Ignore if audio fails to play
-          } catch (e) {}
-        }
-        lastMessageId.current = lastMsg.id || null;
-      }
     });
 
     return () => unsubscribe();
-  }, [studentId, adminUid, currentUserUid, isAdmin]);
+  }, [studentId, adminUid, providedAdminUid]);
 
   useEffect(() => {
     if (scrollRef.current) {

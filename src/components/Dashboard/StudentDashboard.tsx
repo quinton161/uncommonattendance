@@ -205,7 +205,8 @@ const MainContent = styled.div`
   padding: ${theme.spacing.lg};
   height: 100vh;
   height: 100svh; /* Modern mobile browsers */
-  overflow: hidden; /* Prevent outer scroll */
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   box-sizing: border-box;
   padding-top: 60px;
   margin-left: 280px;
@@ -213,7 +214,6 @@ const MainContent = styled.div`
   flex-direction: column;
   ${containerAnimation}
   ${respectMotionPreference}
-  
   @media (max-width: ${theme.breakpoints.tablet}) {
     padding: ${theme.spacing.md};
     padding-top: 70px;
@@ -825,105 +825,102 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
         return <MainContent><MyAttendancePage onBack={() => setActiveNav('dashboard')} isEmbedded={true} /></MainContent>;
       case 'chat':
         return (
-          <MainContent style={{ padding: 0, height: '100svh' }}>
+          <MainContent>
+            <h2 style={{ marginBottom: theme.spacing.lg, color: theme.colors.textPrimary }}>Messages</h2>
             <div style={{ 
               display: 'grid', 
-              gridTemplateColumns: '1fr', 
-              height: '100%',
+              gridTemplateColumns: '320px 1fr', 
+              gap: theme.spacing.lg, 
+              height: 'calc(100vh - 200px)',
               overflow: 'hidden'
             }}>
-              {/* Mobile back button/list view logic could go here, but for now focus on ChatWindow stability */}
               <div style={{ 
                 display: 'flex', 
                 flexDirection: 'column', 
-                gap: 0,
+                gap: theme.spacing.md,
                 height: '100%',
                 overflow: 'hidden'
               }}>
                 <Card style={{ 
                   flex: 1, 
-                  padding: 0,
+                  padding: theme.spacing.sm,
                   display: 'flex',
                   flexDirection: 'column',
-                  overflow: 'hidden',
-                  borderRadius: 0,
-                  border: 'none'
+                  overflow: 'hidden'
                 }}>
                   <div style={{ 
                     flex: 1,
                     overflowY: 'auto',
-                    display: selectedAdmin ? 'none' : 'block'
+                    paddingRight: '4px'
                   }}>
-                    <div style={{ padding: theme.spacing.md }}>
-                      <h2 style={{ marginBottom: theme.spacing.lg, color: theme.colors.textPrimary }}>Messages</h2>
-                      <AttendanceList>
-                        {admins.map((admin) => (
-                          <AttendanceItem 
-                            key={admin.uid}
-                            onClick={() => setSelectedAdmin(admin)}
-                            style={{ 
-                              cursor: 'pointer', 
-                              transition: 'all 0.2s',
-                              background: selectedAdmin?.uid === admin.uid ? 'rgba(6, 71, 161, 0.1)' : 'transparent',
-                              borderLeft: selectedAdmin?.uid === admin.uid ? `4px solid ${theme.colors.primary}` : '4px solid transparent',
-                              padding: theme.spacing.md
-                            }}
-                          >
-                            <UserAvatar>
-                              {admin.photoUrl ? (
-                                <img 
-                                  src={admin.photoUrl} 
-                                  alt="" 
-                                  style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} 
-                                />
-                              ) : (
-                                getInitials(admin.displayName || 'Admin')
-                              )}
-                            </UserAvatar>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ fontWeight: theme.fontWeights.semibold, color: theme.colors.textPrimary, fontSize: theme.fontSizes.sm }}>
-                                {admin.displayName || 'Admin'}
-                              </div>
-                            </div>
-                          </AttendanceItem>
-                        ))}
-                      </AttendanceList>
-                    </div>
-                  </div>
-
-                  {selectedAdmin && (
-                    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
-                      <div style={{ 
-                        padding: theme.spacing.sm, 
-                        background: theme.colors.white, 
-                        borderBottom: `1px solid ${theme.colors.gray200}`,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: theme.spacing.sm
-                      }}>
-                        <Button 
-                          onClick={() => setSelectedAdmin(null)}
-                          style={{ padding: '4px 8px', fontSize: '12px' }}
+                    <AttendanceList>
+                      {admins.map((admin) => (
+                        <AttendanceItem 
+                          key={admin.uid}
+                          onClick={() => setSelectedAdmin(admin)}
+                          style={{ 
+                            cursor: 'pointer', 
+                            transition: 'all 0.2s',
+                            background: selectedAdmin?.uid === admin.uid ? 'rgba(6, 71, 161, 0.1)' : 'transparent',
+                            borderLeft: selectedAdmin?.uid === admin.uid ? `4px solid ${theme.colors.primary}` : '4px solid transparent',
+                            padding: theme.spacing.md
+                          }}
                         >
-                          Back
-                        </Button>
-                        <span style={{ fontWeight: 'bold' }}>{selectedAdmin.displayName}</span>
-                      </div>
-                      <div style={{ flex: 1, minHeight: 0 }}>
-                        <ChatWindow 
-                          studentId={user?.uid || ''} 
-                          studentName={user?.displayName || 'Student'} 
-                          currentUserUid={user?.uid || ''}
-                          studentPhotoUrl={user?.photoUrl}
-                          currentUserPhotoUrl={user?.photoUrl}
-                          adminUid={selectedAdmin.uid}
-                          adminPhotoUrl={selectedAdmin.photoUrl}
-                          adminName={selectedAdmin.displayName}
-                        />
-                      </div>
-                    </div>
-                  )}
+                          <UserAvatar>
+                            {admin.photoUrl ? (
+                              <img 
+                                src={admin.photoUrl} 
+                                alt="" 
+                                style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} 
+                              />
+                            ) : (
+                              getInitials(admin.displayName || 'Admin')
+                            )}
+                          </UserAvatar>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontWeight: theme.fontWeights.semibold, color: theme.colors.textPrimary, fontSize: theme.fontSizes.sm }}>
+                              {admin.displayName || 'Admin'}
+                            </div>
+                            <div style={{ 
+                              fontSize: theme.fontSizes.xs, 
+                              color: theme.colors.textSecondary,
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis'
+                            }}>
+                              Chat with {admin.displayName || 'Admin'}
+                            </div>
+                          </div>
+                        </AttendanceItem>
+                      ))}
+                    </AttendanceList>
+                  </div>
                 </Card>
+              </div>
+
+              <div style={{ 
+                display: 'flex', 
+                flexDirection: 'column', 
+                height: '100%',
+                overflow: 'hidden'
+              }}>
+                <h3 style={{ color: theme.colors.textPrimary, margin: `0 0 ${theme.spacing.md} 0` }}>
+                  {selectedAdmin ? `Chat with ${selectedAdmin.displayName}` : 'Select an Admin'}
+                </h3>
+                <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', height: '100%' }}>
+                      {selectedAdmin && (
+                    <ChatWindow 
+                      studentId={user?.uid || ''} 
+                      studentName={user?.displayName || 'Student'} 
+                      currentUserUid={user?.uid || ''}
+                      studentPhotoUrl={user?.photoUrl}
+                      currentUserPhotoUrl={user?.photoUrl}
+                      adminUid={selectedAdmin.uid}
+                      adminPhotoUrl={selectedAdmin.photoUrl}
+                      adminName={selectedAdmin.displayName}
+                    />
+                  )}
+                </div>
               </div>
             </div>
           </MainContent>
@@ -949,30 +946,37 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
 
       // Subscribe to this student's specific conversations
       const unsubscribe = chatService.subscribeToConversationsByStudent(user.uid, (conversations) => {
-        const myConv = conversations.find(c => c.studentId === user.uid);
-        if (myConv) {
-          const prevUnread = unreadCount;
-          const newUnread = myConv.unreadCount || 0;
+        // Find if any conversation has a new unread message where the student is NOT the sender
+        const prevTotal = unreadCount;
+        const newTotal = conversations.reduce((sum, conv) => sum + (conv.unreadCount || 0), 0);
 
-          if (newUnread > prevUnread) {
+        if (newTotal > prevTotal) {
+          // Find the specific conversation that got a new message
+          const newMsgConv = conversations.find(c => {
+            const prevConv = admins.find(a => `${user.uid}_${a.uid}` === c.id);
+            // Only notify if unreadCount increased AND we are NOT the sender
+            return (c.unreadCount || 0) > (prevConv?.unreadCount || 0) && c.lastSenderId !== user.uid;
+          });
+
+          if (newMsgConv) {
             // Play notification sound
             const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3');
             audio.play().catch(e => console.log('Audio play failed:', e));
 
             // Show toast notification
-            uniqueToast.info(`New message from Admin: ${myConv.lastMessage}`, {
+            uniqueToast.info(`New message from ${newMsgConv.adminName || 'Admin'}: ${newMsgConv.lastMessage}`, {
               position: 'top-right',
               autoClose: 5000
             });
 
             // Send system push notification
             notificationService.sendNotification(
-              'New Message from Admin',
-              myConv.lastMessage
+              `New Message from ${newMsgConv.adminName || 'Admin'}`,
+              newMsgConv.lastMessage
             );
           }
-          setUnreadCount(newUnread);
         }
+        setUnreadCount(newTotal);
       });
 
       return () => unsubscribe();

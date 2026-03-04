@@ -121,7 +121,8 @@ const MainContent = styled.div`
   padding: ${theme.spacing.lg};
   height: 100vh;
   height: 100svh; /* Modern mobile browsers */
-  overflow: hidden; /* Prevent outer scroll to stop shaking */
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   box-sizing: border-box;
   padding-top: 60px;
   margin-left: 280px;
@@ -129,7 +130,6 @@ const MainContent = styled.div`
   flex-direction: column;
   ${containerAnimation}
   ${respectMotionPreference}
-  
   @media (max-width: ${theme.breakpoints.tablet}) {
     padding: ${theme.spacing.md};
     padding-top: 70px;
@@ -544,18 +544,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
         console.log('Chat debug - prevTotal:', prevTotal, 'newTotal:', newTotal);
 
         if (newTotal > prevTotal) {
-          console.log('Chat debug - New message detected!');
-          // Play notification sound
-          const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3');
-          audio.play().catch(e => console.log('Audio play failed:', e));
-          
           // Find the specific conversation that got a new message
           const newMsgConv = data.find(c => {
-            const prevConv = prevConversations.find(p => p.studentId === c.studentId);
-            return (c.unreadCount || 0) > (prevConv?.unreadCount || 0);
+            const prevConv = prevConversations.find(p => p.id === c.id);
+            // Only notify if unreadCount increased AND we are NOT the sender
+            return (c.unreadCount || 0) > (prevConv?.unreadCount || 0) && c.lastSenderId !== user?.uid;
           });
 
           if (newMsgConv) {
+            console.log('Chat debug - New message detected for admin!');
+            // Play notification sound
+            const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3');
+            audio.play().catch(e => console.log('Audio play failed:', e));
+            
             console.log('Chat debug - Showing toast for:', newMsgConv.studentName);
             uniqueToast.info(`New message from ${newMsgConv.studentName}: ${newMsgConv.lastMessage}`, {
               position: 'top-right',
@@ -628,137 +629,144 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
         });
 
         return (
-          <MainContent style={{ padding: 0, height: '100svh' }}>
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: '320px 1fr', 
+            gap: theme.spacing.lg, 
+            height: 'calc(100vh - 140px)',
+            overflow: 'hidden'
+          }}>
+            <div style={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: theme.spacing.md,
+              height: '100%',
+              overflow: 'hidden'
+            }}>
+              <h2 style={{ color: theme.colors.textPrimary, margin: 0 }}>Messages</h2>
+              <Card style={{ 
+                flex: 1, 
+                padding: theme.spacing.sm,
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden'
+              }}>
+                <div style={{ 
+                  flex: 1,
+                  overflowY: 'auto',
+                  paddingRight: '4px'
+                }}>
+                  <AttendanceList>
+                    {displayConversations.map((conv) => (
+                      <AttendanceItem 
+                        key={conv.id} 
+                        style={{ 
+                          cursor: 'pointer', 
+                          transition: 'all 0.2s',
+                          background: selectedConversation?.id === conv.id ? 'rgba(6, 71, 161, 0.1)' : 'transparent',
+                          borderLeft: selectedConversation?.id === conv.id ? `4px solid ${theme.colors.primary}` : '4px solid transparent',
+                          padding: theme.spacing.md
+                        }}
+                        onClick={async () => {
+                          setSelectedConversation(conv as any);
+                          if (conv.unreadCount && conv.unreadCount > 0) {
+                            try {
+                              await chatService.markAsRead(conv.id!);
+                            } catch (error) {
+                              console.error('Failed to mark as read:', error);
+                            }
+                          }
+                        }}
+                      >
+                        <UserAvatar>
+                          {conv.studentPhotoUrl ? (
+                            <img 
+                              src={conv.studentPhotoUrl} 
+                              alt="" 
+                              style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} 
+                            />
+                          ) : (
+                            getInitials(conv.studentName)
+                          )}
+                        </UserAvatar>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: theme.fontWeights.semibold, color: theme.colors.textPrimary, fontSize: theme.fontSizes.sm }}>
+                            {conv.studentName}
+                          </div>
+                          <div style={{ 
+                            fontSize: theme.fontSizes.xs, 
+                            color: theme.colors.textSecondary,
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis'
+                          }}>
+                            {conv.lastMessage}
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                          <div style={{ fontSize: '10px', color: theme.colors.textLight }}>
+                            {conv.lastMessageTime?.toDate ? conv.lastMessageTime.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 
+                             conv.lastMessageTime ? new Date(conv.lastMessageTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                          </div>
+                          {conv.unreadCount !== undefined && conv.unreadCount > 0 && (
+                            <Badge>{conv.unreadCount}</Badge>
+                          )}
+                        </div>
+                      </AttendanceItem>
+                    ))}
+                    {displayConversations.length === 0 && (
+                      <p style={{ textAlign: 'center', color: theme.colors.textSecondary, padding: theme.spacing.lg }}>
+                        No students found.
+                      </p>
+                    )}
+                  </AttendanceList>
+                </div>
+              </Card>
+            </div>
+
             <div style={{ 
               display: 'flex', 
               flexDirection: 'column', 
               height: '100%',
               overflow: 'hidden'
             }}>
-              <Card style={{ 
-                flex: 1, 
-                padding: 0,
-                display: 'flex',
-                flexDirection: 'column',
-                overflow: 'hidden',
-                borderRadius: 0,
-                border: 'none'
-              }}>
+              {selectedConversation ? (
+                <>
+                  <h2 style={{ 
+                    color: theme.colors.textPrimary, 
+                    margin: `0 0 ${theme.spacing.md} 0`,
+                    fontSize: theme.fontSizes.xl
+                  }}>
+                    Chatting with {selectedConversation.studentName}
+                  </h2>
+                  <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+                    <ChatWindow 
+                      studentId={selectedConversation.studentId}
+                      studentName={selectedConversation.studentName}
+                      studentPhotoUrl={selectedConversation.studentPhotoUrl}
+                      currentUserPhotoUrl={user?.photoUrl}
+                      currentUserUid={user?.uid || ''}
+                      isAdmin={true}
+                      adminUid={user?.uid}
+                    />
+                  </div>
+                </>
+              ) : (
                 <div style={{ 
-                  flex: 1,
-                  overflowY: 'auto',
-                  display: selectedConversation ? 'none' : 'block'
+                  flex: 1, 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  background: theme.colors.white,
+                  borderRadius: theme.borderRadius.lg,
+                  border: `1px solid ${theme.colors.gray200}`,
+                  color: theme.colors.textSecondary
                 }}>
-                  <div style={{ padding: theme.spacing.md }}>
-                    <h2 style={{ color: theme.colors.textPrimary, margin: `0 0 ${theme.spacing.md} 0` }}>Messages</h2>
-                    <AttendanceList>
-                      {displayConversations.map((conv) => (
-                        <AttendanceItem 
-                          key={conv.id} 
-                          style={{ 
-                            cursor: 'pointer', 
-                            transition: 'all 0.2s',
-                            background: selectedConversation?.id === conv.id ? 'rgba(6, 71, 161, 0.1)' : 'transparent',
-                            borderLeft: selectedConversation?.id === conv.id ? `4px solid ${theme.colors.primary}` : '4px solid transparent',
-                            padding: theme.spacing.md
-                          }}
-                          onClick={async () => {
-                            setSelectedConversation(conv as any);
-                            if (conv.unreadCount && conv.unreadCount > 0) {
-                              try {
-                                await chatService.markAsRead(conv.id!);
-                              } catch (error) {
-                                console.error('Failed to mark as read:', error);
-                              }
-                            }
-                          }}
-                        >
-                          <UserAvatar>
-                            {conv.studentPhotoUrl ? (
-                              <img 
-                                src={conv.studentPhotoUrl} 
-                                alt="" 
-                                style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} 
-                              />
-                            ) : (
-                              getInitials(conv.studentName || 'Student')
-                            )}
-                          </UserAvatar>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontWeight: theme.fontWeights.semibold, color: theme.colors.textPrimary, fontSize: theme.fontSizes.sm }}>
-                              {conv.studentName}
-                            </div>
-                            <div style={{ 
-                              fontSize: theme.fontSizes.xs, 
-                              color: theme.colors.textSecondary,
-                              whiteSpace: 'nowrap',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis'
-                            }}>
-                              {conv.lastMessage}
-                            </div>
-                          </div>
-                          {conv.unreadCount && conv.unreadCount > 0 ? (
-                            <div style={{ 
-                              background: theme.colors.error, 
-                              color: 'white', 
-                              borderRadius: '50%', 
-                              width: '20px', 
-                              height: '20px', 
-                              display: 'flex', 
-                              alignItems: 'center', 
-                              justifyContent: 'center',
-                              fontSize: '10px',
-                              fontWeight: 'bold'
-                            }}>
-                              {conv.unreadCount}
-                            </div>
-                          ) : null}
-                        </AttendanceItem>
-                      ))}
-                    </AttendanceList>
-                    {displayConversations.length === 0 && (
-                      <p style={{ textAlign: 'center', color: theme.colors.textSecondary, padding: theme.spacing.lg }}>
-                        No students found.
-                      </p>
-                    )}
-                  </div>
+                  Select a student to start chatting
                 </div>
-
-                {selectedConversation && (
-                  <div style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
-                    <div style={{ 
-                      padding: theme.spacing.sm, 
-                      background: theme.colors.white, 
-                      borderBottom: `1px solid ${theme.colors.gray200}`,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: theme.spacing.sm
-                    }}>
-                      <Button 
-                        onClick={() => setSelectedConversation(null)}
-                        style={{ padding: '4px 8px', fontSize: '12px' }}
-                      >
-                        Back
-                      </Button>
-                      <span style={{ fontWeight: 'bold' }}>{selectedConversation.studentName}</span>
-                    </div>
-                    <div style={{ flex: 1, minHeight: 0 }}>
-                      <ChatWindow 
-                        studentId={selectedConversation.studentId}
-                        studentName={selectedConversation.studentName}
-                        studentPhotoUrl={selectedConversation.studentPhotoUrl}
-                        currentUserPhotoUrl={user?.photoUrl}
-                        currentUserUid={user?.uid || ''}
-                        isAdmin={true}
-                        adminUid={user?.uid}
-                      />
-                    </div>
-                  </div>
-                )}
-              </Card>
+              )}
             </div>
-          </MainContent>
+          </div>
         );
       case 'profile':
         return (

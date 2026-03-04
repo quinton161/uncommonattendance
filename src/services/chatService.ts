@@ -33,6 +33,7 @@ export interface Conversation {
   adminPhotoUrl?: string;
   lastMessage: string;
   lastMessageTime: any;
+  lastSenderId?: string;
   unreadCount?: number;
 }
 
@@ -94,7 +95,8 @@ class ChatService {
       adminName,
       lastMessage: text,
       lastMessageTime: serverTimestamp(),
-      unreadCount: senderId === studentId ? (existingDoc.exists() ? (existingDoc.data()?.unreadCount || 0) + 1 : 1) : 0
+      lastSenderId: senderId,
+      unreadCount: existingDoc.exists() ? (existingDoc.data()?.unreadCount || 0) + 1 : 1
     }, { merge: true });
 
     // Add message to subcollection
