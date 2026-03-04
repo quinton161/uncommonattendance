@@ -13,7 +13,7 @@ import {
 import { db } from './firebase';
 import { AttendanceRecord, LocationData } from '../types';
 import { DailyAttendanceService } from './dailyAttendanceService';
-import { findKnownLocationWithAccuracy, getLocationDisplayName } from '../config/locationConfig';
+import { isOnSchoolWifi, SCHOOL_LOCATION, getLocationDisplayName } from '../config/locationConfig';
 import DataService from './DataService';
 import { BrowserEmailService } from '../services/emailService';
 import { TimeService } from './timeService';
@@ -41,23 +41,16 @@ export class AttendanceService {
     location?: LocationData
   ): Promise<AttendanceRecord> {
     console.log('AttendanceService.checkIn called with:', { studentId, studentName, location });
-    console.log('📍 Location data received:', { 
-      hasLocation: !!location,
-      latitude: location?.latitude,
-      longitude: location?.longitude,
-      accuracy: location?.accuracy
-    });
     
-    if (!location) {
-      throw new Error('Location is required to check in. Please enable location services and try again at school.');
+    if (!location || !location.ip) {
+      throw new Error('WiFi connection verification is required to check in. Please connect to the school WiFi.');
     }
 
-    console.log('🗺️ Checking location against school coordinates...');
-    const knownLocation = findKnownLocationWithAccuracy(location.latitude, location.longitude, location.accuracy);
-    if (!knownLocation) {
-      throw new Error('You must be within school premises to check in');
+    console.log('🌐 Checking IP against school WiFi...');
+    if (!isOnSchoolWifi(location.ip)) {
+      throw new Error('You must be connected to the school WiFi to check in');
     }
-    console.log('✅ User is within school premises:', knownLocation.name);
+    console.log('✅ User is on school WiFi');
     
     const harareTime = this.timeService.getCurrentTime();
     const today = harareTime.toISOString().split('T')[0];
@@ -83,9 +76,9 @@ export class AttendanceService {
       date: today,
       isPresent: true,
       location: {
-        latitude: location.latitude,
-        longitude: location.longitude,
-        address: getLocationDisplayName(knownLocation),
+        latitude: location.latitude || 0,
+        longitude: location.longitude || 0,
+        address: getLocationDisplayName(SCHOOL_LOCATION),
       },
     };
 
@@ -150,13 +143,12 @@ export class AttendanceService {
   }
 
   async checkOut(studentId: string, location?: LocationData): Promise<AttendanceRecord> {
-    if (!location) {
-      throw new Error('Location is required to check out. Please enable location services and try again at school.');
+    if (!location || !location.ip) {
+      throw new Error('WiFi connection verification is required to check out. Please connect to the school WiFi.');
     }
 
-    const knownLocation = findKnownLocationWithAccuracy(location.latitude, location.longitude, location.accuracy);
-    if (!knownLocation) {
-      throw new Error('You must be within school premises to check out');
+    if (!isOnSchoolWifi(location.ip)) {
+      throw new Error('You must be connected to the school WiFi to check out');
     }
 
     const harareTime = this.timeService.getCurrentTime();
@@ -180,9 +172,9 @@ export class AttendanceService {
     await updateDoc(doc(db, 'attendance', attendanceId), {
       checkOutTime: Timestamp.fromDate(checkOutTime),
       location: {
-        latitude: location.latitude,
-        longitude: location.longitude,
-        address: getLocationDisplayName(knownLocation),
+        latitude: location.latitude || 0,
+        longitude: location.longitude || 0,
+        address: getLocationDisplayName(SCHOOL_LOCATION),
       },
     });
 
@@ -404,79 +396,10 @@ export class AttendanceService {
     longitude: number
   ): Promise<string> {
     console.log('🗺️ Resolving address for coordinates:', { latitude, longitude });
-
-    // Check if coordinates match any known location (Vincent Bohlen Hub, etc.)
-    const knownLocation = findKnownLocationWithAccuracy(latitude, longitude, 0);
-    if (knownLocation) {
-      const locationName = getLocationDisplayName(knownLocation);
-      console.log('📍 Location identified as known location:', locationName);
-      return locationName;
-    }
-
-    try {
-      // Using reverse geocoding API
-      console.log('🌐 Fetching address from geocoding service...');
-      const response = await fetch(
-        `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`
-      );
-      
-      if (response.ok) {
-        const data = await response.json();
-        console.log('📍 Geocoding response:', data);
-        
-        // Extract meaningful address components
-        let address = '';
-        if (data.locality || data.city) {
-          address = data.locality || data.city;
-          if (data.principalSubdivision) {
-            address += `, ${data.principalSubdivision}`;
-          }
-        } else if (data.display_name) {
-          address = data.display_name;
-        }
-        
-        // Clean up common API response issues
-        if (address) {
-          // Fix common typos in geocoding responses
-          address = address.replace(/\bat uknown\b/gi, 'at unknown');
-          address = address.replace(/\buknown\b/gi, 'unknown');
-          address = address.replace(/\bfalss\b/gi, 'Falls');
-          address = address.replace(/\bvictoria falss\b/gi, 'Victoria Falls');
-          
-          // If the address contains "unknown" or is too generic, prefer our known location
-          if (address.toLowerCase().includes('unknown') || address.toLowerCase().includes('unnamed')) {
-            console.log('📍 Geocoding returned generic address, using Vincent Bohlen Hub fallback');
-            return 'Vincent Bohlen Hub, South Africa';
-          }
-        }
-        
-        // If we got a meaningful address, return it, otherwise use fallback
-        if (address && address.length > 10) {
-          console.log('✅ Address resolved:', address);
-          return address;
-        }
-      }
-    } catch (error) {
-      console.error('❌ Failed to get address from geocoding service:', error);
-    }
-    
-    // Fallback: Check if coordinates suggest it's in South Africa (Vincent Bohlen Hub area)
-    if (this.isInSouthAfrica(latitude, longitude)) {
-      console.log('📍 Coordinates suggest South Africa location, using Vincent Bohlen Hub');
-      return 'Vincent Bohlen Hub, South Africa';
-    }
-    
-    // Final fallback
-    console.log('📍 Using coordinate fallback');
-    return `Location: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+    return getLocationDisplayName(SCHOOL_LOCATION);
   }
 
-
-  /**
-   * Check if coordinates are in South Africa (rough bounds)
-   */
   private isInSouthAfrica(latitude: number, longitude: number): boolean {
-    // South Africa approximate bounds
     const southAfricaBounds = {
       north: -22.0,
       south: -35.0,

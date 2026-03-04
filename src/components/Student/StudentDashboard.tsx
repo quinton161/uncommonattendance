@@ -191,19 +191,35 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
     setError('');
 
     try {
-      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 300000
-        });
-      });
-      const location = {
-        latitude: position.coords.latitude,
-        longitude: position.coords.longitude,
-        accuracy: position.coords.accuracy,
-        timestamp: position.timestamp,
+      console.log('🌐 Fetching public IP for verification...');
+      const ipResponse = await fetch('https://api.ipify.org?format=json');
+      const ipData = await ipResponse.json();
+      const userIp = ipData.ip;
+      console.log('✅ Got user IP:', userIp);
+
+      let location: LocationData = {
+        ip: userIp,
+        timestamp: Date.now()
       };
+
+      try {
+        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            timeout: 5000,
+            maximumAge: 300000
+          });
+        });
+        location = {
+          ...location,
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy,
+          timestamp: position.timestamp,
+        };
+      } catch (err) {
+        console.warn('⚠️ Geolocation failed, proceeding with IP only:', err);
+      }
 
       const attendance = await attendanceService.checkIn(
         user.uid,
@@ -226,19 +242,34 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
     setError('');
 
     try {
-      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 300000
-        });
-      });
-      const location = {
-        latitude: position.coords.latitude,
-        longitude: position.coords.longitude,
-        accuracy: position.coords.accuracy,
-        timestamp: position.timestamp,
+      console.log('🌐 Fetching public IP for verification...');
+      const ipResponse = await fetch('https://api.ipify.org?format=json');
+      const ipData = await ipResponse.json();
+      const userIp = ipData.ip;
+
+      let location: LocationData = {
+        ip: userIp,
+        timestamp: Date.now()
       };
+
+      try {
+        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            timeout: 5000,
+            maximumAge: 300000
+          });
+        });
+        location = {
+          ...location,
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy,
+          timestamp: position.timestamp,
+        };
+      } catch (err) {
+        console.warn('⚠️ Geolocation failed, proceeding with IP only');
+      }
 
       const attendance = await attendanceService.checkOut(user.uid, location);
       setTodayAttendance(attendance);

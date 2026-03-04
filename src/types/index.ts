@@ -92,10 +92,11 @@ export interface AttendanceRecord {
 }
 
 export interface LocationData {
-  latitude: number;
-  longitude: number;
-  accuracy: number;
-  timestamp: number;
+  latitude?: number;
+  longitude?: number;
+  accuracy?: number;
+  timestamp?: number;
+  ip?: string;
 }
 
 // Context Types

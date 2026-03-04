@@ -607,32 +607,21 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
     try {
       console.log('Starting check-in process for user:', user.uid);
       
-      // Get user location
+      // Get user location and public IP
       let location: any = null;
       try {
-        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(resolve, reject, {
-            enableHighAccuracy: true,
-            timeout: 10000,
-            maximumAge: 300000 // 5 minutes
-          });
-        });
-        location = {
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-          accuracy: position.coords.accuracy,
-          timestamp: position.timestamp,
-        };
-        console.log('📍 Got user location:', location);
-      } catch (error) {
-        console.warn('⚠️ Could not get location (high accuracy):', error);
+        console.log('🌐 Fetching public IP for verification...');
+        const ipResponse = await fetch('https://api.ipify.org?format=json');
+        const ipData = await ipResponse.json();
+        const userIp = ipData.ip;
+        console.log('✅ Got user IP:', userIp);
 
         try {
           const position = await new Promise<GeolocationPosition>((resolve, reject) => {
             navigator.geolocation.getCurrentPosition(resolve, reject, {
-              enableHighAccuracy: false,
-              timeout: 20000,
-              maximumAge: 0
+              enableHighAccuracy: true,
+              timeout: 10000,
+              maximumAge: 300000 // 5 minutes
             });
           });
           location = {
@@ -640,16 +629,23 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
             longitude: position.coords.longitude,
             accuracy: position.coords.accuracy,
             timestamp: position.timestamp,
+            ip: userIp
           };
-          console.log('📍 Got user location (fallback):', location);
-        } catch (fallbackError) {
-          console.warn('⚠️ Could not get location (fallback):', fallbackError);
-          uniqueToast.error('Location is required to check in. Please enable location and try again at school.', {
-            autoClose: 4000,
-            position: 'top-center',
-          });
-          return;
+        } catch (error) {
+          console.warn('⚠️ Could not get geolocation (high accuracy), using IP only:', error);
+          location = {
+            ip: userIp,
+            timestamp: Date.now()
+          };
         }
+        console.log('📍 Got user location data:', location);
+      } catch (error) {
+        console.error('❌ Failed to get public IP:', error);
+        uniqueToast.error('Network verification failed. Please check your internet connection.', {
+          autoClose: 4000,
+          position: 'top-center',
+        });
+        return;
       }
       
       const now = new Date();
@@ -844,21 +840,30 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
 
       let location: any = null;
       try {
-        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(resolve, reject, {
-            enableHighAccuracy: true,
-            timeout: 10000,
-            maximumAge: 300000 // 5 minutes
+        console.log('🌐 Fetching public IP for verification...');
+        const ipResponse = await fetch('https://api.ipify.org?format=json');
+        const ipData = await ipResponse.json();
+        const userIp = ipData.ip;
+
+        try {
+          const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, {
+              enableHighAccuracy: true,
+              timeout: 10000,
+              maximumAge: 300000 // 5 minutes
+            });
           });
-        });
-        location = {
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-          accuracy: position.coords.accuracy
-        };
+          location = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracy: position.coords.accuracy,
+            ip: userIp
+          };
+        } catch (error) {
+          location = { ip: userIp };
+        }
       } catch (error) {
-        console.warn('⚠️ Could not get location for check-out:', error);
-        uniqueToast.error('Location is required to check out. Please enable location and try again at school.', {
+        uniqueToast.error('Network verification failed. Please check your internet connection.', {
           autoClose: 4000,
           position: 'top-center',
         });
