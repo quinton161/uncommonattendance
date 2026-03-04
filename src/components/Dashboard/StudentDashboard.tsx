@@ -15,6 +15,7 @@ import { DailyAttendanceService, DailyAttendanceStats } from '../../services/dai
 import { MyAttendancePage } from '../Student/MyAttendancePage';
 import { ProgressPage } from '../Student/ProgressPage';
 import { ProfileUpload } from '../Profile/ProfileUpload';
+import { ChatWindow } from '../Common/ChatWindow';
 import { UncommonLogo } from '../Common/UncommonLogo';
 import { StarField } from '../Common/StarField';
 import TimeSyncStatus from '../Common/TimeSyncStatus';
@@ -41,7 +42,7 @@ const DashboardContainer = styled.div`
   }
 `;
 
-const Sidebar = styled.div<{ isOpen?: boolean }>`
+const Sidebar = styled.aside<{ isOpen: boolean }>`
   width: 280px;
   background: linear-gradient(180deg, ${theme.colors.primary} 0%, ${theme.colors.primaryDark} 100%);
   color: ${theme.colors.white};
@@ -767,6 +768,17 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
     switch (activeNav) {
       case 'attendance':
         return <MainContent><MyAttendancePage onBack={() => setActiveNav('dashboard')} isEmbedded={true} /></MainContent>;
+      case 'chat':
+        return (
+          <MainContent>
+            <h2 style={{ marginBottom: theme.spacing.lg, color: theme.colors.textPrimary }}>Chat with Admin</h2>
+            <ChatWindow 
+              studentId={user?.uid || ''} 
+              studentName={user?.displayName || 'Student'} 
+              currentUserUid={user?.uid || ''} 
+            />
+          </MainContent>
+        );
       case 'progress':
         return <MainContent><ProgressPage onBack={() => setActiveNav('dashboard')} isEmbedded={true} /></MainContent>;
       case 'profile':
@@ -936,7 +948,11 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
           </NavItem>
           <NavItem active={activeNav === 'attendance'} onClick={() => handleNavClick('attendance')}>
             <CheckCircleIcon size={20} />
-            My Attendance
+            Attendance
+          </NavItem>
+          <NavItem active={activeNav === 'chat'} onClick={() => handleNavClick('chat')}>
+            <PersonIcon size={20} />
+            Chat with Admin
           </NavItem>
           <NavItem active={activeNav === 'progress'} onClick={() => handleNavClick('progress')}>
             <BarChartIcon size={20} />

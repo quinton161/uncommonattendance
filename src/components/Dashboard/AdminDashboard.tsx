@@ -16,8 +16,9 @@ import {
 } from '../../styles/animations';
 import DataService from '../../services/DataService';
 import { uniqueToast } from '../../utils/toastUtils';
+import { ChatWindow } from '../Common/ChatWindow';
+import { chatService, Conversation } from '../../services/chatService';
 import { saveAs } from 'file-saver';
-import 'jspdf-autotable';
 
 import {
   DashboardIcon,
@@ -433,12 +434,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
     todayAttendance: 0
   });
   const [recentAttendance, setRecentAttendance] = useState<any[]>([]);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [allStudents, setAllStudents] = useState<any[]>([]);
+  const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const dataService = DataService.getInstance();
 
   const handleDownloadAttendanceCSV = async () => {
     try {
       await dataService.testConnection();
       const users = await dataService.getUsers();
+      setAllStudents(users.filter((u: any) => u.userType === 'attendee'));
       const attendance = await dataService.getAttendance();
       const todayStr = new Date().toISOString().split('T')[0];
       // Only today's attendance
@@ -473,6 +478,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
       uniqueToast.info('Loading dashboard data...', { autoClose: 2000 });
       // Test connection and load stats
       await dataService.testConnection();
+      const users = await dataService.getUsers();
+      setAllStudents(users.filter((u: any) => u.userType === 'attendee'));
+      
       const dashboardStats = await dataService.getDashboardStats();
       
       setStats({
@@ -511,8 +519,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
 
   useEffect(() => {
     // Load dashboard stats on mount
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     loadDashboardData();
+
+    // Subscribe to conversations
+    const unsubscribe = chatService.subscribeToConversations((data) => {
+      setConversations(data);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const handleNavClick = (navItem: string) => {
@@ -532,6 +546,87 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
         return <DailyAttendanceTracker onBack={() => setActiveNav('dashboard')} isEmbedded={true} />;
       case 'users':
         return <UsersPage onBack={() => setActiveNav('dashboard')} />;
+      case 'chat':
+        const displayConversations = allStudents.map(student => {
+          const existingConv = conversations.find(c => c.studentId === student.uid || c.studentId === student.id);
+          return {
+            studentId: student.uid || student.id,
+            studentName: student.displayName || 'Unknown Student',
+            lastMessage: existingConv?.lastMessage || 'No messages yet',
+            lastMessageTime: existingConv?.lastMessageTime || null,
+            adminId: user?.uid || 'admin'
+          };
+        }).sort((a, b) => {
+          if (!a.lastMessageTime) return 1;
+          if (!b.lastMessageTime) return -1;
+          const timeA = a.lastMessageTime.toDate ? a.lastMessageTime.toDate() : new Date(a.lastMessageTime);
+          const timeB = b.lastMessageTime.toDate ? b.lastMessageTime.toDate() : new Date(b.lastMessageTime);
+          return timeB.getTime() - timeA.getTime();
+        });
+
+        return (selectedConversation ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: theme.spacing.md }}>
+            <div style={{ alignSelf: 'flex-start' }}>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setSelectedConversation(null)}
+              >
+                ← Back to Students
+              </Button>
+            </div>
+            <h2 style={{ color: theme.colors.textPrimary }}>Chatting with {selectedConversation.studentName}</h2>
+            <ChatWindow 
+              studentId={selectedConversation.studentId}
+              studentName={selectedConversation.studentName}
+              currentUserUid={user?.uid || ''}
+              isAdmin={true}
+            />
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: theme.spacing.md }}>
+            <h2 style={{ color: theme.colors.textPrimary }}>Student Conversations</h2>
+            <ContentGrid style={{ gridTemplateColumns: '1fr' }}>
+              <Card>
+                <AttendanceList>
+                  {displayConversations.map((conv) => (
+                    <AttendanceItem 
+                      key={conv.studentId} 
+                      style={{ cursor: 'pointer', transition: 'background 0.2s' }}
+                      onClick={() => setSelectedConversation(conv as any)}
+                    >
+                      <UserAvatar>{getInitials(conv.studentName)}</UserAvatar>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: theme.fontWeights.semibold, color: theme.colors.textPrimary }}>
+                          {conv.studentName}
+                        </div>
+                        <div style={{ 
+                          fontSize: theme.fontSizes.sm, 
+                          color: theme.colors.textSecondary,
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          maxWidth: '200px'
+                        }}>
+                          {conv.lastMessage}
+                        </div>
+                      </div>
+                      <div style={{ fontSize: theme.fontSizes.xs, color: theme.colors.textLight }}>
+                        {conv.lastMessageTime?.toDate ? conv.lastMessageTime.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 
+                         conv.lastMessageTime ? new Date(conv.lastMessageTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                      </div>
+                    </AttendanceItem>
+                  ))}
+                  {displayConversations.length === 0 && (
+                    <p style={{ textAlign: 'center', color: theme.colors.textSecondary, padding: theme.spacing.lg }}>
+                      No students found.
+                    </p>
+                  )}
+                </AttendanceList>
+              </Card>
+            </ContentGrid>
+          </div>
+        ));
       default:
         return null; // Will render the main dashboard
     }
@@ -575,6 +670,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
         <NavItem active={activeNav === 'users'} onClick={() => handleNavClick('users')}>
           <PeopleIcon size={20} />
           Users
+        </NavItem>
+        <NavItem active={activeNav === 'chat'} onClick={() => handleNavClick('chat')}>
+          <PersonIcon size={20} />
+          Student Chat
         </NavItem>
         
         <div style={{ marginTop: 'auto', paddingTop: theme.spacing.xl }}>

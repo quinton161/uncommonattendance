@@ -56,6 +56,20 @@ service cloud.firestore {
       allow read, write: if isAuthenticated();
     }
 
+    match /conversations/{studentId} {
+      allow read, write: if isAuthenticated() && (
+        request.auth.uid == studentId || 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.userType == "admin"
+      );
+
+      match /messages/{messageId} {
+        allow read, write: if isAuthenticated() && (
+          request.auth.uid == studentId || 
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.userType == "admin"
+        );
+      }
+    }
+
     // Allow access to any other collections that might be needed
     match /{document=**} {
       allow read, write: if isAuthenticated();
