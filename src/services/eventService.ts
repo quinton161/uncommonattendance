@@ -114,6 +114,7 @@ export class EventService {
 
   async getPublicEvents(): Promise<Event[]> {
     try {
+      // Try the optimized query first (requires index)
       const q = query(
         collection(db, 'events'),
         where('isPublic', '==', true),
@@ -132,6 +133,37 @@ export class EventService {
       })) as Event[];
     } catch (error) {
       console.error('Error getting public events:', error);
+      
+      // Fallback: Try without the compound index if it's still building
+      if (error instanceof Error && error.message.includes('requires an index')) {
+        console.log('🔄 Index still building, using fallback query...');
+        try {
+          const fallbackQ = query(
+            collection(db, 'events'),
+            where('isPublic', '==', true),
+            orderBy('startDate', 'asc'),
+            limit(50)
+          );
+          const fallbackSnapshot = await getDocs(fallbackQ);
+          
+          return fallbackSnapshot.docs
+            .map(doc => {
+              const data = doc.data() as any;
+              return {
+                id: doc.id,
+                ...data,
+                startDate: data.startDate.toDate(),
+                endDate: data.endDate.toDate(),
+                createdAt: data.createdAt.toDate(),
+              };
+            })
+            .filter(event => event.eventStatus === 'published') as Event[];
+        } catch (fallbackError) {
+          console.error('Fallback query also failed:', fallbackError);
+          throw fallbackError;
+        }
+      }
+      
       throw error;
     }
   }
