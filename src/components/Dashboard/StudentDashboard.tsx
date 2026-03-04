@@ -944,8 +944,8 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
       loadStudentData();
       checkTodayAttendance();
 
-      // Subscribe to this student's specific conversation
-      const unsubscribe = chatService.subscribeToConversations((conversations) => {
+      // Subscribe to this student's specific conversations
+      const unsubscribe = chatService.subscribeToConversationsByStudent(user.uid, (conversations) => {
         const myConv = conversations.find(c => c.studentId === user.uid);
         if (myConv) {
           const prevUnread = unreadCount;

@@ -56,16 +56,23 @@ service cloud.firestore {
       allow read, write: if isAuthenticated();
     }
 
-    match /conversations/{studentId} {
-      allow read, write: if isAuthenticated() && (
-        request.auth.uid == studentId || 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.userType == "admin"
+    match /conversations/{conversationId} {
+      // Allow read if user is the student in the conversation OR the specific admin
+      // conversationId format: studentId_adminId (e.g., "abc123_xyz789")
+      allow read: if isAuthenticated() && (
+        request.auth.uid == conversationId.split('_')[0] || // User is the student
+        request.auth.uid == conversationId.split('_')[1]  // User is the admin
+      );
+      
+      allow write: if isAuthenticated() && (
+        request.auth.uid == conversationId.split('_')[0] || // User is the student
+        request.auth.uid == conversationId.split('_')[1]  // User is the admin
       );
 
       match /messages/{messageId} {
         allow read, write: if isAuthenticated() && (
-          request.auth.uid == studentId || 
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.userType == "admin"
+          request.auth.uid == conversationId.split('_')[0] || // User is the student
+          request.auth.uid == conversationId.split('_')[1]  // User is the admin
         );
       }
     }

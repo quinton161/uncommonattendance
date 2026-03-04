@@ -534,8 +534,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
     // Load dashboard stats on mount
     loadDashboardData();
 
-    // Subscribe to conversations
-    const unsubscribe = chatService.subscribeToConversations((data) => {
+    // Subscribe to conversations specific to this admin
+    const unsubscribe = chatService.subscribeToConversationsByAdmin(user?.uid || '', (data) => {
       // Use functional state update to ensure we have the most current conversations
       setConversations(prevConversations => {
         const prevTotal = prevConversations.reduce((sum, conv) => sum + (conv.unreadCount || 0), 0);

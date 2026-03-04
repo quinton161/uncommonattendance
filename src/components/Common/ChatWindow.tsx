@@ -193,26 +193,37 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
 
   const lastMessageId = useRef<string | null>(null);
 
+  // Determine the conversation ID based on who is chatting
+  // If student: conversationId = studentId_adminUid
+  // If admin: conversationId = studentId_adminUid (where adminUid is the current admin's ID)
+  const getConversationId = (): string => {
+    if (!studentId || !adminUid) return '';
+    // Always use studentId_adminUid format for consistency
+    return `${studentId}_${adminUid}`;
+  };
+
   useEffect(() => {
-    if (!adminUid) return;
-
-    if (!providedAdminUid) {
-      const fetchAdminId = async () => {
-        const id = await chatService.getAdminId();
-        setAdminUid(id);
-      };
-      fetchAdminId();
-    } else {
+    // For students: adminUid should be provided via props
+    // For admins: adminUid should be provided via props (the current admin's UID)
+    if (providedAdminUid) {
       setAdminUid(providedAdminUid);
+    } else if (!isAdmin && !providedAdminUid) {
+      // Fallback: if no admin is selected yet, don't subscribe
+      return;
     }
+  }, [providedAdminUid, isAdmin]);
 
-    // Use composite ID for unique student-admin conversation
-    const conversationId = `${studentId}_${adminUid}`;
+  useEffect(() => {
+    // Don't subscribe if we don't have both studentId and adminUid
+    if (!studentId || !adminUid) return;
+
+    const conversationId = getConversationId();
+    if (!conversationId) return;
 
     const unsubscribe = chatService.subscribeToMessages(conversationId, (msgs) => {
       setMessages(msgs);
       
-      // Notification logic
+      // Notification logic - only notify if message is from another person
       if (msgs.length > 0) {
         const lastMsg = msgs[msgs.length - 1];
         // Only notify if it's a new message and NOT sent by the current user
@@ -234,7 +245,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     });
 
     return () => unsubscribe();
-  }, [studentId, adminUid, providedAdminUid, currentUserUid, isAdmin]);
+  }, [studentId, adminUid, currentUserUid, isAdmin]);
 
   useEffect(() => {
     if (scrollRef.current) {
