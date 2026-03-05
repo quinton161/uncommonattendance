@@ -945,7 +945,15 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
       checkTodayAttendance();
 
       // Subscribe to this student's specific conversations
-      const unsubscribe = chatService.subscribeToConversationsByStudent(user.uid, (conversations) => {
+      const unsubscribe = chatService.subscribeToConversationsByStudent(user.uid, async (conversations) => {
+        // Mark selected conversation as read if it has unread messages
+        if (selectedAdmin) {
+          const currentConv = conversations.find(c => c.id === `${user.uid}_${selectedAdmin.uid}`);
+          if (currentConv && currentConv.unreadCount && currentConv.unreadCount > 0) {
+            await chatService.markAsRead(currentConv.id!);
+          }
+        }
+
         // Find if any conversation has a new unread message where the student is NOT the sender
         const prevTotal = unreadCount;
         const newTotal = conversations.reduce((sum, conv) => sum + (conv.unreadCount || 0), 0);

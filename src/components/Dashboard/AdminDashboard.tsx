@@ -540,9 +540,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
     loadDashboardData();
 
     // Subscribe to ALL conversations so admins can see messages from any student
-    const unsubscribe = chatService.subscribeToAllConversations((data) => {
+    const unsubscribe = chatService.subscribeToAllConversations(async (data) => {
       // Use functional state update to ensure we have the most current conversations
       setConversations(prevConversations => {
+        // Mark selected conversation as read if it has unread messages
+        if (selectedConversation) {
+          const currentConv = data.find(c => c.id === selectedConversation.id);
+          if (currentConv && currentConv.unreadCount && currentConv.unreadCount > 0) {
+            chatService.markAsRead(currentConv.id!).catch(e => console.error('Failed to mark as read:', e));
+          }
+        }
+
         // Calculate unread only for conversations belonging to THIS admin
         const myConvs = data.filter(c => c.adminId === user?.uid);
         const prevTotal = prevConversations.reduce((sum, conv) => sum + (conv.unreadCount || 0), 0);
