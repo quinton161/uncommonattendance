@@ -407,14 +407,13 @@ class DataService {
     const uniqueDaysAttendance = Array.from(new Map(
       userAttendance
         .filter(a => a.date || a.checkInTime)
-        .map(a => [a.date || new Date(a.checkInTime).toISOString().split('T')[0], a])
+        .map(a => [a.date || (a.checkInTime.toISOString ? a.checkInTime.toISOString().split('T')[0] : new Date(a.checkInTime).toISOString().split('T')[0]), a])
     ).values()).sort((a, b) => 
       new Date(b.date || b.checkInTime).getTime() - new Date(a.date || a.checkInTime).getTime()
     );
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const todayStr = today.toISOString().split('T')[0];
     
     // Streak logic: A streak is alive if the user checked in today OR yesterday.
     // If the most recent check-in is before yesterday, the streak is 0.

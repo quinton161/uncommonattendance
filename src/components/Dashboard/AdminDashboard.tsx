@@ -28,8 +28,6 @@ import {
   PeopleIcon,
   PersonIcon,
   LogoutIcon,
-  TrendingUpIcon,
-  GroupIcon,
   TodayIcon
 } from '../Common/Icons';
 
