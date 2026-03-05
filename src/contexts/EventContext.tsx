@@ -41,7 +41,7 @@ export const EventProvider: React.FC<EventProviderProps> = ({ children, user }) 
     loadPublicEvents();
   }, []);
 
-  const createEvent = async (eventData: Omit<Event, 'id' | 'createdAt' | 'instructor'>): Promise<string> => {
+  const createEvent = async (eventData: Omit<Event, 'id' | 'createdAt' | 'instructor' | 'instructorId'>): Promise<string> => {
     if (!user) throw new Error('User must be logged in to create events');
     
     try {

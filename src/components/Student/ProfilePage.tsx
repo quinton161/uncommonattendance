@@ -332,7 +332,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onBack }) => {
                 
                 <Input
                   label="Role"
-                  value={user?.userType === 'admin' ? 'Admin' : user?.userType === 'organizer' ? 'Organizer' : 'Attendee'}
+                  value={user?.userType === 'admin' ? 'Admin' : user?.userType === 'instructor' ? 'Instructor' : 'Attendee'}
                   disabled
                   fullWidth
                   helperText="Role is assigned by administrators"
