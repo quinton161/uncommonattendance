@@ -287,14 +287,6 @@ const StatLabel = styled.div`
   margin-bottom: ${theme.spacing.sm};
 `;
 
-const StatChange = styled.div<{ positive?: boolean }>`
-  font-size: ${theme.fontSizes.xs};
-  opacity: 0.8;
-  display: flex;
-  align-items: center;
-  gap: ${theme.spacing.xs};
-`;
-
 const StatIcon = styled.div`
   position: absolute;
   top: ${theme.spacing.md};
