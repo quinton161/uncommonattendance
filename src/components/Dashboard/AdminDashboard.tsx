@@ -448,6 +448,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
   });
   const [recentAttendance, setRecentAttendance] = useState<any[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [allStudents, setAllStudents] = useState<any[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [totalUnread, setTotalUnread] = useState(0);
   const dataService = DataService.getInstance();
@@ -490,6 +491,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
       uniqueToast.info('Loading dashboard data...', { autoClose: 2000 });
       // Test connection and load stats
       await dataService.testConnection();
+      
+      const users = await dataService.getUsers();
+      const students = users.filter((u: any) => u.userType === 'attendee');
+      setAllStudents(students);
       
       const dashboardStats = await dataService.getDashboardStats();
       
@@ -618,12 +623,35 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
       case 'users':
         return <UsersPage onBack={() => setActiveNav('dashboard')} onChat={handleChatFromUsers} />;
       case 'chat':
-        const displayConversations = conversations.map(conv => {
+        // 1. Create a map of existing conversations by studentId
+        const convMap = new Map<string, Conversation>();
+        conversations.forEach(conv => {
+          convMap.set(conv.studentId, conv);
+        });
+
+        // 2. Combine all students with their conversations (if any)
+        const displayConversations = allStudents.map(student => {
+          const existingConv = convMap.get(student.uid || student.id);
+          if (existingConv) {
+            return {
+              ...existingConv,
+              id: existingConv.id || `${existingConv.studentId}_${existingConv.adminId}`
+            };
+          }
+          // Placeholder for students with no chat history yet
           return {
-            ...conv,
-            id: conv.id || `${conv.studentId}_${conv.adminId}`
+            id: `${student.uid || student.id}_${user?.uid}`,
+            studentId: student.uid || student.id,
+            studentName: student.displayName || 'Student',
+            studentPhotoUrl: student.photoUrl,
+            adminId: user?.uid || '',
+            lastMessage: 'No messages yet',
+            lastMessageTime: null,
+            unreadCount: 0
           };
         }).sort((a, b) => {
+          // Sort: Recent messages first, then students with no messages
+          if (!a.lastMessageTime && !b.lastMessageTime) return 0;
           if (!a.lastMessageTime) return 1;
           if (!b.lastMessageTime) return -1;
           const timeA = a.lastMessageTime.toDate ? a.lastMessageTime.toDate() : new Date(a.lastMessageTime);
