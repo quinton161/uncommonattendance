@@ -425,7 +425,10 @@ interface StudentAttendanceData {
 }
 
 export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({ onBack, isEmbedded = true }) => {
-    const [selectedDate, setSelectedDate] = useState(new Date());
+  // Initialize with Harare timezone
+  const timeService = TimeService.getInstance();
+  const todayHarare = timeService.getCurrentTime();
+  const [selectedDate, setSelectedDate] = useState(todayHarare);
   const [attendanceData, setAttendanceData] = useState<StudentAttendanceData[]>([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
@@ -542,7 +545,9 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({ 
   };
 
   const goToToday = () => {
-    setSelectedDate(new Date());
+    const timeService = TimeService.getInstance();
+    const todayHarare = timeService.getCurrentTime();
+    setSelectedDate(todayHarare);
   };
 
   const formatDate = (date: Date) => {

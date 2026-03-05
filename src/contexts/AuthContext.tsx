@@ -67,13 +67,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             });
           } else {
             console.warn('🔐 AuthContext: User document not found in Firestore after retries');
-            // For new users, create a basic user document if it doesn't exist
+            // Check if this is a known instructor/admin email that needs a document
+            const isStaffEmail = firebaseUser.email?.endsWith('@uncommon.org'); // Example check
+            
             console.log('🔐 AuthContext: Creating fallback user document...');
             const fallbackUserData = {
               uid: firebaseUser.uid,
               email: firebaseUser.email!,
               displayName: firebaseUser.displayName || 'New User',
-              userType: 'attendee',
+              userType: isStaffEmail ? 'instructor' : 'attendee',
               createdAt: new Date(),
               photoUrl: null,
               bio: '',
@@ -87,7 +89,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               email: firebaseUser.email!,
               displayName: firebaseUser.displayName || 'New User',
               photoUrl: firebaseUser.photoURL ?? undefined,
-              userType: 'attendee',
+              userType: isStaffEmail ? 'instructor' : 'attendee',
               bio: '',
               createdAt: new Date(),
             });
@@ -97,12 +99,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           // Don't set user to null on error, try to use basic auth user
           if (firebaseUser) {
             console.log('🔐 AuthContext: Using basic Firebase user data as fallback');
+            const isStaffEmail = firebaseUser.email?.endsWith('@uncommon.org');
             setUser({
               uid: firebaseUser.uid,
               email: firebaseUser.email!,
               displayName: firebaseUser.displayName || 'User',
               photoUrl: firebaseUser.photoURL ?? undefined,
-              userType: 'attendee',
+              userType: isStaffEmail ? 'instructor' : 'attendee',
               bio: '',
               createdAt: new Date(),
             });
