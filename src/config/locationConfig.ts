@@ -2,7 +2,7 @@
  * Location Configuration for Vincent Bohlen Hub
  */
 
-export const ALLOWED_WIFI_IP = '74.244.195.215'; // Your current public IP
+export const ALLOWED_WIFI_IP = '143.105.233.179'; // Your current public IP
 
 export interface LocationConfig {
   name: string;
