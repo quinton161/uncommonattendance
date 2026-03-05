@@ -54,6 +54,9 @@ export class AttendanceService {
     
     const harareTime = this.timeService.getCurrentTime();
     const today = harareTime.toISOString().split('T')[0];
+    console.log('🔍 ATTENDANCE SERVICE CHECK-IN DEBUG:');
+    console.log('  - harareTime:', harareTime.toISOString());
+    console.log('  - today (date saved to Firebase):', today);
     const attendanceId = `${studentId}_${today}`;
     console.log('Generated attendanceId:', attendanceId);
 

@@ -5,6 +5,7 @@ import { Button } from '../Common/Button';
 import { UncommonLogo } from '../Common/UncommonLogo';
 import { AttendanceService } from '../../services/attendanceService';
 import DataService from '../../services/DataService';
+import { TimeService } from '../../services/timeService';
 import { uniqueToast } from '../../utils/toastUtils';
 import {
   CheckCircleIcon,
@@ -440,7 +441,22 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({ 
   const loadDailyAttendance = async () => {
     try {
       setLoading(true);
-      console.log('🔄 Loading daily attendance for date:', selectedDate.toISOString().split('T')[0]);
+      
+      // Use TimeService for consistent Harare timezone handling
+      const timeService = TimeService.getInstance();
+      const today = timeService.getCurrentDateString();
+      
+      // Convert selectedDate to Harare timezone date string
+      const selectedDateHarare = new Date(selectedDate.toLocaleString('en-US', { timeZone: 'Africa/Harare' }));
+      const dateStr = selectedDateHarare.toISOString().split('T')[0];
+      
+      console.log('🔍 DAILY ATTENDANCE TRACKER DEBUG:');
+      console.log('  - selectedDate:', selectedDate.toISOString());
+      console.log('  - selectedDate (Harare timezone):', selectedDateHarare.toISOString());
+      console.log('  - dateStr (querying Firebase):', dateStr);
+      console.log('  - today (current Harare date):', today);
+      console.log('  - Browser timezone:', Intl.DateTimeFormat().resolvedOptions().timeZone);
+      console.log('🔄 Loading daily attendance for date:', dateStr);
 
       // Get all users (students)
       const users = await dataService.getUsers();
@@ -450,7 +466,6 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({ 
       console.log('🎓 Students filtered:', students.length, 'students');
 
       // Get attendance records for the selected date
-      const dateStr = selectedDate.toISOString().split('T')[0];
       console.log('📅 Fetching attendance for date:', dateStr);
       const attendanceRecords = await attendanceService.getAttendanceByDateRange(dateStr, dateStr);
       console.log('📊 Attendance records fetched:', attendanceRecords.length, 'records');
