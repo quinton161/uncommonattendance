@@ -390,8 +390,9 @@ class DataService {
       totalEvents: events.length,
       activeEvents: events.filter(e => e.eventStatus === 'published').length,
       totalAttendees: users.filter(u => u.userType === 'attendee').length,
+      totalInstructors: users.filter(u => u.userType === 'instructor').length,
       todayAttendance: todayAttendance.length,
-      recentAttendance: attendance.slice(0, 5)
+      recentAttendance: attendance.slice(0, 10) // Show more recent activity
     };
   }
 
@@ -402,19 +403,65 @@ class DataService {
 
     // Calculate streak
     let currentStreak = 0;
-    const sortedAttendance = userAttendance.sort((a, b) => 
+    // Filter out duplicates for the same day and sort by date descending
+    const uniqueDaysAttendance = Array.from(new Map(
+      userAttendance
+        .filter(a => a.date || a.checkInTime)
+        .map(a => [a.date || new Date(a.checkInTime).toISOString().split('T')[0], a])
+    ).values()).sort((a, b) => 
       new Date(b.date || b.checkInTime).getTime() - new Date(a.date || a.checkInTime).getTime()
     );
 
     const today = new Date();
-    for (let i = 0; i < sortedAttendance.length; i++) {
-      const attendanceDate = new Date(sortedAttendance[i].date || sortedAttendance[i].checkInTime);
-      const daysDiff = Math.floor((today.getTime() - attendanceDate.getTime()) / (1000 * 60 * 60 * 24));
+    today.setHours(0, 0, 0, 0);
+    
+    // Start checking from today or the most recent attendance day
+    let checkDate = new Date(today);
+    let attendanceIdx = 0;
+
+    // If they haven't checked in today, streak might still be alive if they checked in yesterday
+    if (uniqueDaysAttendance.length > 0) {
+      const mostRecentDate = new Date(uniqueDaysAttendance[0].date || uniqueDaysAttendance[0].checkInTime);
+      mostRecentDate.setHours(0, 0, 0, 0);
       
-      if (daysDiff === i) {
-        currentStreak++;
+      // If the most recent check-in is older than yesterday, streak is broken
+      const diffToToday = Math.floor((today.getTime() - mostRecentDate.getTime()) / (1000 * 60 * 60 * 24));
+      if (diffToToday > 1) {
+        currentStreak = 0;
       } else {
-        break;
+        // Walk backwards day by day
+        for (let i = 0; i < uniqueDaysAttendance.length; i++) {
+          const attendanceDate = new Date(uniqueDaysAttendance[i].date || uniqueDaysAttendance[i].checkInTime);
+          attendanceDate.setHours(0, 0, 0, 0);
+          
+          const expectedDate = new Date(today);
+          expectedDate.setDate(today.getDate() - i);
+          
+          // Skip weekends in streak calculation if desired (optional, currently strictly consecutive days)
+          // For now, keeping it strictly consecutive calendar days
+          if (attendanceDate.getTime() === expectedDate.getTime()) {
+            currentStreak++;
+          } else if (i === 0 && attendanceDate.getTime() === (new Date(today.getTime() - 86400000)).getTime()) {
+            // If i=0 and they didn't check in today but did yesterday, streak is still 1 (or more)
+            currentStreak = 1;
+            // Need to continue checking from yesterday
+            const yesterday = new Date(today.getTime() - 86400000);
+            for (let j = 1; j < uniqueDaysAttendance.length; j++) {
+              const prevDate = new Date(uniqueDaysAttendance[j].date || uniqueDaysAttendance[j].checkInTime);
+              prevDate.setHours(0, 0, 0, 0);
+              const nextExpected = new Date(yesterday);
+              nextExpected.setDate(yesterday.getDate() - j);
+              if (prevDate.getTime() === nextExpected.getTime()) {
+                currentStreak++;
+              } else {
+                break;
+              }
+            }
+            break;
+          } else {
+            break;
+          }
+        }
       }
     }
 
@@ -449,8 +496,8 @@ class DataService {
       attendanceRate: Math.round(attendanceRate),
       averageCheckInTime,
       monthlyAttendance: monthlyAttendance.length,
-      eventsAttended: events.filter(e => e.organizerId === userId).length, // Events they might have attended
-      recentActivity: userAttendance.slice(0, 5).map(a => ({
+      eventsAttended: events.filter(e => e.instructorId === userId).length, // Events they might have organized
+      recentActivity: userAttendance.slice(0, 10).map(a => ({
         ...a,
         type: 'checkin',
         id: a.id || `activity-${Date.now()}-${Math.random()}`

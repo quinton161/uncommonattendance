@@ -444,6 +444,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [stats, setStats] = useState({
     totalAttendees: 0,
+    totalInstructors: 0,
     todayAttendance: 0
   });
   const [recentAttendance, setRecentAttendance] = useState<any[]>([]);
@@ -499,9 +500,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
       const dashboardStats = await dataService.getDashboardStats();
       
       setStats({
-                totalAttendees: dashboardStats.totalAttendees,
+        totalAttendees: dashboardStats.totalAttendees,
+        totalInstructors: dashboardStats.totalInstructors,
         todayAttendance: dashboardStats.todayAttendance,
-              });
+      });
       
       setRecentAttendance(dashboardStats.recentAttendance);
       uniqueToast.success('Dashboard data loaded successfully!', { autoClose: 2000 });
@@ -511,9 +513,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
       
       // Fallback data
       setStats({
-                totalAttendees: 25,
-        todayAttendance: 8,
-              });
+        totalAttendees: 25,
+        totalInstructors: 5,
+        todayAttendance: 18,
+      });
       
       setRecentAttendance([
         {
@@ -905,13 +908,20 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
             </Header>
 
             <StatsGrid>
-              <StatCard variant="secondary">
-                <StatIcon><GroupIcon size={32} /></StatIcon>
+              <StatCard>
+                <StatIcon><PersonIcon size={32} /></StatIcon>
                 <StatValue>{stats.totalAttendees}</StatValue>
                 <StatLabel>Total Attendees</StatLabel>
-                <StatChange positive>
-                  <TrendingUpIcon size={16} /> All registered users
-                </StatChange>
+              </StatCard>
+              <StatCard>
+                <StatIcon><PersonIcon size={32} /></StatIcon>
+                <StatValue>{stats.totalInstructors}</StatValue>
+                <StatLabel>Total Instructors</StatLabel>
+              </StatCard>
+              <StatCard>
+                <StatIcon><CheckCircleIcon size={32} /></StatIcon>
+                <StatValue>{stats.todayAttendance}</StatValue>
+                <StatLabel>Present Today</StatLabel>
               </StatCard>
             </StatsGrid>
 
@@ -941,8 +951,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
                     </p>
                   )}
                 </AttendanceList>
-            </Card>
-          </ContentGrid>
+              </Card>
+            </ContentGrid>
           </>
         )}
       </MainContent>
