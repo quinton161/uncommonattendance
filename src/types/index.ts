@@ -7,7 +7,7 @@ export interface User {
   createdAt: Date;
   photoUrl?: string;
   bio?: string;
-  userType: 'organizer' | 'attendee' | 'admin';
+  userType: 'instructor' | 'attendee' | 'admin';
 }
 
 export interface Event {
@@ -18,8 +18,8 @@ export interface Event {
   location: string;
   description: string;
   createdAt: Date;
-  organizer: User;
-  organizerId: string;
+  instructor: User;
+  instructorId: string;
   capacity?: number;
   imageUrl?: string;
   isPublic: boolean;
@@ -113,7 +113,7 @@ export interface AuthContextType {
 export interface EventContextType {
   events: Event[];
   loading: boolean;
-  createEvent: (eventData: Omit<Event, 'id' | 'createdAt' | 'organizer'>) => Promise<string>;
+  createEvent: (eventData: Omit<Event, 'id' | 'createdAt' | 'instructor'>) => Promise<string>;
   updateEvent: (eventId: string, eventData: Partial<Event>) => Promise<void>;
   deleteEvent: (eventId: string) => Promise<void>;
   getEvent: (eventId: string) => Promise<Event | null>;

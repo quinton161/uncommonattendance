@@ -222,7 +222,7 @@ export const EventDashboard: React.FC<EventDashboardProps> = ({ onNavigateToProf
     if (!user) return;
     
     try {
-      if (user.userType === 'organizer' || user.userType === 'admin') {
+      if (user.userType === 'instructor' || user.userType === 'admin') {
         await getUserEvents(user.uid);
       } else {
         await getPublicEvents();
@@ -375,7 +375,7 @@ export const EventDashboard: React.FC<EventDashboardProps> = ({ onNavigateToProf
 
   const getDashboardTitle = () => {
     switch (user?.userType) {
-      case 'organizer':
+      case 'instructor':
         return 'My Events';
       case 'admin':
         return 'Event Management';
@@ -487,18 +487,18 @@ export const EventDashboard: React.FC<EventDashboardProps> = ({ onNavigateToProf
       {events.length === 0 ? (
         <EmptyState>
           <EmptyStateTitle>
-            {user?.userType === 'organizer' || user?.userType === 'admin' 
+            {user?.userType === 'instructor' || user?.userType === 'admin' 
               ? 'No events created yet' 
               : 'No events available'
             }
           </EmptyStateTitle>
           <EmptyStateText>
-            {user?.userType === 'organizer' || user?.userType === 'admin'
+            {user?.userType === 'instructor' || user?.userType === 'admin'
               ? 'Create your first event to get started!'
               : 'Check back later for upcoming events.'
             }
           </EmptyStateText>
-          {(user?.userType === 'organizer' || user?.userType === 'admin') && (
+          {(user?.userType === 'instructor' || user?.userType === 'admin') && (
             <Button variant="primary" onClick={() => setShowCreateForm(true)}>
               Create Event
             </Button>

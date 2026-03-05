@@ -124,7 +124,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     email: string,
     password: string,
     displayName: string,
-    userType: 'organizer' | 'attendee' | 'admin'
+    userType: 'instructor' | 'attendee' | 'admin'
   ) => {
     console.log('🔐 AuthContext: Starting registration for:', email, userType);
     try {

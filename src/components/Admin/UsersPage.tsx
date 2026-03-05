@@ -200,7 +200,7 @@ const UserType = styled.div<{ type: string }>`
           background: rgba(239, 68, 68, 0.1);
           color: #dc2626;
         `;
-      case 'organizer':
+      case 'instructor':
         return `
           background: rgba(251, 191, 36, 0.1);
           color: #d97706;
@@ -349,7 +349,7 @@ const UserTypeTag = styled.span<{ type: string }>`
           background: rgba(239, 68, 68, 0.1);
           color: #dc2626;
         `;
-      case 'organizer':
+      case 'instructor':
         return `
           background: rgba(251, 191, 36, 0.1);
           color: #d97706;
@@ -502,12 +502,12 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase();
   };
 
-  if (user?.userType !== 'admin') {
+  if (user?.userType !== 'admin' && user?.userType !== 'instructor') {
     return (
       <PageContainer>
         <div style={{ textAlign: 'center', padding: theme.spacing['3xl'] }}>
           <h2>Access Denied</h2>
-          <p>Only administrators can access this page.</p>
+          <p>Only administrators and instructors can access this page.</p>
           {onBack && (
             <Button variant="primary" onClick={onBack}>
               Back to Dashboard
@@ -590,8 +590,8 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
         
         <StatCard>
           <StatIcon><PersonIcon size={32} /></StatIcon>
-          <StatValue>{users.filter(u => u.userType === 'organizer').length}</StatValue>
-          <StatLabel>Organizers</StatLabel>
+          <StatValue>{users.filter(u => u.userType === 'instructor').length}</StatValue>
+          <StatLabel>Instructors</StatLabel>
         </StatCard>
       </StatsGrid>
 
@@ -599,10 +599,10 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
         <LoadingState>
           Loading users...
         </LoadingState>
-      ) : users.filter(u => u.userType !== 'admin').length === 0 ? (
+      ) : users.filter(u => u.userType !== 'admin' && u.userType !== 'instructor').length === 0 ? (
         <EmptyState>
           <h3>No Manageable Users Found</h3>
-          <p>No attendees or organizers are registered in the system yet. Admin accounts are protected and not shown here.</p>
+          <p>No attendees are registered in the system yet. Admin and instructor accounts are protected and not shown here.</p>
         </EmptyState>
       ) : (
         <>
@@ -615,7 +615,7 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
                   <div>Status</div>
                 </TableHeader>
           
-          {users.filter(userData => userData.userType !== 'admin').map((userData) => {
+          {users.filter(userData => userData.userType === 'attendee').map((userData) => {
             const todayAttendance = getTodayAttendance(userData.id);
             const isCheckedIn = todayAttendance && todayAttendance.checkInTime && !todayAttendance.checkOutTime;
             
@@ -675,7 +675,7 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
           
           {/* Mobile Card Layout */}
           <div style={{ display: 'block' }}>
-            {users.filter(userData => userData.userType !== 'admin').map((userData) => {
+            {users.filter(userData => userData.userType === 'attendee').map((userData) => {
               const todayAttendance = getTodayAttendance(userData.id);
               const isCheckedIn = todayAttendance && todayAttendance.checkInTime && !todayAttendance.checkOutTime;
               

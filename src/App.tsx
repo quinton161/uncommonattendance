@@ -49,8 +49,8 @@ const AppRoutes: React.FC = () => {
     return <StudentDashboard onNavigateToProfile={() => setCurrentPage('profile')} />;
   }
 
-  // Organizer and Admin dashboard
-  if (user.userType === 'organizer' || user.userType === 'admin') {
+  // Instructor and Admin dashboard
+  if (user.userType === 'instructor' || user.userType === 'admin') {
     if (currentPage === 'profile') {
       return (
         <ProfilePage onBack={() => setCurrentPage('dashboard')} />

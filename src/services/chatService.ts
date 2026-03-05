@@ -225,7 +225,7 @@ class ChatService {
   }
 
   // Student: Listen to conversations for a specific student
-  // This filters conversations so each student only sees their conversations with admins
+  // This filters conversations so each student only sees their conversations with admins or instructors
   subscribeToConversationsByStudent(studentId: string, callback: (conversations: Conversation[]) => void) {
     const q = query(
       collection(db, 'conversations'),
@@ -249,16 +249,16 @@ class ChatService {
             console.log('Error fetching student photo:', e);
           }
           
-          // Get admin photo URL if available
+          // Get admin/instructor photo URL if available
           if (data.adminId) {
             try {
               const adminDocSnap = await getDoc(doc(db, 'users', data.adminId));
               if (adminDocSnap.exists()) {
                 data.adminPhotoUrl = adminDocSnap.data().photoUrl;
-                data.adminName = adminDocSnap.data().displayName || 'Admin';
+                data.adminName = adminDocSnap.data().displayName || (adminDocSnap.data().userType === 'instructor' ? 'Instructor' : 'Admin');
               }
             } catch (e) {
-              console.log('Error fetching admin photo:', e);
+              console.log('Error fetching admin/instructor photo:', e);
             }
           }
           
@@ -269,11 +269,11 @@ class ChatService {
     });
   }
 
-  // Get all Admins
-  async getAllAdmins(): Promise<any[]> {
+  // Get all Admins and Instructors for students to chat with
+  async getAllStaff(): Promise<any[]> {
     const q = query(
       collection(db, 'users'),
-      where('userType', '==', 'admin')
+      where('userType', 'in', ['admin', 'instructor'])
     );
     const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => ({
@@ -284,9 +284,13 @@ class ChatService {
 
   // Get Admin UID (utility to find the first admin user)
   async getAdminId(): Promise<string> {
-    const admins = await this.getAllAdmins();
+    const staff = await this.getAllStaff();
+    const admins = staff.filter(s => s.userType === 'admin');
     if (admins.length > 0) {
       return admins[0].uid;
+    }
+    if (staff.length > 0) {
+      return staff[0].uid;
     }
     return 'admin'; // Fallback
   }

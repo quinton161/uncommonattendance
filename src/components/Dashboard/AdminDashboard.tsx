@@ -843,7 +843,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
         
         <NavItem active={activeNav === 'dashboard'} onClick={() => handleNavClick('dashboard')}>
           <DashboardIcon size={20} />
-          Dashboard
+          {user?.userType === 'instructor' ? 'Instructor Dashboard' : 'Admin Dashboard'}
         </NavItem>
         <NavItem active={activeNav === 'attendance'} onClick={() => handleNavClick('attendance')}>
           <CheckCircleIcon size={20} />
@@ -859,7 +859,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
         </NavItem>
         <NavItem active={activeNav === 'chat'} onClick={() => handleNavClick('chat')}>
           <PersonIcon size={20} />
-          Student Chat
+          {user?.userType === 'instructor' ? 'Student Chat' : 'Student Chat'}
           {totalUnread > 0 && <Badge style={{ marginLeft: 'auto' }}>{totalUnread}</Badge>}
         </NavItem>
         <NavItem active={activeNav === 'profile'} onClick={() => handleNavClick('profile')}>
@@ -893,7 +893,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
                   margin: 0 
                 }}>
                   <UncommonLogo size="lg" showSubtitle={false} />
-                  <span>Dashboard</span>
+                  <span>{user?.userType === 'instructor' ? 'Instructor' : 'Admin'} Dashboard</span>
                 </h1>
                 <p>Welcome back, {user?.displayName}!</p>
               </HeaderTitle>

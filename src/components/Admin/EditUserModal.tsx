@@ -248,7 +248,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
               required
             >
               <option value="attendee">Attendee</option>
-              <option value="organizer">Organizer</option>
+              <option value="instructor">Instructor</option>
               <option value="admin">Administrator</option>
             </Select>
           </FormGroup>

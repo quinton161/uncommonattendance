@@ -332,7 +332,7 @@ export const EventsPage: React.FC<EventsPageProps> = ({ onBack }) => {
     }).format(date);
   };
 
-  const canCreateEvents = user?.userType === 'admin' || user?.userType === 'organizer';
+  const canCreateEvents = user?.userType === 'admin' || user?.userType === 'instructor';
 
   if (showCreateForm) {
     return (

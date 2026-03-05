@@ -90,7 +90,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onToggleMode }) => {
     email: '',
     password: '',
     confirmPassword: '',
-    userType: 'attendee' as 'organizer' | 'attendee' | 'admin',
+    userType: 'instructor' as 'instructor' | 'attendee' | 'admin',
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -104,7 +104,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onToggleMode }) => {
     setError('');
   };
 
-  const handleRoleChange = (userType: 'organizer' | 'attendee' | 'admin') => {
+  const handleRoleChange = (userType: 'instructor' | 'attendee' | 'admin') => {
     setFormData(prev => ({
       ...prev,
       userType,
@@ -196,10 +196,10 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onToggleMode }) => {
               </RoleButton>
               <RoleButton
                 type="button"
-                selected={formData.userType === 'organizer'}
-                onClick={() => handleRoleChange('organizer')}
+                selected={formData.userType === 'instructor'}
+                onClick={() => handleRoleChange('instructor')}
               >
-                Organizer
+                Instructor
               </RoleButton>
               <RoleButton
                 type="button"

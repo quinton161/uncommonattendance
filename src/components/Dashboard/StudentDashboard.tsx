@@ -626,11 +626,11 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
         studentName: user.displayName,
       })));
 
-      // Load all admins for chat
-      const allAdmins = await chatService.getAllAdmins();
-      setAdmins(allAdmins);
-      if (allAdmins.length > 0 && !selectedAdmin) {
-        setSelectedAdmin(allAdmins[0]);
+      // Load all staff (admins and instructors) for chat
+      const allStaff = await chatService.getAllStaff();
+      setAdmins(allStaff);
+      if (allStaff.length > 0 && !selectedAdmin) {
+        setSelectedAdmin(allStaff[0]);
       }
 
     } catch (error) {

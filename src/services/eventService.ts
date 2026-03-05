@@ -72,11 +72,12 @@ export class EventService {
 
   async getEvent(eventId: string): Promise<Event | null> {
     try {
-      const eventDoc = await getDoc(doc(db, 'events', eventId));
-      if (eventDoc.exists()) {
-        const data = eventDoc.data();
+      const docRef = doc(db, 'events', eventId);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        const data = docSnap.data();
         return {
-          id: eventDoc.id,
+          id: docSnap.id,
           ...data,
           startDate: data.startDate.toDate(),
           endDate: data.endDate.toDate(),
@@ -94,7 +95,7 @@ export class EventService {
     try {
       const q = query(
         collection(db, 'events'),
-        where('organizerId', '==', userId),
+        where('instructorId', '==', userId),
         orderBy('createdAt', 'desc')
       );
       const querySnapshot = await getDocs(q);
