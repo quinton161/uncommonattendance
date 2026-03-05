@@ -104,39 +104,45 @@ export class AttendanceService {
     console.log('✅ Daily attendance record saved');
 
     // Verify both records were saved
-    const savedDetailedRecord = await getDoc(doc(db, 'attendance', attendanceId));
-    const isPresentToday = await dailyService.isPresentToday(studentId);
-    
-    if (savedDetailedRecord.exists() && isPresentToday) {
-      console.log('🎉 ATTENDANCE RECORDING COMPLETE:', {
-        detailedRecord: '✅ Saved',
-        dailyRecord: '✅ Saved',
-        studentMarkedPresent: '✅ Yes',
-        attendanceId,
-        date: today
-      });
+    let verified = false;
+    for (let i = 0; i < 3; i++) {
+      const savedDetailedRecord = await getDoc(doc(db, 'attendance', attendanceId));
+      const isPresentToday = await dailyService.isPresentToday(studentId);
       
-      // Send email notification to student's Gmail
-      try {
-        const dataService = DataService.getInstance();
-        const users = await dataService.getUsers();
-        const student = users.find((u: any) => u.uid === studentId);
-        if (student && student.email) {
-          await this.emailService.sendCheckInNotification(
-            student.email,
-            studentName,
-            attendanceRecord.checkInTime
-          );
-        }
-      } catch (emailError) {
-        console.warn('⚠️ Failed to send email notification:', emailError);
+      if (savedDetailedRecord.exists() && isPresentToday) {
+        verified = true;
+        console.log('🎉 ATTENDANCE RECORDING COMPLETE:', {
+          detailedRecord: '✅ Saved',
+          dailyRecord: '✅ Saved',
+          studentMarkedPresent: '✅ Yes',
+          attendanceId,
+          date: today
+        });
+        break;
       }
-    } else {
-      console.error('❌ ATTENDANCE RECORDING VERIFICATION FAILED:', {
-        detailedRecord: savedDetailedRecord.exists() ? '✅' : '❌',
-        dailyRecord: isPresentToday ? '✅' : '❌'
-      });
+      console.warn(`⚠️ Verification attempt ${i + 1} failed, retrying...`);
+      await new Promise(r => setTimeout(r, 1000));
+    }
+    
+    if (!verified) {
+      console.error('❌ ATTENDANCE RECORDING VERIFICATION FAILED after retries');
       throw new Error('Failed to verify attendance records were saved properly');
+    }
+
+    // Send email notification to student's Gmail
+    try {
+      const dataService = DataService.getInstance();
+      const users = await dataService.getUsers();
+      const student = users.find((u: any) => u.uid === studentId);
+      if (student && student.email) {
+        await this.emailService.sendCheckInNotification(
+          student.email,
+          studentName,
+          attendanceRecord.checkInTime
+        );
+      }
+    } catch (emailError) {
+      console.warn('⚠️ Failed to send email notification:', emailError);
     }
 
     return attendanceRecord;

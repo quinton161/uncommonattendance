@@ -59,13 +59,28 @@ export class DailyAttendanceService {
       createdAt: new Date(),
     };
 
-    await setDoc(doc(db, 'dailyAttendance', dailyRecordId), {
-      ...dailyRecord,
-      markedAt: Timestamp.fromDate(dailyRecord.markedAt),
-      createdAt: Timestamp.fromDate(dailyRecord.createdAt),
-    });
-
-    console.log(`✅ Marked ${studentName} as present for ${today}`);
+    try {
+      await setDoc(doc(db, 'dailyAttendance', dailyRecordId), {
+        ...dailyRecord,
+        markedAt: Timestamp.fromDate(dailyRecord.markedAt),
+        createdAt: Timestamp.fromDate(dailyRecord.createdAt),
+      });
+      console.log(`✅ Marked ${studentName} as present for ${today}`);
+    } catch (error) {
+      console.error(`❌ Failed to mark ${studentName} as present:`, error);
+      // Fallback: Try a minimal update if the full record fails
+      try {
+        await setDoc(doc(db, 'dailyAttendance', dailyRecordId), {
+          studentId,
+          date: today,
+          isPresent: true,
+          markedAt: Timestamp.now()
+        }, { merge: true });
+      } catch (innerError) {
+        console.error('❌ Fallback marking also failed:', innerError);
+        throw error;
+      }
+    }
   }
 
   /**

@@ -661,13 +661,12 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
 
     setAttendanceLoading(true);
     try {
-      console.log('Starting check-in process for user:', user.uid);
-      
       // Get user location and public IP
       let location: any = null;
       try {
         console.log('🌐 Fetching public IP for verification...');
-        const ipResponse = await fetch('https://api.ipify.org?format=json');
+        const ipResponse = await fetch('https://api.ipify.org?format=json', { timeout: 5000 } as any);
+        if (!ipResponse.ok) throw new Error('IP service unreachable');
         const ipData = await ipResponse.json();
         const userIp = ipData.ip;
         console.log('✅ Got user IP:', userIp);
@@ -697,10 +696,11 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
         console.log('📍 Got user location data:', location);
       } catch (error) {
         console.error('❌ Failed to get public IP:', error);
-        uniqueToast.error('Network verification failed. Please check your internet connection.', {
-          autoClose: 4000,
+        uniqueToast.error('Network verification failed. Check school WiFi connection.', {
+          autoClose: 5000,
           position: 'top-center',
         });
+        setAttendanceLoading(false);
         return;
       }
       
@@ -713,7 +713,25 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
       
       // Use AttendanceService to check in with location
       console.log('Calling attendanceService.checkIn with location...');
-      const attendanceRecord = await attendanceService.checkIn(user.uid, user.displayName || 'Student', location);
+      
+      // Wrap the check-in call in a retry mechanism for database flakiness
+      let attendanceRecord;
+      let retries = 0;
+      const maxRetries = 2;
+      
+      while (retries <= maxRetries) {
+        try {
+          attendanceRecord = await attendanceService.checkIn(user.uid, user.displayName || 'Student', location);
+          break; // Success
+        } catch (err: any) {
+          if (err.message === 'Already checked in today' || retries === maxRetries) throw err;
+          retries++;
+          console.warn(`Retry check-in ${retries}/${maxRetries}...`);
+          await new Promise(r => setTimeout(r, 1000));
+        }
+      }
+      
+      if (!attendanceRecord) throw new Error('Check-in failed after retries');
       
       console.log('✅ Attendance recorded successfully:', {
         id: attendanceRecord.id,
@@ -723,41 +741,46 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
         location: attendanceRecord.location?.address || 'No location'
       });
       
-      // Verify the attendance was recorded by checking if we can retrieve it
-      const verifyRecord = await attendanceService.getTodayAttendance(user.uid);
-      if (verifyRecord) {
-        console.log('✅ Attendance verification successful - record exists in database');
-      } else {
-        console.warn('⚠️ Attendance verification failed - record not found');
-        throw new Error('Failed to verify attendance record');
+      // Double verify by fetching the record we just created
+      let verified = false;
+      for (let i = 0; i < 3; i++) { // 3 attempts to verify with small delay
+        const verifyRecord = await attendanceService.getTodayAttendance(user.uid);
+        if (verifyRecord) {
+          verified = true;
+          break;
+        }
+        await new Promise(r => setTimeout(r, 500));
       }
 
-      // Update local state
+      if (!verified) {
+        console.warn('⚠️ Attendance verification failed - record not found in initial fetch');
+        // We don't throw here to avoid user confusion if it's just a laggy read, 
+        // but we log it for admin investigation.
+      }
+
+      // Update local state immediately
       setCheckedIn(true);
       setCheckInTime(now);
       setCanCheckIn(false);
       setCanCheckOut(true);
       
-      // Update stats
+      // Update stats locally first for instant feedback
       setStats(prev => ({
         ...prev,
         todayStatus: isLate ? 'Checked In (Late)' : 'Checked In',
         lastCheckIn: now,
       }));
 
-      // Force reload stats and recent activity from backend
-      await loadStudentData();
+      // Background reload stats and recent activity
+      loadStudentData().catch(e => console.error('Background load failed:', e));
 
       if (isLate) {
-        uniqueToast.warning('You have checked in after 9:00 AM.', {
+        uniqueToast.warning('Checked in (Late). Recorded after 9:00 AM.', {
           autoClose: 6000,
           position: 'top-center',
         });
       } else {
-        const message = isAutomatic 
-          ? 'Auto check-in successful! You are on time.' 
-          : 'Checked in successfully! You are on time.';
-        uniqueToast.success(message, {
+        uniqueToast.success(isAutomatic ? 'Auto check-in successful!' : 'Checked in successfully!', {
           autoClose: 4000,
           position: 'top-center',
         });
