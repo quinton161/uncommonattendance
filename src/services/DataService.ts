@@ -414,50 +414,38 @@ class DataService {
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    const todayStr = today.toISOString().split('T')[0];
     
-    // Start checking from today or the most recent attendance day
-    let checkDate = new Date(today);
-    let attendanceIdx = 0;
-
-    // If they haven't checked in today, streak might still be alive if they checked in yesterday
-    if (uniqueDaysAttendance.length > 0) {
-      const mostRecentDate = new Date(uniqueDaysAttendance[0].date || uniqueDaysAttendance[0].checkInTime);
+    // Streak logic: A streak is alive if the user checked in today OR yesterday.
+    // If the most recent check-in is before yesterday, the streak is 0.
+    if (uniqueDaysAttendance.length === 0) {
+      currentStreak = 0;
+    } else {
+      const mostRecentDateStr = uniqueDaysAttendance[0].date || new Date(uniqueDaysAttendance[0].checkInTime).toISOString().split('T')[0];
+      const mostRecentDate = new Date(mostRecentDateStr);
       mostRecentDate.setHours(0, 0, 0, 0);
       
-      // If the most recent check-in is older than yesterday, streak is broken
-      const diffToToday = Math.floor((today.getTime() - mostRecentDate.getTime()) / (1000 * 60 * 60 * 24));
-      if (diffToToday > 1) {
+      const diffInDays = Math.floor((today.getTime() - mostRecentDate.getTime()) / (1000 * 60 * 60 * 24));
+      
+      if (diffInDays > 1) {
+        // Streak broken (more than 1 day since last check-in)
         currentStreak = 0;
       } else {
-        // Walk backwards day by day
-        for (let i = 0; i < uniqueDaysAttendance.length; i++) {
-          const attendanceDate = new Date(uniqueDaysAttendance[i].date || uniqueDaysAttendance[i].checkInTime);
-          attendanceDate.setHours(0, 0, 0, 0);
+        // Streak continues: walk back from the most recent check-in date
+        currentStreak = 1;
+        for (let i = 1; i < uniqueDaysAttendance.length; i++) {
+          const currentDateStr = uniqueDaysAttendance[i-1].date || new Date(uniqueDaysAttendance[i-1].checkInTime).toISOString().split('T')[0];
+          const prevDateStr = uniqueDaysAttendance[i].date || new Date(uniqueDaysAttendance[i].checkInTime).toISOString().split('T')[0];
           
-          const expectedDate = new Date(today);
-          expectedDate.setDate(today.getDate() - i);
+          const current = new Date(currentDateStr);
+          const previous = new Date(prevDateStr);
+          current.setHours(0, 0, 0, 0);
+          previous.setHours(0, 0, 0, 0);
           
-          // Skip weekends in streak calculation if desired (optional, currently strictly consecutive days)
-          // For now, keeping it strictly consecutive calendar days
-          if (attendanceDate.getTime() === expectedDate.getTime()) {
+          const gap = Math.floor((current.getTime() - previous.getTime()) / (1000 * 60 * 60 * 24));
+          
+          if (gap === 1) {
             currentStreak++;
-          } else if (i === 0 && attendanceDate.getTime() === (new Date(today.getTime() - 86400000)).getTime()) {
-            // If i=0 and they didn't check in today but did yesterday, streak is still 1 (or more)
-            currentStreak = 1;
-            // Need to continue checking from yesterday
-            const yesterday = new Date(today.getTime() - 86400000);
-            for (let j = 1; j < uniqueDaysAttendance.length; j++) {
-              const prevDate = new Date(uniqueDaysAttendance[j].date || uniqueDaysAttendance[j].checkInTime);
-              prevDate.setHours(0, 0, 0, 0);
-              const nextExpected = new Date(yesterday);
-              nextExpected.setDate(yesterday.getDate() - j);
-              if (prevDate.getTime() === nextExpected.getTime()) {
-                currentStreak++;
-              } else {
-                break;
-              }
-            }
-            break;
           } else {
             break;
           }
@@ -517,15 +505,16 @@ class DataService {
     
     // Filter attendance for the target date
     const dailyAttendance = allAttendance.filter(a => {
-      const attendanceDate = new Date(a.date || a.checkInTime).toISOString().split('T')[0];
+      // Handle both string dates and Firestore Timestamps/Date objects
+      const attendanceDate = a.date || (a.checkInTime ? (a.checkInTime.toISOString ? a.checkInTime.toISOString().split('T')[0] : new Date(a.checkInTime).toISOString().split('T')[0]) : '');
       return attendanceDate === targetDate;
     });
 
     // Create summary for each user
     const attendanceSummary = allUsers
-      .filter(user => user.userType !== 'admin') // Exclude admin users
+      .filter(user => user.userType === 'attendee') // Only students
       .map(user => {
-        const userAttendance = dailyAttendance.find(a => a.userId === user.uid || a.studentId === user.uid);
+        const userAttendance = dailyAttendance.find(a => a.userId === user.uid || a.studentId === user.uid || a.studentId === user.id || a.userId === user.id);
         
         let status = 'absent';
         let checkInTime = null;
@@ -539,12 +528,13 @@ class DataService {
           
           if (checkInTime) {
             const checkIn = new Date(checkInTime);
-            isLate = checkIn.getHours() >= 9; // After 9 AM is late
+            // Late if after 9:00:59 AM
+            isLate = checkIn.getHours() > 9 || (checkIn.getHours() === 9 && checkIn.getMinutes() > 0);
           }
         }
 
         return {
-          userId: user.uid,
+          userId: user.uid || user.id,
           userName: user.displayName || 'Unknown',
           userEmail: user.email,
           userType: user.userType,
