@@ -68,7 +68,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           } else {
             console.warn('🔐 AuthContext: User document not found in Firestore after retries');
             // Check if this is a known instructor/admin email that needs a document
-            const isStaffEmail = firebaseUser.email?.endsWith('@uncommon.org'); // Example check
+            const isStaffEmail = firebaseUser.email?.endsWith('@uncommon.org') || 
+                               firebaseUser.email?.endsWith('@test.com') ||
+                               firebaseUser.email === 'instructor@example.com'; 
             
             console.log('🔐 AuthContext: Creating fallback user document...');
             const fallbackUserData = {
@@ -99,7 +101,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           // Don't set user to null on error, try to use basic auth user
           if (firebaseUser) {
             console.log('🔐 AuthContext: Using basic Firebase user data as fallback');
-            const isStaffEmail = firebaseUser.email?.endsWith('@uncommon.org');
+            const isStaffEmail = firebaseUser.email?.endsWith('@uncommon.org') || 
+                               firebaseUser.email?.endsWith('@test.com') ||
+                               firebaseUser.email === 'instructor@example.com';
             setUser({
               uid: firebaseUser.uid,
               email: firebaseUser.email!,

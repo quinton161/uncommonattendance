@@ -15,6 +15,7 @@ import {
   respectMotionPreference 
 } from '../../styles/animations';
 import DataService from '../../services/DataService';
+import { TimeService } from '../../services/timeService';
 import { uniqueToast } from '../../utils/toastUtils';
 import { ChatWindow } from '../Common/ChatWindow';
 import { chatService, Conversation } from '../../services/chatService';
@@ -449,7 +450,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
       await dataService.testConnection();
       const users = await dataService.getUsers();
       const attendance = await dataService.getAttendance();
-      const todayStr = new Date().toISOString().split('T')[0];
+      const timeService = TimeService.getInstance();
+      const todayStr = timeService.getCurrentDateString();
       // Only today's attendance
       const todayAttendance = attendance.filter((a: any) => a.date === todayStr);
       const rows = todayAttendance.map((a: any) => {

@@ -1,5 +1,6 @@
 import { AttendanceService } from '../services/attendanceService';
 import { DailyAttendanceService } from '../services/dailyAttendanceService';
+import { TimeService } from '../services/timeService';
 
 /**
  * Utility functions to verify attendance recording
@@ -40,7 +41,7 @@ export class AttendanceVerification {
             isPresent: detailedRecord.isPresent
           } : null,
           dailyPresent: isDailyPresent,
-          date: new Date().toISOString().split('T')[0]
+          date: TimeService.getInstance().getCurrentDateString()
         }
       };
 

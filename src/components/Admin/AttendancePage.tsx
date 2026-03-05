@@ -5,6 +5,7 @@ import { theme } from '../../styles/theme';
 import { Button } from '../Common/Button';
 import DataService from '../../services/DataService';
 import { AttendanceService } from '../../services/attendanceService';
+import { TimeService } from '../../services/timeService';
 import {
   CheckCircleIcon,
   TodayIcon,
@@ -661,7 +662,8 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
   const { user } = useAuth();
   const [attendanceSummary, setAttendanceSummary] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const timeService = TimeService.getInstance();
+  const [selectedDate, setSelectedDate] = useState(timeService.getCurrentDateString());
   const [statusFilter, setStatusFilter] = useState('all');
   const [fixingLocations, setFixingLocations] = useState(false);
   const dataService = DataService.getInstance();

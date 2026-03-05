@@ -14,6 +14,7 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { uniqueToast } from '../utils/toastUtils';
+import { TimeService } from './timeService';
 
 // Mock data for fallback
 const mockEvents = [
@@ -383,7 +384,8 @@ class DataService {
     const attendance = await this.getAttendance();
     const users = await this.getUsers();
 
-    const today = new Date().toISOString().split('T')[0];
+    const timeService = TimeService.getInstance();
+    const today = timeService.getCurrentDateString();
     const todayAttendance = attendance.filter(a => a.date === today);
 
     return {
@@ -498,7 +500,8 @@ class DataService {
 
   // Get daily attendance summary for admin
   async getDailyAttendanceSummary(date?: string): Promise<any> {
-    const targetDate = date || new Date().toISOString().split('T')[0];
+    const timeService = TimeService.getInstance();
+    const targetDate = date || timeService.getCurrentDateString();
     const allUsers = await this.getUsers();
     const allAttendance = await this.getAttendance();
     

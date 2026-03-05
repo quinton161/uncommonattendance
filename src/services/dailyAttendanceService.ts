@@ -12,6 +12,7 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { AttendanceRecord } from '../types';
+import { TimeService } from './timeService';
 
 export interface DailyAttendanceStats {
   totalDays: number;
@@ -46,7 +47,9 @@ export class DailyAttendanceService {
    * Mark a student as present for today when they check in
    */
   async markPresentToday(studentId: string, studentName: string): Promise<void> {
-    const today = new Date().toISOString().split('T')[0];
+    const timeService = TimeService.getInstance();
+    const today = timeService.getCurrentDateString();
+    console.log('📅 markPresentToday - Using Harare date:', today);
     const dailyRecordId = `${studentId}_${today}`;
 
     const dailyRecord = {
@@ -87,7 +90,8 @@ export class DailyAttendanceService {
    * Check if student is marked present today
    */
   async isPresentToday(studentId: string): Promise<boolean> {
-    const today = new Date().toISOString().split('T')[0];
+    const timeService = TimeService.getInstance();
+    const today = timeService.getCurrentDateString();
     const dailyRecordId = `${studentId}_${today}`;
 
     const docRef = doc(db, 'dailyAttendance', dailyRecordId);
@@ -206,7 +210,8 @@ export class DailyAttendanceService {
     });
 
     const calendar: AttendanceCalendarDay[] = [];
-    const today = new Date().toISOString().split('T')[0];
+    const timeService = TimeService.getInstance();
+    const today = timeService.getCurrentDateString();
 
     for (let day = 1; day <= endDate.getDate(); day++) {
       const date = new Date(year, month - 1, day);

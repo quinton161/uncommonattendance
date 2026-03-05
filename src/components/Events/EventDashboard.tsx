@@ -8,6 +8,7 @@ import { CreateEventForm } from './CreateEventForm';
 import { theme } from '../../styles/theme';
 import { doc, setDoc, updateDoc, collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
 import { db } from '../../services/firebase';
+import { TimeService } from '../../services/timeService';
 
 const DashboardContainer = styled.div`
   min-height: 100vh;
@@ -281,7 +282,9 @@ export const EventDashboard: React.FC<EventDashboardProps> = ({ onNavigateToProf
       const { latitude, longitude } = position.coords;
 
       // Create attendance record
-      const attendanceId = `${user.uid}_${new Date().toISOString().split('T')[0]}`;
+      const timeService = TimeService.getInstance();
+      const today = timeService.getCurrentDateString();
+      const attendanceId = `${user.uid}_${today}`;
       const attendanceData = {
         id: attendanceId,
         studentId: user.uid,
@@ -292,7 +295,7 @@ export const EventDashboard: React.FC<EventDashboardProps> = ({ onNavigateToProf
           longitude,
           address: 'Location captured'
         },
-        date: new Date().toISOString().split('T')[0],
+        date: today,
         isPresent: true
       };
 
@@ -319,7 +322,9 @@ export const EventDashboard: React.FC<EventDashboardProps> = ({ onNavigateToProf
       const { latitude, longitude } = position.coords;
 
       // Update attendance record
-      const attendanceId = `${user.uid}_${new Date().toISOString().split('T')[0]}`;
+      const timeService = TimeService.getInstance();
+      const today = timeService.getCurrentDateString();
+      const attendanceId = `${user.uid}_${today}`;
       await updateDoc(doc(db, 'attendance', attendanceId), {
         checkOutTime: new Date(),
         checkOutLocation: {
@@ -346,7 +351,8 @@ export const EventDashboard: React.FC<EventDashboardProps> = ({ onNavigateToProf
       if (!user || user.userType !== 'attendee') return;
 
       try {
-        const today = new Date().toISOString().split('T')[0];
+        const timeService = TimeService.getInstance();
+        const today = timeService.getCurrentDateString();
         const attendanceId = `${user.uid}_${today}`;
         const attendanceDoc = await getDocs(
           query(

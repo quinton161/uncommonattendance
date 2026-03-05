@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { theme } from '../../styles/theme';
 import { Button } from '../Common/Button';
 import DataService from '../../services/DataService';
+import { TimeService } from '../../services/timeService';
 import { DeleteUserModal } from './DeleteUserModal';
 import { uniqueToast } from '../../utils/toastUtils';
 import { UncommonLogo } from '../Common/UncommonLogo';
@@ -492,7 +493,8 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
   };
 
   const getTodayAttendance = (userId: string) => {
-    const today = new Date().toISOString().split('T')[0];
+    const timeService = TimeService.getInstance();
+    const today = timeService.getCurrentDateString();
     return attendance.find(a => a.studentId === userId && a.date === today);
   };
 
