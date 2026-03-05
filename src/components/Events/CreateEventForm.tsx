@@ -169,6 +169,7 @@ export const CreateEventForm: React.FC<CreateEventFormProps> = ({ onCancel, onSu
         imageUrl: formData.imageUrl.trim() || undefined,
         isPublic: formData.isPublic,
         eventStatus: formData.eventStatus,
+        instructorId: user.uid,
       };
 
       await createEvent(eventData);

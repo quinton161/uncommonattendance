@@ -26,7 +26,7 @@ export class EventService {
   }
 
   // Event Management
-  async createEvent(eventData: Omit<Event, 'id' | 'createdAt' | 'organizer'>): Promise<string> {
+  async createEvent(eventData: Omit<Event, 'id' | 'createdAt' | 'instructor'>): Promise<string> {
     try {
       const docRef = await addDoc(collection(db, 'events'), {
         ...eventData,
