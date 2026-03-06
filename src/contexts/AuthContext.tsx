@@ -55,27 +55,40 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           if (userDoc.exists()) {
             const userData = userDoc.data();
             console.log('🔐 AuthContext: User data loaded:', userData.displayName, userData.userType);
+            
+            // SECURITY: Always ensure the specific admin email has the admin role
+            const isAdminEmail = firebaseUser.email === 'quintonndlovu161@gmail.com';
+            const userType = isAdminEmail ? 'admin' : (userData.userType || 'attendee');
+
             setUser({
               uid: firebaseUser.uid,
               email: firebaseUser.email!,
               displayName: firebaseUser.displayName || userData.displayName,
-              // photoUrl can be either Firebase Auth URL or base64 from Firestore
               photoUrl: firebaseUser.photoURL || userData.photoUrl,
-              userType: userData.userType || 'attendee',
+              userType: userType,
               bio: userData.bio,
               createdAt: userData.createdAt?.toDate() || new Date(),
             });
           } else {
             console.warn('🔐 AuthContext: User document not found in Firestore after retries');
-            // Check if this is a known instructor/admin email that needs a document
+            
+            const isAdminEmail = firebaseUser.email === 'quintonndlovu161@gmail.com';
             const isStaffEmail = firebaseUser.email?.endsWith('@uncommon.org'); 
             
             console.log('🔐 AuthContext: Creating fallback user document...');
-            const fallbackUserData = {
+            const fallbackUserData: {
+              uid: string;
+              email: string;
+              displayName: string;
+              userType: 'instructor' | 'attendee' | 'admin';
+              createdAt: Date;
+              photoUrl: string | null;
+              bio: string;
+            } = {
               uid: firebaseUser.uid,
               email: firebaseUser.email!,
               displayName: firebaseUser.displayName || 'New User',
-              userType: isStaffEmail ? 'instructor' : 'attendee',
+              userType: isAdminEmail ? 'admin' : (isStaffEmail ? 'instructor' : 'attendee'),
               createdAt: new Date(),
               photoUrl: null,
               bio: '',
@@ -89,23 +102,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               email: firebaseUser.email!,
               displayName: firebaseUser.displayName || 'New User',
               photoUrl: firebaseUser.photoURL ?? undefined,
-              userType: isStaffEmail ? 'instructor' : 'attendee',
+              userType: fallbackUserData.userType,
               bio: '',
               createdAt: new Date(),
             });
           }
         } catch (error) {
           console.error('🔐 AuthContext: Error fetching user data:', error);
-          // Don't set user to null on error, try to use basic auth user
           if (firebaseUser) {
             console.log('🔐 AuthContext: Using basic Firebase user data as fallback');
+            const isAdminEmail = firebaseUser.email === 'quintonndlovu161@gmail.com';
             const isStaffEmail = firebaseUser.email?.endsWith('@uncommon.org');
             setUser({
               uid: firebaseUser.uid,
               email: firebaseUser.email!,
               displayName: firebaseUser.displayName || 'User',
               photoUrl: firebaseUser.photoURL ?? undefined,
-              userType: isStaffEmail ? 'instructor' : 'attendee',
+              userType: isAdminEmail ? 'admin' : (isStaffEmail ? 'instructor' : 'attendee'),
               bio: '',
               createdAt: new Date(),
             });

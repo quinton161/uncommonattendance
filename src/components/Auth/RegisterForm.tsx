@@ -201,13 +201,6 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onToggleMode }) => {
               >
                 Instructor
               </RoleButton>
-              <RoleButton
-                type="button"
-                selected={formData.userType === 'admin'}
-                onClick={() => handleRoleChange('admin')}
-              >
-                Admin
-              </RoleButton>
             </RoleSelector>
           </div>
           
