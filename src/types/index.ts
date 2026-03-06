@@ -110,6 +110,7 @@ export interface AuthContextType {
   updateProfile: (data: Partial<User>) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   deleteAccount: () => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
 }
 
 export interface EventContextType {

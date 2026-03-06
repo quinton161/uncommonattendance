@@ -7,6 +7,8 @@ import {
   updateProfile,
   sendPasswordResetEmail,
   deleteUser,
+  GoogleAuthProvider,
+  signInWithPopup,
 } from 'firebase/auth';
 import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../services/firebase';
@@ -238,6 +240,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const loginWithGoogle = async () => {
+    console.log('🔐 AuthContext: Starting Google login...');
+    const provider = new GoogleAuthProvider();
+    try {
+      const result = await signInWithPopup(auth, provider);
+      const firebaseUser = result.user;
+      console.log('🔐 AuthContext: Google login successful for:', firebaseUser.email);
+      
+      // Check if user document exists, if not it will be handled by onAuthStateChanged listener
+      // but we can proactively redirect here too if needed
+      
+      uniqueToast.success(`Welcome, ${firebaseUser.displayName}!`, { autoClose: 3000 });
+    } catch (error: any) {
+      console.error('🔐 AuthContext: Google login error:', error);
+      uniqueToast.error('Google login failed. Please try again.');
+      throw error;
+    }
+  };
+
   const logout = async () => {
     try {
       await signOut(auth);
@@ -336,6 +357,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     updateProfile: updateUserProfile,
     resetPassword,
     deleteAccount,
+    loginWithGoogle,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

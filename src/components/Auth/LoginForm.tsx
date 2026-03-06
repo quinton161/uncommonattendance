@@ -97,8 +97,48 @@ const ErrorMessage = styled.div`
   text-align: center;
 `;
 
+const Divider = styled.div`
+  display: flex;
+  align-items: center;
+  margin: ${theme.spacing.lg} 0;
+  color: ${theme.colors.gray400};
+  font-size: ${theme.fontSizes.sm};
+
+  &::before,
+  &::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: ${theme.colors.gray200};
+  }
+
+  span {
+    margin: 0 ${theme.spacing.md};
+  }
+`;
+
+const GoogleButton = styled(Button)`
+  background-color: white;
+  color: ${theme.colors.textPrimary};
+  border: 1px solid ${theme.colors.gray300};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: ${theme.spacing.sm};
+  
+  &:hover {
+    background-color: ${theme.colors.gray50};
+    border-color: ${theme.colors.gray400};
+  }
+
+  img {
+    width: 20px;
+    height: 20px;
+  }
+`;
+
 export const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode }) => {
-  const { login, resetPassword } = useAuth();
+  const { login, loginWithGoogle, resetPassword } = useAuth();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -211,6 +251,21 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode }) => {
             Sign In
           </Button>
         </Form>
+
+        <Divider>
+          <span>OR</span>
+        </Divider>
+
+        <GoogleButton
+          type="button"
+          variant="outline"
+          fullWidth
+          onClick={loginWithGoogle}
+          disabled={loading}
+        >
+          <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" />
+          Sign in with Google
+        </GoogleButton>
         
         <div style={{ textAlign: 'center' }}>
           <ForgotPasswordLink onClick={handleForgotPassword}>
