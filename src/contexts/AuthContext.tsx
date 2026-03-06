@@ -6,11 +6,13 @@ import {
   onAuthStateChanged,
   updateProfile,
   sendPasswordResetEmail,
+  deleteUser,
 } from 'firebase/auth';
 import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../services/firebase';
 import { User, AuthContextType } from '../types';
 import { uniqueToast } from '../utils/toastUtils';
+import DataService from '../services/DataService';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -289,6 +291,33 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const deleteAccount = async () => {
+    if (!auth.currentUser || !user) throw new Error('No user logged in');
+
+    try {
+      const firebaseUser = auth.currentUser;
+      const userId = user.uid;
+
+      // 1. Delete user document from Firestore
+      await DataService.getInstance().deleteUser(userId);
+
+      // 2. Delete user from Firebase Auth
+      await deleteUser(firebaseUser);
+
+      console.log('🔐 AuthContext: Account deleted successfully');
+      uniqueToast.success('Your account has been deleted successfully.');
+    } catch (error: any) {
+      console.error('🔐 AuthContext: Delete account error:', error);
+      
+      if (error.code === 'auth/requires-recent-login') {
+        uniqueToast.error('For security reasons, please log out and log back in before deleting your account.');
+      } else {
+        uniqueToast.error('Failed to delete account. Please try again.');
+      }
+      throw error;
+    }
+  };
+
   const value: AuthContextType = {
     user,
     loading,
@@ -297,6 +326,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     logout,
     updateProfile: updateUserProfile,
     resetPassword,
+    deleteAccount,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
