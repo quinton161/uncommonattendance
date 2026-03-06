@@ -270,6 +270,10 @@ const ChatButton = styled(Button)`
   border-color: ${theme.colors.primary};
   padding: 6px 12px;
   font-size: ${theme.fontSizes.xs};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   
   &:hover {
     background: ${theme.colors.primary};
