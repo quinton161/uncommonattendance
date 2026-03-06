@@ -268,16 +268,25 @@ const DeleteButton = styled(Button)`
 const ChatButton = styled(Button)`
   color: ${theme.colors.primary};
   border-color: ${theme.colors.primary};
-  padding: 6px 12px;
-  font-size: ${theme.fontSizes.xs};
+  padding: 8px 16px;
+  font-size: ${theme.fontSizes.sm};
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 8px;
+  min-width: 100px;
+  opacity: 1;
+  visibility: visible;
   
   &:hover {
     background: ${theme.colors.primary};
     color: white;
+  }
+
+  span {
+    display: inline !important;
+    visibility: visible !important;
+    opacity: 1 !important;
   }
 `;
 
@@ -664,7 +673,7 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
                 </div>
                 <ActionButtons>
                   <ChatButton onClick={() => handleChat(userData.id, userData.displayName || 'Unknown User', userData.photoUrl)}>
-                    <MessageIcon size={14} /> Chat
+                    <MessageIcon size={14} /> <span>Chat</span>
                   </ChatButton>
                   {user?.userType === 'admin' && (
                     <DeleteButton onClick={() => handleOpenDelete(userData)}>
@@ -725,7 +734,7 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
                   </MobileUserDetails>
                   <ActionButtons style={{ marginTop: theme.spacing.sm }}>
                     <ChatButton onClick={() => handleChat(userData.id, userData.displayName || 'Unknown User', userData.photoUrl)}>
-                      <MessageIcon size={14} /> Chat
+                      <MessageIcon size={14} /> <span>Chat</span>
                     </ChatButton>
                     {user?.userType === 'admin' && (
                       <DeleteButton onClick={() => handleOpenDelete(userData)}>
