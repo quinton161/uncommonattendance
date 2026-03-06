@@ -43,14 +43,17 @@ export class AttendanceService {
     console.log('AttendanceService.checkIn called with:', { studentId, studentName, location });
     
     if (!location || !location.ip) {
-      throw new Error('WiFi connection verification is required to check in. Please connect to the school WiFi.');
+      // console.warn('WiFi connection verification is recommended for check in.');
     }
 
+    /* 
     console.log('🌐 Checking IP against school WiFi...');
     if (!isOnSchoolWifi(location.ip)) {
       throw new Error('You must be connected to the school WiFi to check in');
     }
     console.log('✅ User is on school WiFi');
+    */
+    
     
     const harareTime = this.timeService.getCurrentTime();
     const today = harareTime.toISOString().split('T')[0];
@@ -78,11 +81,11 @@ export class AttendanceService {
       checkInTime: harareTime,
       date: today,
       isPresent: true,
-      location: {
-        latitude: location.latitude || 0,
-        longitude: location.longitude || 0,
-        address: getLocationDisplayName(SCHOOL_LOCATION),
-      },
+      location: (location && typeof location.latitude === 'number' && typeof location.longitude === 'number') ? {
+        latitude: location.latitude,
+        longitude: location.longitude,
+        address: location.address || 'Unknown'
+      } : undefined
     };
 
     console.log('📝 Saving detailed attendance record to Firebase:', {
@@ -153,12 +156,14 @@ export class AttendanceService {
 
   async checkOut(studentId: string, location?: LocationData): Promise<AttendanceRecord> {
     if (!location || !location.ip) {
-      throw new Error('WiFi connection verification is required to check out. Please connect to the school WiFi.');
+      // console.warn('WiFi connection verification is recommended for check out.');
     }
 
+    /*
     if (!isOnSchoolWifi(location.ip)) {
       throw new Error('You must be connected to the school WiFi to check out');
     }
+    */
 
     const harareTime = this.timeService.getCurrentTime();
     const today = harareTime.toISOString().split('T')[0];
@@ -178,14 +183,17 @@ export class AttendanceService {
 
     const checkOutTime = harareTime;
     
-    await updateDoc(doc(db, 'attendance', attendanceId), {
-      checkOutTime: Timestamp.fromDate(checkOutTime),
-      location: {
-        latitude: location.latitude || 0,
-        longitude: location.longitude || 0,
-        address: getLocationDisplayName(SCHOOL_LOCATION),
-      },
-    });
+    const updateData: any = {
+      checkOutTime: harareTime,
+      status: 'completed',
+      location: (location && typeof location.latitude === 'number' && typeof location.longitude === 'number') ? {
+        latitude: location.latitude,
+        longitude: location.longitude,
+        address: location.address || 'Unknown'
+      } : (attendanceData.location || undefined)
+    };
+
+    await updateDoc(doc(db, 'attendance', attendanceId), updateData);
 
     return {
       ...attendanceData,

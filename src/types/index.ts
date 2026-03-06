@@ -97,6 +97,7 @@ export interface LocationData {
   accuracy?: number;
   timestamp?: number;
   ip?: string;
+  address?: string;
 }
 
 // Context Types

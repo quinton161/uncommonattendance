@@ -178,7 +178,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       console.log('🔐 AuthContext: Registration complete!');
       uniqueToast.success('Account created successfully! Welcome!', { autoClose: 4000 });
-    } catch (error) {
+
+      // Direct redirection based on user type
+      if (userType === 'admin') {
+        window.location.href = '/admin-dashboard';
+      } else if (userType === 'instructor') {
+        window.location.href = '/instructor-dashboard';
+      } else {
+        window.location.href = '/dashboard';
+      }
+    } catch (error: any) {
       console.error('🔐 AuthContext: Registration error:', error);
       uniqueToast.error('Failed to create account. Please try again.', { autoClose: 4000 });
       throw error;
