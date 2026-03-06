@@ -771,12 +771,12 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
     }
   };
 
-  if (user?.userType !== 'admin') {
+  if (user?.userType !== 'admin' && user?.userType !== 'instructor') {
     return (
       <PageContainer>
         <div style={{ textAlign: 'center', padding: theme.spacing['3xl'] }}>
           <h2>Access Denied</h2>
-          <p>Only administrators can access this page.</p>
+          <p>Only administrators and instructors can access this page.</p>
           {onBack && (
             <Button variant="primary" onClick={onBack}>
               Back to Dashboard
@@ -842,14 +842,16 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
         <Button variant="outline" onClick={() => { setSelectedDate(''); setStatusFilter('all'); }}>
           Clear Filters
         </Button>
-        <Button 
-          variant="secondary" 
-          onClick={handleFixLocations}
-          disabled={fixingLocations}
-        >
-          <LocationOnIcon size={16} style={{ marginRight: theme.spacing.xs }} />
-          {fixingLocations ? 'Fixing Locations...' : 'Fix Location Records'}
-        </Button>
+        {user?.userType === 'admin' && (
+          <Button 
+            variant="secondary" 
+            onClick={handleFixLocations}
+            disabled={fixingLocations}
+          >
+            <LocationOnIcon size={16} style={{ marginRight: theme.spacing.xs }} />
+            {fixingLocations ? 'Fixing Locations...' : 'Fix Location Records'}
+          </Button>
+        )}
       </ActionButtonsContainer>
 
       {loading ? (
@@ -895,22 +897,24 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
                   </StatusBadge>
                 </div>
                 
-                <ActionButtons>
-                  <ActionButton 
-                    variant="edit" 
-                    onClick={() => handleEditAttendance(record)}
-                    title="Edit attendance record"
-                  >
-                    Edit
-                  </ActionButton>
-                  <ActionButton 
-                    variant="delete" 
-                    onClick={() => handleDeleteAttendance(record)}
-                    title="Delete attendance record"
-                  >
-                    Delete
-                  </ActionButton>
-                </ActionButtons>
+                {user?.userType === 'admin' && (
+                  <ActionButtons>
+                    <ActionButton 
+                      variant="edit" 
+                      onClick={() => handleEditAttendance(record)}
+                      title="Edit attendance record"
+                    >
+                      Edit
+                    </ActionButton>
+                    <ActionButton 
+                      variant="delete" 
+                      onClick={() => handleDeleteAttendance(record)}
+                      title="Delete attendance record"
+                    >
+                      Delete
+                    </ActionButton>
+                  </ActionButtons>
+                )}
                 
                 {/* Mobile-only organized layout */}
                 <MobileDataGrid>
