@@ -10,7 +10,8 @@ import {
   limit,
   addDoc,
   Timestamp, 
-  deleteDoc 
+  deleteDoc,
+  onSnapshot 
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { uniqueToast } from '../utils/toastUtils';
@@ -398,7 +399,118 @@ class DataService {
     };
   }
 
-  // Student specific stats
+  // Subscribe to Today's Attendance Summary (Real-time)
+  subscribeToTodayAttendance(callback: (summary: any) => void): () => void {
+    if (!this.useFirebase) {
+      // Fallback for mock data (no real-time support in mock mode)
+      this.getDailyAttendanceSummary().then(callback);
+      return () => {};
+    }
+
+    const timeService = TimeService.getInstance();
+    const today = timeService.getCurrentDateString();
+    
+    console.log('📡 Setting up real-time attendance listener for:', today);
+
+    // 1. Listen for all users (to get the student list)
+    // In a real app, users don't change as often as attendance, 
+    // but we need them to build the summary.
+    let allUsers: any[] = [];
+    
+    const unsubscribeUsers = onSnapshot(collection(db, 'users'), (usersSnapshot) => {
+      allUsers = usersSnapshot.docs.map(doc => ({
+        id: doc.id,
+        uid: doc.id,
+        ...doc.data()
+      }));
+      
+      // Trigger update whenever users change
+      this.refreshSummary(today, allUsers, undefined, callback);
+    });
+
+    // 2. Listen for today's attendance records
+    const attendanceQuery = query(
+      collection(db, 'attendance'),
+      where('date', '==', today),
+      orderBy('checkInTime', 'desc')
+    );
+
+    const unsubscribeAttendance = onSnapshot(attendanceQuery, (attendanceSnapshot) => {
+      const dailyAttendance = attendanceSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        checkInTime: doc.data().checkInTime?.toDate(),
+        checkOutTime: doc.data().checkOutTime?.toDate()
+      }));
+
+      // Trigger update whenever attendance changes
+      this.refreshSummary(today, allUsers, dailyAttendance, callback);
+    }, (error) => {
+      console.error('❌ Error in attendance real-time listener:', error);
+    });
+
+    return () => {
+      console.log('🔌 Cleaning up attendance listeners');
+      unsubscribeUsers();
+      unsubscribeAttendance();
+    };
+  }
+
+  private async refreshSummary(date: string, users: any[], attendance: any[] | undefined, callback: (summary: any) => void) {
+    // If attendance isn't provided, fetch it once or wait for the listener
+    let currentAttendance = attendance;
+    if (!currentAttendance) {
+      const allAttendance = await this.getAttendance();
+      currentAttendance = allAttendance.filter(a => {
+        const attendanceDate = a.date || (a.checkInTime ? (a.checkInTime.toISOString ? a.checkInTime.toISOString().split('T')[0] : new Date(a.checkInTime).toISOString().split('T')[0]) : '');
+        return attendanceDate === date;
+      });
+    }
+
+    const attendanceSummary = users
+      .filter(user => user.userType === 'attendee')
+      .map(user => {
+        const userAttendance = currentAttendance?.find(a => a.userId === user.uid || a.studentId === user.uid || a.studentId === user.id || a.userId === user.id);
+        
+        let status = 'absent';
+        let checkInTime = null;
+        let checkOutTime = null;
+        let isLate = false;
+        
+        if (userAttendance) {
+          status = userAttendance.status || 'present';
+          checkInTime = userAttendance.checkInTime;
+          checkOutTime = userAttendance.checkOutTime;
+          
+          if (checkInTime) {
+            const checkIn = new Date(checkInTime);
+            isLate = checkIn.getHours() > 9 || (checkIn.getHours() === 9 && checkIn.getMinutes() > 0);
+          }
+        }
+
+        return {
+          userId: user.uid || user.id,
+          userName: user.displayName || 'Unknown',
+          userEmail: user.email,
+          userType: user.userType,
+          status,
+          checkInTime,
+          checkOutTime,
+          isLate,
+          attendanceId: userAttendance?.id || null
+        };
+      });
+
+    callback({
+      date,
+      totalUsers: attendanceSummary.length,
+      presentCount: attendanceSummary.filter(a => a.status === 'present' || a.status === 'completed').length,
+      absentCount: attendanceSummary.filter(a => a.status === 'absent').length,
+      lateCount: attendanceSummary.filter(a => a.isLate).length,
+      attendanceList: attendanceSummary,
+      recentAttendance: currentAttendance?.slice(0, 10) || []
+    });
+  }
   async getStudentStats(userId: string): Promise<any> {
     const userAttendance = await this.getAttendance(userId);
     const events = await this.getEvents();

@@ -531,11 +531,26 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
     // Request permission for push notifications
     notificationService.requestPermission();
 
-    // Load dashboard stats on mount
+    // Subscribe to today's attendance in real-time
+    console.log('📊 AdminDashboard: Subscribing to real-time attendance...');
+    const unsubscribeAttendance = dataService.subscribeToTodayAttendance((summary) => {
+      console.log('🔄 AdminDashboard: Received real-time attendance update:', summary);
+      
+      setStats(prev => ({
+        ...prev,
+        todayAttendance: summary.presentCount
+      }));
+      
+      if (summary.recentAttendance) {
+        setRecentAttendance(summary.recentAttendance);
+      }
+    });
+
+    // Load static dashboard stats on mount
     loadDashboardData();
 
     // Subscribe to ALL conversations so admins can see messages from any student
-    const unsubscribe = chatService.subscribeToAllConversations(async (data) => {
+    const unsubscribeChat = chatService.subscribeToAllConversations(async (data) => {
       // Use functional state update to ensure we have the most current conversations
       setConversations(prevConversations => {
         // Mark selected conversation as read if it has unread messages
@@ -588,7 +603,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
       });
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribeAttendance();
+      unsubscribeChat();
+    };
   }, []);
 
   const handleNavClick = (navItem: string) => {

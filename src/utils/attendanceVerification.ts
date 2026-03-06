@@ -20,7 +20,7 @@ export class AttendanceVerification {
     details: any;
   }> {
     try {
-      console.log(`🔍 Verifying attendance for student: ${studentId}`);
+      console.log(` Verifying attendance for student: ${studentId}`);
 
       // Check detailed attendance record
       const detailedRecord = await this.attendanceService.getTodayAttendance(studentId);
