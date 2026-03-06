@@ -13,7 +13,7 @@ import {
 import { db } from './firebase';
 import { AttendanceRecord, LocationData } from '../types';
 import { DailyAttendanceService } from './dailyAttendanceService';
-import { isOnSchoolWifi, SCHOOL_LOCATION, getLocationDisplayName } from '../config/locationConfig';
+import { SCHOOL_LOCATION, getLocationDisplayName } from '../config/locationConfig';
 import DataService from './DataService';
 import { BrowserEmailService } from '../services/emailService';
 import { TimeService } from './timeService';
