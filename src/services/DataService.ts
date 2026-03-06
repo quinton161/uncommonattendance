@@ -13,7 +13,8 @@ import {
   deleteDoc,
   onSnapshot 
 } from 'firebase/firestore';
-import { db } from './firebase';
+import { ref, deleteObject } from 'firebase/storage';
+import { db, storage } from './firebase';
 import { uniqueToast } from '../utils/toastUtils';
 import { TimeService } from './timeService';
 
@@ -363,18 +364,54 @@ class DataService {
     }
 
     try {
-      // Delete user document
+      console.log('🗑️ DataService: Starting comprehensive user data deletion for:', userId);
+      
+      // 1. Delete user document
       await deleteDoc(doc(db, 'users', userId));
+      console.log('🗑️ Deleted: users/', userId);
       
-      // Note: In a real app with real student accounts, 
-      // you should NOT delete the user document. Instead, consider marking the account as inactive or deleted.
-      // For demo purposes, we allow deletion
-      // You might also want to delete or mark as deleted related attendance records
+      // 2. Delete attendance records for this user
+      const attendanceQuery = query(collection(db, 'attendance'), where('studentId', '==', userId));
+      const attendanceSnapshot = await getDocs(attendanceQuery);
+      const attendanceDeletes = attendanceSnapshot.docs.map(doc => deleteDoc(doc.ref));
+      await Promise.all(attendanceDeletes);
+      console.log('🗑️ Deleted:', attendanceSnapshot.size, 'attendance records');
       
-      uniqueToast.success('User deleted successfully!');
+      // 3. Delete chat conversations where user is involved
+      // Conversations are stored with ID format: studentId_adminId
+      const conversationsQuery = query(
+        collection(db, 'conversations'),
+        where('studentId', '==', userId)
+      );
+      const conversationsSnapshot = await getDocs(conversationsQuery);
+      const conversationDeletes = conversationsSnapshot.docs.map(doc => deleteDoc(doc.ref));
+      await Promise.all(conversationDeletes);
+      console.log('🗑️ Deleted:', conversationsSnapshot.size, 'conversations');
+      
+      // 4. Delete registrations for this user
+      const registrationsQuery = query(collection(db, 'registrations'), where('studentId', '==', userId));
+      const registrationsSnapshot = await getDocs(registrationsQuery);
+      const registrationDeletes = registrationsSnapshot.docs.map(doc => deleteDoc(doc.ref));
+      await Promise.all(registrationDeletes);
+      console.log('🗑️ Deleted:', registrationsSnapshot.size, 'registrations');
+      
+      // 5. Delete profile photo from storage if exists
+      try {
+        const profilePhotoRef = ref(storage, `profile-photos/${userId}/profile.jpg`);
+        await deleteObject(profilePhotoRef);
+        console.log('🗑️ Deleted: profile photo');
+      } catch (storageError: any) {
+        // File might not exist, which is fine
+        if (storageError.code !== 'storage/object-not-found') {
+          console.warn('⚠️ Could not delete profile photo:', storageError.message);
+        }
+      }
+      
+      console.log('✅ DataService: User and all associated data deleted successfully');
+      uniqueToast.success('Account and all associated data deleted successfully!');
     } catch (error) {
       console.error('Error deleting user:', error);
-      uniqueToast.error('Failed to delete user');
+      uniqueToast.error('Failed to delete account data. Please try again.');
       throw error;
     }
   }

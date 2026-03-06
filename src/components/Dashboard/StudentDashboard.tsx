@@ -553,7 +553,21 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
   };
 
   const checkTodayAttendance = useCallback(async () => {
-    if (!user || user.userType !== 'attendee') return;
+    if (!user) return;
+    
+    // Debug: Log the user type
+    console.log('checkTodayAttendance - user.userType:', user.userType, 'user.email:', user.email);
+    
+    if (user.userType !== 'attendee') {
+      // Allow check-in for users without explicit attendee type (fix for Google login users)
+      // Only block for explicit admin/instructor roles
+      if (user.userType === 'admin' || user.userType === 'instructor') {
+        console.log('User is not an attendee, skipping attendance check');
+        return;
+      }
+      // For undefined/null userType, default to allowing attendance (treat as attendee)
+      console.log('User type not set, defaulting to attendee for attendance');
+    }
 
     try {
       // Use the AttendanceService with daily reset logic
@@ -651,8 +665,16 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
       return;
     }
 
+    // Debug: Check if user has required properties
+    console.log('User details for check-in:', {
+      uid: user.uid,
+      displayName: user.displayName,
+      email: user.email,
+      userType: user.userType
+    });
+
     if (!canCheckIn) {
-      uniqueToast.info('You cannot check in right now.', {
+      uniqueToast.info('You cannot check in right now. Please try again or refresh the page.', {
         autoClose: 4000,
         position: 'top-center',
       });

@@ -94,7 +94,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               displayName: firebaseUser.displayName || 'New User',
               userType: isAdminEmail ? 'admin' : (isStaffEmail ? 'instructor' : 'attendee'),
               createdAt: new Date(),
-              photoUrl: null,
+              photoUrl: firebaseUser.photoURL || null,
               bio: '',
             };
             
@@ -243,6 +243,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const loginWithGoogle = async () => {
     console.log('🔐 AuthContext: Starting Google login...');
     const provider = new GoogleAuthProvider();
+    
+    // Add common scopes
+    provider.addScope('profile');
+    provider.addScope('email');
+    
     try {
       const result = await signInWithPopup(auth, provider);
       const firebaseUser = result.user;
@@ -252,9 +257,41 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // but we can proactively redirect here too if needed
       
       uniqueToast.success(`Welcome, ${firebaseUser.displayName}!`, { autoClose: 3000 });
+      
+      // Redirect based on user type after a short delay
+      setTimeout(() => {
+        window.location.href = '/dashboard';
+      }, 500);
     } catch (error: any) {
       console.error('🔐 AuthContext: Google login error:', error);
-      uniqueToast.error('Google login failed. Please try again.');
+      
+      let errorMessage = 'Google login failed. Please try again.';
+      
+      // Provide specific error messages based on Firebase error codes
+      switch (error.code) {
+        case 'auth/popup-closed-by-user':
+          errorMessage = 'Sign-in popup was closed before completing the sign-in. Please try again.';
+          break;
+        case 'auth/cancelled-popup-request':
+          errorMessage = 'Only one popup allowed at a time. Please close any other popups.';
+          break;
+        case 'auth/operation-not-allowed':
+          errorMessage = 'Google sign-in is not enabled. Please contact the administrator.';
+          break;
+        case 'auth/unauthorized-domain':
+          errorMessage = 'This domain is not authorized for Google sign-in. Please contact the administrator.';
+          break;
+        case 'auth/network-request-failed':
+          errorMessage = 'Network error. Please check your connection and try again.';
+          break;
+        case 'auth/popup-blocked':
+          errorMessage = 'Sign-in popup was blocked by your browser. Please allow popups for this site.';
+          break;
+        default:
+          errorMessage = error.message || 'Google login failed. Please try again.';
+      }
+      
+      uniqueToast.error(errorMessage, { autoClose: 5000 });
       throw error;
     }
   };
