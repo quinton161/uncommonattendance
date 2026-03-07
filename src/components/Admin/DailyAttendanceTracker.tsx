@@ -560,6 +560,24 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({ 
     setSelectedDate(todayHarare);
   };
 
+  const handleClearToday = async () => {
+    if (!window.confirm('Are you sure you want to clear ALL attendance records for today? This cannot be undone.')) {
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      const count = await attendanceService.clearTodayAttendance();
+      uniqueToast.success(`Cleared ${count} attendance records for today`);
+      await loadDailyAttendance();
+    } catch (error) {
+      console.error('Error clearing today attendance:', error);
+      uniqueToast.error('Failed to clear attendance records');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const formatDate = (date: Date) => {
     return date.toLocaleDateString('en-US', {
       weekday: 'long',
@@ -642,6 +660,10 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({ 
           
           <Button variant="outline" onClick={goToToday}>
             Go to Today
+          </Button>
+          
+          <Button variant="danger" onClick={handleClearToday}>
+            Clear Today
           </Button>
         </ControlsSection>
 

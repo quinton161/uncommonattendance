@@ -9,6 +9,7 @@ import {
   orderBy,
   updateDoc,
   Timestamp,
+  deleteDoc,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { AttendanceRecord, LocationData } from '../types';
@@ -434,6 +435,28 @@ export class AttendanceService {
     });
 
     return records;
+  }
+
+  // Clear all attendance records for today (admin function)
+  async clearTodayAttendance(): Promise<number> {
+    const today = this.timeService.getCurrentDateString();
+    
+    const q = query(
+      collection(db, 'attendance'),
+      where('date', '==', today)
+    );
+    
+    const querySnapshot = await getDocs(q);
+    let deletedCount = 0;
+    
+    const deletePromises = querySnapshot.docs.map(doc => {
+      deletedCount++;
+      return deleteDoc(doc.ref);
+    });
+    
+    await Promise.all(deletePromises);
+    console.log('🗑️ Cleared', deletedCount, 'attendance records for', today);
+    return deletedCount;
   }
 
   private async getAddressFromCoordinates(
