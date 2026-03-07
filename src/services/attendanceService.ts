@@ -350,33 +350,61 @@ export class AttendanceService {
     endDate: string,
     studentId?: string
   ): Promise<AttendanceRecord[]> {
-    let q = query(
+    // For single day queries (most common), use equality filter
+    if (startDate === endDate) {
+      let q;
+      if (studentId) {
+        q = query(
+          collection(db, 'attendance'),
+          where('studentId', '==', studentId),
+          where('date', '==', startDate)
+        );
+      } else {
+        q = query(
+          collection(db, 'attendance'),
+          where('date', '==', startDate)
+        );
+      }
+      
+      const querySnapshot = await getDocs(q);
+      const records: AttendanceRecord[] = [];
+      
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        records.push({
+          ...data,
+          checkInTime: data.checkInTime?.toDate(),
+          checkOutTime: data.checkOutTime?.toDate(),
+        } as AttendanceRecord);
+      });
+      
+      return records;
+    }
+    
+    // For date range queries, use orderBy on a single field and filter in memory
+    // This avoids Firestore composite index requirements
+    const q = query(
       collection(db, 'attendance'),
-      where('date', '>=', startDate),
-      where('date', '<=', endDate),
       orderBy('date', 'desc')
     );
 
-    if (studentId) {
-      q = query(
-        collection(db, 'attendance'),
-        where('studentId', '==', studentId),
-        where('date', '>=', startDate),
-        where('date', '<=', endDate),
-        orderBy('date', 'desc')
-      );
-    }
-
     const querySnapshot = await getDocs(q);
     const records: AttendanceRecord[] = [];
-
+    
+    // Filter by date range and studentId in memory
     querySnapshot.forEach((doc) => {
       const data = doc.data();
-      records.push({
-        ...data,
-        checkInTime: data.checkInTime.toDate(),
-        checkOutTime: data.checkOutTime?.toDate(),
-      } as AttendanceRecord);
+      const recordDate = data.date;
+      const matchesStudent = !studentId || data.studentId === studentId;
+      const matchesDate = recordDate >= startDate && recordDate <= endDate;
+      
+      if (matchesStudent && matchesDate) {
+        records.push({
+          ...data,
+          checkInTime: data.checkInTime?.toDate(),
+          checkOutTime: data.checkOutTime?.toDate(),
+        } as AttendanceRecord);
+      }
     });
 
     return records;

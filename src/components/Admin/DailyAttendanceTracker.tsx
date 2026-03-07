@@ -451,13 +451,23 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({ 
       
       // Convert selectedDate to Harare timezone date string
       const selectedDateHarare = new Date(selectedDate.toLocaleString('en-US', { timeZone: 'Africa/Harare' }));
-      const dateStr = selectedDateHarare.toISOString().split('T')[0];
+      let dateStr = selectedDateHarare.toISOString().split('T')[0];
       
+      // Auto-correct: if viewing future date, show today
+      if (dateStr > today) {
+        console.log('⚠️ Selected date is in the future, auto-correcting to today');
+        dateStr = today;
+        setSelectedDate(timeService.getCurrentTime());
+      }
+      
+      // Debug: verify date consistency
+      const isToday = dateStr === today;
       console.log('🔍 DAILY ATTENDANCE TRACKER DEBUG:');
       console.log('  - selectedDate:', selectedDate.toISOString());
       console.log('  - selectedDate (Harare timezone):', selectedDateHarare.toISOString());
       console.log('  - dateStr (querying Firebase):', dateStr);
       console.log('  - today (current Harare date):', today);
+      console.log('  - isToday (are we viewing today?):', isToday);
       console.log('  - Browser timezone:', Intl.DateTimeFormat().resolvedOptions().timeZone);
       console.log('🔄 Loading daily attendance for date:', dateStr);
 
