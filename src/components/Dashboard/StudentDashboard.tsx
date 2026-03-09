@@ -908,6 +908,7 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
                       studentId={user?.uid || ''} 
                       studentName={user?.displayName || 'Student'} 
                       currentUserUid={user?.uid || ''}
+                      currentUserName={user?.displayName || 'Student'}
                       studentPhotoUrl={user?.photoUrl}
                       currentUserPhotoUrl={user?.photoUrl}
                       adminUid={selectedAdmin.uid}

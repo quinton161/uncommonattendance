@@ -132,3 +132,59 @@ export interface RegistrationContextType {
   getUserRegistrations: (userId: string) => Promise<Registration[]>;
   getEventRegistrations: (eventId: string) => Promise<Registration[]>;
 }
+
+// ==================== Calling System Types ====================
+
+export type CallType = 'voice' | 'video';
+export type CallStatus = 'ringing' | 'active' | 'ended' | 'declined' | 'missed';
+
+export interface CallSession {
+  id: string;
+  callerId: string;
+  callerName: string;
+  calleeId: string;
+  calleeName: string;
+  type: CallType;
+  status: CallStatus;
+  startedAt: any;
+  endedAt?: any;
+  duration?: number; // in seconds
+}
+
+export interface SignalingMessage {
+  id: string;
+  type: 'offer' | 'answer' | 'ice-candidate' | 'call-request' | 'call-response' | 'call-ended';
+  callId: string;
+  senderId: string;
+  senderName: string;
+  receiverId: string;
+  data?: {
+    sdp?: string; // for offer/answer
+    candidate?: RTCIceCandidateInit; // for ICE
+    callType?: CallType;
+    response?: 'accept' | 'decline';
+  };
+  timestamp: any;
+}
+
+export interface UserPresence {
+  userId: string;
+  displayName: string;
+  isOnline: boolean;
+  lastSeen: any;
+  lastActive: any;
+}
+
+export interface MessageStatus {
+  messageId: string;
+  status: 'sent' | 'delivered' | 'read';
+  updatedAt: any;
+}
+
+export interface TypingIndicator {
+  conversationId: string;
+  userId: string;
+  userName: string;
+  isTyping: boolean;
+  timestamp: any;
+}

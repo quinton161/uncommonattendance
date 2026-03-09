@@ -10,9 +10,11 @@ import {
   orderBy,
   onSnapshot,
   where,
-  getDocs
+  getDocs,
+  deleteDoc
 } from 'firebase/firestore';
-import { db } from './firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, storage } from './firebase';
 
 export interface Message {
   id?: string;
@@ -21,6 +23,10 @@ export interface Message {
   senderPhotoUrl?: string;
   text: string;
   createdAt: any;
+  readBy?: string[]; // Array of user IDs who have read the message
+  audioUrl?: string; // Voice message audio URL
+  audioDuration?: number; // Voice message duration in seconds
+  messageType?: 'text' | 'voice'; // Type of message
 }
 
 export interface Conversation {
@@ -112,6 +118,77 @@ class ChatService {
     );
   }
 
+  // Send a voice message
+  async sendVoiceMessage(
+    studentId: string,
+    studentName: string,
+    senderId: string,
+    audioBlob: Blob,
+    duration: number,
+    adminId: string,
+    senderPhotoUrl?: string
+  ) {
+    const conversationId = `${studentId}_${adminId}`;
+    const conversationRef = doc(db, 'conversations', conversationId);
+    const existingDoc = await getDoc(conversationRef);
+
+    // Get sender name
+    let senderName = studentName;
+    let actualAdminId = adminId;
+    
+    if (senderId !== studentId) {
+      const senderDoc = await getDoc(doc(db, 'users', senderId));
+      if (senderDoc.exists()) {
+        senderName = senderDoc.data().displayName || 'Admin';
+        actualAdminId = senderId;
+      }
+    }
+
+    // Get admin name for the conversation
+    let adminName = 'Admin';
+    try {
+      const adminDoc = await getDoc(doc(db, 'users', adminId));
+      if (adminDoc.exists()) {
+        adminName = adminDoc.data().displayName || 'Admin';
+      }
+    } catch (e) {
+      console.log('Error fetching admin name:', e);
+    }
+
+    // Upload audio to Firebase Storage
+    const audioFileName = `voice_messages/${conversationId}/${Date.now()}.webm`;
+    const audioRef = ref(storage, audioFileName);
+    await uploadBytes(audioRef, audioBlob);
+    const audioUrl = await getDownloadURL(audioRef);
+
+    // Ensure conversation exists and update last message
+    await setDoc(conversationRef, {
+      studentId,
+      studentName,
+      adminId: actualAdminId,
+      adminName,
+      lastMessage: '🎤 Voice message',
+      lastMessageTime: serverTimestamp(),
+      lastSenderId: senderId,
+      unreadCount: existingDoc.exists() ? (existingDoc.data()?.unreadCount || 0) + 1 : 1
+    }, { merge: true });
+
+    // Add voice message to subcollection
+    await addDoc(
+      collection(db, 'conversations', conversationId, 'messages'),
+      {
+        senderId,
+        senderName,
+        senderPhotoUrl,
+        text: '',
+        audioUrl,
+        audioDuration: duration,
+        messageType: 'voice',
+        createdAt: serverTimestamp()
+      }
+    );
+  }
+
   // Reset unread count for a conversation
   async markAsRead(conversationId: string) {
     const conversationRef = doc(db, 'conversations', conversationId);
@@ -134,6 +211,47 @@ class ChatService {
       })) as Message[];
       callback(messages);
     });
+  }
+
+  // Mark a message as read by a user
+  async markMessageAsRead(conversationId: string, messageId: string, userId: string): Promise<void> {
+    const messageRef = doc(db, 'conversations', conversationId, 'messages', messageId);
+    const messageDoc = await getDoc(messageRef);
+    
+    if (messageDoc.exists()) {
+      const messageData = messageDoc.data();
+      const readBy: string[] = messageData.readBy || [];
+      
+      if (!readBy.includes(userId)) {
+        await updateDoc(messageRef, {
+          readBy: [...readBy, userId]
+        });
+      }
+    }
+  }
+
+  // Mark all messages in a conversation as read
+  async markAllMessagesAsRead(conversationId: string, userId: string): Promise<void> {
+    const q = query(
+      collection(db, 'conversations', conversationId, 'messages'),
+      orderBy('createdAt', 'asc')
+    );
+
+    const snapshot = await getDocs(q);
+    const updatePromises = snapshot.docs.map(async (docSnap) => {
+      const messageData = docSnap.data();
+      const readBy: string[] = messageData.readBy || [];
+
+      // Only update if user hasn't already read this message
+      if (!readBy.includes(userId)) {
+        const messageRef = doc(db, 'conversations', conversationId, 'messages', docSnap.id);
+        await updateDoc(messageRef, {
+          readBy: [...readBy, userId]
+        });
+      }
+    });
+
+    await Promise.all(updatePromises);
   }
 
   // Get user photo URL by user ID
@@ -293,6 +411,42 @@ class ChatService {
       return staff[0].uid;
     }
     return 'admin'; // Fallback
+  }
+
+  // Set typing indicator
+  async setTyping(conversationId: string, userId: string, userName: string, isTyping: boolean): Promise<void> {
+    const typingRef = doc(db, 'typing', conversationId, 'indicators', userId);
+    
+    if (isTyping) {
+      await setDoc(typingRef, {
+        userId,
+        userName,
+        isTyping: true,
+        timestamp: serverTimestamp()
+      }, { merge: true });
+      
+      // Auto-clear typing after 3 seconds
+      setTimeout(async () => {
+        await deleteDoc(typingRef);
+      }, 3000);
+    } else {
+      await deleteDoc(typingRef);
+    }
+  }
+
+  // Subscribe to typing indicators
+  subscribeToTyping(conversationId: string, callback: (typingUsers: { userId: string; userName: string }[]) => void): () => void {
+    const q = collection(db, 'typing', conversationId, 'indicators');
+    
+    return onSnapshot(q, (snapshot) => {
+      const typingUsers = snapshot.docs
+        .filter(doc => doc.data().isTyping)
+        .map(doc => ({
+          userId: doc.id,
+          userName: doc.data().userName
+        }));
+      callback(typingUsers);
+    });
   }
 }
 
