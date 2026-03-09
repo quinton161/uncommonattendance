@@ -684,86 +684,16 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
 
     setAttendanceLoading(true);
     try {
-      // Get user location and public IP
-      let location: any = null;
+      // Get minimal network info (non-blocking)
+      let location: any = { ip: '0.0.0.0', timestamp: Date.now() };
       try {
-        console.log('🌐 Fetching public IP for verification...');
-        let userIp = '0.0.0.0';
-        
-        // Try multiple IP services for better reliability across devices/networks
-        const ipServices = [
-          'https://api.ipify.org?format=json',
-          'https://api64.ipify.org?format=json',
-          'https://ipapi.co/json/'
-        ];
-
-        for (const service of ipServices) {
-          try {
-            const ipResponse = await fetch(service, { signal: AbortSignal.timeout(5000) });
-            if (ipResponse.ok) {
-              const ipData = await ipResponse.json();
-              userIp = ipData.ip || ipData.query || userIp;
-              console.log(`✅ Got user IP from ${service}:`, userIp);
-              break;
-            }
-          } catch (e) {
-            console.warn(`⚠️ IP service ${service} failed, trying next...`);
-          }
+        const ipResponse = await fetch('https://api.ipify.org?format=json');
+        if (ipResponse.ok) {
+          const ipData = await ipResponse.json();
+          location = { ...location, ip: ipData.ip || location.ip };
         }
-
-        try {
-          // Check if geolocation is available and we're on a secure context
-          if ('geolocation' in navigator) {
-            console.log('🌐 Requesting geolocation (lenient)...');
-            const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-              const timeoutId = setTimeout(() => {
-                reject(new Error('Geolocation request timed out'));
-              }, 5000); // 5 second timeout for fast fallback
-
-              navigator.geolocation.getCurrentPosition(
-                (pos) => {
-                  clearTimeout(timeoutId);
-                  resolve(pos);
-                },
-                (err) => {
-                  clearTimeout(timeoutId);
-                  reject(err);
-                },
-                {
-                  enableHighAccuracy: false,
-                  timeout: 5000,
-                  maximumAge: 3600000 // 1 hour (allow cached location)
-                }
-              );
-            });
-            location = {
-              latitude: position.coords.latitude,
-              longitude: position.coords.longitude,
-              accuracy: position.coords.accuracy,
-              timestamp: position.timestamp,
-              ip: userIp
-            };
-            console.log('✅ Geolocation obtained successfully');
-          } else {
-            throw new Error('Geolocation not supported');
-          }
-        } catch (error) {
-          console.warn('⚠️ Geolocation failed or timed out, skipping to IP-only check:', error);
-          location = {
-            ip: userIp,
-            timestamp: Date.now(),
-            geolocationStatus: 'skipped'
-          };
-        }
-        console.log('📍 Got user location data:', location);
-      } catch (error) {
-        console.error('❌ Failed to get network info:', error);
-        // Don't block check-in completely if IP services fail, but log it
-        location = {
-          ip: '0.0.0.0',
-          timestamp: Date.now(),
-          error: 'Network verification services unreachable'
-        };
+      } catch (e) {
+        // Ignore IP failures
       }
       
       const now = new Date();
@@ -853,42 +783,19 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
     } catch (error) {
       console.error('Check-in error:', error);
 
-      if (error instanceof Error) {
-        if (error.message === 'Already checked in today') {
+      const errAny = error as any;
+      const errorMessage = (errAny?.message as string | undefined) || (error instanceof Error ? error.message : undefined) || 'Unknown error';
+      const errorCode = errAny?.code as string | undefined;
+
+      if (errorMessage === 'Already checked in today') {
           uniqueToast.info('You have already checked in today.', {
             autoClose: 4000,
             position: 'top-center',
           });
           // Refresh state to sync with database
           checkTodayAttendance();
-        } else if (error.message.includes('within school premises') || error.message.includes('school WiFi')) {
-          uniqueToast.error(error.message, {
-            autoClose: 5000,
-            position: 'top-center',
-          });
-        } else if (error.message.toLowerCase().includes('location is required')) {
-          uniqueToast.error(error.message, {
-            autoClose: 5000,
-            position: 'top-center',
-          });
-        } else if (error.message.includes('User denied')) {
-          uniqueToast.error('Location permission denied. Please enable it and try again.', {
-            autoClose: 5000,
-            position: 'top-center',
-          });
-        } else if (error.message.toLowerCase().includes('timeout')) {
-          uniqueToast.error('Location request timed out. Please try again.', {
-            autoClose: 5000,
-            position: 'top-center',
-          });
-        } else {
-          uniqueToast.error('Failed to check in. Please try again.', {
-            autoClose: 4000,
-            position: 'top-center',
-          });
-        }
       } else {
-        uniqueToast.error('Failed to check in. Please try again.', {
+        uniqueToast.error(`Failed to check in: ${errorCode ? `${errorCode} - ` : ''}${errorMessage}`, {
           autoClose: 4000,
           position: 'top-center',
         });
@@ -1131,36 +1038,15 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
     try {
       uniqueToast.info('Recording check-out...', { autoClose: 2000, position: 'top-center' });
 
-      let location: any = null;
+      let location: any = { ip: '0.0.0.0', timestamp: Date.now() };
       try {
-        console.log('🌐 Fetching public IP for verification...');
         const ipResponse = await fetch('https://api.ipify.org?format=json');
-        const ipData = await ipResponse.json();
-        const userIp = ipData.ip;
-
-        try {
-          const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-            navigator.geolocation.getCurrentPosition(resolve, reject, {
-              enableHighAccuracy: true,
-              timeout: 10000,
-              maximumAge: 300000 // 5 minutes
-            });
-          });
-          location = {
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-            accuracy: position.coords.accuracy,
-            ip: userIp
-          };
-        } catch (error) {
-          location = { ip: userIp };
+        if (ipResponse.ok) {
+          const ipData = await ipResponse.json();
+          location = { ...location, ip: ipData.ip || location.ip };
         }
-      } catch (error) {
-        uniqueToast.error('Network verification failed. Please check your internet connection.', {
-          autoClose: 4000,
-          position: 'top-center',
-        });
-        return;
+      } catch (e) {
+        // Ignore IP failures
       }
 
       await attendanceService.checkOut(user.uid, location);
@@ -1174,18 +1060,19 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
       uniqueToast.success('Checked out successfully! See you tomorrow.', { autoClose: 3000, position: 'top-center' });
     } catch (error) {
       console.error('Check-out error:', error);
-      if (error instanceof Error) {
-        if (error.message === 'Already checked out today') {
+
+      const errAny = error as any;
+      const errorMessage = (errAny?.message as string | undefined) || (error instanceof Error ? error.message : undefined) || 'Unknown error';
+      const errorCode = errAny?.code as string | undefined;
+
+      if (errorMessage === 'Already checked out today') {
           uniqueToast.info('You have already checked out today!', { autoClose: 4000, position: 'top-center' });
           checkTodayAttendance();
-        } else if (error.message === 'No check-in record found for today') {
+      } else if (errorMessage === 'No check-in record found for today') {
           uniqueToast.warning('You need to check in first!', { autoClose: 4000, position: 'top-center' });
           checkTodayAttendance();
-        } else {
-          uniqueToast.error('Failed to check out. Please try again.', { autoClose: 4000, position: 'top-center' });
-        }
       } else {
-        uniqueToast.error('Failed to check out. Please try again.', { autoClose: 4000, position: 'top-center' });
+        uniqueToast.error(`Failed to check out: ${errorCode ? `${errorCode} - ` : ''}${errorMessage}`, { autoClose: 4000, position: 'top-center' });
       }
     } finally {
       setAttendanceLoading(false);
