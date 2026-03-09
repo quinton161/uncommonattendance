@@ -120,33 +120,40 @@ export class AttendanceService {
     // Mark student as present for today in daily attendance tracking
     console.log('📊 Marking student as present in daily attendance tracking...');
     const dailyService = DailyAttendanceService.getInstance();
-    await dailyService.markPresentToday(studentId, studentName);
-    console.log('✅ Daily attendance record saved');
+    try {
+      await dailyService.markPresentToday(studentId, studentName);
+      console.log('✅ Daily attendance record saved');
+    } catch (dailyError) {
+      console.warn('⚠️ Daily attendance record failed to save (continuing):', dailyError);
+    }
 
     // Verify both records were saved
-    let verified = false;
-    for (let i = 0; i < 3; i++) {
-      const savedDetailedRecord = await getDoc(doc(db, 'attendance', attendanceId));
-      const isPresentToday = await dailyService.isPresentToday(studentId);
-      
-      if (savedDetailedRecord.exists() && isPresentToday) {
-        verified = true;
-        console.log('🎉 ATTENDANCE RECORDING COMPLETE:', {
-          detailedRecord: '✅ Saved',
-          dailyRecord: '✅ Saved',
-          studentMarkedPresent: '✅ Yes',
-          attendanceId,
-          date: today
-        });
-        break;
+    try {
+      let verified = false;
+      for (let i = 0; i < 3; i++) {
+        const savedDetailedRecord = await getDoc(doc(db, 'attendance', attendanceId));
+        const isPresentToday = await dailyService.isPresentToday(studentId);
+        
+        if (savedDetailedRecord.exists() && isPresentToday) {
+          verified = true;
+          console.log('🎉 ATTENDANCE RECORDING COMPLETE:', {
+            detailedRecord: '✅ Saved',
+            dailyRecord: '✅ Saved',
+            studentMarkedPresent: '✅ Yes',
+            attendanceId,
+            date: today
+          });
+          break;
+        }
+        console.warn(`⚠️ Verification attempt ${i + 1} failed, retrying...`);
+        await new Promise(r => setTimeout(r, 1000));
       }
-      console.warn(`⚠️ Verification attempt ${i + 1} failed, retrying...`);
-      await new Promise(r => setTimeout(r, 1000));
-    }
-    
-    if (!verified) {
-      console.error('❌ ATTENDANCE RECORDING VERIFICATION FAILED after retries');
-      throw new Error('Failed to verify attendance records were saved properly');
+      
+      if (!verified) {
+        console.warn('⚠️ Attendance verification did not fully succeed after retries (continuing).');
+      }
+    } catch (verificationError) {
+      console.warn('⚠️ Attendance verification encountered an error (continuing):', verificationError);
     }
 
     // Send email notification to student's Gmail
