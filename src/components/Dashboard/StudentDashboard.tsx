@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, FC } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import styled from 'styled-components';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../Common/Button';
@@ -515,7 +515,7 @@ interface StudentDashboardProps {
   onNavigateToProfile?: () => void;
 }
 
-export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps): React.ReactElement => {
+export function StudentDashboard({ onNavigateToProfile }: StudentDashboardProps): React.ReactElement {
   const { user, logout } = useAuth();
   const [activeNav, setActiveNav] = useState('dashboard');
   const [checkedIn, setCheckedIn] = useState(false);
