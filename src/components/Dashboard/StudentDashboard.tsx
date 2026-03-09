@@ -525,7 +525,7 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
   const [canCheckIn, setCanCheckIn] = useState(true);
   const [canCheckOut, setCanCheckOut] = useState(false);
   const [stats, setStats] = useState({
-        totalCheckIns: 0,
+    totalCheckIns: 0,
     currentStreak: 0,
     todayStatus: 'Not Checked In',
     lastCheckIn: null as Date | null
@@ -543,11 +543,14 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
   const [unreadCount, setUnreadCount] = useState(0);
   const [admins, setAdmins] = useState<any[]>([]);
   const [selectedAdmin, setSelectedAdmin] = useState<any | null>(null);
+  const [daysPresent, setDaysPresent] = useState(0);
+  const [attendanceRate, setAttendanceRate] = useState(0);
+  const [statsRange, setStatsRange] = useState<'week' | 'month' | 'custom'>('month');
+  const [customDays, setCustomDays] = useState(7);
+
   const dataService = DataService.getInstance();
   const attendanceService = AttendanceService.getInstance();
   const dailyAttendanceService = DailyAttendanceService.getInstance();
-
-  // useEffect hooks will be moved after function declarations
 
   const getInitials = (name: string) => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase();
@@ -1095,10 +1098,7 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
   };
 
   // Attendance stats from Firebase
-  const [daysPresent, setDaysPresent] = useState(0);
-  const [attendanceRate, setAttendanceRate] = useState(0);
-  const [statsRange, setStatsRange] = useState<'week' | 'month' | 'custom'>('month');
-  const [customDays, setCustomDays] = useState(7);
+  // (Moved up)
   const totalSchoolDays = getTotalSchoolDaysInMonth();
 
   // Fetch attendance stats from Firebase for selected range
@@ -1134,33 +1134,78 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
       let location: any = null;
       try {
         console.log('🌐 Fetching public IP for verification...');
-        const ipResponse = await fetch('https://api.ipify.org?format=json');
-        const ipData = await ipResponse.json();
-        const userIp = ipData.ip;
+        let userIp = '0.0.0.0';
+        
+        const ipServices = [
+          'https://api.ipify.org?format=json',
+          'https://api64.ipify.org?format=json',
+          'https://ipapi.co/json/'
+        ];
+
+        for (const service of ipServices) {
+          try {
+            const ipResponse = await fetch(service, { signal: AbortSignal.timeout(5000) });
+            if (ipResponse.ok) {
+              const ipData = await ipResponse.json();
+              userIp = ipData.ip || ipData.query || userIp;
+              console.log(`✅ Got user IP from ${service}:`, userIp);
+              break;
+            }
+          } catch (e) {
+            console.warn(`⚠️ IP service ${service} failed, trying next...`);
+          }
+        }
 
         try {
-          const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-            navigator.geolocation.getCurrentPosition(resolve, reject, {
-              enableHighAccuracy: true,
-              timeout: 10000,
-              maximumAge: 300000 // 5 minutes
+          if ('geolocation' in navigator) {
+            console.log('🌐 Requesting geolocation (lenient)...');
+            const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+              const timeoutId = setTimeout(() => {
+                reject(new Error('Geolocation request timed out'));
+              }, 5000);
+
+              navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                  clearTimeout(timeoutId);
+                  resolve(pos);
+                },
+                (err) => {
+                  clearTimeout(timeoutId);
+                  reject(err);
+                },
+                {
+                  enableHighAccuracy: false,
+                  timeout: 5000,
+                  maximumAge: 3600000
+                }
+              );
             });
-          });
-          location = {
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-            accuracy: position.coords.accuracy,
-            ip: userIp
-          };
+            location = {
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+              accuracy: position.coords.accuracy,
+              timestamp: position.timestamp,
+              ip: userIp
+            };
+            console.log('✅ Geolocation obtained successfully');
+          } else {
+            throw new Error('Geolocation not supported');
+          }
         } catch (error) {
-          location = { ip: userIp };
+          console.warn('⚠️ Geolocation failed or timed out, skipping to IP-only check:', error);
+          location = {
+            ip: userIp,
+            timestamp: Date.now(),
+            geolocationStatus: 'skipped'
+          };
         }
       } catch (error) {
-        uniqueToast.error('Network verification failed. Please check your internet connection.', {
-          autoClose: 4000,
-          position: 'top-center',
-        });
-        return;
+        console.error('❌ Failed to get network info:', error);
+        location = {
+          ip: '0.0.0.0',
+          timestamp: Date.now(),
+          error: 'Network verification services unreachable'
+        };
       }
 
       await attendanceService.checkOut(user.uid, location);
