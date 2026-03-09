@@ -5,11 +5,6 @@ import { SignalingMessage } from '../types';
 type StreamCallback = (stream: MediaStream | null) => void;
 type CallStateCallback = (state: 'idle' | 'calling' | 'ringing' | 'connected' | 'ended') => void;
 
-interface PeerConnection {
-  peer: SimplePeerInstance;
-  stream: MediaStream | null;
-}
-
 class WebRTCService {
   private static instance: WebRTCService;
   private peer: SimplePeerInstance | null = null;

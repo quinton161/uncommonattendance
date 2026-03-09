@@ -1,7 +1,6 @@
 import {
   doc,
   setDoc,
-  getDoc,
   collection,
   addDoc,
   serverTimestamp,
@@ -9,11 +8,10 @@ import {
   query,
   where,
   orderBy,
-  onSnapshot,
-  deleteDoc
+  onSnapshot
 } from 'firebase/firestore';
 import { db } from './firebase';
-import { CallSession, CallStatus, CallType, SignalingMessage } from '../types';
+import { CallSession, CallType, SignalingMessage } from '../types';
 
 type CallEventCallback = (call: CallSession | null) => void;
 type SignalingCallback = (message: SignalingMessage) => void;
