@@ -687,29 +687,51 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
       let location: any = null;
       try {
         console.log('🌐 Fetching public IP for verification...');
-        const ipResponse = await fetch('https://api.ipify.org?format=json', { timeout: 5000 } as any);
-        if (!ipResponse.ok) throw new Error('IP service unreachable');
-        const ipData = await ipResponse.json();
-        const userIp = ipData.ip;
-        console.log('✅ Got user IP:', userIp);
+        let userIp = '0.0.0.0';
+        
+        // Try multiple IP services for better reliability across devices/networks
+        const ipServices = [
+          'https://api.ipify.org?format=json',
+          'https://api64.ipify.org?format=json',
+          'https://ipapi.co/json/'
+        ];
+
+        for (const service of ipServices) {
+          try {
+            const ipResponse = await fetch(service, { signal: AbortSignal.timeout(5000) });
+            if (ipResponse.ok) {
+              const ipData = await ipResponse.json();
+              userIp = ipData.ip || ipData.query || userIp;
+              console.log(`✅ Got user IP from ${service}:`, userIp);
+              break;
+            }
+          } catch (e) {
+            console.warn(`⚠️ IP service ${service} failed, trying next...`);
+          }
+        }
 
         try {
-          const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-            navigator.geolocation.getCurrentPosition(resolve, reject, {
-              enableHighAccuracy: true,
-              timeout: 10000,
-              maximumAge: 300000 // 5 minutes
+          // Check if geolocation is available and we're on a secure context
+          if ('geolocation' in navigator) {
+            const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+              navigator.geolocation.getCurrentPosition(resolve, reject, {
+                enableHighAccuracy: false, // Set to false for faster results on mobile
+                timeout: 8000,
+                maximumAge: 600000 // 10 minutes
+              });
             });
-          });
-          location = {
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-            accuracy: position.coords.accuracy,
-            timestamp: position.timestamp,
-            ip: userIp
-          };
+            location = {
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+              accuracy: position.coords.accuracy,
+              timestamp: position.timestamp,
+              ip: userIp
+            };
+          } else {
+            throw new Error('Geolocation not supported');
+          }
         } catch (error) {
-          console.warn('⚠️ Could not get geolocation (high accuracy), using IP only:', error);
+          console.warn('⚠️ Geolocation failed or not supported, using IP only:', error);
           location = {
             ip: userIp,
             timestamp: Date.now()
@@ -717,13 +739,13 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
         }
         console.log('📍 Got user location data:', location);
       } catch (error) {
-        console.error('❌ Failed to get public IP:', error);
-        uniqueToast.error('Network verification failed. Check school WiFi connection.', {
-          autoClose: 5000,
-          position: 'top-center',
-        });
-        setAttendanceLoading(false);
-        return;
+        console.error('❌ Failed to get network info:', error);
+        // Don't block check-in completely if IP services fail, but log it
+        location = {
+          ip: '0.0.0.0',
+          timestamp: Date.now(),
+          error: 'Network verification services unreachable'
+        };
       }
       
       const now = new Date();
