@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, FC } from 'react';
 import styled from 'styled-components';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../Common/Button';
@@ -515,7 +515,7 @@ interface StudentDashboardProps {
   onNavigateToProfile?: () => void;
 }
 
-export function StudentDashboard({ onNavigateToProfile }: StudentDashboardProps): React.ReactElement {
+export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps): React.ReactElement => {
   const { user, logout } = useAuth();
   const [activeNav, setActiveNav] = useState('dashboard');
   const [checkedIn, setCheckedIn] = useState(false);
@@ -525,7 +525,7 @@ export function StudentDashboard({ onNavigateToProfile }: StudentDashboardProps)
   const [canCheckIn, setCanCheckIn] = useState(true);
   const [canCheckOut, setCanCheckOut] = useState(false);
   const [stats, setStats] = useState({
-    totalCheckIns: 0,
+        totalCheckIns: 0,
     currentStreak: 0,
     todayStatus: 'Not Checked In',
     lastCheckIn: null as Date | null
@@ -543,14 +543,11 @@ export function StudentDashboard({ onNavigateToProfile }: StudentDashboardProps)
   const [unreadCount, setUnreadCount] = useState(0);
   const [admins, setAdmins] = useState<any[]>([]);
   const [selectedAdmin, setSelectedAdmin] = useState<any | null>(null);
-  const [daysPresent, setDaysPresent] = useState(0);
-  const [attendanceRate, setAttendanceRate] = useState(0);
-  const [statsRange, setStatsRange] = useState<'week' | 'month' | 'custom'>('month');
-  const [customDays, setCustomDays] = useState(7);
-
   const dataService = DataService.getInstance();
   const attendanceService = AttendanceService.getInstance();
   const dailyAttendanceService = DailyAttendanceService.getInstance();
+
+  // useEffect hooks will be moved after function declarations
 
   const getInitials = (name: string) => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase();
@@ -669,6 +666,14 @@ export function StudentDashboard({ onNavigateToProfile }: StudentDashboardProps)
       return;
     }
 
+    // Debug: Check if user has required properties
+    console.log('User details for check-in:', {
+      uid: user.uid,
+      displayName: user.displayName,
+      email: user.email,
+      userType: user.userType
+    });
+
     if (!canCheckIn) {
       uniqueToast.info('You cannot check in right now. Please try again or refresh the page.', {
         autoClose: 4000,
@@ -679,42 +684,102 @@ export function StudentDashboard({ onNavigateToProfile }: StudentDashboardProps)
 
     setAttendanceLoading(true);
     try {
-      // Simplified location data for record keeping only
-      const location = {
-        timestamp: Date.now(),
-        ip: '0.0.0.0', // We can still try to get IP but it won't block
-        status: 'recorded'
-      };
-
+      // Get user location and public IP
+      let location: any = null;
       try {
+        console.log('🌐 Fetching public IP for verification...');
+        let userIp = '0.0.0.0';
+        
+        // Try multiple IP services for better reliability across devices/networks
         const ipServices = [
           'https://api.ipify.org?format=json',
-          'https://api64.ipify.org?format=json'
+          'https://api64.ipify.org?format=json',
+          'https://ipapi.co/json/'
         ];
 
         for (const service of ipServices) {
           try {
-            const ipResponse = await fetch(service, { signal: AbortSignal.timeout(3000) });
+            const ipResponse = await fetch(service, { signal: AbortSignal.timeout(5000) });
             if (ipResponse.ok) {
               const ipData = await ipResponse.json();
-              location.ip = ipData.ip || ipData.query || location.ip;
+              userIp = ipData.ip || ipData.query || userIp;
+              console.log(`✅ Got user IP from ${service}:`, userIp);
               break;
             }
           } catch (e) {
-            // Silently continue
+            console.warn(`⚠️ IP service ${service} failed, trying next...`);
           }
         }
-      } catch (err) {
-        // IP failure is fine
+
+        try {
+          // Check if geolocation is available and we're on a secure context
+          if ('geolocation' in navigator) {
+            console.log('🌐 Requesting geolocation (lenient)...');
+            const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+              const timeoutId = setTimeout(() => {
+                reject(new Error('Geolocation request timed out'));
+              }, 5000); // 5 second timeout for fast fallback
+
+              navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                  clearTimeout(timeoutId);
+                  resolve(pos);
+                },
+                (err) => {
+                  clearTimeout(timeoutId);
+                  reject(err);
+                },
+                {
+                  enableHighAccuracy: false,
+                  timeout: 5000,
+                  maximumAge: 3600000 // 1 hour (allow cached location)
+                }
+              );
+            });
+            location = {
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+              accuracy: position.coords.accuracy,
+              timestamp: position.timestamp,
+              ip: userIp
+            };
+            console.log('✅ Geolocation obtained successfully');
+          } else {
+            throw new Error('Geolocation not supported');
+          }
+        } catch (error) {
+          console.warn('⚠️ Geolocation failed or timed out, skipping to IP-only check:', error);
+          location = {
+            ip: userIp,
+            timestamp: Date.now(),
+            geolocationStatus: 'skipped'
+          };
+        }
+        console.log('📍 Got user location data:', location);
+      } catch (error) {
+        console.error('❌ Failed to get network info:', error);
+        // Don't block check-in completely if IP services fail, but log it
+        location = {
+          ip: '0.0.0.0',
+          timestamp: Date.now(),
+          error: 'Network verification services unreachable'
+        };
       }
       
       const now = new Date();
+      // CRITICAL FIX: Use Harare time for late check, not local browser time
       const timeService = TimeService.getInstance();
       const harareNow = timeService.getCurrentTime();
-      const currentTime = harareNow.getHours() * 60 + harareNow.getMinutes();
-      const nineAM = 9 * 60;
+      const currentTime = harareNow.getHours() * 60 + harareNow.getMinutes(); // Convert to minutes
+      const nineAM = 9 * 60; // 9:00 AM in minutes
+      
+      // Check if checking in after 9 AM
       const isLate = currentTime > nineAM;
       
+      // Use AttendanceService to check in with location
+      console.log('Calling attendanceService.checkIn with location...');
+      
+      // Wrap the check-in call in a retry mechanism for database flakiness
       let attendanceRecord;
       let retries = 0;
       const maxRetries = 2;
@@ -722,27 +787,56 @@ export function StudentDashboard({ onNavigateToProfile }: StudentDashboardProps)
       while (retries <= maxRetries) {
         try {
           attendanceRecord = await attendanceService.checkIn(user.uid, user.displayName || 'Student', location);
-          break;
+          break; // Success
         } catch (err: any) {
           if (err.message === 'Already checked in today' || retries === maxRetries) throw err;
           retries++;
+          console.warn(`Retry check-in ${retries}/${maxRetries}...`);
           await new Promise(r => setTimeout(r, 1000));
         }
       }
       
-      if (!attendanceRecord) throw new Error('Check-in failed');
+      if (!attendanceRecord) throw new Error('Check-in failed after retries');
       
+      console.log('✅ Attendance recorded successfully:', {
+        id: attendanceRecord.id,
+        studentId: attendanceRecord.studentId,
+        date: attendanceRecord.date,
+        checkInTime: attendanceRecord.checkInTime,
+        location: attendanceRecord.location?.address || 'No location'
+      });
+      
+      // Double verify by fetching the record we just created
+      let verified = false;
+      for (let i = 0; i < 3; i++) { // 3 attempts to verify with small delay
+        const verifyRecord = await attendanceService.getTodayAttendance(user.uid);
+        if (verifyRecord) {
+          verified = true;
+          break;
+        }
+        await new Promise(r => setTimeout(r, 500));
+      }
+
+      if (!verified) {
+        console.warn('⚠️ Attendance verification failed - record not found in initial fetch');
+        // We don't throw here to avoid user confusion if it's just a laggy read, 
+        // but we log it for admin investigation.
+      }
+
+      // Update local state immediately
       setCheckedIn(true);
       setCheckInTime(now);
       setCanCheckIn(false);
       setCanCheckOut(true);
       
+      // Update stats locally first for instant feedback
       setStats(prev => ({
         ...prev,
         todayStatus: isLate ? 'Checked In (Late)' : 'Checked In',
         lastCheckIn: now,
       }));
 
+      // Background reload stats and recent activity
       loadStudentData().catch(e => console.error('Background load failed:', e));
 
       if (isLate) {
@@ -758,12 +852,41 @@ export function StudentDashboard({ onNavigateToProfile }: StudentDashboardProps)
       }
     } catch (error) {
       console.error('Check-in error:', error);
-      if (error instanceof Error && error.message === 'Already checked in today') {
-        uniqueToast.info('You have already checked in today.', {
-          autoClose: 4000,
-          position: 'top-center',
-        });
-        checkTodayAttendance();
+
+      if (error instanceof Error) {
+        if (error.message === 'Already checked in today') {
+          uniqueToast.info('You have already checked in today.', {
+            autoClose: 4000,
+            position: 'top-center',
+          });
+          // Refresh state to sync with database
+          checkTodayAttendance();
+        } else if (error.message.includes('within school premises') || error.message.includes('school WiFi')) {
+          uniqueToast.error(error.message, {
+            autoClose: 5000,
+            position: 'top-center',
+          });
+        } else if (error.message.toLowerCase().includes('location is required')) {
+          uniqueToast.error(error.message, {
+            autoClose: 5000,
+            position: 'top-center',
+          });
+        } else if (error.message.includes('User denied')) {
+          uniqueToast.error('Location permission denied. Please enable it and try again.', {
+            autoClose: 5000,
+            position: 'top-center',
+          });
+        } else if (error.message.toLowerCase().includes('timeout')) {
+          uniqueToast.error('Location request timed out. Please try again.', {
+            autoClose: 5000,
+            position: 'top-center',
+          });
+        } else {
+          uniqueToast.error('Failed to check in. Please try again.', {
+            autoClose: 4000,
+            position: 'top-center',
+          });
+        }
       } else {
         uniqueToast.error('Failed to check in. Please try again.', {
           autoClose: 4000,
@@ -972,7 +1095,10 @@ export function StudentDashboard({ onNavigateToProfile }: StudentDashboardProps)
   };
 
   // Attendance stats from Firebase
-  // (Moved up)
+  const [daysPresent, setDaysPresent] = useState(0);
+  const [attendanceRate, setAttendanceRate] = useState(0);
+  const [statsRange, setStatsRange] = useState<'week' | 'month' | 'custom'>('month');
+  const [customDays, setCustomDays] = useState(7);
   const totalSchoolDays = getTotalSchoolDaysInMonth();
 
   // Fetch attendance stats from Firebase for selected range
@@ -1005,21 +1131,36 @@ export function StudentDashboard({ onNavigateToProfile }: StudentDashboardProps)
     try {
       uniqueToast.info('Recording check-out...', { autoClose: 2000, position: 'top-center' });
 
-      // Simplified location data
-      const location = {
-        timestamp: Date.now(),
-        ip: '0.0.0.0',
-        status: 'recorded'
-      };
-
+      let location: any = null;
       try {
-        const ipResponse = await fetch('https://api.ipify.org?format=json', { signal: AbortSignal.timeout(3000) });
-        if (ipResponse.ok) {
-          const ipData = await ipResponse.json();
-          location.ip = ipData.ip || location.ip;
+        console.log('🌐 Fetching public IP for verification...');
+        const ipResponse = await fetch('https://api.ipify.org?format=json');
+        const ipData = await ipResponse.json();
+        const userIp = ipData.ip;
+
+        try {
+          const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, {
+              enableHighAccuracy: true,
+              timeout: 10000,
+              maximumAge: 300000 // 5 minutes
+            });
+          });
+          location = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracy: position.coords.accuracy,
+            ip: userIp
+          };
+        } catch (error) {
+          location = { ip: userIp };
         }
-      } catch (e) {
-        // Silently continue
+      } catch (error) {
+        uniqueToast.error('Network verification failed. Please check your internet connection.', {
+          autoClose: 4000,
+          position: 'top-center',
+        });
+        return;
       }
 
       await attendanceService.checkOut(user.uid, location);
@@ -1029,7 +1170,7 @@ export function StudentDashboard({ onNavigateToProfile }: StudentDashboardProps)
       setCanCheckOut(false);
       setStats(prev => ({ ...prev, todayStatus: 'Completed for Today' }));
       await loadStudentData();
-      await fetchAttendanceStats();
+      await fetchAttendanceStats(); // update stats after check-out
       uniqueToast.success('Checked out successfully! See you tomorrow.', { autoClose: 3000, position: 'top-center' });
     } catch (error) {
       console.error('Check-out error:', error);
