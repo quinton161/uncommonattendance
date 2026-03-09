@@ -1,6 +1,7 @@
 import {
   doc,
   setDoc,
+  getDoc,
   collection,
   addDoc,
   serverTimestamp,
@@ -34,6 +35,17 @@ class CallService {
       CallService.instance = new CallService();
     }
     return CallService.instance;
+  }
+
+  private async getOtherParticipantId(callId: string): Promise<string> {
+    const callDoc = await getDoc(doc(db, 'calls', callId));
+    const data = callDoc.data() as CallSession | undefined;
+    if (!data) {
+      throw new Error('Call session not found');
+    }
+
+    if (data.callerId === this.currentUserId) return data.calleeId;
+    return data.callerId;
   }
 
   /**
@@ -119,13 +131,15 @@ class CallService {
       status: 'active'
     });
 
+    const receiverId = await this.getOtherParticipantId(callId);
+
     // Send acceptance signaling
     await this.sendSignalingMessage({
       type: 'call-response',
       callId,
       senderId: this.currentUserId,
       senderName: this.currentUserName,
-      receiverId: '', // Will be filled by looking up the call
+      receiverId,
       data: {
         response: 'accept'
       }
@@ -145,13 +159,15 @@ class CallService {
       endedAt: serverTimestamp()
     });
 
+    const receiverId = await this.getOtherParticipantId(callId);
+
     // Send decline signaling
     await this.sendSignalingMessage({
       type: 'call-response',
       callId,
       senderId: this.currentUserId,
       senderName: this.currentUserName,
-      receiverId: '',
+      receiverId,
       data: {
         response: 'decline'
       }
@@ -180,13 +196,15 @@ class CallService {
       console.log('Call already ended or not found');
     }
 
+    const receiverId = await this.getOtherParticipantId(activeCallId);
+
     // Send end signaling
     await this.sendSignalingMessage({
       type: 'call-ended',
       callId: activeCallId,
       senderId: this.currentUserId,
       senderName: this.currentUserName,
-      receiverId: ''
+      receiverId
     });
 
     this.activeCallId = null;

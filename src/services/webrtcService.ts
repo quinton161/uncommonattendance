@@ -11,6 +11,7 @@ class WebRTCService {
   private localStream: MediaStream | null = null;
   private remoteStream: MediaStream | null = null;
   private currentCallId: string | null = null;
+  private remotePeerId: string | null = null;
   private callType: 'voice' | 'video' = 'voice';
   private isInitiator: boolean = false;
   
@@ -39,11 +40,16 @@ class WebRTCService {
     this.onCallStateChange = onCallStateChange;
   }
 
+  setRemotePeerId(peerId: string): void {
+    this.remotePeerId = peerId;
+  }
+
   /**
    * Start a call (initiator)
    */
   async startCall(callId: string, peerId: string, callType: 'voice' | 'video'): Promise<void> {
     this.currentCallId = callId;
+    this.remotePeerId = peerId;
     this.callType = callType;
     this.isInitiator = true;
 
@@ -73,6 +79,7 @@ class WebRTCService {
    */
   async answerCall(callId: string, callType: 'voice' | 'video'): Promise<void> {
     this.currentCallId = callId;
+    // remotePeerId should be set by caller before answering
     this.callType = callType;
     this.isInitiator = false;
 
@@ -171,8 +178,8 @@ class WebRTCService {
       console.log('📡 Peer signaling:', data.type);
       
       // Send signal to remote peer via Firestore
-      if (this.currentCallId) {
-        const receiverId = ''; // Will be determined by the call session
+      if (this.currentCallId && this.remotePeerId) {
+        const receiverId = this.remotePeerId;
         if (data.type === 'offer') {
           callService.sendOffer(this.currentCallId, receiverId, JSON.stringify(data));
         } else if (data.type === 'answer') {
@@ -180,6 +187,8 @@ class WebRTCService {
         } else if (data.type === 'candidate') {
           callService.sendIceCandidate(this.currentCallId, receiverId, data.candidate as RTCIceCandidateInit);
         }
+      } else {
+        console.warn('📡 Missing callId or remotePeerId, cannot send signaling');
       }
     });
 
@@ -288,6 +297,7 @@ class WebRTCService {
     }
 
     this.currentCallId = null;
+    this.remotePeerId = null;
 
     if (this.onLocalStream) {
       this.onLocalStream(null);

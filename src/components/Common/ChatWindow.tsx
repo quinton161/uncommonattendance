@@ -7,6 +7,7 @@ import { webrtcService } from '../../services/webrtcService';
 import { theme } from '../../styles/theme';
 import { IncomingCallModal, ActiveCallScreen } from './CallModals';
 import { CallSession } from '../../types';
+import { uniqueToast } from '../../utils/toastUtils';
 
 const ChatContainer = styled.div`
   display: flex;
@@ -354,34 +355,37 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   const otherUserName = isAdmin ? studentName : (providedAdminName || 'Admin');
 
   useEffect(() => {
-    if (!adminUid) return;
+    let unsubscribe: (() => void) | undefined;
+    let cancelled = false;
 
-    if (!providedAdminUid) {
-      const fetchAdminId = async () => {
-        const id = await chatService.getAdminId();
-        setAdminUid(id);
-      };
-      fetchAdminId();
-    } else {
-      setAdminUid(providedAdminUid);
-    }
+    const start = async () => {
+      let resolvedAdminUid = providedAdminUid || '';
+      if (!resolvedAdminUid) {
+        resolvedAdminUid = await chatService.getAdminId();
+      }
+      if (cancelled) return;
 
-    // Use composite ID for unique student-admin conversation
-    const conversationId = `${studentId}_${adminUid}`;
+      setAdminUid(resolvedAdminUid);
+      const conversationId = `${studentId}_${resolvedAdminUid}`;
 
-    const unsubscribe = chatService.subscribeToMessages(conversationId, (msgs) => {
-      setMessages(msgs);
-      
-      // Mark messages as read when received
-      msgs.forEach(msg => {
-        if (msg.senderId !== currentUserUid && msg.id) {
-          chatService.markMessageAsRead(conversationId, msg.id, currentUserUid);
-        }
+      unsubscribe = chatService.subscribeToMessages(conversationId, (msgs) => {
+        setMessages(msgs);
+
+        msgs.forEach(msg => {
+          if (msg.senderId !== currentUserUid && msg.id) {
+            chatService.markMessageAsRead(conversationId, msg.id, currentUserUid);
+          }
+        });
       });
-    });
+    };
 
-    return () => unsubscribe();
-  }, [studentId, adminUid, providedAdminUid]);
+    start();
+
+    return () => {
+      cancelled = true;
+      if (unsubscribe) unsubscribe();
+    };
+  }, [studentId, providedAdminUid, currentUserUid]);
 
   // Subscribe to typing indicators
   useEffect(() => {
@@ -420,11 +424,19 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
 
   const handleVoiceCall = async () => {
     if (isCalling) return;
+    if (!otherUserId) {
+      uniqueToast.error('No user selected to call.', { autoClose: 3000, position: 'top-center' });
+      return;
+    }
     setIsCalling(true);
     try {
-      await callService.initiateCall(otherUserId, otherUserName, 'voice');
+      const call = await callService.initiateCall(otherUserId, otherUserName, 'voice');
+      setActiveCall(call);
+      await webrtcService.startCall(call.id, otherUserId, 'voice');
     } catch (error) {
       console.error('Failed to initiate voice call:', error);
+      const errAny = error as any;
+      uniqueToast.error(`Call failed: ${errAny?.message || 'Unknown error'}`, { autoClose: 4000, position: 'top-center' });
     } finally {
       setIsCalling(false);
     }
@@ -432,11 +444,19 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
 
   const handleVideoCall = async () => {
     if (isCalling) return;
+    if (!otherUserId) {
+      uniqueToast.error('No user selected to call.', { autoClose: 3000, position: 'top-center' });
+      return;
+    }
     setIsCalling(true);
     try {
-      await callService.initiateCall(otherUserId, otherUserName, 'video');
+      const call = await callService.initiateCall(otherUserId, otherUserName, 'video');
+      setActiveCall(call);
+      await webrtcService.startCall(call.id, otherUserId, 'video');
     } catch (error) {
       console.error('Failed to initiate video call:', error);
+      const errAny = error as any;
+      uniqueToast.error(`Call failed: ${errAny?.message || 'Unknown error'}`, { autoClose: 4000, position: 'top-center' });
     } finally {
       setIsCalling(false);
     }
@@ -474,11 +494,14 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     if (!incomingCall) return;
     try {
       await callService.acceptCall(incomingCall.id);
+      webrtcService.setRemotePeerId(incomingCall.callerId);
       await webrtcService.answerCall(incomingCall.id, incomingCall.type);
       setActiveCall(incomingCall);
       setIncomingCall(null);
     } catch (error) {
       console.error('Failed to accept call:', error);
+      const errAny = error as any;
+      uniqueToast.error(`Failed to accept call: ${errAny?.message || 'Unknown error'}`, { autoClose: 4000, position: 'top-center' });
     }
   };
 
@@ -602,6 +625,12 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     e.preventDefault();
     if (!inputText.trim()) return;
 
+    const effectiveAdminUid = isAdmin ? currentUserUid : adminUid;
+    if (!effectiveAdminUid) {
+      uniqueToast.error('Chat is not ready yet. Please try again in a moment.', { autoClose: 3000, position: 'top-center' });
+      return;
+    }
+
     const text = inputText.trim();
     setInputText('');
 
@@ -617,11 +646,18 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         studentName,
         currentUserUid,
         text,
-        isAdmin ? currentUserUid : adminUid,
+        effectiveAdminUid,
         currentUserPhotoUrl
       );
     } catch (error) {
       console.error('Failed to send message:', error);
+      const errAny = error as any;
+      const errorMessage = (errAny?.message as string | undefined) || (error instanceof Error ? error.message : undefined) || 'Unknown error';
+      const errorCode = errAny?.code as string | undefined;
+      uniqueToast.error(`Failed to send message: ${errorCode ? `${errorCode} - ` : ''}${errorMessage}`, {
+        autoClose: 4000,
+        position: 'top-center',
+      });
     }
   };
 
