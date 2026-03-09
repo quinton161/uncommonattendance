@@ -48,6 +48,7 @@ export class DailyAttendanceService {
    */
   async markPresentToday(studentId: string, studentName: string): Promise<void> {
     const timeService = TimeService.getInstance();
+    // CRITICAL FIX: Use consistent date string from TimeService to avoid timezone issues
     const today = timeService.getCurrentDateString();
     console.log('📅 markPresentToday - Using Harare date:', today);
     const dailyRecordId = `${studentId}_${today}`;
@@ -91,7 +92,9 @@ export class DailyAttendanceService {
    */
   async isPresentToday(studentId: string): Promise<boolean> {
     const timeService = TimeService.getInstance();
+    // CRITICAL FIX: Use consistent date from TimeService
     const today = timeService.getCurrentDateString();
+    console.log('📅 isPresentToday - Using Harare date:', today);
     const dailyRecordId = `${studentId}_${today}`;
 
     const docRef = doc(db, 'dailyAttendance', dailyRecordId);

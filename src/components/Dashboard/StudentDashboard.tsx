@@ -12,6 +12,7 @@ import {
 import DataService from '../../services/DataService';
 import { AttendanceService } from '../../services/attendanceService';
 import { DailyAttendanceService, DailyAttendanceStats } from '../../services/dailyAttendanceService';
+import { TimeService } from '../../services/timeService';
 import { MyAttendancePage } from '../Student/MyAttendancePage';
 import { ProgressPage } from '../Student/ProgressPage';
 import { ProfileUpload } from '../Profile/ProfileUpload';
@@ -713,12 +714,27 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
         try {
           // Check if geolocation is available and we're on a secure context
           if ('geolocation' in navigator) {
+            console.log('🌐 Requesting geolocation (lenient)...');
             const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-              navigator.geolocation.getCurrentPosition(resolve, reject, {
-                enableHighAccuracy: false, // Set to false for faster results on mobile
-                timeout: 8000,
-                maximumAge: 600000 // 10 minutes
-              });
+              const timeoutId = setTimeout(() => {
+                reject(new Error('Geolocation request timed out'));
+              }, 5000); // 5 second timeout for fast fallback
+
+              navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                  clearTimeout(timeoutId);
+                  resolve(pos);
+                },
+                (err) => {
+                  clearTimeout(timeoutId);
+                  reject(err);
+                },
+                {
+                  enableHighAccuracy: false,
+                  timeout: 5000,
+                  maximumAge: 3600000 // 1 hour (allow cached location)
+                }
+              );
             });
             location = {
               latitude: position.coords.latitude,
@@ -727,14 +743,16 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
               timestamp: position.timestamp,
               ip: userIp
             };
+            console.log('✅ Geolocation obtained successfully');
           } else {
             throw new Error('Geolocation not supported');
           }
         } catch (error) {
-          console.warn('⚠️ Geolocation failed or not supported, using IP only:', error);
+          console.warn('⚠️ Geolocation failed or timed out, skipping to IP-only check:', error);
           location = {
             ip: userIp,
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            geolocationStatus: 'skipped'
           };
         }
         console.log('📍 Got user location data:', location);
@@ -749,7 +767,10 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
       }
       
       const now = new Date();
-      const currentTime = now.getHours() * 60 + now.getMinutes(); // Convert to minutes
+      // CRITICAL FIX: Use Harare time for late check, not local browser time
+      const timeService = TimeService.getInstance();
+      const harareNow = timeService.getCurrentTime();
+      const currentTime = harareNow.getHours() * 60 + harareNow.getMinutes(); // Convert to minutes
       const nineAM = 9 * 60; // 9:00 AM in minutes
       
       // Check if checking in after 9 AM

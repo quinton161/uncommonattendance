@@ -57,10 +57,13 @@ export class AttendanceService {
     
     
     const harareTime = this.timeService.getCurrentTime();
-    const today = harareTime.toISOString().split('T')[0];
+    // CRITICAL FIX: Use consistent date string from TimeService to avoid timezone mismatches
+    // Previously used harareTime.toISOString().split('T')[0] which could cause UTC/Harare date mismatch
+    const today = this.timeService.getCurrentDateString(); // Use this instead - it's timezone-aware
     console.log('🔍 ATTENDANCE SERVICE CHECK-IN DEBUG:');
-    console.log('  - harareTime:', harareTime.toISOString());
-    console.log('  - today (date saved to Firebase):', today);
+    console.log('  - harareTime (raw):', harareTime.toISOString());
+    console.log('  - getCurrentDateString() (Harare date):', today);
+    console.log('  - Today from toISOString (may differ at midnight):', harareTime.toISOString().split('T')[0]);
     const attendanceId = `${studentId}_${today}`;
     console.log('Generated attendanceId:', attendanceId);
 
@@ -69,9 +72,19 @@ export class AttendanceService {
     const existingRecord = await this.getTodayAttendance(studentId);
     console.log('Existing record:', existingRecord);
     
+    // Additional check: verify the record is actually for today (not yesterday with same ID)
     if (existingRecord && existingRecord.checkInTime) {
-      console.log('Already checked in today, throwing error');
-      throw new Error('Already checked in today');
+      const recordDate = existingRecord.date;
+      const todayDate = today;
+      console.log('Comparing dates - Record date:', recordDate, 'vs Today:', todayDate);
+      
+      if (recordDate !== todayDate) {
+        console.log('Existing record is from a different day, allowing check-in');
+        // Record exists but is from a different day - this is fine, allow check-in
+      } else {
+        console.log('Already checked in today, throwing error');
+        throw new Error('Already checked in today');
+      }
     }
 
 
@@ -167,7 +180,8 @@ export class AttendanceService {
     */
 
     const harareTime = this.timeService.getCurrentTime();
-    const today = harareTime.toISOString().split('T')[0];
+    // CRITICAL FIX: Use consistent date string from TimeService
+    const today = this.timeService.getCurrentDateString();
     const attendanceId = `${studentId}_${today}`;
 
     const attendanceDoc = await getDoc(doc(db, 'attendance', attendanceId));
@@ -204,7 +218,9 @@ export class AttendanceService {
   }
 
   async getTodayAttendance(studentId?: string): Promise<AttendanceRecord | null> {
+    // Use consistent date from TimeService
     const today = this.timeService.getCurrentDateString();
+    console.log('getTodayAttendance - Using date:', today);
     
     if (studentId) {
       const attendanceId = `${studentId}_${today}`;
