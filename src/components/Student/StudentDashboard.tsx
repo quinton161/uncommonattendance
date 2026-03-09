@@ -148,7 +148,7 @@ interface StudentDashboardProps {
   onNavigateToProfile?: () => void;
 }
 
-export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateToProfile }) => {
+export function StudentDashboard({ onNavigateToProfile }: StudentDashboardProps): React.ReactElement {
   const { user, logout } = useAuth();
   const [todayAttendance, setTodayAttendance] = useState<AttendanceRecord | null>(null);
   const [attendanceHistory, setAttendanceHistory] = useState<AttendanceRecord[]>([]);
@@ -160,7 +160,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
   useEffect(() => {
     loadTodayAttendance();
     loadAttendanceHistory();
-  }, []);
+  }, [user]);
 
   const loadTodayAttendance = async () => {
     if (!user) return;
@@ -190,89 +190,24 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
     setLoading(true);
     setError('');
 
+    try {
+      let userIp = '0.0.0.0';
       try {
-        console.log('🌐 Fetching public IP for verification...');
-        let userIp = '0.0.0.0';
-        
-        const ipServices = [
-          'https://api.ipify.org?format=json',
-          'https://api64.ipify.org?format=json',
-          'https://ipapi.co/json/'
-        ];
-
-        for (const service of ipServices) {
-          try {
-            const ipResponse = await fetch(service, { signal: AbortSignal.timeout(5000) });
-            if (ipResponse.ok) {
-              const ipData = await ipResponse.json();
-              userIp = ipData.ip || ipData.query || userIp;
-              console.log(`✅ Got user IP from ${service}:`, userIp);
-              break;
-            }
-          } catch (e) {
-            console.warn(`⚠️ IP service ${service} failed, trying next...`);
-          }
+        const ipResponse = await fetch('https://api.ipify.org?format=json');
+        if (ipResponse.ok) {
+          const ipData = await ipResponse.json();
+          userIp = ipData.ip || userIp;
         }
-
-        try {
-          if ('geolocation' in navigator) {
-            console.log('🌐 Requesting geolocation (lenient)...');
-            const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-              const timeoutId = setTimeout(() => {
-                reject(new Error('Geolocation request timed out'));
-              }, 5000); // 5 second timeout for fast fallback
-
-              navigator.geolocation.getCurrentPosition(
-                (pos) => {
-                  clearTimeout(timeoutId);
-                  resolve(pos);
-                },
-                (err) => {
-                  clearTimeout(timeoutId);
-                  reject(err);
-                },
-                {
-                  enableHighAccuracy: false,
-                  timeout: 5000,
-                  maximumAge: 3600000 // 1 hour (allow cached location)
-                }
-              );
-            });
-            location = {
-              ...location,
-              latitude: position.coords.latitude,
-              longitude: position.coords.longitude,
-              accuracy: position.coords.accuracy,
-              timestamp: position.coords.timestamp || position.timestamp,
-              ip: userIp
-            };
-            console.log('✅ Geolocation obtained successfully');
-          } else {
-            throw new Error('Geolocation not supported');
-          }
-        } catch (err) {
-          console.warn('⚠️ Geolocation failed or timed out, skipping to IP-only check:', err);
-          location = {
-            ...location,
-            ip: userIp,
-            timestamp: Date.now(),
-            geolocationStatus: 'skipped'
-          };
-        }
-      } catch (err) {
-        console.error('❌ Failed to get network info:', err);
-        location = {
-          ip: '0.0.0.0',
-          timestamp: Date.now(),
-          error: 'Network verification services unreachable'
-        };
+      } catch (e) {
+        // Ignore IP failures
       }
 
-      const attendance = await attendanceService.checkIn(
-        user.uid,
-        user.displayName,
-        location
-      );
+      const locationData: LocationData = {
+        ip: userIp,
+        timestamp: Date.now(),
+      };
+
+      const attendance = await attendanceService.checkIn(user.uid, user.displayName, locationData);
       setTodayAttendance(attendance);
       await loadAttendanceHistory();
     } catch (err: any) {
@@ -290,56 +225,23 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
     setError('');
 
     try {
-      console.log('🌐 Fetching public IP for verification...');
       let userIp = '0.0.0.0';
-      
-      const ipServices = [
-        'https://api.ipify.org?format=json',
-        'https://api64.ipify.org?format=json',
-        'https://ipapi.co/json/'
-      ];
-
-      for (const service of ipServices) {
-        try {
-          const ipResponse = await fetch(service, { signal: AbortSignal.timeout(5000) });
-          if (ipResponse.ok) {
-            const ipData = await ipResponse.json();
-            userIp = ipData.ip || ipData.query || userIp;
-            console.log(`✅ Got user IP from ${service}:`, userIp);
-            break;
-          }
-        } catch (e) {
-          console.warn(`⚠️ IP service ${service} failed, trying next...`);
+      try {
+        const ipResponse = await fetch('https://api.ipify.org?format=json');
+        if (ipResponse.ok) {
+          const ipData = await ipResponse.json();
+          userIp = ipData.ip || userIp;
         }
+      } catch (e) {
+        // Ignore IP failures
       }
 
-      let location: LocationData = {
+      const locationData: LocationData = {
         ip: userIp,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
 
-      try {
-        if ('geolocation' in navigator) {
-          const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-            navigator.geolocation.getCurrentPosition(resolve, reject, {
-              enableHighAccuracy: false,
-              timeout: 8000,
-              maximumAge: 600000
-            });
-          });
-          location = {
-            ...location,
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-            accuracy: position.coords.accuracy,
-            timestamp: position.timestamp,
-          };
-        }
-      } catch (err) {
-        console.warn('⚠️ Geolocation failed, proceeding with IP only');
-      }
-
-      const attendance = await attendanceService.checkOut(user.uid, location);
+      const attendance = await attendanceService.checkOut(user.uid, locationData);
       setTodayAttendance(attendance);
       await loadAttendanceHistory();
     } catch (err: any) {
@@ -490,4 +392,4 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigateTo
       </DashboardContainer>
     </Layout>
   );
-};
+}
