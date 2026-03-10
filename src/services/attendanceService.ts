@@ -43,6 +43,14 @@ export class AttendanceService {
   ): Promise<AttendanceRecord> {
     console.log('AttendanceService.checkIn called with:', { studentId, studentName, location });
     
+    // Validate inputs
+    if (!studentId || typeof studentId !== 'string') {
+      throw new Error('Invalid student ID');
+    }
+    if (!studentName || typeof studentName !== 'string') {
+      throw new Error('Invalid student name');
+    }
+    
     if (!location || !location.ip) {
       // console.warn('WiFi connection verification is recommended for check in.');
     }
@@ -64,7 +72,22 @@ export class AttendanceService {
     console.log('  - harareTime (raw):', harareTime.toISOString());
     console.log('  - getCurrentDateString() (Harare date):', today);
     console.log('  - Today from toISOString (may differ at midnight):', harareTime.toISOString().split('T')[0]);
+    
+    // Validate the generated IDs
+    if (!today || today.includes('NaN')) {
+      throw new Error('Invalid date generated');
+    }
+    
     const attendanceId = `${studentId}_${today}`;
+    
+    // Validate document ID doesn't contain invalid characters
+    const invalidChars = ['/', '\\', '#', '%'];
+    const hasInvalidChar = invalidChars.some(char => attendanceId.includes(char));
+    if (hasInvalidChar) {
+      console.error('Invalid attendance ID generated:', attendanceId);
+      throw new Error('Failed to generate valid attendance ID');
+    }
+    
     console.log('Generated attendanceId:', attendanceId);
 
     // Check if already checked in today
