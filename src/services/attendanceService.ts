@@ -253,16 +253,21 @@ export class AttendanceService {
     }
 
     const checkOutTime = harareTime;
-    
+
     const updateData: any = {
-      checkOutTime: harareTime,
-      status: 'completed',
-      location: (location && typeof location.latitude === 'number' && typeof location.longitude === 'number') ? {
-        latitude: location.latitude,
-        longitude: location.longitude,
-        address: location.address || 'Unknown'
-      } : (attendanceData.location || undefined)
+      checkOutTime: Timestamp.fromDate(checkOutTime),
+      status: 'completed'
     };
+
+    const resolvedLocation = (location && typeof location.latitude === 'number' && typeof location.longitude === 'number') ? {
+      latitude: location.latitude,
+      longitude: location.longitude,
+      address: location.address || 'Unknown'
+    } : attendanceData.location;
+
+    if (resolvedLocation) {
+      updateData.location = resolvedLocation;
+    }
 
     await updateDoc(doc(db, 'attendance', attendanceId), updateData);
 
