@@ -17,7 +17,7 @@ import { MyAttendancePage } from '../Student/MyAttendancePage';
 import { ProgressPage } from '../Student/ProgressPage';
 import { ProfileUpload } from '../Profile/ProfileUpload';
 import { ChatWindow } from '../Common/ChatWindow';
-import { chatService } from '../../services/chatService';
+import { chatService, Conversation } from '../../services/chatService';
 import { notificationService } from '../../services/notificationService';
 import { UncommonLogo } from '../Common/UncommonLogo';
 import StarField from '../Common/StarField';
@@ -45,7 +45,7 @@ const DashboardContainer = styled.div`
   }
 `;
 
-const Sidebar = styled.aside<{ isOpen: boolean }>`
+const Sidebar = styled.aside<{ $isOpen: boolean }>`
   width: 280px;
   background: linear-gradient(180deg, ${theme.colors.primary} 0%, ${theme.colors.primaryDark} 100%);
   color: ${theme.colors.white};
@@ -68,7 +68,7 @@ const Sidebar = styled.aside<{ isOpen: boolean }>`
   @media (max-width: ${theme.breakpoints.tablet}) {
     position: fixed;
     top: 0;
-    left: ${props => props.isOpen ? '0' : '-100%'};
+    left: ${props => props.$isOpen ? '0' : '-100%'};
     height: 100vh;
     z-index: ${theme.zIndex.modal};
     transition: left 0.3s ease;
@@ -186,11 +186,11 @@ const MobileMenuButton = styled.button`
   }
 `;
 
-const MobileOverlay = styled.div<{ isOpen: boolean }>`
+const MobileOverlay = styled.div<{ $isOpen: boolean }>`
   display: none;
   
   @media (max-width: ${theme.breakpoints.tablet}) {
-    display: ${props => props.isOpen ? 'block' : 'none'};
+    display: ${props => props.$isOpen ? 'block' : 'none'};
     position: fixed;
     top: 0;
     left: 0;
@@ -540,9 +540,10 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
     lastAttendanceDate: null,
   });
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const [selectedAdmin, setSelectedAdmin] = useState<any>(null);
   const [admins, setAdmins] = useState<any[]>([]);
-  const [selectedAdmin, setSelectedAdmin] = useState<any | null>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [studentConversations, setStudentConversations] = useState<Conversation[]>([]);
   const dataService = DataService.getInstance();
   const attendanceService = AttendanceService.getInstance();
   const dailyAttendanceService = DailyAttendanceService.getInstance();
@@ -849,10 +850,30 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
                     paddingRight: '4px'
                   }}>
                     <AttendanceList>
-                      {admins.map((admin) => (
+                      {admins.map((admin) => {
+                        const convId = user?.uid ? `${user.uid}_${admin.uid}` : '';
+                        const conv = convId ? studentConversations.find(c => c.id === convId) : undefined;
+                        const unread = conv?.unreadCount || 0;
+                        const time = conv?.lastMessageTime?.toDate
+                          ? conv.lastMessageTime.toDate()
+                          : conv?.lastMessageTime
+                            ? new Date(conv.lastMessageTime)
+                            : null;
+                        const previewText = conv?.lastMessage || `Chat with ${admin.displayName || 'Admin'}`;
+
+                        return (
                         <AttendanceItem 
                           key={admin.uid}
-                          onClick={() => setSelectedAdmin(admin)}
+                          onClick={async () => {
+                            setSelectedAdmin(admin);
+                            if (convId && unread > 0) {
+                              try {
+                                await chatService.markAsRead(convId);
+                              } catch (error) {
+                                console.error('Failed to mark as read:', error);
+                              }
+                            }
+                          }}
                           style={{ 
                             cursor: 'pointer', 
                             transition: 'all 0.2s',
@@ -883,11 +904,20 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
                               overflow: 'hidden',
                               textOverflow: 'ellipsis'
                             }}>
-                              Chat with {admin.displayName || 'Admin'}
+                              {previewText}
                             </div>
                           </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                            <div style={{ fontSize: '10px', color: theme.colors.textLight }}>
+                              {time ? time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                            </div>
+                            {unread > 0 && (
+                              <Badge>{unread}</Badge>
+                            )}
+                          </div>
                         </AttendanceItem>
-                      ))}
+                        );
+                      })}
                     </AttendanceList>
                   </div>
                 </Card>
@@ -942,6 +972,7 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
 
       // Subscribe to this student's specific conversations
       const unsubscribe = chatService.subscribeToConversationsByStudent(user.uid, async (conversations) => {
+        setStudentConversations(conversations);
         // Mark selected conversation as read if it has unread messages
         if (selectedAdmin) {
           const currentConv = conversations.find(c => c.id === `${user.uid}_${selectedAdmin.uid}`);
@@ -1101,9 +1132,9 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
         </MobileMenuButton>
       </MobileHeader>
 
-      <MobileOverlay isOpen={mobileMenuOpen} onClick={() => setMobileMenuOpen(false)} />
+      <MobileOverlay $isOpen={mobileMenuOpen} onClick={() => setMobileMenuOpen(false)} />
 
-      <Sidebar isOpen={mobileMenuOpen}>
+      <Sidebar $isOpen={mobileMenuOpen}>
         <StarField density="low" speed="slow" />
         <Logo>
           <img src="/shapes.svg" alt="Logo" style={{ width: 24, height: 24, marginRight: theme.spacing.sm }} />
@@ -1123,13 +1154,6 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
             active={activeNav === 'chat'} 
             onClick={async () => {
               handleNavClick('chat');
-              if (unreadCount > 0 && user) {
-                try {
-                  await chatService.markAsRead(user.uid);
-                } catch (error) {
-                  console.error('Failed to mark as read:', error);
-                }
-              }
             }}
           >
             <PersonIcon size={20} />
