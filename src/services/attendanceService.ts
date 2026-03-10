@@ -143,10 +143,20 @@ export class AttendanceService {
     
     // Save detailed attendance record
     try {
-      await setDoc(doc(db, 'attendance', attendanceId), {
-        ...attendanceRecord,
-        checkInTime: Timestamp.fromDate(attendanceRecord.checkInTime),
-      });
+      const firestoreRecord: Omit<AttendanceRecord, 'checkInTime'> & { checkInTime: Timestamp } = {
+        id: attendanceRecord.id,
+        studentId: attendanceRecord.studentId,
+        studentName: attendanceRecord.studentName,
+        date: attendanceRecord.date,
+        isPresent: attendanceRecord.isPresent,
+        checkInTime: Timestamp.fromDate(attendanceRecord.checkInTime)
+      };
+
+      if (attendanceRecord.location) {
+        (firestoreRecord as any).location = attendanceRecord.location;
+      }
+
+      await setDoc(doc(db, 'attendance', attendanceId), firestoreRecord);
       console.log('✅ Detailed attendance record saved to Firebase');
     } catch (firestoreError: any) {
       console.error('❌ Firestore error saving attendance:', firestoreError);
