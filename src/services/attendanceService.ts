@@ -50,6 +50,9 @@ export class AttendanceService {
     if (!studentName || typeof studentName !== 'string') {
       throw new Error('Invalid student name');
     }
+    if (!studentId.trim()) {
+      throw new Error('Student ID cannot be empty');
+    }
     
     if (!location || !location.ip) {
       // console.warn('WiFi connection verification is recommended for check in.');
@@ -76,6 +79,11 @@ export class AttendanceService {
     // Validate the generated IDs
     if (!today || today.includes('NaN')) {
       throw new Error('Invalid date generated');
+    }
+    
+    if (!today.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      console.error('Invalid date format:', today);
+      throw new Error('Invalid date format');
     }
     
     const attendanceId = `${studentId}_${today}`;
@@ -134,11 +142,19 @@ export class AttendanceService {
     });
     
     // Save detailed attendance record
-    await setDoc(doc(db, 'attendance', attendanceId), {
-      ...attendanceRecord,
-      checkInTime: Timestamp.fromDate(attendanceRecord.checkInTime),
-    });
-    console.log('✅ Detailed attendance record saved to Firebase');
+    try {
+      await setDoc(doc(db, 'attendance', attendanceId), {
+        ...attendanceRecord,
+        checkInTime: Timestamp.fromDate(attendanceRecord.checkInTime),
+      });
+      console.log('✅ Detailed attendance record saved to Firebase');
+    } catch (firestoreError: any) {
+      console.error('❌ Firestore error saving attendance:', firestoreError);
+      console.error('Error code:', firestoreError.code);
+      console.error('Error message:', firestoreError.message);
+      // Re-throw with more context
+      throw new Error(`Firestore error: ${firestoreError.message} (code: ${firestoreError.code})`);
+    }
 
     // Mark student as present for today in daily attendance tracking
     console.log('📊 Marking student as present in daily attendance tracking...');
