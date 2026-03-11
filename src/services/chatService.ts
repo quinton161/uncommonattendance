@@ -345,10 +345,10 @@ class ChatService {
   // Student: Listen to conversations for a specific student
   // This filters conversations so each student only sees their conversations with admins or instructors
   subscribeToConversationsByStudent(studentId: string, callback: (conversations: Conversation[]) => void) {
+    // Simplified query to avoid composite index requirement
     const q = query(
       collection(db, 'conversations'),
-      where('studentId', '==', studentId), // Filter by specific student
-      orderBy('lastMessageTime', 'desc')
+      where('studentId', '==', studentId) // Filter by specific student
     );
 
     return onSnapshot(q, async (snapshot) => {

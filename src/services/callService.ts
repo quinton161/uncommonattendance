@@ -269,11 +269,11 @@ class CallService {
   private listenForIncomingCalls(): void {
     if (!this.currentUserId || this.callUnsubscribe) return;
 
+    // Simplified query to avoid composite index requirement
     const q = query(
       collection(db, 'calls'),
       where('calleeId', '==', this.currentUserId),
-      where('status', '==', 'ringing'),
-      orderBy('startedAt', 'desc')
+      where('status', '==', 'ringing')
     );
 
     this.callUnsubscribe = onSnapshot(q, (snapshot) => {
@@ -298,11 +298,11 @@ class CallService {
   private listenForSignaling(): void {
     if (!this.currentUserId || this.signalingUnsubscribe) return;
 
+    // Simplified query to avoid composite index requirement
     // Listen for messages where current user is the receiver
     const q = query(
       collection(db, 'signaling'),
-      where('receiverId', '==', this.currentUserId),
-      orderBy('timestamp', 'asc')
+      where('receiverId', '==', this.currentUserId)
     );
 
     this.signalingUnsubscribe = onSnapshot(q, (snapshot) => {
