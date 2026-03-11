@@ -911,23 +911,30 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
                             <div style={{ fontSize: '10px', color: theme.colors.textLight }}>
                               {time ? time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                             </div>
-                            {unread > 0 && (
-                              <Badge style={{ 
-                                background: theme.colors.success, 
-                                color: 'white',
-                                borderRadius: '10px',
-                                padding: '2px 6px',
-                                fontSize: '10px',
-                                fontWeight: 'bold',
-                                minWidth: '18px',
-                                height: '18px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center'
-                              }}>
-                                {unread}
-                              </Badge>
-                            )}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              {conv && conv.lastSenderId === user?.uid && (
+                                <span style={{ color: conv.unreadCount === 0 ? '#34B7F1' : theme.colors.textLight, fontSize: '14px', lineHeight: 1 }}>
+                                  {conv.unreadCount === 0 ? '✓✓' : '✓'}
+                                </span>
+                              )}
+                              {unread > 0 && (
+                                <Badge style={{ 
+                                  background: theme.colors.success, 
+                                  color: 'white',
+                                  borderRadius: '10px',
+                                  padding: '2px 6px',
+                                  fontSize: '10px',
+                                  fontWeight: 'bold',
+                                  minWidth: '18px',
+                                  height: '18px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center'
+                                }}>
+                                  {unread}
+                                </Badge>
+                              )}
+                            </div>
                           </div>
                         </AttendanceItem>
                         );

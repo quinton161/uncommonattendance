@@ -675,6 +675,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
             adminId: user?.uid || '',
             lastMessage: 'No messages yet',
             lastMessageTime: null,
+            lastSenderId: undefined,
             unreadCount: 0
           };
         }).sort((a, b) => {
@@ -767,23 +768,30 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
                             {conv.lastMessageTime?.toDate ? conv.lastMessageTime.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 
                              conv.lastMessageTime ? new Date(conv.lastMessageTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                           </div>
-                          {conv.unreadCount !== undefined && conv.unreadCount > 0 && (
-                            <Badge style={{ 
-                              background: theme.colors.success, 
-                              color: 'white',
-                              borderRadius: '10px',
-                              padding: '2px 6px',
-                              fontSize: '10px',
-                              fontWeight: 'bold',
-                              minWidth: '18px',
-                              height: '18px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center'
-                            }}>
-                              {conv.unreadCount}
-                            </Badge>
-                          )}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            {conv.lastSenderId === user?.uid && conv.lastMessageTime && (
+                              <span style={{ color: conv.unreadCount === 0 ? '#34B7F1' : theme.colors.textLight, fontSize: '14px', lineHeight: 1 }}>
+                                {conv.unreadCount === 0 ? '✓✓' : '✓'}
+                              </span>
+                            )}
+                            {conv.unreadCount !== undefined && conv.unreadCount > 0 && (
+                              <Badge style={{ 
+                                background: theme.colors.success, 
+                                color: 'white',
+                                borderRadius: '10px',
+                                padding: '2px 6px',
+                                fontSize: '10px',
+                                fontWeight: 'bold',
+                                minWidth: '18px',
+                                height: '18px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                              }}>
+                                {conv.unreadCount}
+                              </Badge>
+                            )}
+                          </div>
                         </div>
                       </AttendanceItem>
                     ))}
