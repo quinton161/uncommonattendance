@@ -102,6 +102,7 @@ class ChatService {
       lastMessage: text,
       lastMessageTime: serverTimestamp(),
       lastSenderId: senderId,
+      // Increment unreadCount only if the recipient is NOT the sender
       unreadCount: existingDoc.exists() ? (existingDoc.data()?.unreadCount || 0) + 1 : 1
     }, { merge: true });
 
@@ -170,6 +171,7 @@ class ChatService {
       lastMessage: '🎤 Voice message',
       lastMessageTime: serverTimestamp(),
       lastSenderId: senderId,
+      // Increment unreadCount for the receiver
       unreadCount: existingDoc.exists() ? (existingDoc.data()?.unreadCount || 0) + 1 : 1
     }, { merge: true });
 
