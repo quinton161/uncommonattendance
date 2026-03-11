@@ -572,8 +572,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
           // Find the specific conversation that got a new message
           const newMsgConv = data.find(c => {
             const prevConv = prevConversations.find(p => p.id === c.id);
-            // Only notify if unreadCount increased AND we are NOT the sender
-            return (c.unreadCount || 0) > (prevConv?.unreadCount || 0) && c.lastSenderId !== user?.uid;
+            
+            // 1. Unread count must have increased
+            const countIncreased = (c.unreadCount || 0) > (prevConv?.unreadCount || 0);
+            // 2. We are NOT the sender
+            const notMe = c.lastSenderId !== user?.uid;
+            // 3. This conversation is NOT currently open/selected
+            const notSelected = selectedConversation?.id !== c.id;
+
+            return countIncreased && notMe && notSelected;
           });
 
           if (newMsgConv) {
@@ -761,7 +768,21 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
                              conv.lastMessageTime ? new Date(conv.lastMessageTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                           </div>
                           {conv.unreadCount !== undefined && conv.unreadCount > 0 && (
-                            <Badge>{conv.unreadCount}</Badge>
+                            <Badge style={{ 
+                              background: theme.colors.success, 
+                              color: 'white',
+                              borderRadius: '10px',
+                              padding: '2px 6px',
+                              fontSize: '10px',
+                              fontWeight: 'bold',
+                              minWidth: '18px',
+                              height: '18px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
+                            }}>
+                              {conv.unreadCount}
+                            </Badge>
                           )}
                         </div>
                       </AttendanceItem>

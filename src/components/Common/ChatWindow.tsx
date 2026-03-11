@@ -597,7 +597,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         currentUserUid,
         recordedAudio,
         recordingDuration,
-        isAdmin ? currentUserUid : adminUid,
+        adminUid,
         currentUserPhotoUrl
       );
       setRecordedAudio(null);
@@ -625,7 +625,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     e.preventDefault();
     if (!inputText.trim()) return;
 
-    const effectiveAdminUid = isAdmin ? currentUserUid : adminUid;
+    const effectiveAdminUid = isAdmin ? adminUid : adminUid;
     if (!effectiveAdminUid) {
       uniqueToast.error('Chat is not ready yet. Please try again in a moment.', { autoClose: 3000, position: 'top-center' });
       return;
@@ -646,7 +646,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         studentName,
         currentUserUid,
         text,
-        effectiveAdminUid,
+        adminUid,
         currentUserPhotoUrl
       );
     } catch (error) {

@@ -912,7 +912,21 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
                               {time ? time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                             </div>
                             {unread > 0 && (
-                              <Badge>{unread}</Badge>
+                              <Badge style={{ 
+                                background: theme.colors.success, 
+                                color: 'white',
+                                borderRadius: '10px',
+                                padding: '2px 6px',
+                                fontSize: '10px',
+                                fontWeight: 'bold',
+                                minWidth: '18px',
+                                height: '18px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                              }}>
+                                {unread}
+                              </Badge>
                             )}
                           </div>
                         </AttendanceItem>
@@ -989,8 +1003,15 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
           // Find the specific conversation that got a new message
           const newMsgConv = conversations.find(c => {
             const prevConv = admins.find(a => `${user.uid}_${a.uid}` === c.id);
-            // Only notify if unreadCount increased AND we are NOT the sender
-            return (c.unreadCount || 0) > (prevConv?.unreadCount || 0) && c.lastSenderId !== user.uid;
+            
+            // 1. Unread count must have increased
+            const countIncreased = (c.unreadCount || 0) > (prevConv?.unreadCount || 0);
+            // 2. We are NOT the sender
+            const notMe = c.lastSenderId !== user.uid;
+            // 3. This admin is NOT currently selected
+            const notSelected = selectedAdmin?.uid !== c.adminId;
+
+            return countIncreased && notMe && notSelected;
           });
 
           if (newMsgConv) {
