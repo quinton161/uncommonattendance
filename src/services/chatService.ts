@@ -25,6 +25,9 @@ export interface Message {
   text: string;
   createdAt: any;
   readBy?: string[]; // Array of user IDs who have read the message
+  deliveredTo?: string[]; // Array of user IDs who have received the message
+  deletedFor?: string[]; // Array of user IDs who deleted this message
+  isDeletedForEveryone?: boolean; // If message was deleted for everyone
   audioUrl?: string; // Voice message audio URL
   audioDuration?: number; // Voice message duration in seconds
   fileUrl?: string; // Attachment URL
@@ -38,6 +41,8 @@ export interface Message {
   };
   reactions?: Record<string, string[]>; // emoji -> userIds[]
   isGroupMessage?: boolean;
+  isForwarded?: boolean;
+  status?: 'sent' | 'delivered' | 'read';
 }
 
 export interface Conversation {
@@ -104,12 +109,10 @@ class ChatService {
   ) {
     const conversationRef = doc(db, 'conversations', conversationId);
     
-    // Update conversation last message
     await updateDoc(conversationRef, {
       lastMessage: text,
       lastMessageTime: serverTimestamp(),
       lastSenderId: senderId,
-      // In groups, we might handle unread differently, but for now incrementing simple count
       unreadCount: increment(1)
     });
 
@@ -119,7 +122,8 @@ class ChatService {
       senderPhotoUrl,
       text,
       createdAt: serverTimestamp(),
-      isGroupMessage: true
+      isGroupMessage: true,
+      status: 'sent'
     };
 
     if (replyTo) {
@@ -130,36 +134,30 @@ class ChatService {
   }
 
   // Send a message (works for both Student and Admin)
-  // IMPORTANT: This now properly uses the specific adminId to create unique conversations
   async sendMessage(
     studentId: string,
     studentName: string,
     senderId: string,
     text: string,
-    adminId: string, // Now required - the specific admin to message
+    adminId: string,
     senderPhotoUrl?: string,
     replyTo?: { id: string; text: string; senderName: string }
   ) {
-    // Each student has a unique conversation with EACH admin
-    // The conversationId is: studentId_adminId (e.g., "studentUID_adminUID")
     const conversationId = `${studentId}_${adminId}`;
     const conversationRef = doc(db, 'conversations', conversationId);
     const existingDoc = await getDoc(conversationRef);
 
-    // Get sender name
     let senderName = studentName;
     let actualAdminId = adminId;
     
     if (senderId !== studentId) {
-      // Sender is an admin - get admin's name
       const senderDoc = await getDoc(doc(db, 'users', senderId));
       if (senderDoc.exists()) {
         senderName = senderDoc.data().displayName || 'Admin';
-        actualAdminId = senderId; // Use the actual sender's ID as admin
+        actualAdminId = senderId;
       }
     }
 
-    // Get admin name for the conversation
     let adminName = 'Admin';
     try {
       const adminDoc = await getDoc(doc(db, 'users', adminId));
@@ -170,7 +168,6 @@ class ChatService {
       console.log('Error fetching admin name:', e);
     }
 
-    // Ensure conversation exists and update last message
     await setDoc(conversationRef, {
       studentId,
       studentName,
@@ -179,17 +176,16 @@ class ChatService {
       lastMessage: text,
       lastMessageTime: serverTimestamp(),
       lastSenderId: senderId,
-      // Increment unreadCount only if the recipient is NOT the sender
       unreadCount: existingDoc.exists() ? (existingDoc.data()?.unreadCount || 0) + 1 : 1
     }, { merge: true });
 
-    // Add message to subcollection
     const messageData: any = {
       senderId,
       senderName,
       senderPhotoUrl,
       text,
-      createdAt: serverTimestamp()
+      createdAt: serverTimestamp(),
+      status: 'sent'
     };
 
     if (replyTo) {
@@ -216,7 +212,6 @@ class ChatService {
     const conversationRef = doc(db, 'conversations', conversationId);
     const existingDoc = await getDoc(conversationRef);
 
-    // Get sender name
     let senderName = studentName;
     let actualAdminId = adminId;
     
@@ -228,7 +223,6 @@ class ChatService {
       }
     }
 
-    // Get admin name for the conversation
     let adminName = 'Admin';
     try {
       const adminDoc = await getDoc(doc(db, 'users', adminId));
@@ -239,13 +233,11 @@ class ChatService {
       console.log('Error fetching admin name:', e);
     }
 
-    // Upload audio to Firebase Storage
     const audioFileName = `voice_messages/${conversationId}/${Date.now()}.webm`;
     const audioRef = ref(storage, audioFileName);
     await uploadBytes(audioRef, audioBlob);
     const audioUrl = await getDownloadURL(audioRef);
 
-    // Ensure conversation exists and update last message
     await setDoc(conversationRef, {
       studentId,
       studentName,
@@ -254,11 +246,9 @@ class ChatService {
       lastMessage: '🎤 Voice message',
       lastMessageTime: serverTimestamp(),
       lastSenderId: senderId,
-      // Increment unreadCount for the receiver
       unreadCount: existingDoc.exists() ? (existingDoc.data()?.unreadCount || 0) + 1 : 1
     }, { merge: true });
 
-    // Add voice message to subcollection
     await addDoc(
       collection(db, 'conversations', conversationId, 'messages'),
       {
@@ -269,7 +259,8 @@ class ChatService {
         audioUrl,
         audioDuration: duration,
         messageType: 'voice',
-        createdAt: serverTimestamp()
+        createdAt: serverTimestamp(),
+        status: 'sent'
       }
     );
   }
@@ -287,7 +278,6 @@ class ChatService {
     const conversationRef = doc(db, 'conversations', conversationId);
     const existingDoc = await getDoc(conversationRef);
 
-    // Get sender name
     let senderName = studentName;
     let actualAdminId = adminId;
     
@@ -299,7 +289,6 @@ class ChatService {
       }
     }
 
-    // Get admin name for the conversation
     let adminName = 'Admin';
     try {
       const adminDoc = await getDoc(doc(db, 'users', adminId));
@@ -310,20 +299,16 @@ class ChatService {
       console.log('Error fetching admin name:', e);
     }
 
-    // Determine message type
     const isImage = file.type.startsWith('image/');
     const messageType = isImage ? 'image' : 'file';
     const lastMessagePreview = isImage ? '📷 Image' : `📄 ${file.name}`;
 
-    // Upload file to Firebase Storage
-    const fileExtension = file.name.split('.').pop();
     const fileName = `${Date.now()}_${file.name}`;
     const filePath = `chat_attachments/${conversationId}/${fileName}`;
     const fileRef = ref(storage, filePath);
     await uploadBytes(fileRef, file);
     const fileUrl = await getDownloadURL(fileRef);
 
-    // Ensure conversation exists and update last message
     await setDoc(conversationRef, {
       studentId,
       studentName,
@@ -335,7 +320,6 @@ class ChatService {
       unreadCount: existingDoc.exists() ? (existingDoc.data()?.unreadCount || 0) + 1 : 1
     }, { merge: true });
 
-    // Add message to subcollection
     await addDoc(
       collection(db, 'conversations', conversationId, 'messages'),
       {
@@ -347,7 +331,8 @@ class ChatService {
         fileName: file.name,
         fileType: file.type,
         messageType,
-        createdAt: serverTimestamp()
+        createdAt: serverTimestamp(),
+        status: 'sent'
       }
     );
   }
@@ -387,7 +372,26 @@ class ChatService {
       
       if (!readBy.includes(userId)) {
         await updateDoc(messageRef, {
-          readBy: [...readBy, userId]
+          readBy: [...readBy, userId],
+          status: 'read'
+        });
+      }
+    }
+  }
+
+  // Mark a message as delivered to a user
+  async markMessageAsDelivered(conversationId: string, messageId: string, userId: string): Promise<void> {
+    const messageRef = doc(db, 'conversations', conversationId, 'messages', messageId);
+    const messageDoc = await getDoc(messageRef);
+    
+    if (messageDoc.exists()) {
+      const messageData = messageDoc.data();
+      const deliveredTo: string[] = messageData.deliveredTo || [];
+      
+      if (!deliveredTo.includes(userId)) {
+        await updateDoc(messageRef, {
+          deliveredTo: [...deliveredTo, userId],
+          status: messageData.status === 'read' ? 'read' : 'delivered'
         });
       }
     }
@@ -405,16 +409,21 @@ class ChatService {
       const messageData = docSnap.data();
       const readBy: string[] = messageData.readBy || [];
 
-      // Only update if user hasn't already read this message
       if (!readBy.includes(userId)) {
         const messageRef = doc(db, 'conversations', conversationId, 'messages', docSnap.id);
         await updateDoc(messageRef, {
-          readBy: [...readBy, userId]
+          readBy: [...readBy, userId],
+          status: 'read'
         });
       }
     });
 
     await Promise.all(updatePromises);
+    
+    const conversationRef = doc(db, 'conversations', conversationId);
+    await updateDoc(conversationRef, {
+      unreadCount: 0
+    });
   }
 
   // Get user photo URL by user ID
@@ -428,6 +437,34 @@ class ChatService {
       console.error('Error getting user photo URL:', error);
     }
     return undefined;
+  }
+
+  // Delete message for me
+  async deleteMessageForMe(conversationId: string, messageId: string, userId: string): Promise<void> {
+    const messageRef = doc(db, 'conversations', conversationId, 'messages', messageId);
+    const messageDoc = await getDoc(messageRef);
+    
+    if (messageDoc.exists()) {
+      const deletedFor: string[] = messageDoc.data().deletedFor || [];
+      if (!deletedFor.includes(userId)) {
+        await updateDoc(messageRef, {
+          deletedFor: [...deletedFor, userId]
+        });
+      }
+    }
+  }
+
+  // Delete message for everyone
+  async deleteMessageForEveryone(conversationId: string, messageId: string): Promise<void> {
+    const messageRef = doc(db, 'conversations', conversationId, 'messages', messageId);
+    await updateDoc(messageRef, {
+      text: '🚫 This message was deleted',
+      isDeletedForEveryone: true,
+      messageType: 'text',
+      fileUrl: null,
+      audioUrl: null,
+      fileName: null
+    });
   }
 
   // Add a reaction to a message
@@ -444,19 +481,69 @@ class ChatService {
       } else {
         const index = reactions[emoji].indexOf(userId);
         if (index > -1) {
-          // Remove reaction if already exists
           reactions[emoji].splice(index, 1);
           if (reactions[emoji].length === 0) {
             delete reactions[emoji];
           }
         } else {
-          // Add reaction
           reactions[emoji].push(userId);
         }
       }
       
       await updateDoc(messageRef, { reactions });
     }
+  }
+
+  // Forward a message to another conversation
+  async forwardMessage(
+    targetConversationId: string,
+    message: Message,
+    senderId: string,
+    senderName: string,
+    senderPhotoUrl?: string
+  ) {
+    const conversationRef = doc(db, 'conversations', targetConversationId);
+    const existingDoc = await getDoc(conversationRef);
+    const conversationData = existingDoc.data();
+
+    if (!existingDoc.exists()) {
+      throw new Error('Target conversation does not exist');
+    }
+
+    const forwardText = message.text || (message.messageType === 'voice' ? '🎤 Voice message' : message.messageType === 'image' ? '📷 Image' : '📄 File');
+
+    await updateDoc(conversationRef, {
+      lastMessage: forwardText,
+      lastMessageTime: serverTimestamp(),
+      lastSenderId: senderId,
+      unreadCount: (conversationData?.unreadCount || 0) + 1
+    });
+
+    const messageData: any = {
+      senderId,
+      senderName,
+      senderPhotoUrl,
+      text: message.text || '',
+      createdAt: serverTimestamp(),
+      isForwarded: true,
+      messageType: message.messageType || 'text',
+      status: 'sent'
+    };
+
+    if (message.audioUrl) {
+      messageData.audioUrl = message.audioUrl;
+      messageData.audioDuration = message.audioDuration;
+    }
+    if (message.fileUrl) {
+      messageData.fileUrl = message.fileUrl;
+      messageData.fileName = message.fileName;
+      messageData.fileType = message.fileType;
+    }
+
+    await addDoc(
+      collection(db, 'conversations', targetConversationId, 'messages'),
+      messageData
+    );
   }
 
   // Admin: Listen to all conversations
@@ -471,7 +558,6 @@ class ChatService {
         snapshot.docs.map(async (docSnap) => {
           const data = docSnap.data() as Conversation;
           
-          // Get student photo URL if missing
           if (!data.studentPhotoUrl) {
             try {
               const studentDoc = await getDoc(doc(db, 'users', data.studentId));
@@ -503,14 +589,12 @@ class ChatService {
       where('memberIds', 'array-contains', adminId)
     );
 
-    // Helper to merge and fetch photos
     const fetchMetadata = async (docs: any[]) => {
       return await Promise.all(
         docs.map(async (docSnap) => {
           const data = docSnap.data() as Conversation;
           
           if (!data.isGroup) {
-            // Get student photo URL
             try {
               const studentDocSnap = await getDoc(doc(db, 'users', data.studentId));
               if (studentDocSnap.exists()) {
@@ -531,7 +615,23 @@ class ChatService {
 
     const unsubP = onSnapshot(q, async (snapshot) => {
       pConvs = await fetchMetadata(snapshot.docs);
-      callback([...pConvs, ...gConvs].sort((a, b) => {
+      const allConvs = [...pConvs, ...gConvs];
+      
+      // Update delivery status for received messages
+      allConvs.forEach(conv => {
+        const qMsgs = query(
+          collection(db, 'conversations', conv.id!, 'messages'),
+          where('senderId', '!=', adminId),
+          where('status', '==', 'sent')
+        );
+        getDocs(qMsgs).then(snap => {
+          snap.docs.forEach(msgDoc => {
+            this.markMessageAsDelivered(conv.id!, msgDoc.id, adminId);
+          });
+        });
+      });
+
+      callback(allConvs.sort((a, b) => {
         const timeA = a.lastMessageTime?.toDate ? a.lastMessageTime.toDate() : new Date(a.lastMessageTime || 0);
         const timeB = b.lastMessageTime?.toDate ? b.lastMessageTime.toDate() : new Date(b.lastMessageTime || 0);
         return timeB.getTime() - timeA.getTime();
@@ -540,7 +640,24 @@ class ChatService {
 
     const unsubG = onSnapshot(qGroup, async (snapshot) => {
       gConvs = await fetchMetadata(snapshot.docs);
-      callback([...pConvs, ...gConvs].sort((a, b) => {
+      const allConvs = [...pConvs, ...gConvs];
+
+      // Update delivery status for received messages in groups
+      allConvs.forEach(conv => {
+        if (!conv.isGroup) return;
+        const qMsgs = query(
+          collection(db, 'conversations', conv.id!, 'messages'),
+          where('senderId', '!=', adminId),
+          where('status', '==', 'sent')
+        );
+        getDocs(qMsgs).then(snap => {
+          snap.docs.forEach(msgDoc => {
+            this.markMessageAsDelivered(conv.id!, msgDoc.id, adminId);
+          });
+        });
+      });
+
+      callback(allConvs.sort((a, b) => {
         const timeA = a.lastMessageTime?.toDate ? a.lastMessageTime.toDate() : new Date(a.lastMessageTime || 0);
         const timeB = b.lastMessageTime?.toDate ? b.lastMessageTime.toDate() : new Date(b.lastMessageTime || 0);
         return timeB.getTime() - timeA.getTime();
@@ -651,7 +768,6 @@ class ChatService {
         timestamp: serverTimestamp()
       }, { merge: true });
       
-      // Auto-clear typing after 3 seconds
       setTimeout(async () => {
         await deleteDoc(typingRef);
       }, 3000);

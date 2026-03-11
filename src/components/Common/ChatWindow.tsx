@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import styled from 'styled-components';
-import { chatService, Message } from '../../services/chatService';
+import { chatService, Message, Conversation } from '../../services/chatService';
 import { callService } from '../../services/callService';
 import { presenceService } from '../../services/presenceService';
 import { webrtcService } from '../../services/webrtcService';
@@ -133,6 +133,65 @@ const EmojiOption = styled.span`
   }
 `;
 
+const ModalOverlay = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+`;
+
+const ForwardModal = styled.div`
+  background: white;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 400px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+`;
+
+const ModalHeader = styled.div`
+  padding: 16px;
+  border-bottom: 1px solid ${theme.colors.gray200};
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: bold;
+`;
+
+const ModalContent = styled.div`
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+`;
+
+const RecipientItem = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+
+  &:hover {
+    background: ${theme.colors.gray100};
+  }
+`;
+
+const ForwardIcon = styled.svg`
+  width: 12px;
+  height: 12px;
+  fill: currentColor;
+`;
+
 const ChatContainer = styled.div`
   display: flex;
   flex-direction: column;
@@ -181,6 +240,37 @@ const AvatarImg = styled.img`
   width: 100%;
   height: 100%;
   object-fit: cover;
+`;
+
+const OptionItem = styled.div`
+  padding: 10px 16px;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: background 0.2s;
+
+  &:hover {
+    background: ${theme.colors.gray100};
+  }
+
+  &.delete {
+    color: #f44336;
+  }
+`;
+
+const OptionsMenu = styled.div<{ isOwn: boolean }>`
+  position: absolute;
+  top: 100%;
+  ${props => props.isOwn ? 'right: 0;' : 'left: 0;'}
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  z-index: 100;
+  min-width: 150px;
+  margin-top: 4px;
+  overflow: hidden;
 `;
 
 const MessageList = styled.div`
@@ -371,9 +461,29 @@ const Input = styled.input`
   }
 `;
 
-const ReadReceipt = styled.span`
-  color: #53bdeb;
-  margin-left: 4px;
+const SendButton = styled.button`
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: ${theme.colors.primary};
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+
+  &:hover {
+    background-color: ${theme.colors.primaryDark};
+    transform: scale(1.05);
+  }
+
+  &:disabled {
+    background-color: ${theme.colors.gray300};
+    cursor: not-allowed;
+  }
 `;
 
 const VoiceRecordContainer = styled.div`
@@ -439,40 +549,6 @@ const AudioProgress = styled.div`
 const AudioDuration = styled.span`
   font-size: 12px;
   color: rgba(255,255,255,0.8);
-`;
-
-const SendButton = styled.button`
-  border-radius: 50%;
-  width: 40px;
-  height: 40px;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: ${theme.colors.primary};
-  border: none;
-  cursor: pointer;
-  transition: all 0.2s;
-  flex-shrink: 0;
-
-  &:hover {
-    background-color: ${theme.colors.primaryDark};
-    transform: scale(1.05);
-  }
-
-  &:disabled {
-    background-color: ${theme.colors.gray300};
-    cursor: not-allowed;
-  }
-`;
-
-const OnlineStatusDot = styled.span<{ isOnline: boolean }>`
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background-color: ${props => props.isOnline ? '#25D366' : theme.colors.gray400};
-  display: inline-block;
-  margin-right: 6px;
 `;
 
 const CallButton = styled.button`
@@ -583,6 +659,9 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   const [replyingTo, setReplyTo] = useState<Message | null>(null);
   const [activeCall, setActiveCall] = useState<CallSession | null>(null);
   const [showReactionPickerId, setShowReactionPickerId] = useState<string | null>(null);
+  const [forwardingMessage, setForwardingMessage] = useState<Message | null>(null);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [showMessageOptionsId, setShowMessageOptionsId] = useState<string | null>(null);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
   const [isMuted, setIsMuted] = useState(false);
@@ -621,7 +700,12 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
 
         msgs.forEach(msg => {
           if (msg.senderId !== currentUserUid && msg.id) {
+            // Mark as read when the message list updates and we are not the sender
             chatService.markMessageAsRead(resolvedConversationId, msg.id, currentUserUid);
+          } else if (msg.senderId === currentUserUid && msg.id && msg.status === 'sent') {
+            // If it's our own message and still only 'sent', check if we should mark as delivered
+            // In a real app, this would be handled by the receiver's client, 
+            // but we can add a check here for robustness if needed.
           }
         });
       });
@@ -882,6 +966,34 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     }
   };
 
+  useEffect(() => {
+    if (!currentUserUid) return;
+    
+    const unsub = isAdmin 
+      ? chatService.subscribeToConversationsByAdmin(currentUserUid, setConversations)
+      : chatService.subscribeToConversationsByStudent(currentUserUid, setConversations);
+      
+    return () => unsub();
+  }, [currentUserUid, isAdmin]);
+
+  const handleForwardMessage = async (targetConvId: string) => {
+    if (!forwardingMessage) return;
+    try {
+      await chatService.forwardMessage(
+        targetConvId,
+        forwardingMessage,
+        currentUserUid,
+        currentUserName || 'User',
+        currentUserPhotoUrl
+      );
+      setForwardingMessage(null);
+      uniqueToast.success('Message forwarded');
+    } catch (error) {
+      console.error('Failed to forward message:', error);
+      uniqueToast.error('Failed to forward message');
+    }
+  };
+
   const handleReaction = async (messageId: string, emoji: string) => {
     if (!adminUid) return;
     const conversationId = `${studentId}_${adminUid}`;
@@ -976,6 +1088,32 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     }
   };
 
+  const handleDeleteForMe = async (messageId: string) => {
+    if (!adminUid) return;
+    const conversationId = isGroup && groupId ? groupId : `${studentId}_${adminUid}`;
+    try {
+      await chatService.deleteMessageForMe(conversationId, messageId, currentUserUid);
+      setShowMessageOptionsId(null);
+      uniqueToast.success('Message deleted for you');
+    } catch (error) {
+      console.error('Failed to delete message for me:', error);
+      uniqueToast.error('Failed to delete message');
+    }
+  };
+
+  const handleDeleteForEveryone = async (messageId: string) => {
+    if (!adminUid) return;
+    const conversationId = isGroup && groupId ? groupId : `${studentId}_${adminUid}`;
+    try {
+      await chatService.deleteMessageForEveryone(conversationId, messageId);
+      setShowMessageOptionsId(null);
+      uniqueToast.success('Message deleted for everyone');
+    } catch (error) {
+      console.error('Failed to delete message for everyone:', error);
+      uniqueToast.error('Failed to delete message');
+    }
+  };
+
   const formatTime = (createdAt: any) => {
     if (!createdAt) return '';
     const date = createdAt.toDate ? createdAt.toDate() : new Date(createdAt);
@@ -986,6 +1124,27 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     return name.split(' ').map(n => n[0]).join('').toUpperCase();
   };
 
+  const renderStatusTicks = (msg: Message) => {
+    if (msg.senderId !== currentUserUid) return null;
+
+    const color = msg.status === 'read' ? '#53bdeb' : 'rgba(0, 0, 0, 0.45)';
+    const isDeliveredOrRead = msg.status === 'delivered' || msg.status === 'read';
+
+    return (
+      <span style={{ color, marginLeft: '4px', fontSize: '14px', display: 'flex', alignItems: 'center' }}>
+        {isDeliveredOrRead ? (
+          <svg viewBox="0 0 16 15" width="16" height="15">
+            <path fill="currentColor" d="M15.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L8.666 9.879a.32.32 0 0 1-.484.033l-.358-.325a.319.329 0 0 0-.484.032l-.378.483a.418.418 0 0 0 .036.541l1.32 1.266a.32.32 0 0 0 .484-.032l6.272-8.048a.366.365 0 0 0-.063-.512zm-4.1 0l-.478-.372a.365.365 0 0 0-.51.063L5.066 9.879a.32.32 0 0 1-.484.033L1.091 6.839a.365.365 0 0 0-.51.063l-.478.371a.365.365 0 0 0 .063.51l4.737 3.699a.32.32 0 0 0 .484-.033l6.272-8.048a.366.365 0 0 0-.063-.512z"></path>
+          </svg>
+        ) : (
+          <svg viewBox="0 0 16 15" width="16" height="15">
+            <path fill="currentColor" d="M10.91 3.316l-.478-.372a.365.365 0 0 0-.51.063L4.566 9.879a.32.32 0 0 1-.484.033L.591 6.839a.365.365 0 0 0-.51.063l-.478.371a.365.365 0 0 0 .063.51l4.737 3.699a.32.32 0 0 0 .484-.033l6.272-8.048a.366.365 0 0 0-.063-.512z"></path>
+          </svg>
+        )}
+      </span>
+    );
+  };
+
   // Filter messages based on search query
   const filteredMessages = searchQuery.trim() 
     ? messages.filter(msg => msg.text.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -994,6 +1153,42 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
 
   return (
     <>
+      {forwardingMessage && (
+        <ModalOverlay onClick={() => setForwardingMessage(null)}>
+          <ForwardModal onClick={e => e.stopPropagation()}>
+            <ModalHeader>
+              <span>Forward Message</span>
+              <button 
+                onClick={() => setForwardingMessage(null)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px' }}
+              >✕</button>
+            </ModalHeader>
+            <ModalContent>
+              <div style={{ padding: '8px', color: theme.colors.textSecondary, fontSize: '12px' }}>
+                Select a chat to forward to:
+              </div>
+              {conversations.map(conv => (
+                <RecipientItem key={conv.id} onClick={() => handleForwardMessage(conv.id!)}>
+                  <Avatar hasPhoto={!!(conv.isGroup ? conv.groupPhotoUrl : (isAdmin ? conv.studentPhotoUrl : conv.adminPhotoUrl))}>
+                    {conv.isGroup ? (
+                      conv.groupPhotoUrl ? <AvatarImg src={conv.groupPhotoUrl} alt="" /> : '👥'
+                    ) : (
+                      (isAdmin ? conv.studentPhotoUrl : conv.adminPhotoUrl) ? (
+                        <AvatarImg src={isAdmin ? conv.studentPhotoUrl : conv.adminPhotoUrl} alt="" />
+                      ) : getInitials(conv.isGroup ? (conv.groupName || 'Group') : (isAdmin ? conv.studentName : (conv.adminName || 'Admin')))
+                    )}
+                  </Avatar>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 500 }}>{conv.isGroup ? conv.groupName : (isAdmin ? conv.studentName : conv.adminName)}</div>
+                    <div style={{ fontSize: '12px', color: theme.colors.textSecondary }}>{conv.lastMessage}</div>
+                  </div>
+                </RecipientItem>
+              ))}
+            </ModalContent>
+          </ForwardModal>
+        </ModalOverlay>
+      )}
+
       {incomingCall && (
         <IncomingCallModal
           call={incomingCall}
@@ -1120,6 +1315,37 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
             <React.Fragment key={msg.id || index}>
               {showDateDivider && <DateDivider>{dateLabel}</DateDivider>}
               <MessageBubble isOwn={isOwn} onDoubleClick={() => setReplyTo(msg)} onContextMenu={(e) => { e.preventDefault(); setShowReactionPickerId(msg.id!); }}>
+                <div 
+                  style={{ position: 'absolute', top: '4px', right: '4px', cursor: 'pointer', opacity: 0.5 }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowMessageOptionsId(showMessageOptionsId === msg.id ? null : (msg.id || null));
+                  }}
+                >
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                    <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
+                  </svg>
+                </div>
+
+                {showMessageOptionsId === msg.id && (
+                  <OptionsMenu isOwn={isOwn}>
+                    <OptionItem onClick={() => { setReplyTo(msg); setShowMessageOptionsId(null); }}>
+                      Reply
+                    </OptionItem>
+                    <OptionItem onClick={() => { setForwardingMessage(msg); setShowMessageOptionsId(null); }}>
+                      Forward
+                    </OptionItem>
+                    <OptionItem onClick={() => handleDeleteForMe(msg.id!)} className="delete">
+                      Delete for me
+                    </OptionItem>
+                    {isOwn && (
+                      <OptionItem onClick={() => handleDeleteForEveryone(msg.id!)} className="delete">
+                        Delete for everyone
+                      </OptionItem>
+                    )}
+                  </OptionsMenu>
+                )}
+
                 {showReactionPickerId === msg.id && (
                   <ReactionPicker>
                     {['👍', '❤️', '😂', '😮', '😢', '🙏'].map(emoji => (
@@ -1127,7 +1353,18 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                         {emoji}
                       </EmojiOption>
                     ))}
+                    <EmojiOption onClick={() => { setForwardingMessage(msg); setShowReactionPickerId(null); }} title="Forward">
+                      ↪️
+                    </EmojiOption>
                   </ReactionPicker>
+                )}
+                {msg.isForwarded && (
+                  <div style={{ fontSize: '11px', color: theme.colors.textSecondary, fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+                    <ForwardIcon viewBox="0 0 24 24">
+                      <path d="M14 9V5l7 7-7 7v-4.1c-5 0-8.5 1.6-11 5.1 1-5 4-10 11-11z" />
+                    </ForwardIcon>
+                    Forwarded
+                  </div>
                 )}
                 {msg.replyTo && (
                   <QuotedMessage isOwn={isOwn}>
@@ -1206,12 +1443,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
 
                 <TimeLabel isOwn={isOwn}>
                   {formatTime(msg.createdAt)}
-                  {/* Read receipt indicator */}
-                  {isOwn && (
-                    <span style={{ color: msg.readBy && msg.readBy.includes(isAdmin ? studentId : adminUid) ? '#34B7F1' : 'rgba(0, 0, 0, 0.45)' }}>
-                      {msg.readBy && msg.readBy.includes(isAdmin ? studentId : adminUid) ? '✓✓' : '✓'}
-                    </span>
-                  )}
+                  {renderStatusTicks(msg)}
                 </TimeLabel>
               </MessageBubble>
             </React.Fragment>

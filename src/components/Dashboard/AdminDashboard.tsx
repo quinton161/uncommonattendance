@@ -777,15 +777,23 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
                               {conv.lastMessage}
                             </div>
                           </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
                           <div style={{ fontSize: '10px', color: theme.colors.textLight }}>
                             {conv.lastMessageTime?.toDate ? conv.lastMessageTime.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 
                              conv.lastMessageTime ? new Date(conv.lastMessageTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                             {conv.lastSenderId === user?.uid && conv.lastMessageTime && (
-                              <span style={{ color: conv.unreadCount === 0 ? '#34B7F1' : theme.colors.textLight, fontSize: '14px', lineHeight: 1 }}>
-                                {conv.unreadCount === 0 ? '✓✓' : '✓'}
+                              <span style={{ color: conv.unreadCount === 0 ? '#34B7F1' : 'rgba(0, 0, 0, 0.45)', fontSize: '14px', lineHeight: 1, display: 'flex', alignItems: 'center' }}>
+                                {conv.unreadCount === 0 ? (
+                                  <svg viewBox="0 0 16 15" width="16" height="15">
+                                    <path fill="currentColor" d="M15.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L8.666 9.879a.32.32 0 0 1-.484.033l-.358-.325a.319.329 0 0 0-.484.032l-.378.483a.418.418 0 0 0 .036.541l1.32 1.266a.32.32 0 0 0 .484-.032l6.272-8.048a.366.365 0 0 0-.063-.512zm-4.1 0l-.478-.372a.365.365 0 0 0-.51.063L5.066 9.879a.32.32 0 0 1-.484.033L1.091 6.839a.365.365 0 0 0-.51.063l-.478.371a.365.365 0 0 0 .063.51l4.737 3.699a.32.32 0 0 0 .484-.033l6.272-8.048a.366.365 0 0 0-.063-.512z"></path>
+                                  </svg>
+                                ) : (
+                                  <svg viewBox="0 0 16 15" width="16" height="15">
+                                    <path fill="currentColor" d="M10.91 3.316l-.478-.372a.365.365 0 0 0-.51.063L4.566 9.879a.32.32 0 0 1-.484.033L.591 6.839a.365.365 0 0 0-.51.063l-.478.371a.365.365 0 0 0 .063.51l4.737 3.699a.32.32 0 0 0 .484-.033l6.272-8.048a.366.365 0 0 0-.063-.512z"></path>
+                                  </svg>
+                                )}
                               </span>
                             )}
                             {conv.unreadCount !== undefined && conv.unreadCount > 0 && (
