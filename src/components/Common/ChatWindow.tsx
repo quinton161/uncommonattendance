@@ -9,6 +9,28 @@ import { IncomingCallModal, ActiveCallScreen } from './CallModals';
 import { CallSession } from '../../types';
 import { uniqueToast } from '../../utils/toastUtils';
 
+const SearchContainer = styled.div`
+  padding: 8px 16px;
+  background: ${theme.colors.white};
+  border-bottom: 1px solid ${theme.colors.gray200};
+  display: flex;
+  align-items: center;
+  gap: 8px;
+`;
+
+const SearchInput = styled.input`
+  flex: 1;
+  padding: 6px 12px;
+  border-radius: 15px;
+  border: 1px solid ${theme.colors.gray200};
+  font-size: ${theme.fontSizes.sm};
+  outline: none;
+  
+  &:focus {
+    border-color: ${theme.colors.primary};
+  }
+`;
+
 const ChatContainer = styled.div`
   display: flex;
   flex-direction: column;
@@ -447,6 +469,8 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   const [isOtherUserOnline, setIsOtherUserOnline] = useState(false);
   const [otherUserLastSeen, setOtherUserLastSeen] = useState<any>(null);
   const [isCalling, setIsCalling] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
   const [incomingCall, setIncomingCall] = useState<CallSession | null>(null);
   const [activeCall, setActiveCall] = useState<CallSession | null>(null);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
@@ -815,6 +839,12 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     return name.split(' ').map(n => n[0]).join('').toUpperCase();
   };
 
+  // Filter messages based on search query
+  const filteredMessages = searchQuery.trim() 
+    ? messages.filter(msg => msg.text.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                            msg.fileName?.toLowerCase().includes(searchQuery.toLowerCase()))
+    : messages;
+
   return (
     <>
       {incomingCall && (
@@ -867,6 +897,11 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
           </StatusText>
         </div>
         <CallButtonsContainer>
+          <AttachmentButton type="button" onClick={() => setIsSearching(!isSearching)} title="Search messages">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="white">
+              <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+            </svg>
+          </AttachmentButton>
           <CallButton onClick={handleVoiceCall} disabled={isCalling || !otherUserId} title="Voice call">
             <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
               <path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56a.977.977 0 0 0-1.01.24l-1.57 1.97c-2.83-1.35-5.48-3.9-6.89-6.83l1.95-1.66c.27-.28.35-.67.24-1.02-.37-1.11-.56-2.3-.56-3.53 0-.54-.45-.99-.99-.99H4.19C3.65 3 3 3.24 3 3.99 3 13.28 10.73 21 20.01 21c.71 0 .99-.63.99-1.18v-3.45c0-.54-.45-.99-.99-.99z"/>
@@ -879,14 +914,31 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
           </CallButton>
         </CallButtonsContainer>
       </ChatHeader>
+
+      {isSearching && (
+        <SearchContainer>
+          <SearchInput 
+            placeholder="Search messages..." 
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            autoFocus
+          />
+          <AttachmentButton onClick={() => { setIsSearching(false); setSearchQuery(''); }}>
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+              <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+            </svg>
+          </AttachmentButton>
+        </SearchContainer>
+      )}
+
       <MessageList ref={scrollRef}>
-        {messages.map((msg, index) => {
+        {filteredMessages.map((msg, index) => {
           const isOwn = msg.senderId === currentUserUid;
           
           // Logic for date grouping
           const showDateDivider = index === 0 || (() => {
             const currentMsgDate = msg.createdAt?.toDate ? msg.createdAt.toDate().toDateString() : new Date(msg.createdAt).toDateString();
-            const prevMsgDate = messages[index-1].createdAt?.toDate ? messages[index-1].createdAt.toDate().toDateString() : new Date(messages[index-1].createdAt).toDateString();
+            const prevMsgDate = filteredMessages[index-1].createdAt?.toDate ? filteredMessages[index-1].createdAt.toDate().toDateString() : new Date(filteredMessages[index-1].createdAt).toDateString();
             return currentMsgDate !== prevMsgDate;
           })();
 
