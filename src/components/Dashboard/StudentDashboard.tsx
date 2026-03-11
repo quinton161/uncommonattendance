@@ -854,11 +854,15 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
                         const convId = user?.uid ? `${user.uid}_${admin.uid}` : '';
                         const conv = convId ? studentConversations.find(c => c.id === convId) : undefined;
                         const unread = conv?.unreadCount || 0;
-                        const time = conv?.lastMessageTime?.toDate
-                          ? conv.lastMessageTime.toDate()
-                          : conv?.lastMessageTime
-                            ? new Date(conv.lastMessageTime)
-                            : null;
+                        
+                        // Parse date for comparison
+                        const parseDate = (d: any) => {
+                          if (!d) return null;
+                          if (d.toDate) return d.toDate();
+                          return new Date(d);
+                        };
+
+                        const time = parseDate(conv?.lastMessageTime);
                         const previewText = conv?.lastMessage || `Chat with ${admin.displayName || 'Admin'}`;
 
                         return (
@@ -879,7 +883,9 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
                             transition: 'all 0.2s',
                             background: selectedAdmin?.uid === admin.uid ? 'rgba(6, 71, 161, 0.1)' : 'transparent',
                             borderLeft: selectedAdmin?.uid === admin.uid ? `4px solid ${theme.colors.primary}` : '4px solid transparent',
-                            padding: theme.spacing.md
+                            padding: theme.spacing.md,
+                            // Ensure newest appear top if we sort later
+                            order: time ? -time.getTime() : 0 
                           }}
                         >
                           <UserAvatar>
