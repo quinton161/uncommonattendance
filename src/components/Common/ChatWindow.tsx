@@ -31,6 +31,108 @@ const SearchInput = styled.input`
   }
 `;
 
+const ReplyPreview = styled.div`
+  background: rgba(0, 0, 0, 0.05);
+  border-left: 4px solid ${theme.colors.primary};
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  border-radius: 4px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+`;
+
+const ReplyPreviewContent = styled.div`
+  flex: 1;
+  min-width: 0;
+`;
+
+const ReplySender = styled.div`
+  font-weight: bold;
+  font-size: 12px;
+  color: ${theme.colors.primary};
+  margin-bottom: 2px;
+`;
+
+const ReplyText = styled.div`
+  font-size: 12px;
+  color: ${theme.colors.textSecondary};
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+`;
+
+const QuotedMessage = styled.div<{ isOwn: boolean }>`
+  background: ${props => props.isOwn ? 'rgba(0, 0, 0, 0.05)' : 'rgba(0, 0, 0, 0.03)'};
+  border-left: 4px solid ${props => props.isOwn ? theme.colors.primaryDark : theme.colors.primary};
+  padding: 4px 8px;
+  margin-bottom: 4px;
+  border-radius: 4px;
+  font-size: 12px;
+`;
+
+const QuotedSender = styled.div`
+  font-weight: bold;
+  color: ${theme.colors.primary};
+  margin-bottom: 2px;
+`;
+
+const QuotedText = styled.div`
+  color: ${theme.colors.textSecondary};
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+`;
+
+const ReactionsContainer = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+`;
+
+const ReactionBadge = styled.div<{ $hasMyReaction: boolean }>`
+  background: ${props => props.$hasMyReaction ? 'rgba(52, 183, 241, 0.1)' : 'rgba(0, 0, 0, 0.05)'};
+  border: 1px solid ${props => props.$hasMyReaction ? '#34B7F1' : 'transparent'};
+  border-radius: 12px;
+  padding: 2px 6px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    background: rgba(0, 0, 0, 0.1);
+  }
+`;
+
+const ReactionPicker = styled.div`
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  background: white;
+  border-radius: 20px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+  display: flex;
+  gap: 8px;
+  padding: 8px 12px;
+  z-index: 100;
+  margin-bottom: 8px;
+`;
+
+const EmojiOption = styled.span`
+  cursor: pointer;
+  font-size: 20px;
+  transition: transform 0.2s;
+
+  &:hover {
+    transform: scale(1.3);
+  }
+`;
+
 const ChatContainer = styled.div`
   display: flex;
   flex-direction: column;
@@ -472,7 +574,9 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [incomingCall, setIncomingCall] = useState<CallSession | null>(null);
+  const [replyingTo, setReplyTo] = useState<Message | null>(null);
   const [activeCall, setActiveCall] = useState<CallSession | null>(null);
+  const [showReactionPickerId, setShowReactionPickerId] = useState<string | null>(null);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
   const [isMuted, setIsMuted] = useState(false);
@@ -767,6 +871,17 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     }
   };
 
+  const handleReaction = async (messageId: string, emoji: string) => {
+    if (!adminUid) return;
+    const conversationId = `${studentId}_${adminUid}`;
+    try {
+      await chatService.toggleReaction(conversationId, messageId, currentUserUid, emoji);
+      setShowReactionPickerId(null);
+    } catch (error) {
+      console.error('Failed to toggle reaction:', error);
+    }
+  };
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !adminUid) return;
@@ -815,8 +930,14 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         currentUserUid,
         text,
         adminUid,
-        currentUserPhotoUrl
+        currentUserPhotoUrl,
+        replyingTo ? {
+          id: replyingTo.id!,
+          text: replyingTo.text || (replyingTo.messageType === 'voice' ? '🎤 Voice message' : replyingTo.messageType === 'image' ? '📷 Image' : '📄 File'),
+          senderName: replyingTo.senderName || 'User'
+        } : undefined
       );
+      setReplyTo(null);
     } catch (error) {
       console.error('Failed to send message:', error);
       const errAny = error as any;
@@ -931,6 +1052,22 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         </SearchContainer>
       )}
 
+      {replyingTo && (
+        <ReplyPreview>
+          <ReplyPreviewContent>
+            <ReplySender>{replyingTo.senderName}</ReplySender>
+            <ReplyText>
+              {replyingTo.text || (replyingTo.messageType === 'voice' ? '🎤 Voice message' : replyingTo.messageType === 'image' ? '📷 Image' : '📄 File')}
+            </ReplyText>
+          </ReplyPreviewContent>
+          <AttachmentButton onClick={() => setReplyTo(null)}>
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+              <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+            </svg>
+          </AttachmentButton>
+        </ReplyPreview>
+      )}
+
       <MessageList ref={scrollRef}>
         {filteredMessages.map((msg, index) => {
           const isOwn = msg.senderId === currentUserUid;
@@ -956,7 +1093,22 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
           return (
             <React.Fragment key={msg.id || index}>
               {showDateDivider && <DateDivider>{dateLabel}</DateDivider>}
-              <MessageBubble isOwn={isOwn}>
+              <MessageBubble isOwn={isOwn} onDoubleClick={() => setReplyTo(msg)} onContextMenu={(e) => { e.preventDefault(); setShowReactionPickerId(msg.id!); }}>
+                {showReactionPickerId === msg.id && (
+                  <ReactionPicker>
+                    {['👍', '❤️', '😂', '😮', '😢', '🙏'].map(emoji => (
+                      <EmojiOption key={emoji} onClick={() => handleReaction(msg.id!, emoji)}>
+                        {emoji}
+                      </EmojiOption>
+                    ))}
+                  </ReactionPicker>
+                )}
+                {msg.replyTo && (
+                  <QuotedMessage isOwn={isOwn}>
+                    <QuotedSender>{msg.replyTo.senderName}</QuotedSender>
+                    <QuotedText>{msg.replyTo.text}</QuotedText>
+                  </QuotedMessage>
+                )}
                 {!isOwn && msg.senderPhotoUrl && (
                   <Avatar 
                     hasPhoto={true} 
@@ -1010,6 +1162,22 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                 ) : (
                   <MessageText>{msg.text}</MessageText>
                 )}
+                
+                {msg.reactions && Object.keys(msg.reactions).length > 0 && (
+                  <ReactionsContainer>
+                    {Object.entries(msg.reactions).map(([emoji, userIds]) => (
+                      <ReactionBadge 
+                        key={emoji} 
+                        $hasMyReaction={userIds.includes(currentUserUid)}
+                        onClick={() => handleReaction(msg.id!, emoji)}
+                      >
+                        <span>{emoji}</span>
+                        <span>{userIds.length}</span>
+                      </ReactionBadge>
+                    ))}
+                  </ReactionsContainer>
+                )}
+
                 <TimeLabel isOwn={isOwn}>
                   {formatTime(msg.createdAt)}
                   {/* Read receipt indicator */}

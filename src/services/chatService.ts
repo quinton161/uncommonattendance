@@ -30,6 +30,12 @@ export interface Message {
   fileName?: string; // Attachment file name
   fileType?: string; // MIME type
   messageType?: 'text' | 'voice' | 'image' | 'file'; // Type of message
+  replyTo?: {
+    id: string;
+    text: string;
+    senderName: string;
+  };
+  reactions?: Record<string, string[]>; // emoji -> userIds[]
 }
 
 export interface Conversation {
@@ -64,7 +70,8 @@ class ChatService {
     senderId: string,
     text: string,
     adminId: string, // Now required - the specific admin to message
-    senderPhotoUrl?: string
+    senderPhotoUrl?: string,
+    replyTo?: { id: string; text: string; senderName: string }
   ) {
     // Each student has a unique conversation with EACH admin
     // The conversationId is: studentId_adminId (e.g., "studentUID_adminUID")
@@ -110,15 +117,21 @@ class ChatService {
     }, { merge: true });
 
     // Add message to subcollection
+    const messageData: any = {
+      senderId,
+      senderName,
+      senderPhotoUrl,
+      text,
+      createdAt: serverTimestamp()
+    };
+
+    if (replyTo) {
+      messageData.replyTo = replyTo;
+    }
+
     await addDoc(
       collection(db, 'conversations', conversationId, 'messages'),
-      {
-        senderId,
-        senderName,
-        senderPhotoUrl,
-        text,
-        createdAt: serverTimestamp()
-      }
+      messageData
     );
   }
 
@@ -348,6 +361,35 @@ class ChatService {
       console.error('Error getting user photo URL:', error);
     }
     return undefined;
+  }
+
+  // Add a reaction to a message
+  async toggleReaction(conversationId: string, messageId: string, userId: string, emoji: string): Promise<void> {
+    const messageRef = doc(db, 'conversations', conversationId, 'messages', messageId);
+    const messageDoc = await getDoc(messageRef);
+    
+    if (messageDoc.exists()) {
+      const messageData = messageDoc.data();
+      const reactions: Record<string, string[]> = messageData.reactions || {};
+      
+      if (!reactions[emoji]) {
+        reactions[emoji] = [userId];
+      } else {
+        const index = reactions[emoji].indexOf(userId);
+        if (index > -1) {
+          // Remove reaction if already exists
+          reactions[emoji].splice(index, 1);
+          if (reactions[emoji].length === 0) {
+            delete reactions[emoji];
+          }
+        } else {
+          // Add reaction
+          reactions[emoji].push(userId);
+        }
+      }
+      
+      await updateDoc(messageRef, { reactions });
+    }
   }
 
   // Admin: Listen to all conversations
