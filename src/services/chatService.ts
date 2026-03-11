@@ -11,7 +11,8 @@ import {
   onSnapshot,
   where,
   getDocs,
-  deleteDoc
+  deleteDoc,
+  increment
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from './firebase';
@@ -36,6 +37,7 @@ export interface Message {
     senderName: string;
   };
   reactions?: Record<string, string[]>; // emoji -> userIds[]
+  isGroupMessage?: boolean;
 }
 
 export interface Conversation {
@@ -50,6 +52,11 @@ export interface Conversation {
   lastMessageTime: any;
   lastSenderId?: string;
   unreadCount?: number;
+  isGroup?: boolean;
+  groupName?: string;
+  groupPhotoUrl?: string;
+  memberIds?: string[];
+  createdBy?: string;
 }
 
 class ChatService {
@@ -60,6 +67,66 @@ class ChatService {
       ChatService.instance = new ChatService();
     }
     return ChatService.instance;
+  }
+
+  // Create a new group chat
+  async createGroup(name: string, memberIds: string[], createdBy: string, groupPhotoUrl?: string): Promise<string> {
+    const allMembers = [...memberIds, createdBy];
+    const uniqueMembers = allMembers.filter((value, index, self) => self.indexOf(value) === index);
+    
+    const conversationData: any = {
+      isGroup: true,
+      groupName: name,
+      memberIds: uniqueMembers,
+      createdBy,
+      lastMessage: 'Group created',
+      lastMessageTime: serverTimestamp(),
+      lastSenderId: createdBy,
+      unreadCount: 0
+    };
+
+    if (groupPhotoUrl) {
+      conversationData.groupPhotoUrl = groupPhotoUrl;
+    }
+
+    const docRef = await addDoc(collection(db, 'conversations'), conversationData);
+    return docRef.id;
+  }
+
+  // Send a message to a group
+  async sendGroupMessage(
+    conversationId: string,
+    senderId: string,
+    senderName: string,
+    text: string,
+    senderPhotoUrl?: string,
+    replyTo?: { id: string; text: string; senderName: string }
+  ) {
+    const conversationRef = doc(db, 'conversations', conversationId);
+    
+    // Update conversation last message
+    await updateDoc(conversationRef, {
+      lastMessage: text,
+      lastMessageTime: serverTimestamp(),
+      lastSenderId: senderId,
+      // In groups, we might handle unread differently, but for now incrementing simple count
+      unreadCount: increment(1)
+    });
+
+    const messageData: any = {
+      senderId,
+      senderName,
+      senderPhotoUrl,
+      text,
+      createdAt: serverTimestamp(),
+      isGroupMessage: true
+    };
+
+    if (replyTo) {
+      messageData.replyTo = replyTo;
+    }
+
+    await addDoc(collection(db, 'conversations', conversationId, 'messages'), messageData);
   }
 
   // Send a message (works for both Student and Admin)
@@ -423,32 +490,87 @@ class ChatService {
     });
   }
 
-  // Admin: Listen to conversations specific to this admin
+  // Listen to conversations specific to this admin
   subscribeToConversationsByAdmin(adminId: string, callback: (conversations: Conversation[]) => void) {
     const q = query(
       collection(db, 'conversations'),
-      where('adminId', '==', adminId), // Filter by specific admin
-      orderBy('lastMessageTime', 'desc')
+      where('adminId', '==', adminId)
     );
 
-    return onSnapshot(q, async (snapshot) => {
-      // Fetch user data for each conversation to get photo URLs
-      const conversationsWithPhotos = await Promise.all(
-        snapshot.docs.map(async (docSnap) => {
+    const qGroup = query(
+      collection(db, 'conversations'),
+      where('isGroup', '==', true),
+      where('memberIds', 'array-contains', adminId)
+    );
+
+    // Helper to merge and fetch photos
+    const fetchMetadata = async (docs: any[]) => {
+      return await Promise.all(
+        docs.map(async (docSnap) => {
           const data = docSnap.data() as Conversation;
           
-          // Get student photo URL
-          try {
-            const studentDocSnap = await getDoc(doc(db, 'users', data.studentId));
-            if (studentDocSnap.exists()) {
-              data.studentPhotoUrl = studentDocSnap.data().photoUrl;
+          if (!data.isGroup) {
+            // Get student photo URL
+            try {
+              const studentDocSnap = await getDoc(doc(db, 'users', data.studentId));
+              if (studentDocSnap.exists()) {
+                data.studentPhotoUrl = studentDocSnap.data().photoUrl;
+              }
+            } catch (e) {
+              console.log('Error fetching student photo:', e);
             }
-          } catch (e) {
-            console.log('Error fetching student photo:', e);
           }
           
-          // Get admin photo URL if available
-          if (data.adminId) {
+          return { id: docSnap.id, ...data };
+        })
+      );
+    };
+
+    let pConvs: Conversation[] = [];
+    let gConvs: Conversation[] = [];
+
+    const unsubP = onSnapshot(q, async (snapshot) => {
+      pConvs = await fetchMetadata(snapshot.docs);
+      callback([...pConvs, ...gConvs].sort((a, b) => {
+        const timeA = a.lastMessageTime?.toDate ? a.lastMessageTime.toDate() : new Date(a.lastMessageTime || 0);
+        const timeB = b.lastMessageTime?.toDate ? b.lastMessageTime.toDate() : new Date(b.lastMessageTime || 0);
+        return timeB.getTime() - timeA.getTime();
+      }));
+    });
+
+    const unsubG = onSnapshot(qGroup, async (snapshot) => {
+      gConvs = await fetchMetadata(snapshot.docs);
+      callback([...pConvs, ...gConvs].sort((a, b) => {
+        const timeA = a.lastMessageTime?.toDate ? a.lastMessageTime.toDate() : new Date(a.lastMessageTime || 0);
+        const timeB = b.lastMessageTime?.toDate ? b.lastMessageTime.toDate() : new Date(b.lastMessageTime || 0);
+        return timeB.getTime() - timeA.getTime();
+      }));
+    });
+
+    return () => {
+      unsubP();
+      unsubG();
+    };
+  }
+
+  // Student: Listen to conversations for a specific student
+  subscribeToConversationsByStudent(studentId: string, callback: (conversations: Conversation[]) => void) {
+    const q = query(
+      collection(db, 'conversations'),
+      where('studentId', '==', studentId)
+    );
+
+    const qGroup = query(
+      collection(db, 'conversations'),
+      where('isGroup', '==', true),
+      where('memberIds', 'array-contains', studentId)
+    );
+
+    const fetchMetadata = async (docs: any[]) => {
+      return await Promise.all(
+        docs.map(async (docSnap) => {
+          const data = docSnap.data() as Conversation;
+          if (!data.isGroup && data.adminId) {
             try {
               const adminDocSnap = await getDoc(doc(db, 'users', data.adminId));
               if (adminDocSnap.exists()) {
@@ -459,57 +581,36 @@ class ChatService {
               console.log('Error fetching admin photo:', e);
             }
           }
-          
           return { id: docSnap.id, ...data };
         })
       );
-      callback(conversationsWithPhotos);
-    });
-  }
+    };
 
-  // Student: Listen to conversations for a specific student
-  // This filters conversations so each student only sees their conversations with admins or instructors
-  subscribeToConversationsByStudent(studentId: string, callback: (conversations: Conversation[]) => void) {
-    // Simplified query to avoid composite index requirement
-    const q = query(
-      collection(db, 'conversations'),
-      where('studentId', '==', studentId) // Filter by specific student
-    );
+    let pConvs: Conversation[] = [];
+    let gConvs: Conversation[] = [];
 
-    return onSnapshot(q, async (snapshot) => {
-      // Fetch user data for each conversation to get photo URLs
-      const conversationsWithPhotos = await Promise.all(
-        snapshot.docs.map(async (docSnap) => {
-          const data = docSnap.data() as Conversation;
-          
-          // Get student photo URL
-          try {
-            const studentDocSnap = await getDoc(doc(db, 'users', data.studentId));
-            if (studentDocSnap.exists()) {
-              data.studentPhotoUrl = studentDocSnap.data().photoUrl;
-            }
-          } catch (e) {
-            console.log('Error fetching student photo:', e);
-          }
-          
-          // Get admin/instructor photo URL if available
-          if (data.adminId) {
-            try {
-              const adminDocSnap = await getDoc(doc(db, 'users', data.adminId));
-              if (adminDocSnap.exists()) {
-                data.adminPhotoUrl = adminDocSnap.data().photoUrl;
-                data.adminName = adminDocSnap.data().displayName || (adminDocSnap.data().userType === 'instructor' ? 'Instructor' : 'Admin');
-              }
-            } catch (e) {
-              console.log('Error fetching admin/instructor photo:', e);
-            }
-          }
-          
-          return { id: docSnap.id, ...data };
-        })
-      );
-      callback(conversationsWithPhotos);
+    const unsubP = onSnapshot(q, async (snapshot) => {
+      pConvs = await fetchMetadata(snapshot.docs);
+      callback([...pConvs, ...gConvs].sort((a, b) => {
+        const timeA = a.lastMessageTime?.toDate ? a.lastMessageTime.toDate() : new Date(a.lastMessageTime || 0);
+        const timeB = b.lastMessageTime?.toDate ? b.lastMessageTime.toDate() : new Date(b.lastMessageTime || 0);
+        return timeB.getTime() - timeA.getTime();
+      }));
     });
+
+    const unsubG = onSnapshot(qGroup, async (snapshot) => {
+      gConvs = await fetchMetadata(snapshot.docs);
+      callback([...pConvs, ...gConvs].sort((a, b) => {
+        const timeA = a.lastMessageTime?.toDate ? a.lastMessageTime.toDate() : new Date(a.lastMessageTime || 0);
+        const timeB = b.lastMessageTime?.toDate ? b.lastMessageTime.toDate() : new Date(b.lastMessageTime || 0);
+        return timeB.getTime() - timeA.getTime();
+      }));
+    });
+
+    return () => {
+      unsubP();
+      unsubG();
+    };
   }
 
   // Get all Admins and Instructors for students to chat with
