@@ -233,6 +233,21 @@ class PresenceService {
   }
 
   /**
+   * Listen to a specific user's presence
+   */
+  subscribeToUserPresence(userId: string, callback: PresenceCallback): () => void {
+    const presenceRef = doc(db, 'presence', userId);
+    
+    return onSnapshot(presenceRef, (snapshot) => {
+      if (snapshot.exists()) {
+        callback(snapshot.id === userId ? { userId: snapshot.id, ...snapshot.data() } as UserPresence : null);
+      } else {
+        callback(null);
+      }
+    });
+  }
+
+  /**
    * Set up offline detection
    */
   private setupOfflineDetection(): void {

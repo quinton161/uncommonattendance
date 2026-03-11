@@ -274,9 +274,9 @@ const CallButtonsContainer = styled.div`
   gap: 4px;
 `;
 
-const StatusText = styled.span<{ isOnline: boolean }>`
+const StatusText = styled.span<{ $isOnline: boolean }>`
   font-size: ${theme.fontSizes.xs};
-  color: ${props => props.isOnline ? '#25D366' : theme.colors.gray400};
+  color: ${props => props.$isOnline ? '#25D366' : theme.colors.gray400};
 `;
 
 const TypingIndicator = styled.div`
@@ -338,6 +338,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
   const [adminUid, setAdminUid] = useState<string>(providedAdminUid || '');
   const [isOtherUserOnline, setIsOtherUserOnline] = useState(false);
+  const [otherUserLastSeen, setOtherUserLastSeen] = useState<any>(null);
   const [isCalling, setIsCalling] = useState(false);
   const [incomingCall, setIncomingCall] = useState<CallSession | null>(null);
   const [activeCall, setActiveCall] = useState<CallSession | null>(null);
@@ -406,21 +407,34 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     }
   }, [messages]);
 
-  // Check online status of the other user
+  // Check online status of the other user in real-time
   useEffect(() => {
     if (!otherUserId) return;
     
-    const checkOnlineStatus = async () => {
-      const isOnline = await presenceService.isUserOnline(otherUserId);
-      setIsOtherUserOnline(isOnline);
-    };
+    const unsubscribe = presenceService.subscribeToUserPresence(otherUserId, (presence) => {
+      if (presence) {
+        setIsOtherUserOnline(presence.isOnline);
+        setOtherUserLastSeen(presence.lastSeen);
+      } else {
+        setIsOtherUserOnline(false);
+        setOtherUserLastSeen(null);
+      }
+    });
     
-    checkOnlineStatus();
-    // Check every 10 seconds
-    const interval = setInterval(checkOnlineStatus, 10000);
-    
-    return () => clearInterval(interval);
+    return () => unsubscribe();
   }, [otherUserId]);
+
+  const formatLastSeen = (lastSeen: any) => {
+    if (!lastSeen) return '';
+    const date = lastSeen.toDate ? lastSeen.toDate() : new Date(lastSeen);
+    const now = new Date();
+    const isToday = date.toDateString() === now.toDateString();
+    
+    if (isToday) {
+      return `last seen today at ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    }
+    return `last seen ${date.toLocaleDateString()} at ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+  };
 
   const handleVoiceCall = async () => {
     if (isCalling) return;
@@ -714,9 +728,12 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         </Avatar>
         <div style={{ flex: 1 }}>
           <div style={{ fontWeight: 'bold' }}>{isAdmin ? studentName : (providedAdminName || "Admin")}</div>
-          <StatusText isOnline={isOtherUserOnline}>
-            <OnlineStatusDot isOnline={isOtherUserOnline} />
-            {isOtherUserOnline ? 'online' : 'offline'}
+          <StatusText $isOnline={isOtherUserOnline}>
+            {isOtherUserOnline ? (
+              <span style={{ color: '#22c55e', fontWeight: 500 }}>online</span>
+            ) : (
+              <span style={{ fontSize: '12px' }}>{formatLastSeen(otherUserLastSeen)}</span>
+            )}
           </StatusText>
         </div>
         <CallButtonsContainer>
