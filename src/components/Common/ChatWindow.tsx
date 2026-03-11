@@ -933,7 +933,8 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   };
 
   const sendVoiceMessage = async () => {
-    if (!recordedAudio || !adminUid) return;
+    const effectiveAdminUid = adminUid || providedAdminUid;
+    if (!recordedAudio || (!effectiveAdminUid && !isGroup)) return;
 
     try {
       await chatService.sendVoiceMessage(
@@ -942,13 +943,14 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         currentUserUid,
         recordedAudio,
         recordingDuration,
-        adminUid,
+        effectiveAdminUid || '',
         currentUserPhotoUrl
       );
       setRecordedAudio(null);
       setRecordingDuration(0);
     } catch (error) {
       console.error('Failed to send voice message:', error);
+      uniqueToast.error('Failed to send voice message');
     }
   };
 
@@ -1007,7 +1009,8 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !adminUid) return;
+    const effectiveAdminUid = adminUid || providedAdminUid;
+    if (!file || (!effectiveAdminUid && !isGroup)) return;
 
     try {
       uniqueToast.info(file.type.startsWith('image/') ? 'Sending image...' : 'Sending file...', { autoClose: 2000 });
@@ -1016,7 +1019,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         studentName,
         currentUserUid,
         file,
-        adminUid,
+        effectiveAdminUid || '',
         currentUserPhotoUrl
       );
     } catch (error) {
@@ -1031,18 +1034,25 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     e.preventDefault();
     if (!inputText.trim()) return;
 
-    const effectiveAdminUid = isAdmin ? adminUid : adminUid;
-    if (!effectiveAdminUid) {
-      uniqueToast.error('Chat is not ready yet. Please try again in a moment.', { autoClose: 3000, position: 'top-center' });
-      return;
+    // Use current state adminUid or fall back to provided prop
+    const effectiveAdminUid = adminUid || providedAdminUid;
+    if (!effectiveAdminUid && !isGroup) {
+      // Try to get admin ID if missing
+      const resolvedAdminId = await chatService.getAdminId();
+      if (resolvedAdminId) {
+        setAdminUid(resolvedAdminId);
+      } else {
+        uniqueToast.error('Chat is not ready yet. Please try again in a moment.', { autoClose: 3000, position: 'top-center' });
+        return;
+      }
     }
 
     const text = inputText.trim();
     setInputText('');
 
     // Clear typing indicator when sending
-    const conversationId = isGroup && groupId ? groupId : `${studentId}_${adminUid}`;
-    if (adminUid || (isGroup && groupId)) {
+    const conversationId = isGroup && groupId ? groupId : `${studentId}_${adminUid || providedAdminUid}`;
+    if (adminUid || providedAdminUid || (isGroup && groupId)) {
       chatService.setTyping(conversationId, currentUserUid, currentUserName || 'User', false);
     }
 
@@ -1066,7 +1076,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
           studentName,
           currentUserUid,
           text,
-          adminUid,
+          adminUid || providedAdminUid || '',
           currentUserPhotoUrl,
           replyingTo ? {
             id: replyingTo.id!,

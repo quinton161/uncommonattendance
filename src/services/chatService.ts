@@ -353,10 +353,23 @@ class ChatService {
     );
 
     return onSnapshot(q, (snapshot) => {
-      const messages = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Message[];
+      const messages = snapshot.docs.map(doc => {
+        const data = doc.data();
+        // Check if createdAt is a Firestore Timestamp or a serializable date
+        let createdAt = data.createdAt;
+        if (createdAt && typeof createdAt.toDate === 'function') {
+          createdAt = createdAt.toDate();
+        } else if (createdAt && typeof createdAt === 'object' && createdAt.seconds) {
+          // Manual conversion if toDate is missing for some reason
+          createdAt = new Date(createdAt.seconds * 1000);
+        }
+
+        return {
+          id: doc.id,
+          ...data,
+          createdAt
+        };
+      }) as Message[];
       callback(messages);
     });
   }
@@ -368,6 +381,8 @@ class ChatService {
     
     if (messageDoc.exists()) {
       const messageData = messageDoc.data();
+      if (messageData.senderId === userId) return; // Don't mark own messages as read by self
+
       const readBy: string[] = messageData.readBy || [];
       
       if (!readBy.includes(userId)) {
@@ -386,6 +401,8 @@ class ChatService {
     
     if (messageDoc.exists()) {
       const messageData = messageDoc.data();
+      if (messageData.senderId === userId) return; // Don't mark own messages as delivered to self
+
       const deliveredTo: string[] = messageData.deliveredTo || [];
       
       if (!deliveredTo.includes(userId)) {
@@ -401,16 +418,16 @@ class ChatService {
   async markAllMessagesAsRead(conversationId: string, userId: string): Promise<void> {
     const q = query(
       collection(db, 'conversations', conversationId, 'messages'),
-      orderBy('createdAt', 'asc')
+      where('senderId', '!=', userId),
+      where('status', '!=', 'read')
     );
 
     const snapshot = await getDocs(q);
     const updatePromises = snapshot.docs.map(async (docSnap) => {
-      const messageData = docSnap.data();
-      const readBy: string[] = messageData.readBy || [];
-
+      const messageRef = doc(db, 'conversations', conversationId, 'messages', docSnap.id);
+      const data = docSnap.data();
+      const readBy = data.readBy || [];
       if (!readBy.includes(userId)) {
-        const messageRef = doc(db, 'conversations', conversationId, 'messages', docSnap.id);
         await updateDoc(messageRef, {
           readBy: [...readBy, userId],
           status: 'read'
@@ -631,10 +648,16 @@ class ChatService {
         });
       });
 
-      callback(allConvs.sort((a, b) => {
-        const timeA = a.lastMessageTime?.toDate ? a.lastMessageTime.toDate() : new Date(a.lastMessageTime || 0);
-        const timeB = b.lastMessageTime?.toDate ? b.lastMessageTime.toDate() : new Date(b.lastMessageTime || 0);
-        return timeB.getTime() - timeA.getTime();
+      callback(allConvs.map(conv => {
+        let lastMessageTime = conv.lastMessageTime;
+        if (lastMessageTime && typeof lastMessageTime.toDate === 'function') {
+          lastMessageTime = lastMessageTime.toDate();
+        }
+        return { ...conv, lastMessageTime };
+      }).sort((a, b) => {
+        const timeA = a.lastMessageTime ? new Date(a.lastMessageTime).getTime() : 0;
+        const timeB = b.lastMessageTime ? new Date(b.lastMessageTime).getTime() : 0;
+        return timeB - timeA;
       }));
     });
 
@@ -657,10 +680,16 @@ class ChatService {
         });
       });
 
-      callback(allConvs.sort((a, b) => {
-        const timeA = a.lastMessageTime?.toDate ? a.lastMessageTime.toDate() : new Date(a.lastMessageTime || 0);
-        const timeB = b.lastMessageTime?.toDate ? b.lastMessageTime.toDate() : new Date(b.lastMessageTime || 0);
-        return timeB.getTime() - timeA.getTime();
+      callback(allConvs.map(conv => {
+        let lastMessageTime = conv.lastMessageTime;
+        if (lastMessageTime && typeof lastMessageTime.toDate === 'function') {
+          lastMessageTime = lastMessageTime.toDate();
+        }
+        return { ...conv, lastMessageTime };
+      }).sort((a, b) => {
+        const timeA = a.lastMessageTime ? new Date(a.lastMessageTime).getTime() : 0;
+        const timeB = b.lastMessageTime ? new Date(b.lastMessageTime).getTime() : 0;
+        return timeB - timeA;
       }));
     });
 
@@ -708,19 +737,31 @@ class ChatService {
 
     const unsubP = onSnapshot(q, async (snapshot) => {
       pConvs = await fetchMetadata(snapshot.docs);
-      callback([...pConvs, ...gConvs].sort((a, b) => {
-        const timeA = a.lastMessageTime?.toDate ? a.lastMessageTime.toDate() : new Date(a.lastMessageTime || 0);
-        const timeB = b.lastMessageTime?.toDate ? b.lastMessageTime.toDate() : new Date(b.lastMessageTime || 0);
-        return timeB.getTime() - timeA.getTime();
+      callback([...pConvs, ...gConvs].map(conv => {
+        let lastMessageTime = conv.lastMessageTime;
+        if (lastMessageTime && typeof lastMessageTime.toDate === 'function') {
+          lastMessageTime = lastMessageTime.toDate();
+        }
+        return { ...conv, lastMessageTime };
+      }).sort((a, b) => {
+        const timeA = a.lastMessageTime ? new Date(a.lastMessageTime).getTime() : 0;
+        const timeB = b.lastMessageTime ? new Date(b.lastMessageTime).getTime() : 0;
+        return timeB - timeA;
       }));
     });
 
     const unsubG = onSnapshot(qGroup, async (snapshot) => {
       gConvs = await fetchMetadata(snapshot.docs);
-      callback([...pConvs, ...gConvs].sort((a, b) => {
-        const timeA = a.lastMessageTime?.toDate ? a.lastMessageTime.toDate() : new Date(a.lastMessageTime || 0);
-        const timeB = b.lastMessageTime?.toDate ? b.lastMessageTime.toDate() : new Date(b.lastMessageTime || 0);
-        return timeB.getTime() - timeA.getTime();
+      callback([...pConvs, ...gConvs].map(conv => {
+        let lastMessageTime = conv.lastMessageTime;
+        if (lastMessageTime && typeof lastMessageTime.toDate === 'function') {
+          lastMessageTime = lastMessageTime.toDate();
+        }
+        return { ...conv, lastMessageTime };
+      }).sort((a, b) => {
+        const timeA = a.lastMessageTime ? new Date(a.lastMessageTime).getTime() : 0;
+        const timeB = b.lastMessageTime ? new Date(b.lastMessageTime).getTime() : 0;
+        return timeB - timeA;
       }));
     });
 
