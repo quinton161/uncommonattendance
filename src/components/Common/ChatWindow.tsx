@@ -537,16 +537,19 @@ const TypingDot = styled.span`
 `;
 
 interface ChatWindowProps {
-studentId: string;
-studentName: string;
-currentUserUid: string;
-currentUserName?: string;
-studentPhotoUrl?: string;
-currentUserPhotoUrl?: string;
-isAdmin?: boolean;
-adminUid?: string;
-adminPhotoUrl?: string;
-adminName?: string;
+  studentId: string;
+  studentName: string;
+  currentUserUid: string;
+  currentUserName?: string;
+  studentPhotoUrl?: string;
+  currentUserPhotoUrl?: string;
+  isAdmin?: boolean;
+  adminUid?: string;
+  adminPhotoUrl?: string;
+  adminName?: string;
+  isGroup?: boolean;
+  groupId?: string;
+  groupName?: string;
 }
 
 export const ChatWindow: React.FC<ChatWindowProps> = ({
@@ -559,7 +562,10 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   isAdmin = false,
   adminUid: providedAdminUid,
   adminPhotoUrl: providedAdminPhotoUrl,
-  adminName: providedAdminName
+  adminName: providedAdminName,
+  isGroup = false,
+  groupId,
+  groupName
 }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
@@ -596,21 +602,26 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     let cancelled = false;
 
     const start = async () => {
-      let resolvedAdminUid = providedAdminUid || '';
-      if (!resolvedAdminUid) {
-        resolvedAdminUid = await chatService.getAdminId();
+      let resolvedConversationId = '';
+      
+      if (isGroup && groupId) {
+        resolvedConversationId = groupId;
+      } else {
+        let resolvedAdminUid = providedAdminUid || '';
+        if (!resolvedAdminUid) {
+          resolvedAdminUid = await chatService.getAdminId();
+        }
+        if (cancelled) return;
+        setAdminUid(resolvedAdminUid);
+        resolvedConversationId = `${studentId}_${resolvedAdminUid}`;
       }
-      if (cancelled) return;
 
-      setAdminUid(resolvedAdminUid);
-      const conversationId = `${studentId}_${resolvedAdminUid}`;
-
-      unsubscribe = chatService.subscribeToMessages(conversationId, (msgs) => {
+      unsubscribe = chatService.subscribeToMessages(resolvedConversationId, (msgs) => {
         setMessages(msgs);
 
         msgs.forEach(msg => {
           if (msg.senderId !== currentUserUid && msg.id) {
-            chatService.markMessageAsRead(conversationId, msg.id, currentUserUid);
+            chatService.markMessageAsRead(resolvedConversationId, msg.id, currentUserUid);
           }
         });
       });
@@ -622,7 +633,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
       cancelled = true;
       if (unsubscribe) unsubscribe();
     };
-  }, [studentId, providedAdminUid, currentUserUid]);
+  }, [studentId, providedAdminUid, currentUserUid, isGroup, groupId]);
 
   // Subscribe to typing indicators
   useEffect(() => {
@@ -918,25 +929,40 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     setInputText('');
 
     // Clear typing indicator when sending
-    if (adminUid) {
-      const conversationId = `${studentId}_${adminUid}`;
+    const conversationId = isGroup && groupId ? groupId : `${studentId}_${adminUid}`;
+    if (adminUid || (isGroup && groupId)) {
       chatService.setTyping(conversationId, currentUserUid, currentUserName || 'User', false);
     }
 
     try {
-      await chatService.sendMessage(
-        studentId,
-        studentName,
-        currentUserUid,
-        text,
-        adminUid,
-        currentUserPhotoUrl,
-        replyingTo ? {
-          id: replyingTo.id!,
-          text: replyingTo.text || (replyingTo.messageType === 'voice' ? '🎤 Voice message' : replyingTo.messageType === 'image' ? '📷 Image' : '📄 File'),
-          senderName: replyingTo.senderName || 'User'
-        } : undefined
-      );
+      if (isGroup && groupId) {
+        await chatService.sendGroupMessage(
+          groupId,
+          currentUserUid,
+          currentUserName || 'User',
+          text,
+          currentUserPhotoUrl,
+          replyingTo ? {
+            id: replyingTo.id!,
+            text: replyingTo.text || (replyingTo.messageType === 'voice' ? '🎤 Voice message' : replyingTo.messageType === 'image' ? '📷 Image' : '📄 File'),
+            senderName: replyingTo.senderName || 'User'
+          } : undefined
+        );
+      } else {
+        await chatService.sendMessage(
+          studentId,
+          studentName,
+          currentUserUid,
+          text,
+          adminUid,
+          currentUserPhotoUrl,
+          replyingTo ? {
+            id: replyingTo.id!,
+            text: replyingTo.text || (replyingTo.messageType === 'voice' ? '🎤 Voice message' : replyingTo.messageType === 'image' ? '📷 Image' : '📄 File'),
+            senderName: replyingTo.senderName || 'User'
+          } : undefined
+        );
+      }
       setReplyTo(null);
     } catch (error) {
       console.error('Failed to send message:', error);

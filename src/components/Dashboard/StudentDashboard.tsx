@@ -889,7 +889,17 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
                           }}
                         >
                           <UserAvatar>
-                            {admin.photoUrl ? (
+                            {conv?.isGroup ? (
+                              conv.groupPhotoUrl ? (
+                                <img 
+                                  src={conv.groupPhotoUrl} 
+                                  alt="" 
+                                  style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} 
+                                />
+                              ) : (
+                                <div style={{ background: theme.colors.secondary, width: '100%', height: '100%', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>👥</div>
+                              )
+                            ) : admin.photoUrl ? (
                               <img 
                                 src={admin.photoUrl} 
                                 alt="" 
@@ -900,8 +910,9 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
                             )}
                           </UserAvatar>
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontWeight: theme.fontWeights.semibold, color: theme.colors.textPrimary, fontSize: theme.fontSizes.sm }}>
-                              {admin.displayName || 'Admin'}
+                            <div style={{ fontWeight: theme.fontWeights.semibold, color: theme.colors.textPrimary, fontSize: theme.fontSizes.sm, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              {conv?.isGroup && <span>👥</span>}
+                              {conv?.isGroup ? conv.groupName : (admin.displayName || 'Admin')}
                             </div>
                             <div style={{ 
                               fontSize: theme.fontSizes.xs, 
@@ -971,6 +982,9 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
                       adminUid={selectedAdmin.uid}
                       adminPhotoUrl={selectedAdmin.photoUrl}
                       adminName={selectedAdmin.displayName}
+                      isGroup={selectedAdmin.isGroup}
+                      groupId={selectedAdmin.id}
+                      groupName={selectedAdmin.groupName}
                     />
                   )}
                 </div>

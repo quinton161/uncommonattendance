@@ -676,7 +676,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
             lastMessage: 'No messages yet',
             lastMessageTime: null,
             lastSenderId: undefined,
-            unreadCount: 0
+            unreadCount: 0,
+            isGroup: false,
+            groupPhotoUrl: undefined,
+            groupName: undefined
           };
         }).sort((a, b) => {
           // Sort: Recent messages first, then students with no messages
@@ -718,51 +721,62 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
                 }}>
                   <AttendanceList>
                     {displayConversations.map((conv) => (
-                      <AttendanceItem 
-                        key={conv.id} 
-                        style={{ 
-                          cursor: 'pointer', 
-                          transition: 'all 0.2s',
-                          background: selectedConversation?.id === conv.id ? 'rgba(6, 71, 161, 0.1)' : 'transparent',
-                          borderLeft: selectedConversation?.id === conv.id ? `4px solid ${theme.colors.primary}` : '4px solid transparent',
-                          padding: theme.spacing.md
-                        }}
-                        onClick={async () => {
-                          setSelectedConversation(conv as any);
-                          if (conv.unreadCount && conv.unreadCount > 0) {
-                            try {
-                              await chatService.markAsRead(conv.id!);
-                            } catch (error) {
-                              console.error('Failed to mark as read:', error);
+                        <AttendanceItem 
+                          key={conv.id} 
+                          style={{ 
+                            cursor: 'pointer', 
+                            transition: 'all 0.2s',
+                            background: selectedConversation?.id === conv.id ? 'rgba(6, 71, 161, 0.1)' : 'transparent',
+                            borderLeft: selectedConversation?.id === conv.id ? `4px solid ${theme.colors.primary}` : '4px solid transparent',
+                            padding: theme.spacing.md
+                          }}
+                          onClick={async () => {
+                            setSelectedConversation(conv as any);
+                            if (conv.unreadCount && conv.unreadCount > 0) {
+                              try {
+                                await chatService.markAsRead(conv.id!);
+                              } catch (error) {
+                                console.error('Failed to mark as read:', error);
+                              }
                             }
-                          }
-                        }}
-                      >
-                        <UserAvatar>
-                          {conv.studentPhotoUrl ? (
-                            <img 
-                              src={conv.studentPhotoUrl} 
-                              alt="" 
-                              style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} 
-                            />
-                          ) : (
-                            getInitials(conv.studentName)
-                          )}
-                        </UserAvatar>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontWeight: theme.fontWeights.semibold, color: theme.colors.textPrimary, fontSize: theme.fontSizes.sm }}>
-                            {conv.studentName}
+                          }}
+                        >
+                          <UserAvatar>
+                            {conv.isGroup ? (
+                              conv.groupPhotoUrl ? (
+                                <img 
+                                  src={conv.groupPhotoUrl} 
+                                  alt="" 
+                                  style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} 
+                                />
+                              ) : (
+                                <div style={{ background: theme.colors.secondary, width: '100%', height: '100%', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>👥</div>
+                              )
+                            ) : conv.studentPhotoUrl ? (
+                              <img 
+                                src={conv.studentPhotoUrl} 
+                                alt="" 
+                                style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} 
+                              />
+                            ) : (
+                              getInitials(conv.studentName)
+                            )}
+                          </UserAvatar>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontWeight: theme.fontWeights.semibold, color: theme.colors.textPrimary, fontSize: theme.fontSizes.sm, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              {conv.isGroup && <span>👥</span>}
+                              {conv.isGroup ? conv.groupName : conv.studentName}
+                            </div>
+                            <div style={{ 
+                              fontSize: theme.fontSizes.xs, 
+                              color: theme.colors.textSecondary,
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis'
+                            }}>
+                              {conv.lastMessage}
+                            </div>
                           </div>
-                          <div style={{ 
-                            fontSize: theme.fontSizes.xs, 
-                            color: theme.colors.textSecondary,
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis'
-                          }}>
-                            {conv.lastMessage}
-                          </div>
-                        </div>
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
                           <div style={{ fontSize: '10px', color: theme.colors.textLight }}>
                             {conv.lastMessageTime?.toDate ? conv.lastMessageTime.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 
@@ -816,9 +830,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
                   <h2 style={{ 
                     color: theme.colors.textPrimary, 
                     margin: `0 0 ${theme.spacing.md} 0`,
-                    fontSize: theme.fontSizes.xl
+                    fontSize: theme.fontSizes.xl,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
                   }}>
-                    Chatting with {selectedConversation.studentName}
+                    {selectedConversation.isGroup && <span>👥</span>}
+                    Chatting with {selectedConversation.isGroup ? selectedConversation.groupName : selectedConversation.studentName}
                   </h2>
                   <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
                     <ChatWindow 
@@ -830,6 +848,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
                       currentUserName={user?.displayName || 'Admin'}
                       isAdmin={true}
                       adminUid={selectedConversation.adminId || user?.uid}
+                      isGroup={selectedConversation.isGroup}
+                      groupId={selectedConversation.id}
+                      groupName={selectedConversation.groupName}
                     />
                   </div>
                 </>
