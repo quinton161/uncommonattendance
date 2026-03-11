@@ -62,41 +62,88 @@ const AvatarImg = styled.img`
 const MessageList = styled.div`
   flex: 1;
   overflow-y: auto;
-  -webkit-overflow-scrolling: touch; /* Momentum scrolling for Safari/iOS */
-  padding: ${theme.spacing.md};
+  padding: 20px;
   display: flex;
   flex-direction: column;
   gap: 4px;
-  z-index: 1;
-  min-height: 0;
-  overflow-anchor: none;
-  
-  /* Custom Scrollbar */
+  background-image: url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png');
+  background-repeat: repeat;
+  background-attachment: local;
+
   &::-webkit-scrollbar {
     width: 6px;
   }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
   &::-webkit-scrollbar-thumb {
-    background: rgba(0, 0, 0, 0.2);
+    background: rgba(0, 0, 0, 0.1);
     border-radius: 3px;
   }
 `;
 
 const MessageBubble = styled.div<{ isOwn: boolean }>`
-  max-width: 85%;
-  padding: 8px 12px;
-  border-radius: 12px;
-  background: ${props => props.isOwn ? theme.colors.primary : theme.colors.white};
-  color: ${props => props.isOwn ? theme.colors.white : theme.colors.textPrimary};
+  max-width: 75%;
+  padding: 6px 10px 8px 10px;
+  border-radius: ${props => props.isOwn ? '8px 0 8px 8px' : '0 8px 8px 8px'};
+  background: ${props => props.isOwn ? '#dcf8c6' : theme.colors.white};
+  color: #303030;
   align-self: ${props => props.isOwn ? 'flex-end' : 'flex-start'};
   font-size: ${theme.fontSizes.sm};
-  box-shadow: ${theme.shadows.sm};
+  box-shadow: 0 1px 0.5px rgba(0, 0, 0, 0.13);
   position: relative;
   line-height: 1.4;
-  border: 1px solid ${props => props.isOwn ? 'transparent' : theme.colors.gray200};
+  margin-bottom: 2px;
+  
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    width: 0;
+    height: 0;
+    border: 8px solid transparent;
+    ${props => props.isOwn ? `
+      right: -8px;
+      border-top-color: #dcf8c6;
+      border-left-color: #dcf8c6;
+    ` : `
+      left: -8px;
+      border-top-color: white;
+      border-right-color: white;
+    `}
+  }
 `;
 
 const MessageText = styled.div`
-  margin-right: 20px;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+  padding-right: 40px;
+`;
+
+const TimeLabel = styled.div<{ isOwn: boolean }>`
+  font-size: 10px;
+  color: rgba(0, 0, 0, 0.45);
+  margin-top: -10px;
+  text-align: right;
+  float: right;
+  margin-left: 8px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+`;
+
+const DateDivider = styled.div`
+  align-self: center;
+  margin: 16px 0;
+  padding: 5px 12px;
+  background: #e1f3fb;
+  border-radius: 7.5px;
+  font-size: 12px;
+  color: #51585c;
+  box-shadow: 0 1px 0.5px rgba(0, 0, 0, 0.13);
+  text-transform: uppercase;
 `;
 
 const InputArea = styled.form`
@@ -198,13 +245,6 @@ const Input = styled.input`
   @media (min-width: ${theme.breakpoints.tablet}) {
     font-size: ${theme.fontSizes.sm};
   }
-`;
-
-const TimeLabel = styled.div<{ isOwn: boolean }>`
-  font-size: 10px;
-  color: ${props => props.isOwn ? 'rgba(255, 255, 255, 0.7)' : theme.colors.textSecondary};
-  margin-top: 4px;
-  text-align: right;
 `;
 
 const ReadReceipt = styled.span`
@@ -348,6 +388,9 @@ const TypingIndicator = styled.div`
   font-size: ${theme.fontSizes.xs};
   color: ${theme.colors.textSecondary};
   font-style: italic;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 `;
 
 const TypingDot = styled.span`
@@ -370,16 +413,16 @@ const TypingDot = styled.span`
 `;
 
 interface ChatWindowProps {
-  studentId: string;
-  studentName: string;
-  currentUserUid: string;
-  currentUserName?: string;
-  studentPhotoUrl?: string;
-  currentUserPhotoUrl?: string;
-  isAdmin?: boolean;
-  adminUid?: string;
-  adminPhotoUrl?: string;
-  adminName?: string;
+studentId: string;
+studentName: string;
+currentUserUid: string;
+currentUserName?: string;
+studentPhotoUrl?: string;
+currentUserPhotoUrl?: string;
+isAdmin?: boolean;
+adminUid?: string;
+adminPhotoUrl?: string;
+adminName?: string;
 }
 
 export const ChatWindow: React.FC<ChatWindowProps> = ({
@@ -839,69 +882,93 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
       <MessageList ref={scrollRef}>
         {messages.map((msg, index) => {
           const isOwn = msg.senderId === currentUserUid;
+          
+          // Logic for date grouping
+          const showDateDivider = index === 0 || (() => {
+            const currentMsgDate = msg.createdAt?.toDate ? msg.createdAt.toDate().toDateString() : new Date(msg.createdAt).toDateString();
+            const prevMsgDate = messages[index-1].createdAt?.toDate ? messages[index-1].createdAt.toDate().toDateString() : new Date(messages[index-1].createdAt).toDateString();
+            return currentMsgDate !== prevMsgDate;
+          })();
+
+          const dateLabel = (() => {
+            const date = msg.createdAt?.toDate ? msg.createdAt.toDate() : new Date(msg.createdAt);
+            const today = new Date();
+            const yesterday = new Date();
+            yesterday.setDate(today.getDate() - 1);
+
+            if (date.toDateString() === today.toDateString()) return 'Today';
+            if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
+            return date.toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' });
+          })();
+
           return (
-            <MessageBubble key={msg.id || index} isOwn={isOwn}>
-              {!isOwn && msg.senderPhotoUrl && (
-                <Avatar 
-                  hasPhoto={true} 
-                  style={{ 
-                    width: 24, 
-                    height: 24, 
-                    fontSize: 10,
-                    position: 'absolute',
-                    left: 8,
-                    top: 8
-                  }}
-                >
-                  <AvatarImg src={msg.senderPhotoUrl} alt="" />
-                </Avatar>
-              )}
-              {/* Voice, Image, File or text message */}
-              {msg.messageType === 'voice' && msg.audioUrl ? (
-                <VoiceMessageContainer isOwn={isOwn}>
-                  <PlayButton onClick={() => playAudio(msg.audioUrl!, msg.id || '')}>
-                    {playingAudioId === msg.id ? (
-                      <svg viewBox="0 0 24 24" width="16" height="16" fill="white">
-                        <path d="M6 6h12v12H6z"/>
-                      </svg>
-                    ) : (
-                      <svg viewBox="0 0 24 24" width="16" height="16" fill="white">
-                        <path d="M8 5v14l11-7z"/>
-                      </svg>
-                    )}
-                  </PlayButton>
-                  <AudioProgress />
-                  <AudioDuration>{msg.audioDuration || 0}s</AudioDuration>
-                </VoiceMessageContainer>
-              ) : msg.messageType === 'image' && msg.fileUrl ? (
-                <MessageImage 
-                  src={msg.fileUrl} 
-                  alt="Attachment" 
-                  onClick={() => window.open(msg.fileUrl, '_blank')}
-                />
-              ) : msg.messageType === 'file' && msg.fileUrl ? (
-                <FileAttachment isOwn={isOwn} onClick={() => window.open(msg.fileUrl, '_blank')}>
-                  <FileIcon>
-                    <svg viewBox="0 0 24 24" width="20" height="20" fill="white">
-                      <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
-                    </svg>
-                  </FileIcon>
-                  <FileInfo>
-                    <FileName isOwn={isOwn}>{msg.fileName || 'File'}</FileName>
-                    <FileSize isOwn={isOwn}>Click to download</FileSize>
-                  </FileInfo>
-                </FileAttachment>
-              ) : (
-                <MessageText>{msg.text}</MessageText>
-              )}
-              <TimeLabel isOwn={isOwn}>
-                {formatTime(msg.createdAt)}
-                {/* Read receipt indicator */}
-                {isOwn && msg.readBy && msg.readBy.includes(isAdmin ? studentId : adminUid) && (
-                  <ReadReceipt>✓✓</ReadReceipt>
+            <React.Fragment key={msg.id || index}>
+              {showDateDivider && <DateDivider>{dateLabel}</DateDivider>}
+              <MessageBubble isOwn={isOwn}>
+                {!isOwn && msg.senderPhotoUrl && (
+                  <Avatar 
+                    hasPhoto={true} 
+                    style={{ 
+                      width: 24, 
+                      height: 24, 
+                      fontSize: 10,
+                      position: 'absolute',
+                      left: -32,
+                      top: 0
+                    }}
+                  >
+                    <AvatarImg src={msg.senderPhotoUrl} alt="" />
+                  </Avatar>
                 )}
-              </TimeLabel>
-            </MessageBubble>
+                {/* Voice, Image, File or text message */}
+                {msg.messageType === 'voice' && msg.audioUrl ? (
+                  <VoiceMessageContainer isOwn={isOwn}>
+                    <PlayButton onClick={() => playAudio(msg.audioUrl!, msg.id || '')}>
+                      {playingAudioId === msg.id ? (
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="white">
+                          <path d="M6 6h12v12H6z"/>
+                        </svg>
+                      ) : (
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="white">
+                          <path d="M8 5v14l11-7z"/>
+                        </svg>
+                      )}
+                    </PlayButton>
+                    <AudioProgress />
+                    <AudioDuration>{msg.audioDuration || 0}s</AudioDuration>
+                  </VoiceMessageContainer>
+                ) : msg.messageType === 'image' && msg.fileUrl ? (
+                  <MessageImage 
+                    src={msg.fileUrl} 
+                    alt="Attachment" 
+                    onClick={() => window.open(msg.fileUrl, '_blank')}
+                  />
+                ) : msg.messageType === 'file' && msg.fileUrl ? (
+                  <FileAttachment isOwn={isOwn} onClick={() => window.open(msg.fileUrl, '_blank')}>
+                    <FileIcon>
+                      <svg viewBox="0 0 24 24" width="20" height="20" fill="white">
+                        <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+                      </svg>
+                    </FileIcon>
+                    <FileInfo>
+                      <FileName isOwn={isOwn}>{msg.fileName || 'File'}</FileName>
+                      <FileSize isOwn={isOwn}>Click to download</FileSize>
+                    </FileInfo>
+                  </FileAttachment>
+                ) : (
+                  <MessageText>{msg.text}</MessageText>
+                )}
+                <TimeLabel isOwn={isOwn}>
+                  {formatTime(msg.createdAt)}
+                  {/* Read receipt indicator */}
+                  {isOwn && (
+                    <span style={{ color: msg.readBy && msg.readBy.includes(isAdmin ? studentId : adminUid) ? '#34B7F1' : 'rgba(0, 0, 0, 0.45)' }}>
+                      {msg.readBy && msg.readBy.includes(isAdmin ? studentId : adminUid) ? '✓✓' : '✓'}
+                    </span>
+                  )}
+                </TimeLabel>
+              </MessageBubble>
+            </React.Fragment>
           );
         })}
       </MessageList>
