@@ -110,10 +110,74 @@ const InputArea = styled.form`
   border-top: 1px solid ${theme.colors.gray200};
   position: sticky;
   bottom: 0;
+`;
 
-  @media (max-width: ${theme.breakpoints.tablet}) {
-    padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+const AttachmentButton = styled.button`
+  background: none;
+  border: none;
+  color: ${theme.colors.gray500};
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 50%;
+  transition: all 0.2s;
+
+  &:hover {
+    background: ${theme.colors.gray100};
+    color: ${theme.colors.primary};
   }
+`;
+
+const MessageImage = styled.img`
+  max-width: 100%;
+  max-height: 300px;
+  border-radius: 8px;
+  margin-top: 4px;
+  cursor: pointer;
+`;
+
+const FileAttachment = styled.div<{ isOwn: boolean }>`
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  background: ${props => props.isOwn ? 'rgba(255, 255, 255, 0.1)' : theme.colors.gray100};
+  border-radius: 8px;
+  margin-top: 4px;
+  cursor: pointer;
+  max-width: 250px;
+`;
+
+const FileIcon = styled.div`
+  width: 36px;
+  height: 36px;
+  background: ${theme.colors.primary};
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+`;
+
+const FileInfo = styled.div`
+  flex: 1;
+  min-width: 0;
+`;
+
+const FileName = styled.div<{ isOwn: boolean }>`
+  font-size: ${theme.fontSizes.sm};
+  font-weight: 500;
+  color: ${props => props.isOwn ? 'white' : theme.colors.textPrimary};
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+`;
+
+const FileSize = styled.div<{ isOwn: boolean }>`
+  font-size: 10px;
+  color: ${props => props.isOwn ? 'rgba(255, 255, 255, 0.7)' : theme.colors.textLight};
 `;
 
 const Input = styled.input`
@@ -349,6 +413,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   const scrollRef = useRef<HTMLDivElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [typingUsers, setTypingUsers] = useState<{ userId: string; userName: string }[]>([]);
   
   // Get the other user's ID based on context
@@ -635,6 +700,28 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     }
   };
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !adminUid) return;
+
+    try {
+      uniqueToast.info(file.type.startsWith('image/') ? 'Sending image...' : 'Sending file...', { autoClose: 2000 });
+      await chatService.sendFileMessage(
+        studentId,
+        studentName,
+        currentUserUid,
+        file,
+        adminUid,
+        currentUserPhotoUrl
+      );
+    } catch (error) {
+      console.error('Failed to send file:', error);
+      uniqueToast.error('Failed to send file. Please try again.');
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputText.trim()) return;
@@ -769,7 +856,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                   <AvatarImg src={msg.senderPhotoUrl} alt="" />
                 </Avatar>
               )}
-              {/* Voice message or text message */}
+              {/* Voice, Image, File or text message */}
               {msg.messageType === 'voice' && msg.audioUrl ? (
                 <VoiceMessageContainer isOwn={isOwn}>
                   <PlayButton onClick={() => playAudio(msg.audioUrl!, msg.id || '')}>
@@ -786,6 +873,24 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                   <AudioProgress />
                   <AudioDuration>{msg.audioDuration || 0}s</AudioDuration>
                 </VoiceMessageContainer>
+              ) : msg.messageType === 'image' && msg.fileUrl ? (
+                <MessageImage 
+                  src={msg.fileUrl} 
+                  alt="Attachment" 
+                  onClick={() => window.open(msg.fileUrl, '_blank')}
+                />
+              ) : msg.messageType === 'file' && msg.fileUrl ? (
+                <FileAttachment isOwn={isOwn} onClick={() => window.open(msg.fileUrl, '_blank')}>
+                  <FileIcon>
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="white">
+                      <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+                    </svg>
+                  </FileIcon>
+                  <FileInfo>
+                    <FileName isOwn={isOwn}>{msg.fileName || 'File'}</FileName>
+                    <FileSize isOwn={isOwn}>Click to download</FileSize>
+                  </FileInfo>
+                </FileAttachment>
               ) : (
                 <MessageText>{msg.text}</MessageText>
               )}
@@ -875,6 +980,18 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
             <path d="M1.101 21.757L23.8 12.028 1.101 2.3l.011 7.912 13.623 1.816-13.623 1.817-.011 7.912z" />
           </svg>
         </SendButton>
+        <AttachmentButton type="button" onClick={() => fileInputRef.current?.click()} title="Send file or image">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+            <path d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5c0-1.38.62-2.5 1.5-2.5s1.5 1.12 1.5 2.5v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H8v9.5c0 1.66 1.34 3 3 3s3-1.34 3-3V5c0-2.21-1.79-4-4-4S6 2.79 6 5v12.5c0 3.31 2.69 6 6 6s6-2.69 6-6V6h-1.5z"/>
+          </svg>
+        </AttachmentButton>
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={handleFileUpload}
+          style={{ display: 'none' }}
+          accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
+        />
       </InputArea>
       )}
     </ChatContainer>

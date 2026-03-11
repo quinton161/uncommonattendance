@@ -26,7 +26,10 @@ export interface Message {
   readBy?: string[]; // Array of user IDs who have read the message
   audioUrl?: string; // Voice message audio URL
   audioDuration?: number; // Voice message duration in seconds
-  messageType?: 'text' | 'voice'; // Type of message
+  fileUrl?: string; // Attachment URL
+  fileName?: string; // Attachment file name
+  fileType?: string; // MIME type
+  messageType?: 'text' | 'voice' | 'image' | 'file'; // Type of message
 }
 
 export interface Conversation {
@@ -186,6 +189,84 @@ class ChatService {
         audioUrl,
         audioDuration: duration,
         messageType: 'voice',
+        createdAt: serverTimestamp()
+      }
+    );
+  }
+
+  // Send a file or image message
+  async sendFileMessage(
+    studentId: string,
+    studentName: string,
+    senderId: string,
+    file: File,
+    adminId: string,
+    senderPhotoUrl?: string
+  ) {
+    const conversationId = `${studentId}_${adminId}`;
+    const conversationRef = doc(db, 'conversations', conversationId);
+    const existingDoc = await getDoc(conversationRef);
+
+    // Get sender name
+    let senderName = studentName;
+    let actualAdminId = adminId;
+    
+    if (senderId !== studentId) {
+      const senderDoc = await getDoc(doc(db, 'users', senderId));
+      if (senderDoc.exists()) {
+        senderName = senderDoc.data().displayName || 'Admin';
+        actualAdminId = senderId;
+      }
+    }
+
+    // Get admin name for the conversation
+    let adminName = 'Admin';
+    try {
+      const adminDoc = await getDoc(doc(db, 'users', adminId));
+      if (adminDoc.exists()) {
+        adminName = adminDoc.data().displayName || 'Admin';
+      }
+    } catch (e) {
+      console.log('Error fetching admin name:', e);
+    }
+
+    // Determine message type
+    const isImage = file.type.startsWith('image/');
+    const messageType = isImage ? 'image' : 'file';
+    const lastMessagePreview = isImage ? '📷 Image' : `📄 ${file.name}`;
+
+    // Upload file to Firebase Storage
+    const fileExtension = file.name.split('.').pop();
+    const fileName = `${Date.now()}_${file.name}`;
+    const filePath = `chat_attachments/${conversationId}/${fileName}`;
+    const fileRef = ref(storage, filePath);
+    await uploadBytes(fileRef, file);
+    const fileUrl = await getDownloadURL(fileRef);
+
+    // Ensure conversation exists and update last message
+    await setDoc(conversationRef, {
+      studentId,
+      studentName,
+      adminId: actualAdminId,
+      adminName,
+      lastMessage: lastMessagePreview,
+      lastMessageTime: serverTimestamp(),
+      lastSenderId: senderId,
+      unreadCount: existingDoc.exists() ? (existingDoc.data()?.unreadCount || 0) + 1 : 1
+    }, { merge: true });
+
+    // Add message to subcollection
+    await addDoc(
+      collection(db, 'conversations', conversationId, 'messages'),
+      {
+        senderId,
+        senderName,
+        senderPhotoUrl,
+        text: '',
+        fileUrl,
+        fileName: file.name,
+        fileType: file.type,
+        messageType,
         createdAt: serverTimestamp()
       }
     );
