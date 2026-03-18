@@ -323,7 +323,9 @@ export function StudentDashboard({ onNavigateToProfile }: StudentDashboardProps)
               </StatusIcon>
               
               <StatusText>
-                {status === 'checked-in' ? 'Checked In' : 'Not Checked In'}
+                {status === 'checked-in'
+                  ? `Checked In${todayAttendance?.status === 'late' ? ' (Late)' : ''}`
+                  : 'Not Checked In'}
               </StatusText>
               
               {todayAttendance?.checkInTime && (

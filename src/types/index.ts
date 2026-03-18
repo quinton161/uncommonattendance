@@ -76,6 +76,8 @@ export interface Feedback {
 }
 
 // Legacy types for attendance system (still used by some components)
+export type AttendanceStatus = 'present' | 'late' | 'absent' | 'completed';
+
 export interface AttendanceRecord {
   id: string;
   studentId: string;
@@ -89,6 +91,7 @@ export interface AttendanceRecord {
   };
   date: string; // YYYY-MM-DD format
   isPresent: boolean;
+  status?: AttendanceStatus;
 }
 
 export interface LocationData {

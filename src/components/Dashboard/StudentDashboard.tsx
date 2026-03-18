@@ -1486,6 +1486,7 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
               </ActivityList>
             </Card>
           </ContentGrid>
+
         </MainContent>
       )}
     </DashboardContainer>

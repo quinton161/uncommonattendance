@@ -478,7 +478,7 @@ const DateDisplay = styled.div`
   }
 `;
 
-const StatusBadge = styled.div<{ status: 'present' | 'late' | 'absent' }>`
+const StatusBadge = styled.div<{ status: 'present' | 'late' | 'absent' | 'completed' }>`
   display: inline-flex;
   align-items: center;
   gap: ${theme.spacing.xs};
@@ -510,6 +510,12 @@ const StatusBadge = styled.div<{ status: 'present' | 'late' | 'absent' }>`
           background: rgba(239, 68, 68, 0.1);
           color: #dc2626;
           border-color: rgba(239, 68, 68, 0.2);
+        `;
+      case 'completed':
+        return `
+          background: rgba(59, 130, 246, 0.1);
+          color: #2563eb;
+          border-color: rgba(59, 130, 246, 0.2);
         `;
       default:
         return `
@@ -687,7 +693,19 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
   };
 
   useEffect(() => {
-    // Intentionally only depend on selectedDate; loadAttendanceSummary closes over services.
+    const today = timeService.getCurrentDateString();
+
+    // For today, use a real-time listener (feels “live” and avoids re-fetch loops).
+    if (selectedDate === today) {
+      setLoading(true);
+      const unsubscribe = dataService.subscribeToTodayAttendance((summary) => {
+        setAttendanceSummary(summary);
+        setLoading(false);
+      });
+      return unsubscribe;
+    }
+
+    // For non-today dates, do a one-time fetch.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     loadAttendanceSummary();
   }, [selectedDate]);
@@ -701,10 +719,12 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
       filtered = filtered.filter(record => {
         if (statusFilter === 'present') {
           return record.status === 'present' || record.status === 'completed';
-        } else if (statusFilter === 'absent') {
-          return record.status === 'absent';
+        } else if (statusFilter === 'on-time') {
+          return (record.status === 'present' || record.status === 'completed') && !record.isLate;
         } else if (statusFilter === 'late') {
           return record.isLate;
+        } else if (statusFilter === 'absent') {
+          return record.status === 'absent';
         }
         return true;
       });
@@ -823,9 +843,10 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
             onChange={(e) => setStatusFilter(e.target.value)}
           >
             <option value="all">All</option>
-            <option value="present">Present</option>
+            <option value="present">Present (All)</option>
+            <option value="on-time">Present (On-Time)</option>
+            <option value="late">Present (Late)</option>
             <option value="absent">Absent</option>
-            <option value="late">Late Arrivals</option>
           </select>
         </FilterGroup>
         {attendanceSummary && (
@@ -892,8 +913,10 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
                 <div>
                   <StatusBadge status={record.status}>
                     <CheckCircleIcon size={12} />
-                    {record.status}
-                    {record.isLate && <span style={{ color: '#f59e0b', marginLeft: '4px' }}>(Late)</span>}
+                    {record.status === 'completed' ? 'present' : record.status}
+                    {(record.status === 'late' || record.isLate) && (
+                      <span style={{ color: '#f59e0b', marginLeft: '4px' }}>(Late)</span>
+                    )}
                   </StatusBadge>
                 </div>
                 
@@ -926,8 +949,10 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
                     <div>
                       <StatusBadge status={record.status}>
                         <CheckCircleIcon size={12} />
-                        {record.status}
-                        {record.isLate && <span style={{ color: '#f59e0b', marginLeft: '4px' }}>(Late)</span>}
+                        {record.status === 'completed' ? 'present' : record.status}
+                        {(record.status === 'late' || record.isLate) && (
+                          <span style={{ color: '#f59e0b', marginLeft: '4px' }}>(Late)</span>
+                        )}
                       </StatusBadge>
                     </div>
                   </MobileDataItem>

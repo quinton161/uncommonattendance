@@ -23,6 +23,18 @@ import { notificationService } from '../../services/notificationService';
 import { saveAs } from 'file-saver';
 import { ProfileUpload } from '../Profile/ProfileUpload';
 
+import { 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  Legend
+} from 'recharts';
 import {
   DashboardIcon,
   CheckCircleIcon,
@@ -436,11 +448,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
   const [stats, setStats] = useState({
     totalAttendees: 0,
     totalInstructors: 0,
-    todayAttendance: 0
+    todayAttendance: 0,
+    lateCount: 0,
+    absentCount: 0,
+    attendanceRate: 0
   });
   const [recentAttendance, setRecentAttendance] = useState<any[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [allStudents, setAllStudents] = useState<any[]>([]);
+  const [weeklyData, setWeeklyData] = useState<any[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [totalUnread, setTotalUnread] = useState(0);
   const dataService = DataService.getInstance();
@@ -477,8 +493,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
     }
   };
 
-  // Removed unused handleDownloadAttendancePDF function
-
   const loadDashboardData = async () => {
     try {
       uniqueToast.info('Loading dashboard data...', { autoClose: 2000 });
@@ -495,9 +509,35 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
         totalAttendees: dashboardStats.totalAttendees,
         totalInstructors: dashboardStats.totalInstructors,
         todayAttendance: dashboardStats.todayAttendance,
+        lateCount: dashboardStats.lateCount || 0,
+        absentCount: dashboardStats.totalAttendees - (dashboardStats.todayAttendance || 0),
+        attendanceRate: Math.round((dashboardStats.todayAttendance / (dashboardStats.totalAttendees || 1)) * 100)
       });
       
       setRecentAttendance(dashboardStats.recentAttendance);
+
+      // Load weekly data
+      const timeService = TimeService.getInstance();
+      const attendance = await dataService.getAttendance();
+      const last7Days = [...Array(7)].map((_, i) => {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        return d.toISOString().split('T')[0];
+      }).reverse();
+
+      const weeklyTrends = last7Days.map(date => {
+        const dayAttendance = attendance.filter((a: any) => a.date === date);
+        return {
+          name: new Date(date).toLocaleDateString('en-US', { weekday: 'short' }),
+          present: dayAttendance.length,
+          late: dayAttendance.filter((a: any) => {
+            const checkIn = a.checkInTime ? new Date(a.checkInTime) : null;
+            return checkIn && (checkIn.getHours() > 9 || (checkIn.getHours() === 9 && checkIn.getMinutes() > 0));
+          }).length
+        };
+      });
+      setWeeklyData(weeklyTrends);
+
       uniqueToast.success('Dashboard data loaded successfully!', { autoClose: 2000 });
     } catch (error) {
       console.error('Error loading dashboard data:', error);
@@ -508,6 +548,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
         totalAttendees: 25,
         totalInstructors: 5,
         todayAttendance: 18,
+        lateCount: 3,
+        absentCount: 7,
+        attendanceRate: 72
       });
       
       setRecentAttendance([
@@ -538,7 +581,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
       
       setStats(prev => ({
         ...prev,
-        todayAttendance: summary.presentCount
+        todayAttendance: summary.presentCount,
+        lateCount: summary.lateCount,
+        absentCount: summary.absentCount,
+        attendanceRate: Math.round((summary.presentCount / (summary.totalUsers || 1)) * 100)
       }));
       
       if (summary.recentAttendance) {
@@ -977,24 +1023,49 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
             </Header>
 
             <StatsGrid>
-              <StatCard>
-                <StatIcon><PersonIcon size={32} /></StatIcon>
+              <StatCard variant="primary">
                 <StatValue>{stats.totalAttendees}</StatValue>
-                <StatLabel>Total Attendees</StatLabel>
+                <StatLabel>Total Students</StatLabel>
               </StatCard>
-              <StatCard>
-                <StatIcon><PersonIcon size={32} /></StatIcon>
-                <StatValue>{stats.totalInstructors}</StatValue>
-                <StatLabel>Total Instructors</StatLabel>
-              </StatCard>
-              <StatCard>
-                <StatIcon><CheckCircleIcon size={32} /></StatIcon>
+              <StatCard variant="accent">
                 <StatValue>{stats.todayAttendance}</StatValue>
                 <StatLabel>Present Today</StatLabel>
+              </StatCard>
+              <StatCard style={{ background: stats.lateCount > 0 ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' : theme.colors.white, color: stats.lateCount > 0 ? 'white' : theme.colors.textPrimary }}>
+                <StatValue>{stats.lateCount}</StatValue>
+                <StatLabel>Late Arrivals</StatLabel>
+              </StatCard>
+              <StatCard style={{ background: stats.absentCount > 0 ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)' : theme.colors.white, color: stats.absentCount > 0 ? 'white' : theme.colors.textPrimary }}>
+                <StatValue>{stats.absentCount}</StatValue>
+                <StatLabel>Absent Students</StatLabel>
+              </StatCard>
+              <StatCard variant="secondary">
+                <StatValue>{stats.attendanceRate}%</StatValue>
+                <StatLabel>Attendance Rate</StatLabel>
               </StatCard>
             </StatsGrid>
 
             <ContentGrid>
+              <Card>
+                <CardTitle>Attendance Trends (Last 7 Days)</CardTitle>
+                <div style={{ width: '100%', height: 300 }}>
+                  <ResponsiveContainer>
+                    <BarChart data={weeklyData}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis dataKey="name" axisLine={false} tickLine={false} />
+                      <YAxis axisLine={false} tickLine={false} />
+                      <Tooltip 
+                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: theme.shadows.md }}
+                        cursor={{ fill: 'rgba(0,0,0,0.05)' }}
+                      />
+                      <Legend iconType="circle" verticalAlign="top" align="right" height={36} />
+                      <Bar dataKey="present" name="Present" fill={theme.colors.primary} radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="late" name="Late" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </Card>
+
               <Card>
                 <CardTitle>Recent Check-ins</CardTitle>
                 <AttendanceList>
@@ -1025,7 +1096,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
           </>
         )}
       </MainContent>
-  </DashboardContainer>
+    </DashboardContainer>
   );
 };
 

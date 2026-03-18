@@ -10,9 +10,10 @@ import {
   updateDoc,
   Timestamp,
   deleteDoc,
+  serverTimestamp,
 } from 'firebase/firestore';
 import { db } from './firebase';
-import { AttendanceRecord, LocationData } from '../types';
+import { AttendanceRecord, AttendanceStatus, LocationData } from '../types';
 import { DailyAttendanceService } from './dailyAttendanceService';
 import { SCHOOL_LOCATION, getLocationDisplayName } from '../config/locationConfig';
 import DataService from './DataService';
@@ -118,19 +119,24 @@ export class AttendanceService {
       }
     }
 
-
-    const attendanceRecord: AttendanceRecord = {
+    const status: AttendanceStatus = this.timeService.isLate(harareTime) ? 'late' : 'present';
+    const attendanceRecord: any = {
       id: attendanceId,
       studentId,
       studentName,
-      checkInTime: harareTime,
+      // Use a timezone-consistent timestamp for business logic (late/present),
+      // plus a server timestamp for auditing.
+      checkInTime: Timestamp.fromDate(harareTime),
+      serverReceivedAt: serverTimestamp(),
       date: today,
       isPresent: true,
+      status,
       location: (location && typeof location.latitude === 'number' && typeof location.longitude === 'number') ? {
         latitude: location.latitude,
         longitude: location.longitude,
         address: location.address || 'Unknown'
-      } : undefined
+      } : undefined,
+      createdAt: serverTimestamp(), // For analytics tracking
     };
 
     console.log('📝 Saving detailed attendance record to Firebase:', {
@@ -143,21 +149,20 @@ export class AttendanceService {
     
     // Save detailed attendance record
     try {
-      const firestoreRecord: Omit<AttendanceRecord, 'checkInTime'> & { checkInTime: Timestamp } = {
-        id: attendanceRecord.id,
-        studentId: attendanceRecord.studentId,
-        studentName: attendanceRecord.studentName,
-        date: attendanceRecord.date,
-        isPresent: attendanceRecord.isPresent,
-        checkInTime: Timestamp.fromDate(attendanceRecord.checkInTime)
-      };
-
-      if (attendanceRecord.location) {
-        (firestoreRecord as any).location = attendanceRecord.location;
-      }
-
-      await setDoc(doc(db, 'attendance', attendanceId), firestoreRecord);
-      console.log('✅ Detailed attendance record saved to Firebase');
+      await setDoc(doc(db, 'attendance', attendanceId), attendanceRecord);
+      
+      // Log analytics event for check-in
+      await setDoc(doc(collection(db, 'attendance_analytics')), {
+        eventId: `checkin_${attendanceId}_${Date.now()}`,
+        type: 'check_in',
+        studentId,
+        studentName,
+        timestamp: serverTimestamp(),
+        date: today,
+        attendanceId
+      });
+      
+      console.log('✅ Detailed attendance record and analytics saved to Firebase');
     } catch (firestoreError: any) {
       console.error('❌ Firestore error saving attendance:', firestoreError);
       console.error('Error code:', firestoreError.code);
@@ -214,14 +219,21 @@ export class AttendanceService {
         await this.emailService.sendCheckInNotification(
           student.email,
           studentName,
-          attendanceRecord.checkInTime
+          harareTime
         );
       }
     } catch (emailError) {
       console.warn('⚠️ Failed to send email notification:', emailError);
     }
 
-    return attendanceRecord;
+    // Return a normalized record with JS Date fields (so UI doesn’t get Firestore Timestamps)
+    const saved = await getDoc(doc(db, 'attendance', attendanceId));
+    const savedData: any = saved.exists() ? saved.data() : attendanceRecord;
+    return {
+      ...savedData,
+      checkInTime: savedData.checkInTime?.toDate ? savedData.checkInTime.toDate() : harareTime,
+      checkOutTime: savedData.checkOutTime?.toDate ? savedData.checkOutTime.toDate() : undefined,
+    } as AttendanceRecord;
   }
 
   async checkOut(studentId: string, location?: LocationData): Promise<AttendanceRecord> {

@@ -507,22 +507,28 @@ class DataService {
     const attendanceSummary = users
       .filter(user => user.userType === 'attendee')
       .map(user => {
-        const userAttendance = currentAttendance?.find(a => a.userId === user.uid || a.studentId === user.uid || a.studentId === user.id || a.userId === user.id);
+        const studentUid = user.uid || user.id;
+        const userAttendance = currentAttendance?.find(a => 
+          a.studentId === studentUid || 
+          a.userId === studentUid
+        );
         
-        let status = 'absent';
+        let status: 'present' | 'late' | 'absent' | 'completed' = 'absent';
         let checkInTime = null;
         let checkOutTime = null;
         let isLate = false;
         
         if (userAttendance) {
-          status = userAttendance.status || 'present';
+          // If a record exists, they are not absent. Normalize legacy values.
+          const rawStatus = (userAttendance.status || '').toString().toLowerCase();
+          if (rawStatus === 'late') status = 'late';
+          else if (rawStatus === 'completed') status = 'completed';
+          else status = 'present';
+
           checkInTime = userAttendance.checkInTime;
           checkOutTime = userAttendance.checkOutTime;
           
-          if (checkInTime) {
-            const checkIn = new Date(checkInTime);
-            isLate = checkIn.getHours() > 9 || (checkIn.getHours() === 9 && checkIn.getMinutes() > 0);
-          }
+          isLate = status === 'late';
         }
 
         return {
@@ -543,7 +549,7 @@ class DataService {
       totalUsers: attendanceSummary.length,
       presentCount: attendanceSummary.filter(a => a.status === 'present' || a.status === 'completed').length,
       absentCount: attendanceSummary.filter(a => a.status === 'absent').length,
-      lateCount: attendanceSummary.filter(a => a.isLate).length,
+      lateCount: attendanceSummary.filter(a => a.status === 'late' || a.isLate).length,
       attendanceList: attendanceSummary,
       recentAttendance: currentAttendance?.slice(0, 10) || []
     });
@@ -667,21 +673,20 @@ class DataService {
       .map(user => {
         const userAttendance = dailyAttendance.find(a => a.userId === user.uid || a.studentId === user.uid || a.studentId === user.id || a.userId === user.id);
         
-        let status = 'absent';
+        let status: 'present' | 'late' | 'absent' | 'completed' = 'absent';
         let checkInTime = null;
         let checkOutTime = null;
         let isLate = false;
         
         if (userAttendance) {
-          status = userAttendance.status || 'present';
+          const rawStatus = (userAttendance.status || '').toString().toLowerCase();
+          if (rawStatus === 'late') status = 'late';
+          else if (rawStatus === 'completed') status = 'completed';
+          else status = 'present';
           checkInTime = userAttendance.checkInTime;
           checkOutTime = userAttendance.checkOutTime;
-          
-          if (checkInTime) {
-            const checkIn = new Date(checkInTime);
-            // Late if after 9:00:59 AM
-            isLate = checkIn.getHours() > 9 || (checkIn.getHours() === 9 && checkIn.getMinutes() > 0);
-          }
+
+          isLate = status === 'late';
         }
 
         return {
@@ -702,7 +707,7 @@ class DataService {
       totalUsers: attendanceSummary.length,
       presentCount: attendanceSummary.filter(a => a.status === 'present' || a.status === 'completed').length,
       absentCount: attendanceSummary.filter(a => a.status === 'absent').length,
-      lateCount: attendanceSummary.filter(a => a.isLate).length,
+      lateCount: attendanceSummary.filter(a => a.status === 'late' || a.isLate).length,
       attendanceList: attendanceSummary
     };
   }

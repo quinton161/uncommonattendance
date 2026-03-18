@@ -416,22 +416,21 @@ class ChatService {
 
   // Mark all messages in a conversation as read
   async markAllMessagesAsRead(conversationId: string, userId: string): Promise<void> {
-    const q = query(
-      collection(db, 'conversations', conversationId, 'messages'),
-      where('senderId', '!=', userId),
-      where('status', '!=', 'read')
-    );
-
-    const snapshot = await getDocs(q);
+    const messagesRef = collection(db, 'conversations', conversationId, 'messages');
+    const snapshot = await getDocs(messagesRef);
+    
     const updatePromises = snapshot.docs.map(async (docSnap) => {
-      const messageRef = doc(db, 'conversations', conversationId, 'messages', docSnap.id);
       const data = docSnap.data();
-      const readBy = data.readBy || [];
-      if (!readBy.includes(userId)) {
-        await updateDoc(messageRef, {
-          readBy: [...readBy, userId],
-          status: 'read'
-        });
+      // Filter in memory to avoid needing a complex composite index
+      if (data.senderId !== userId && data.status !== 'read') {
+        const messageRef = doc(db, 'conversations', conversationId, 'messages', docSnap.id);
+        const readBy = data.readBy || [];
+        if (!readBy.includes(userId)) {
+          await updateDoc(messageRef, {
+            readBy: [...readBy, userId],
+            status: 'read'
+          });
+        }
       }
     });
 
@@ -636,14 +635,13 @@ class ChatService {
       
       // Update delivery status for received messages
       allConvs.forEach(conv => {
-        const qMsgs = query(
-          collection(db, 'conversations', conv.id!, 'messages'),
-          where('senderId', '!=', adminId),
-          where('status', '==', 'sent')
-        );
-        getDocs(qMsgs).then(snap => {
+        const messagesRef = collection(db, 'conversations', conv.id!, 'messages');
+        getDocs(messagesRef).then(snap => {
           snap.docs.forEach(msgDoc => {
-            this.markMessageAsDelivered(conv.id!, msgDoc.id, adminId);
+            const data = msgDoc.data();
+            if (data.senderId !== adminId && data.status === 'sent') {
+              this.markMessageAsDelivered(conv.id!, msgDoc.id, adminId);
+            }
           });
         });
       });
@@ -668,14 +666,13 @@ class ChatService {
       // Update delivery status for received messages in groups
       allConvs.forEach(conv => {
         if (!conv.isGroup) return;
-        const qMsgs = query(
-          collection(db, 'conversations', conv.id!, 'messages'),
-          where('senderId', '!=', adminId),
-          where('status', '==', 'sent')
-        );
-        getDocs(qMsgs).then(snap => {
+        const messagesRef = collection(db, 'conversations', conv.id!, 'messages');
+        getDocs(messagesRef).then(snap => {
           snap.docs.forEach(msgDoc => {
-            this.markMessageAsDelivered(conv.id!, msgDoc.id, adminId);
+            const data = msgDoc.data();
+            if (data.senderId !== adminId && data.status === 'sent') {
+              this.markMessageAsDelivered(conv.id!, msgDoc.id, adminId);
+            }
           });
         });
       });
