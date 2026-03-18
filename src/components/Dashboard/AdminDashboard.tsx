@@ -31,8 +31,6 @@ import {
   CartesianGrid, 
   Tooltip, 
   ResponsiveContainer,
-  LineChart,
-  Line,
   Legend
 } from 'recharts';
 import {
@@ -300,13 +298,6 @@ const StatLabel = styled.div`
   margin-bottom: ${theme.spacing.sm};
 `;
 
-const StatIcon = styled.div`
-  position: absolute;
-  top: ${theme.spacing.md};
-  right: ${theme.spacing.md};
-  opacity: 0.3;
-`;
-
 const Badge = styled.div`
   background-color: ${theme.colors.success};
   color: white;
@@ -517,7 +508,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
       setRecentAttendance(dashboardStats.recentAttendance);
 
       // Load weekly data
-      const timeService = TimeService.getInstance();
       const attendance = await dataService.getAttendance();
       const last7Days = [...Array(7)].map((_, i) => {
         const d = new Date();
