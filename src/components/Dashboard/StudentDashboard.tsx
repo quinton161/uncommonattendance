@@ -23,6 +23,7 @@ import { UncommonLogo } from '../Common/UncommonLogo';
 import StarField from '../Common/StarField';
 import TimeSyncStatus from '../Common/TimeSyncStatus';
 import { uniqueToast } from '../../utils/toastUtils';
+import { StudentAttendanceAnalytics } from '../Analytics/StudentAttendanceAnalytics';
 import {
   DashboardIcon,
   CheckCircleIcon,
@@ -819,6 +820,13 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
     switch (activeNav) {
       case 'attendance':
         return <MainContent><MyAttendancePage onBack={() => setActiveNav('dashboard')} isEmbedded={true} /></MainContent>;
+      case 'analytics':
+        return (
+          <MainContent>
+            <h2 style={{ marginBottom: theme.spacing.lg, color: theme.colors.textPrimary }}>My Analytics</h2>
+            <StudentAttendanceAnalytics studentId={user?.uid || ''} />
+          </MainContent>
+        );
       case 'chat':
         return (
           <MainContent>
@@ -1206,6 +1214,10 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
             <CheckCircleIcon size={20} />
             Attendance
           </NavItem>
+        <NavItem active={activeNav === 'analytics'} onClick={() => handleNavClick('analytics')}>
+          <BarChartIcon size={20} />
+          Analytics
+        </NavItem>
           <NavItem 
             active={activeNav === 'chat'} 
             onClick={async () => {

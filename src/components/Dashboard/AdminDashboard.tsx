@@ -22,6 +22,7 @@ import { chatService, Conversation } from '../../services/chatService';
 import { notificationService } from '../../services/notificationService';
 import { saveAs } from 'file-saver';
 import { ProfileUpload } from '../Profile/ProfileUpload';
+import { AdminAttendanceAnalytics } from '../Analytics/AdminAttendanceAnalytics';
 
 import { 
   BarChart, 
@@ -36,6 +37,7 @@ import {
 import {
   DashboardIcon,
   CheckCircleIcon,
+  BarChartIcon,
   PeopleIcon,
   PersonIcon,
   LogoutIcon,
@@ -133,10 +135,11 @@ const MainContent = styled.div`
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   box-sizing: border-box;
-  padding-top: 60px;
+  padding-top: 80px; /* Increased to align with sidebar top */
   margin-left: 280px;
   display: flex;
   flex-direction: column;
+  gap: ${theme.spacing.lg};
   ${containerAnimation}
   ${respectMotionPreference}
   @media (max-width: ${theme.breakpoints.tablet}) {
@@ -145,6 +148,7 @@ const MainContent = styled.div`
     margin-left: 0;
     height: calc(100vh - 60px);
     height: calc(100svh - 60px);
+    gap: ${theme.spacing.md};
   }
 `;
 
@@ -491,7 +495,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
       await dataService.testConnection();
       
       const users = await dataService.getUsers();
-      const students = users.filter((u: any) => u.userType === 'attendee');
+      // Backward compat: some legacy users may not have userType set; treat them as students.
+      const students = users.filter((u: any) => !u.userType || u.userType === 'attendee');
       setAllStudents(students);
       
       const dashboardStats = await dataService.getDashboardStats();
@@ -680,6 +685,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
 
   const renderCurrentPage = () => {
     switch (activeNav) {
+      case 'analytics':
+        return (
+          <MainContent>
+            <h2 style={{ margin: `0 0 ${theme.spacing.lg} 0`, color: theme.colors.textPrimary }}>Attendance Analytics</h2>
+            <AdminAttendanceAnalytics />
+          </MainContent>
+        );
       case 'attendance':
         return <AttendancePage onBack={() => setActiveNav('dashboard')} />;
       case 'daily-tracker':
@@ -956,6 +968,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
         <NavItem active={activeNav === 'attendance'} onClick={() => handleNavClick('attendance')}>
           <CheckCircleIcon size={20} />
           Attendance
+        </NavItem>
+        <NavItem active={activeNav === 'analytics'} onClick={() => handleNavClick('analytics')}>
+          <BarChartIcon size={20} />
+          Analytics
         </NavItem>
         <NavItem active={activeNav === 'daily-tracker'} onClick={() => handleNavClick('daily-tracker')}>
           <TodayIcon size={20} />

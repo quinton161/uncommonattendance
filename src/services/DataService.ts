@@ -137,6 +137,18 @@ class DataService {
   private static instance: DataService;
   private useFirebase: boolean = true;
 
+  private isStudentUser(user: any): boolean {
+    const t = (user?.userType || '').toString().toLowerCase();
+    // Backward compat: treat missing userType as attendee/student.
+    if (!t) return true;
+    return t === 'attendee';
+  }
+
+  private isInstructorUser(user: any): boolean {
+    const t = (user?.userType || '').toString().toLowerCase();
+    return t === 'instructor';
+  }
+
   static getInstance(): DataService {
     if (!DataService.instance) {
       DataService.instance = new DataService();
@@ -429,8 +441,8 @@ class DataService {
     return {
       totalEvents: events.length,
       activeEvents: events.filter(e => e.eventStatus === 'published').length,
-      totalAttendees: users.filter(u => u.userType === 'attendee').length,
-      totalInstructors: users.filter(u => u.userType === 'instructor').length,
+      totalAttendees: users.filter(u => this.isStudentUser(u)).length,
+      totalInstructors: users.filter(u => this.isInstructorUser(u)).length,
       todayAttendance: todayAttendance.length,
       recentAttendance: attendance.slice(0, 10) // Show more recent activity
     };
@@ -505,7 +517,7 @@ class DataService {
     }
 
     const attendanceSummary = users
-      .filter(user => user.userType === 'attendee')
+      .filter(user => this.isStudentUser(user))
       .map(user => {
         const studentUid = user.uid || user.id;
         const userAttendance = currentAttendance?.find(a => 
@@ -669,7 +681,7 @@ class DataService {
 
     // Create summary for each user
     const attendanceSummary = allUsers
-      .filter(user => user.userType === 'attendee') // Only students
+      .filter(user => this.isStudentUser(user)) // Only students (missing userType treated as student)
       .map(user => {
         const userAttendance = dailyAttendance.find(a => a.userId === user.uid || a.studentId === user.uid || a.studentId === user.id || a.userId === user.id);
         
