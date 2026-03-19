@@ -20,32 +20,21 @@ import StarField from '../Common/StarField';
 import TimeSyncStatus from '../Common/TimeSyncStatus';
 import { uniqueToast } from '../../utils/toastUtils';
 import { StudentAttendanceAnalytics } from '../Analytics/StudentAttendanceAnalytics';
-import { qrCodeService, DailyQRCode } from '../../services/qrCodeService';
+import { qrCodeService } from '../../services/qrCodeService';
 import { 
   FiLogOut, 
   FiUser, 
-  FiCalendar, 
   FiBarChart2, 
-  FiMessageSquare, 
   FiCheckCircle, 
-  FiXCircle, 
-  FiAward, 
   FiTrendingUp,
   FiClock,
   FiStar,
   FiTarget,
   FiMenu,
   FiBarChart,
-  FiLogIn,
-  FiUsers,
-  FiActivity,
-  FiInfo,
-  FiChevronLeft,
-  FiTrendingDown,
   FiCamera,
   FiX
 } from 'react-icons/fi';
-import { GiTrophy } from 'react-icons/gi';
 import { QRCodeSVG } from 'qrcode.react';
 
 const DashboardContainer = styled.div`
@@ -881,25 +870,13 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
     return total;
   };
 
-  // Attendance stats from Firebase
-  const [daysPresent, setDaysPresent] = useState(0);
-  const [attendanceRate, setAttendanceRate] = useState(0);
-  const [statsRange, setStatsRange] = useState<'week' | 'month' | 'custom'>('month');
-  const [customDays, setCustomDays] = useState(7);
-  const totalSchoolDays = getTotalSchoolDaysInMonth();
-
   // Fetch attendance stats from Firebase for selected range
   const fetchAttendanceStats = useCallback(async () => {
     if (!user) return;
     const dailyAttendanceService = DailyAttendanceService.getInstance();
     let daysToCheck = 30;
-    if (statsRange === 'week') daysToCheck = 7;
-    else if (statsRange === 'month') daysToCheck = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
-    else if (statsRange === 'custom') daysToCheck = customDays;
-    const stats = await dailyAttendanceService.getAttendanceStats(user.uid, daysToCheck);
-    setDaysPresent(stats.presentDays);
-    setAttendanceRate(Math.round(stats.attendanceRate));
-  }, [user, statsRange, customDays]);
+    await dailyAttendanceService.getAttendanceStats(user.uid, daysToCheck);
+  }, [user]);
 
   useEffect(() => {
     fetchAttendanceStats();
@@ -1148,241 +1125,7 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
             </AttendanceCard>
           </StatsGrid>
 
-          {false && (<><div style={{ padding: theme.spacing.lg }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing.md, marginBottom: theme.spacing.lg }}>
-              <span style={{ fontWeight: 500 }}>Attendance Rate: {attendanceRate}%</span>
-            </div>
-          </div>
 
-
-          {/* Achievement Badges Section */}
-          <Card style={{ marginBottom: theme.spacing.lg, padding: theme.spacing.lg }}>
-            <CardTitle>🏆 Achievements & Streaks</CardTitle>
-            <div style={{ display: 'flex', gap: theme.spacing.md, flexWrap: 'wrap', justifyContent: 'center' }}>
-              {/* Current Streak Badge */}
-              <div style={{ 
-                padding: theme.spacing.md, 
-                borderRadius: theme.borderRadius.lg, 
-                background: dailyStats.currentStreak > 0 ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' : theme.colors.gray100,
-                color: dailyStats.currentStreak > 0 ? 'white' : theme.colors.textSecondary,
-                textAlign: 'center',
-                minWidth: '100px'
-              }}>
-                <div style={{ fontSize: '24px', marginBottom: theme.spacing.xs }}>
-                  {dailyStats.currentStreak > 0 ? '🔥' : '❄️'}
-                </div>
-                <div style={{ fontWeight: theme.fontWeights.bold, fontSize: theme.fontSizes.xl }}>
-                  {dailyStats.currentStreak}
-                </div>
-                <div style={{ fontSize: theme.fontSizes.xs }}>Day Streak</div>
-              </div>
-
-              {/* Perfect Week Badge */}
-              <div style={{ 
-                padding: theme.spacing.md, 
-                borderRadius: theme.borderRadius.lg, 
-                background: dailyStats.presentDays >= 5 && dailyStats.totalDays >= 5 ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : theme.colors.gray100,
-                color: dailyStats.presentDays >= 5 && dailyStats.totalDays >= 5 ? 'white' : theme.colors.textSecondary,
-                textAlign: 'center',
-                minWidth: '100px'
-              }}>
-                <div style={{ fontSize: '24px', marginBottom: theme.spacing.xs }}>
-                  {dailyStats.presentDays >= 5 && dailyStats.totalDays >= 5 ? '⭐' : '📅'}
-                </div>
-                <div style={{ fontWeight: theme.fontWeights.bold, fontSize: theme.fontSizes.xl }}>
-                  {dailyStats.presentDays >= 5 && dailyStats.totalDays >= 5 ? 'Perfect' : '0'}
-                </div>
-                <div style={{ fontSize: theme.fontSizes.xs }}>This Week</div>
-              </div>
-
-              {/* Top Performer Badge */}
-              <div style={{ 
-                padding: theme.spacing.md, 
-                borderRadius: theme.borderRadius.lg, 
-                background: dailyStats.attendanceRate >= 90 ? 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)' : theme.colors.gray100,
-                color: dailyStats.attendanceRate >= 90 ? 'white' : theme.colors.textSecondary,
-                textAlign: 'center',
-                minWidth: '100px'
-              }}>
-                <div style={{ fontSize: '24px', marginBottom: theme.spacing.xs }}>
-                  {dailyStats.attendanceRate >= 90 ? '🎯' : '📊'}
-                </div>
-                <div style={{ fontWeight: theme.fontWeights.bold, fontSize: theme.fontSizes.xl }}>
-                  {dailyStats.attendanceRate}%
-                </div>
-                <div style={{ fontSize: theme.fontSizes.xs }}>Attendance</div>
-              </div>
-
-              {/* Milestone Badges */}
-              <div style={{ 
-                padding: theme.spacing.md, 
-                borderRadius: theme.borderRadius.lg, 
-                background: dailyStats.longestStreak >= 7 ? 'linear-gradient(135deg, #ec4899 0%, #db2777 100%)' : theme.colors.gray100,
-                color: dailyStats.longestStreak >= 7 ? 'white' : theme.colors.textSecondary,
-                textAlign: 'center',
-                minWidth: '100px'
-              }}>
-                <div style={{ fontSize: '24px', marginBottom: theme.spacing.xs }}>
-                  {dailyStats.longestStreak >= 30 ? '👑' : dailyStats.longestStreak >= 7 ? '🌟' : '🎖️'}
-                </div>
-                <div style={{ fontWeight: theme.fontWeights.bold, fontSize: theme.fontSizes.xl }}>
-                  {dailyStats.longestStreak >= 30 ? 'Master' : dailyStats.longestStreak >= 7 ? 'Bronze' : 'None'}
-                </div>
-                <div style={{ fontSize: theme.fontSizes.xs }}>Milestone</div>
-              </div>
-            </div>
-            
-            {/* Motivational Message */}
-            <div style={{ 
-              marginTop: theme.spacing.md, 
-              padding: theme.spacing.md, 
-              background: theme.colors.gray50, 
-              borderRadius: theme.borderRadius.md,
-              textAlign: 'center',
-              color: theme.colors.textSecondary
-            }}>
-              {dailyStats.currentStreak >= 7 
-                ? `🔥 Amazing! ${dailyStats.currentStreak} days and counting! Keep it up!`
-                : dailyStats.currentStreak >= 3 
-                  ? `💪 You're on a ${dailyStats.currentStreak}-day streak! Almost there!`
-                  : dailyStats.attendanceRate >= 90
-                    ? `🎯 Great attendance! ${dailyStats.attendanceRate}% this month!`
-                    : dailyStats.absentDays > dailyStats.presentDays
-                      ? `📢 Remember to check in daily to improve your attendance!`
-                      : `🌟 Check in today to start a streak!`
-              }
-            </div>
-          </Card>
-
-          <ContentGrid>
-            <Card>
-              <CardTitle>Attendance Summary</CardTitle>
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(2, 1fr)',
-                  gap: theme.spacing.md,
-                  marginBottom: theme.spacing.md,
-                }}
-              >
-                <div style={{ textAlign: 'center', padding: theme.spacing.sm }}>
-                  <div
-                    style={{
-                      fontSize: theme.fontSizes.xl,
-                      fontWeight: theme.fontWeights.bold,
-                      color: theme.colors.success,
-                    }}
-                  >
-                    {dailyStats.longestStreak}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: theme.fontSizes.xs,
-                      color: theme.colors.textSecondary,
-                    }}
-                  >
-                    Longest Streak
-                  </div>
-                </div>
-                <div style={{ textAlign: 'center', padding: theme.spacing.sm }}>
-                  <div
-                    style={{
-                      fontSize: theme.fontSizes.xl,
-                      fontWeight: theme.fontWeights.bold,
-                      color: theme.colors.warning,
-                    }}
-                  >
-                    {dailyStats.absentDays}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: theme.fontSizes.xs,
-                      color: theme.colors.textSecondary,
-                    }}
-                  >
-                    Days Absent
-                  </div>
-                </div>
-              </div>
-              {dailyStats.lastAttendanceDate && (
-                <div
-                  style={{
-                    textAlign: 'center',
-                    padding: theme.spacing.sm,
-                    backgroundColor: theme.colors.gray50,
-                    borderRadius: theme.borderRadius.md,
-                    fontSize: theme.fontSizes.sm,
-                    color: theme.colors.textSecondary,
-                  }}
-                >
-                  Last attended:{' '}
-                  {new Date(dailyStats.lastAttendanceDate as string).toLocaleDateString('en-US', {
-                    weekday: 'long',
-                    month: 'long',
-                    day: 'numeric',
-                  })}
-                </div>
-              )}
-            </Card>
-
-            <Card>
-              <CardTitle>Recent Attendance</CardTitle>
-              <ActivityList>
-                {recentActivity.map((activity: any) => (
-                  <ActivityItem key={activity.id}>
-                    <ActivityIcon type={activity.type}>
-                      {activity.type === 'present'
-                        ? '✅'
-                        : activity.type === 'absent'
-                        ? '❌'
-                        : '📅'}
-                    </ActivityIcon>
-                    <div style={{ flex: 1 }}>
-                      <div
-                        style={{
-                          fontWeight: theme.fontWeights.medium,
-                          color: theme.colors.textPrimary,
-                          fontSize: theme.fontSizes.sm,
-                        }}
-                      >
-                        {activity.description || 'Attendance Record'}
-                      </div>
-                      <div
-                        style={{
-                          color: theme.colors.textSecondary,
-                          fontSize: theme.fontSizes.xs,
-                        }}
-                      >
-                        {activity.date
-                          ? new Date(activity.date).toLocaleDateString('en-US', {
-                              weekday: 'short',
-                              month: 'short',
-                              day: 'numeric',
-                            })
-                          : 'Unknown date'}
-                        {activity.time &&
-                          ` • ${activity.time.toLocaleTimeString('en-US', {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}`}
-                      </div>
-                    </div>
-                  </ActivityItem>
-                ))}
-                {recentActivity.length === 0 && (
-                  <p
-                    style={{
-                      color: theme.colors.textSecondary,
-                      textAlign: 'center',
-                      padding: theme.spacing.lg,
-                    }}
-                  >
-                    No recent attendance records
-                  </p>
-                )}
-              </ActivityList>
-            </Card>
-          </ContentGrid></>)}
 
         </div>
             )}

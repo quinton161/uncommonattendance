@@ -37,9 +37,7 @@ import {
   FiLogOut, 
   FiUser, 
   FiBarChart2, 
-  FiMessageSquare, 
   FiUsers,
-  FiSettings,
   FiTrendingUp,
   FiMenu,
   FiX,
@@ -452,8 +450,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
     absentCount: 0,
     attendanceRate: 0
   });
-  const [recentAttendance, setRecentAttendance] = useState<any[]>([]);
-  const [allStudents, setAllStudents] = useState<any[]>([]);
   const [weeklyData, setWeeklyData] = useState<any[]>([]);
   const [todayAttendanceList, setTodayAttendanceList] = useState<any[]>([]);
   const [atRiskStudents, setAtRiskStudents] = useState<any[]>([]);
@@ -560,7 +556,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
       const users = await dataService.getUsers();
       // Backward compat: some legacy users may not have userType set; treat them as students.
       const students = users.filter((u: any) => !u.userType || u.userType === 'attendee');
-      setAllStudents(students);
       
       const dashboardStats = await dataService.getDashboardStats();
       
@@ -573,8 +568,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
         attendanceRate: Math.round((dashboardStats.todayAttendance / (dashboardStats.totalAttendees || 1)) * 100)
       });
       
-      setRecentAttendance(dashboardStats.recentAttendance);
-
       // Load weekly data
       const attendance = await dataService.getAttendance();
       const last7Days = [...Array(7)].map((_, i) => {
@@ -622,21 +615,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
         absentCount: 7,
         attendanceRate: 72
       });
-      
-      setRecentAttendance([
-        {
-          id: '1',
-          studentName: 'John Doe',
-          checkInTime: new Date(),
-          isPresent: true
-        },
-        {
-          id: '2',
-          studentName: 'Jane Smith',
-          checkInTime: new Date(Date.now() - 3600000),
-          isPresent: true
-        }
-      ]);
     }
   };
 
@@ -656,10 +634,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
 
       if (summary.attendanceList) {
         setTodayAttendanceList(summary.attendanceList);
-      }
-      
-      if (summary.recentAttendance) {
-        setRecentAttendance(summary.recentAttendance);
       }
     });
 
@@ -734,6 +708,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
       <MobileOverlay isOpen={mobileMenuOpen} onClick={() => setMobileMenuOpen(false)} />
       
       <Sidebar isOpen={mobileMenuOpen}>
+        <StarField />
+        <Logo>
+          <UncommonLogo size="sm" showSubtitle={false} />
+        </Logo>
         
       <NavItem active={activeNav === 'dashboard'} onClick={() => handleNavClick('dashboard')}>
         <FiBarChart2 size={20} />

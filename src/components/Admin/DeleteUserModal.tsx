@@ -3,7 +3,6 @@ import { FiAlertTriangle, FiUser } from 'react-icons/fi';
 import styled from 'styled-components';
 import { theme } from '../../styles/theme';
 import { Button } from '../Common/Button';
-import { PersonIcon } from '../Common/Icons';
 
 const ModalOverlay = styled.div`
   position: fixed;

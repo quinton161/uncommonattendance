@@ -75,7 +75,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             });
             
             // Initialize call and presence services for logged-in user
-            const displayName = firebaseUser.displayName || userData.displayName || 'User';
           } else {
             console.warn('🔐 AuthContext: User document not found in Firestore after retries');
             
