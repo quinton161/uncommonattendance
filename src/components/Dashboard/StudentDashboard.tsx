@@ -6,6 +6,7 @@ import { theme } from '../../styles/theme';
 import { 
   staggeredAnimation, 
   pageTransition, 
+  containerAnimation,
   respectMotionPreference 
 } from '../../styles/animations';
 import DataService from '../../services/DataService';
@@ -200,7 +201,30 @@ const MobileOverlay = styled.div<{ $isOpen: boolean }>`
   }
 `;
 
-// MainContent styled component was removed because it was replaced by inline styles on a <div> to fix ESLint unused variable warnings.
+const MainContent = styled.div`
+  flex: 1;
+  padding: 0;
+  height: 100vh;
+  height: 100svh; /* Modern mobile browsers */
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  box-sizing: border-box;
+  padding-top: 80px; /* Increased to align with sidebar top */
+  margin-left: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  ${containerAnimation}
+  ${respectMotionPreference}
+  @media (max-width: ${theme.breakpoints.tablet}) {
+    padding: 0;
+    padding-top: 70px;
+    margin-left: 0;
+    height: calc(100vh - 60px);
+    height: calc(100svh - 60px);
+    gap: 0;
+  }
+`;
 
 const Header = styled.div`
   display: flex;
@@ -1225,8 +1249,9 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
         </SidebarFooter>
       </Sidebar>
 
-      {renderCurrentPage() || (
-        <div style={{ padding: 0 }}>
+      <MainContent style={{ padding: 0 }}>
+        {renderCurrentPage() || (
+          <div style={{ padding: 0 }}>
           <Header style={{ padding: theme.spacing.lg }}>
             <HeaderTitle>
               <h1
@@ -1579,6 +1604,7 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
 
         </div>
       )}
+      </MainContent>
     </DashboardContainer>
   );
 };
