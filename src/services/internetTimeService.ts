@@ -226,8 +226,10 @@ export class InternetTimeService {
    * Get current time in Harare/Pretoria timezone (CAT - Central Africa Time)
    */
   getCurrentTimeHarare(): Date {
-    const internetTime = this.getCurrentTime();
-    return new Date(internetTime.toLocaleString("en-US", { timeZone: "Africa/Harare" }));
+    // Important: Avoid parsing locale-formatted strings back into Date (can yield Invalid Date
+    // depending on environment/locale). We return an absolute Date (internet-synced if available).
+    // Any "Harare-local" components should be derived via Intl with the Africa/Harare timeZone.
+    return this.getCurrentTime();
   }
 
   /**
@@ -262,17 +264,48 @@ export class InternetTimeService {
    * Get current date string in Harare timezone
    */
   getCurrentDateString(): string {
-    const now = this.getCurrentTimeHarare();
-    return now.toISOString().split('T')[0];
+    const now = this.getCurrentTime();
+    // Use a stable, timezone-aware formatter to avoid Invalid Date / timezone parsing issues.
+    // en-CA yields ISO-like YYYY-MM-DD.
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Africa/Harare',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(now);
+
+    const y = parts.find(p => p.type === 'year')?.value;
+    const m = parts.find(p => p.type === 'month')?.value;
+    const d = parts.find(p => p.type === 'day')?.value;
+
+    if (!y || !m || !d) {
+      // Ultimate fallback: system date in ISO format
+      return new Date().toISOString().split('T')[0];
+    }
+
+    return `${y}-${m}-${d}`;
   }
 
   /**
    * Check if it's after 9 AM Harare time
    */
   isLate(checkInTime: Date): boolean {
-    const harareTime = new Date(checkInTime.toLocaleString("en-US", { timeZone: "Africa/Harare" }));
-    const hours = harareTime.getHours();
-    const minutes = harareTime.getMinutes();
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Africa/Harare',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    }).formatToParts(checkInTime);
+
+    const hourStr = parts.find(p => p.type === 'hour')?.value;
+    const minuteStr = parts.find(p => p.type === 'minute')?.value;
+    const hours = hourStr ? Number(hourStr) : NaN;
+    const minutes = minuteStr ? Number(minuteStr) : NaN;
+
+    if (!Number.isFinite(hours) || !Number.isFinite(minutes)) {
+      // If formatting fails for some reason, default to "not late" rather than blocking check-in.
+      return false;
+    }
     
     // Consider late if after 9:00 AM
     return hours > 9 || (hours === 9 && minutes > 0);

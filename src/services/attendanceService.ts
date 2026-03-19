@@ -131,13 +131,18 @@ export class AttendanceService {
       date: today,
       isPresent: true,
       status,
-      location: (location && typeof location.latitude === 'number' && typeof location.longitude === 'number') ? {
+      createdAt: serverTimestamp(), // For analytics tracking
+    };
+
+    // Firestore does not allow `undefined` values. Only include `location`
+    // when we have a valid latitude/longitude.
+    if (location && typeof location.latitude === 'number' && typeof location.longitude === 'number') {
+      attendanceRecord.location = {
         latitude: location.latitude,
         longitude: location.longitude,
         address: location.address || 'Unknown'
-      } : undefined,
-      createdAt: serverTimestamp(), // For analytics tracking
-    };
+      };
+    }
 
     console.log('📝 Saving detailed attendance record to Firebase:', {
       collection: 'attendance',
