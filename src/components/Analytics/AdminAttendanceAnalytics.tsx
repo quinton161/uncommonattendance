@@ -24,10 +24,10 @@ import {
 
 // Enhanced color palette with gradients and modern colors
 const COLORS = {
-  present: '#2563eb',
+  present: '#22c55e', // Green to match student dashboard success
   late: '#f59e0b',
   absent: '#ef4444',
-  presentGradient: ['#3b82f6', '#1d4ed8'],
+  presentGradient: ['#22c55e', '#16a34a'],
   lateGradient: ['#fbbf24', '#d97706'],
   absentGradient: ['#f87171', '#dc2626'],
 };
@@ -96,47 +96,33 @@ const CustomTooltip = ({ active, payload, label }: ChartTooltipProps) => {
 const Page = styled.div`
   display: flex;
   flex-direction: column;
-  gap: ${theme.spacing.lg};
+  gap: ${theme.spacing.md};
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
-  padding: ${theme.spacing.lg};
+  padding: 0;
   
   @media (max-width: ${theme.breakpoints.tablet}) {
-    gap: ${theme.spacing.md};
-    padding: ${theme.spacing.md};
-  }
-
-  @media (max-width: ${theme.breakpoints.mobile}) {
-    padding: ${theme.spacing.sm};
+    gap: ${theme.spacing.sm};
   }
 `;
 
 const FilterRow = styled.div`
   display: flex;
-  gap: ${theme.spacing.lg};
+  gap: ${theme.spacing.md};
   flex-wrap: wrap;
-  align-items: flex-end;
-  background: ${theme.colors.white};
-  padding: ${theme.spacing.lg};
-  border-radius: ${theme.borderRadius.xl};
-  border: 1px solid ${theme.colors.gray200};
-  box-shadow: ${theme.shadows.sm};
+  align-items: center;
+  justify-content: space-between;
 
   @media (max-width: ${theme.breakpoints.tablet}) {
-    padding: ${theme.spacing.md};
     gap: ${theme.spacing.md};
   }
 `;
 
 const OverviewGrid = styled.div`
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: ${theme.spacing.lg};
-
-  @media (max-width: ${theme.breakpoints.desktop}) {
-    grid-template-columns: repeat(2, 1fr);
-  }
 
   @media (max-width: ${theme.breakpoints.mobile}) {
     grid-template-columns: 1fr;
@@ -144,17 +130,72 @@ const OverviewGrid = styled.div`
   }
 `;
 
-const OverviewCard = styled(motion.div)`
-  background: ${theme.colors.white};
-  border: 1px solid ${theme.colors.gray200};
+const OverviewCard = styled(motion.div)<{ $variant?: 'primary' | 'secondary' | 'accent' | 'error' }>`
+  background: ${props => {
+    switch (props.$variant) {
+      case 'primary': return `linear-gradient(135deg, ${theme.colors.primary} 0%, ${theme.colors.primaryDark} 100%)`;
+      case 'accent': return `linear-gradient(135deg, ${theme.colors.success} 0%, #16a34a 100%)`;
+      case 'secondary': return `linear-gradient(135deg, #f59e0b 0%, #d97706 100%)`;
+      case 'error': return `linear-gradient(135deg, #ef4444 0%, #dc2626 100%)`;
+      default: return theme.colors.white;
+    }
+  }};
+  color: ${props => props.$variant ? theme.colors.white : theme.colors.textPrimary};
+  border: 1px solid ${props => props.$variant ? 'transparent' : theme.colors.gray200};
   border-radius: ${theme.borderRadius.xl};
   padding: ${theme.spacing.lg};
   display: flex;
   flex-direction: column;
   justify-content: center;
-  min-height: 100px;
-  box-shadow: ${theme.shadows.sm};
+  min-height: 120px;
+  box-shadow: ${theme.shadows.md};
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: ${theme.shadows.lg};
+  }
+  
+  .v {
+    font-weight: ${theme.fontWeights.bold};
+    font-size: ${theme.fontSizes['3xl']};
+    line-height: 1;
+    margin-bottom: ${theme.spacing.xs};
+  }
+  .l {
+    font-size: ${theme.fontSizes.sm};
+    opacity: 0.9;
+    font-weight: ${theme.fontWeights.medium};
+  }
+
+  @media (max-width: ${theme.breakpoints.tablet}) {
+    padding: ${theme.spacing.md};
+    min-height: 100px;
+  }
+`;
+
+const StatRow = styled.div`
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: ${theme.spacing.md};
+
+  @media (max-width: ${theme.breakpoints.mobile}) {
+    grid-template-columns: 1fr 1fr;
+  }
+`;
+
+const Stat = styled.div`
+  background: linear-gradient(135deg, ${theme.colors.primary}10 0%, ${theme.colors.primaryLight}18 100%);
+  border: 1px solid ${theme.colors.primary}20;
+  border-radius: ${theme.borderRadius.lg};
+  padding: ${theme.spacing.md};
+  min-height: 86px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+
   .v {
     font-weight: ${theme.fontWeights.bold};
     font-size: ${theme.fontSizes['2xl']};
@@ -169,8 +210,10 @@ const OverviewCard = styled(motion.div)`
   }
 
   @media (max-width: ${theme.breakpoints.tablet}) {
-    padding: ${theme.spacing.md};
-    min-height: 80px;
+    min-height: 70px;
+    .v {
+      font-size: ${theme.fontSizes.xl};
+    }
   }
 `;
 
@@ -205,6 +248,11 @@ const Card = styled(motion.div)`
   box-shadow: ${theme.shadows.sm};
   padding: ${theme.spacing.lg};
   overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  
+  &:hover {
+    box-shadow: ${theme.shadows.md};
+  }
   
   @media (max-width: ${theme.breakpoints.tablet}) {
     padding: ${theme.spacing.md};
@@ -214,13 +262,14 @@ const Card = styled(motion.div)`
 
 const Title = styled.div`
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
-  margin-bottom: ${theme.spacing.md};
+  margin-bottom: ${theme.spacing.lg};
 
   h3 {
     margin: 0;
     font-size: ${theme.fontSizes.lg};
+    font-weight: ${theme.fontWeights.semibold};
     color: ${theme.colors.textPrimary};
   }
   span {
@@ -230,43 +279,70 @@ const Title = styled.div`
 `;
 
 const Select = styled.select`
-  padding: ${theme.spacing.sm};
+  padding: ${theme.spacing.sm} ${theme.spacing.md};
   border: 1px solid ${theme.colors.gray300};
-  border-radius: ${theme.borderRadius.md};
-  min-height: 40px;
+  border-radius: ${theme.borderRadius.lg};
+  min-height: 44px;
   background: ${theme.colors.white};
   font-size: ${theme.fontSizes.sm};
+  color: ${theme.colors.textPrimary};
+  cursor: pointer;
+  transition: border-color 0.2s;
+  
+  &:focus {
+    outline: none;
+    border-color: ${theme.colors.primary};
+  }
+`;
+
+const Grid = styled.div`
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: ${theme.spacing.lg};
+
+  @media (max-width: ${theme.breakpoints.desktop}) {
+    grid-template-columns: 1fr;
+  }
+
+  @media (max-width: ${theme.breakpoints.tablet}) {
+    gap: ${theme.spacing.md};
+  }
 `;
 
 const Table = styled.div`
   display: flex;
   flex-direction: column;
-  gap: ${theme.spacing.xs};
+  gap: ${theme.spacing.sm};
 `;
 
 const Row = styled.div`
   display: grid;
-  grid-template-columns: 1fr 90px;
+  grid-template-columns: 1fr auto;
   gap: ${theme.spacing.md};
   align-items: center;
-  padding: ${theme.spacing.sm} ${theme.spacing.md};
+  padding: ${theme.spacing.md};
   border-radius: ${theme.borderRadius.lg};
-  background: ${theme.colors.gray50};
-  border: 1px solid ${theme.colors.gray100};
+  background: ${theme.colors.backgroundSecondary};
+  transition: transform 0.2s;
+  
+  &:hover {
+    transform: translateX(4px);
+  }
 `;
 
 const BarWrap = styled.div`
-  height: 10px;
+  height: 8px;
   border-radius: 999px;
   background: ${theme.colors.gray200};
   overflow: hidden;
+  margin-top: ${theme.spacing.sm};
 `;
 
 const BarFill = styled.div<{ $p: number; $kind: 'good' | 'bad' }>`
   height: 100%;
   width: ${({ $p }) => `${Math.max(0, Math.min(100, $p))}%`};
-  background: ${({ $kind }) => ($kind === 'good' ? 'linear-gradient(90deg, #22c55e, #16a34a)' : 'linear-gradient(90deg, #ef4444, #dc2626)')};
-  transition: width 0.4s ease;
+  background: ${({ $kind }) => ($kind === 'good' ? `linear-gradient(90deg, ${theme.colors.success}, #16a34a)` : 'linear-gradient(90deg, #ef4444, #dc2626)')};
+  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
 `;
 
 function fmtShort(dateIso: string) {
@@ -356,26 +432,20 @@ export function AdminAttendanceAnalytics(): React.ReactElement {
         </div>
       </FilterRow>
 
-      <OverviewGrid>
-        <OverviewCard {...cardAnim}>
-          <div className="v">{Math.round(analytics?.totals.attendanceRate || 0)}%</div>
-          <div className="l">Attendance rate</div>
-        </OverviewCard>
-        <OverviewCard {...cardAnim}>
-          <div className="v">{analytics?.totals.present ?? 0}</div>
-          <div className="l">Present</div>
-        </OverviewCard>
-        <OverviewCard {...cardAnim}>
-          <div className="v">{analytics?.totals.late ?? 0}</div>
-          <div className="l">Late</div>
-        </OverviewCard>
-        <OverviewCard {...cardAnim}>
-          <div className="v">{analytics?.totals.absent ?? 0}</div>
-          <div className="l">Absent</div>
-        </OverviewCard>
-      </OverviewGrid>
+      <Card {...cardAnim}>
+        <Title>
+          <h3>Attendance overview</h3>
+          <span>{loading ? 'Updating…' : `${analytics?.range.startDate} → ${analytics?.range.endDate}`}</span>
+        </Title>
+        <StatRow>
+          <Stat><div className="v">{Math.round(analytics?.totals.attendanceRate || 0)}%</div><div className="l">Attendance rate</div></Stat>
+          <Stat><div className="v">{analytics?.totals.present ?? 0}</div><div className="l">Present</div></Stat>
+          <Stat><div className="v">{analytics?.totals.late ?? 0}</div><div className="l">Late</div></Stat>
+          <Stat><div className="v">{analytics?.totals.absent ?? 0}</div><div className="l">Absent</div></Stat>
+        </StatRow>
+      </Card>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: theme.spacing.lg }}>
+      <Grid>
         <Card {...cardAnim}>
           <Title>
             <h3>Daily trend</h3>
@@ -438,7 +508,7 @@ export function AdminAttendanceAnalytics(): React.ReactElement {
             )}
           </ChartContainer>
         </Card>
-      </div>
+      </Grid>
 
       <Card {...cardAnim}>
         <Title>

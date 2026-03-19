@@ -129,7 +129,7 @@ const NavItem = styled.div<{ active?: boolean }>`
 
 const MainContent = styled.div`
   flex: 1;
-  padding: ${theme.spacing.lg};
+  padding: 0;
   height: 100vh;
   height: 100svh; /* Modern mobile browsers */
   overflow-y: auto;
@@ -139,16 +139,16 @@ const MainContent = styled.div`
   margin-left: 280px;
   display: flex;
   flex-direction: column;
-  gap: ${theme.spacing.lg};
+  gap: 0;
   ${containerAnimation}
   ${respectMotionPreference}
   @media (max-width: ${theme.breakpoints.tablet}) {
-    padding: ${theme.spacing.md};
+    padding: 0;
     padding-top: 70px;
     margin-left: 0;
     height: calc(100vh - 60px);
     height: calc(100svh - 60px);
-    gap: ${theme.spacing.md};
+    gap: 0;
   }
 `;
 
@@ -687,17 +687,29 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
     switch (activeNav) {
       case 'analytics':
         return (
-          <MainContent>
+          <div style={{ padding: theme.spacing.lg }}>
             <h2 style={{ margin: `0 0 ${theme.spacing.lg} 0`, color: theme.colors.textPrimary }}>Attendance Analytics</h2>
             <AdminAttendanceAnalytics />
-          </MainContent>
+          </div>
         );
       case 'attendance':
-        return <AttendancePage onBack={() => setActiveNav('dashboard')} />;
+        return (
+          <div style={{ padding: theme.spacing.lg }}>
+            <AttendancePage onBack={() => setActiveNav('dashboard')} />
+          </div>
+        );
       case 'daily-tracker':
-        return <DailyAttendanceTracker onBack={() => setActiveNav('dashboard')} isEmbedded={true} />;
+        return (
+          <div style={{ padding: theme.spacing.lg }}>
+            <DailyAttendanceTracker onBack={() => setActiveNav('dashboard')} isEmbedded={true} />
+          </div>
+        );
       case 'users':
-        return <UsersPage onBack={() => setActiveNav('dashboard')} onChat={handleChatFromUsers} />;
+        return (
+          <div style={{ padding: theme.spacing.lg }}>
+            <UsersPage onBack={() => setActiveNav('dashboard')} onChat={handleChatFromUsers} />
+          </div>
+        );
       case 'chat':
         // 1. Create a map of existing conversations by studentId
         const convMap = new Map<string, Conversation>();
@@ -745,7 +757,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
             gridTemplateColumns: '320px 1fr', 
             gap: theme.spacing.lg, 
             height: 'calc(100vh - 140px)',
-            overflow: 'hidden'
+            overflow: 'hidden',
+            padding: 0
           }}>
             <div style={{ 
               display: 'flex', 
@@ -754,7 +767,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
               height: '100%',
               overflow: 'hidden'
             }}>
-              <h2 style={{ color: theme.colors.textPrimary, margin: 0 }}>Messages</h2>
+              <h2 style={{ color: theme.colors.textPrimary, margin: 0, padding: theme.spacing.lg }}>Messages</h2>
               <Card style={{ 
                 flex: 1, 
                 padding: theme.spacing.sm,
@@ -889,7 +902,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
                     fontSize: theme.fontSizes.xl,
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '8px'
+                    gap: '8px',
+                    padding: theme.spacing.lg
                   }}>
                     {selectedConversation.isGroup && <span>👥</span>}
                     Chatting with {selectedConversation.isGroup ? selectedConversation.groupName : selectedConversation.studentName}
@@ -919,7 +933,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
                   background: theme.colors.white,
                   borderRadius: theme.borderRadius.lg,
                   border: `1px solid ${theme.colors.gray200}`,
-                  color: theme.colors.textSecondary
+                  color: theme.colors.textSecondary,
+                  padding: theme.spacing.lg
                 }}>
                   Select a student to start chatting
                 </div>
@@ -929,9 +944,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
         );
       case 'profile':
         return (
-          <MainContent>
+          <div style={{ padding: 0 }}>
             <ProfileUpload />
-          </MainContent>
+          </div>
         );
       default:
         return null; // Will render the main dashboard
@@ -1005,9 +1020,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
         </div>
       </Sidebar>
 
-      <MainContent>
+      <MainContent style={{ padding: 0 }}>
         {renderCurrentPage() || (
-          <>
+          <div style={{ padding: theme.spacing.lg, display: 'flex', flexDirection: 'column', gap: theme.spacing.lg }}>
             <Header>
               <HeaderTitle>
                 <h1 style={{ 
@@ -1099,7 +1114,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
                 </AttendanceList>
               </Card>
             </ContentGrid>
-          </>
+          </div>
         )}
       </MainContent>
     </DashboardContainer>

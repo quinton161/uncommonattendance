@@ -14,7 +14,6 @@ import { AttendanceService } from '../../services/attendanceService';
 import { DailyAttendanceService, DailyAttendanceStats } from '../../services/dailyAttendanceService';
 import { TimeService } from '../../services/timeService';
 import { MyAttendancePage } from '../Student/MyAttendancePage';
-import { ProgressPage } from '../Student/ProgressPage';
 import { ProfileUpload } from '../Profile/ProfileUpload';
 import { ChatWindow } from '../Common/ChatWindow';
 import { chatService, Conversation } from '../../services/chatService';
@@ -204,7 +203,7 @@ const MobileOverlay = styled.div<{ $isOpen: boolean }>`
 
 const MainContent = styled.div`
   flex: 1;
-  padding: ${theme.spacing.lg};
+  padding: 0;
   height: 100vh;
   height: 100svh; /* Modern mobile browsers */
   overflow-y: auto;
@@ -214,14 +213,16 @@ const MainContent = styled.div`
   margin-left: 280px;
   display: flex;
   flex-direction: column;
+  gap: 0;
   ${containerAnimation}
   ${respectMotionPreference}
   @media (max-width: ${theme.breakpoints.tablet}) {
-    padding: ${theme.spacing.md};
+    padding: 0;
     padding-top: 70px;
     margin-left: 0;
     height: calc(100vh - 60px);
     height: calc(100svh - 60px);
+    gap: 0;
   }
 `;
 
@@ -819,17 +820,21 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
   const renderCurrentPage = () => {
     switch (activeNav) {
       case 'attendance':
-        return <MainContent><MyAttendancePage onBack={() => setActiveNav('dashboard')} isEmbedded={true} /></MainContent>;
+        return (
+          <div style={{ padding: theme.spacing.lg }}>
+            <MyAttendancePage onBack={() => setActiveNav('dashboard')} isEmbedded={true} />
+          </div>
+        );
       case 'analytics':
         return (
-          <MainContent>
+          <div style={{ padding: theme.spacing.lg }}>
             <h2 style={{ marginBottom: theme.spacing.lg, color: theme.colors.textPrimary }}>My Analytics</h2>
             <StudentAttendanceAnalytics studentId={user?.uid || ''} />
-          </MainContent>
+          </div>
         );
       case 'chat':
         return (
-          <MainContent>
+          <div style={{ padding: theme.spacing.lg }}>
             <h2 style={{ marginBottom: theme.spacing.lg, color: theme.colors.textPrimary }}>Messages</h2>
             <div style={{ 
               display: 'grid', 
@@ -1006,12 +1011,14 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
                 </div>
               </div>
             </div>
-          </MainContent>
+          </div>
         );
-      case 'progress':
-        return <MainContent><ProgressPage onBack={() => setActiveNav('dashboard')} isEmbedded={true} /></MainContent>;
       case 'profile':
-        return <MainContent><ProfileUpload /></MainContent>;
+        return (
+          <div style={{ padding: theme.spacing.lg }}>
+            <ProfileUpload />
+          </div>
+        );
       default:
         return null; // Will render the main dashboard
     }
@@ -1228,10 +1235,6 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
             Chat with Admin
             {unreadCount > 0 && <Badge style={{ marginLeft: 'auto' }}>{unreadCount}</Badge>}
           </NavItem>
-          <NavItem active={activeNav === 'progress'} onClick={() => handleNavClick('progress')}>
-            <BarChartIcon size={20} />
-            Progress
-          </NavItem>
           <NavItem active={activeNav === 'profile'} onClick={() => handleNavClick('profile')}>
             <PersonIcon size={20} />
             Profile
@@ -1247,8 +1250,8 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
       </Sidebar>
 
       {renderCurrentPage() || (
-        <MainContent>
-          <Header>
+        <div style={{ padding: 0 }}>
+          <Header style={{ padding: theme.spacing.lg }}>
             <HeaderTitle>
               <h1
                 style={{
@@ -1281,7 +1284,7 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
             </HeaderActions>
           </Header>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing.md, marginBottom: theme.spacing.lg }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing.md, marginBottom: theme.spacing.lg, padding: theme.spacing.lg }}>
             <span style={{ fontWeight: 500 }}>Attendance Stats for:</span>
             <button
               style={{ padding: '6px 12px', borderRadius: 6, border: 'none', background: statsRange === 'week' ? theme.colors.primary : theme.colors.gray200, color: statsRange === 'week' ? '#fff' : theme.colors.textPrimary, cursor: 'pointer' }}
@@ -1308,7 +1311,7 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
               days
             </label>
           </div>
-          <StatsGrid>
+          <StatsGrid style={{ padding: theme.spacing.lg }}>
             <AttendanceCard variant="primary">
               <StatIcon>
                 <CheckCircleIcon size={32} />
@@ -1370,7 +1373,7 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
           </StatsGrid>
 
           {/* Achievement Badges Section */}
-          <Card style={{ marginBottom: theme.spacing.lg }}>
+          <Card style={{ marginBottom: theme.spacing.lg, padding: theme.spacing.lg }}>
             <CardTitle>🏆 Achievements & Streaks</CardTitle>
             <div style={{ display: 'flex', gap: theme.spacing.md, flexWrap: 'wrap', justifyContent: 'center' }}>
               {/* Current Streak Badge */}
@@ -1598,7 +1601,7 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
             </Card>
           </ContentGrid>
 
-        </MainContent>
+        </div>
       )}
     </DashboardContainer>
   );
