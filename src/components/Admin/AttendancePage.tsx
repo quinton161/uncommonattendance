@@ -671,6 +671,7 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
   const timeService = TimeService.getInstance();
   const [selectedDate, setSelectedDate] = useState(timeService.getCurrentDateString());
   const [statusFilter, setStatusFilter] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
   const [fixingLocations, setFixingLocations] = useState(false);
   const dataService = DataService.getInstance();
   const attendanceService = AttendanceService.getInstance();
@@ -714,6 +715,16 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
     if (!attendanceSummary) return [];
     
     let filtered = [...attendanceSummary.attendanceList];
+
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter(record => {
+        const name = (record.name || '').toLowerCase();
+        const studentId = (record.userId || '').toLowerCase();
+        return name.includes(query) || studentId.includes(query);
+      });
+    }
 
     if (statusFilter !== 'all') {
       filtered = filtered.filter(record => {
@@ -829,6 +840,16 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
 
       <FilterSection>
         <FilterGroup>
+          <label>Search</label>
+          <input
+            type="text"
+            placeholder="Search by name or ID..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '14px' }}
+          />
+        </FilterGroup>
+        <FilterGroup>
           <label>Date</label>
           <input
             type="date"
@@ -860,7 +881,7 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
       </FilterSection>
       
       <ActionButtonsContainer>
-        <Button variant="outline" onClick={() => { setSelectedDate(''); setStatusFilter('all'); }}>
+        <Button variant="outline" onClick={() => { setSelectedDate(''); setStatusFilter('all'); setSearchQuery(''); }}>
           Clear Filters
         </Button>
         {user?.userType === 'admin' && (

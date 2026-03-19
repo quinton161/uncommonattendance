@@ -1357,6 +1357,105 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
             </AttendanceCard>
           </StatsGrid>
 
+          {/* Achievement Badges Section */}
+          <Card style={{ marginBottom: theme.spacing.lg }}>
+            <CardTitle>🏆 Achievements & Streaks</CardTitle>
+            <div style={{ display: 'flex', gap: theme.spacing.md, flexWrap: 'wrap', justifyContent: 'center' }}>
+              {/* Current Streak Badge */}
+              <div style={{ 
+                padding: theme.spacing.md, 
+                borderRadius: theme.borderRadius.lg, 
+                background: dailyStats.currentStreak > 0 ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' : theme.colors.gray100,
+                color: dailyStats.currentStreak > 0 ? 'white' : theme.colors.textSecondary,
+                textAlign: 'center',
+                minWidth: '100px'
+              }}>
+                <div style={{ fontSize: '24px', marginBottom: theme.spacing.xs }}>
+                  {dailyStats.currentStreak > 0 ? '🔥' : '❄️'}
+                </div>
+                <div style={{ fontWeight: theme.fontWeights.bold, fontSize: theme.fontSizes.xl }}>
+                  {dailyStats.currentStreak}
+                </div>
+                <div style={{ fontSize: theme.fontSizes.xs }}>Day Streak</div>
+              </div>
+
+              {/* Perfect Week Badge */}
+              <div style={{ 
+                padding: theme.spacing.md, 
+                borderRadius: theme.borderRadius.lg, 
+                background: dailyStats.presentDays >= 5 && dailyStats.totalDays >= 5 ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : theme.colors.gray100,
+                color: dailyStats.presentDays >= 5 && dailyStats.totalDays >= 5 ? 'white' : theme.colors.textSecondary,
+                textAlign: 'center',
+                minWidth: '100px'
+              }}>
+                <div style={{ fontSize: '24px', marginBottom: theme.spacing.xs }}>
+                  {dailyStats.presentDays >= 5 && dailyStats.totalDays >= 5 ? '⭐' : '📅'}
+                </div>
+                <div style={{ fontWeight: theme.fontWeights.bold, fontSize: theme.fontSizes.xl }}>
+                  {dailyStats.presentDays >= 5 && dailyStats.totalDays >= 5 ? 'Perfect' : '0'}
+                </div>
+                <div style={{ fontSize: theme.fontSizes.xs }}>This Week</div>
+              </div>
+
+              {/* Top Performer Badge */}
+              <div style={{ 
+                padding: theme.spacing.md, 
+                borderRadius: theme.borderRadius.lg, 
+                background: dailyStats.attendanceRate >= 90 ? 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)' : theme.colors.gray100,
+                color: dailyStats.attendanceRate >= 90 ? 'white' : theme.colors.textSecondary,
+                textAlign: 'center',
+                minWidth: '100px'
+              }}>
+                <div style={{ fontSize: '24px', marginBottom: theme.spacing.xs }}>
+                  {dailyStats.attendanceRate >= 90 ? '🎯' : '📊'}
+                </div>
+                <div style={{ fontWeight: theme.fontWeights.bold, fontSize: theme.fontSizes.xl }}>
+                  {dailyStats.attendanceRate}%
+                </div>
+                <div style={{ fontSize: theme.fontSizes.xs }}>Attendance</div>
+              </div>
+
+              {/* Milestone Badges */}
+              <div style={{ 
+                padding: theme.spacing.md, 
+                borderRadius: theme.borderRadius.lg, 
+                background: dailyStats.longestStreak >= 7 ? 'linear-gradient(135deg, #ec4899 0%, #db2777 100%)' : theme.colors.gray100,
+                color: dailyStats.longestStreak >= 7 ? 'white' : theme.colors.textSecondary,
+                textAlign: 'center',
+                minWidth: '100px'
+              }}>
+                <div style={{ fontSize: '24px', marginBottom: theme.spacing.xs }}>
+                  {dailyStats.longestStreak >= 30 ? '👑' : dailyStats.longestStreak >= 7 ? '🌟' : '🎖️'}
+                </div>
+                <div style={{ fontWeight: theme.fontWeights.bold, fontSize: theme.fontSizes.xl }}>
+                  {dailyStats.longestStreak >= 30 ? 'Master' : dailyStats.longestStreak >= 7 ? 'Bronze' : 'None'}
+                </div>
+                <div style={{ fontSize: theme.fontSizes.xs }}>Milestone</div>
+              </div>
+            </div>
+            
+            {/* Motivational Message */}
+            <div style={{ 
+              marginTop: theme.spacing.md, 
+              padding: theme.spacing.md, 
+              background: theme.colors.gray50, 
+              borderRadius: theme.borderRadius.md,
+              textAlign: 'center',
+              color: theme.colors.textSecondary
+            }}>
+              {dailyStats.currentStreak >= 7 
+                ? `🔥 Amazing! ${dailyStats.currentStreak} days and counting! Keep it up!`
+                : dailyStats.currentStreak >= 3 
+                  ? `💪 You're on a ${dailyStats.currentStreak}-day streak! Almost there!`
+                  : dailyStats.attendanceRate >= 90
+                    ? `🎯 Great attendance! ${dailyStats.attendanceRate}% this month!`
+                    : dailyStats.absentDays > dailyStats.presentDays
+                      ? `📢 Remember to check in daily to improve your attendance!`
+                      : `🌟 Check in today to start a streak!`
+              }
+            </div>
+          </Card>
+
           <ContentGrid>
             <Card>
               <CardTitle>Attendance Summary</CardTitle>
