@@ -531,12 +531,12 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
   const [canCheckIn, setCanCheckIn] = useState(true);
   const [canCheckOut, setCanCheckOut] = useState(false);
   const [stats, setStats] = useState({
-        totalCheckIns: 0,
+    totalCheckIns: 0,
     currentStreak: 0,
     todayStatus: 'Not Checked In',
     lastCheckIn: null as Date | null
   });
-  const [dailyStats, setDailyStats] = useState<DailyAttendanceStats>({
+  const [dailyStats] = useState<DailyAttendanceStats>({
     totalDays: 0,
     presentDays: 0,
     absentDays: 0,
@@ -545,39 +545,15 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
     attendanceRate: 0,
     lastAttendanceDate: null,
   });
-  const [recentActivity, setRecentActivity] = useState<any[]>([]);
   const [showScanner, setShowScanner] = useState(false);
   const [qrCodeInput, setQrCodeInput] = useState('');
   const [isVerifyingQR, setIsVerifyingQR] = useState(false);
-  const dataService = DataService.getInstance();
   const attendanceService = AttendanceService.getInstance();
-  const dailyAttendanceService = DailyAttendanceService.getInstance();
-
-  // useEffect hooks will be moved after function declarations
-
-  const getInitials = (name: string) => {
-    return name.split(' ').map(n => n[0]).join('').toUpperCase();
-  };
 
   const checkTodayAttendance = useCallback(async () => {
     if (!user) return;
     
-    // Debug: Log the user type
-    console.log('checkTodayAttendance - user.userType:', user.userType, 'user.email:', user.email);
-    
-    if (user.userType !== 'attendee') {
-      // Allow check-in for users without explicit attendee type (fix for Google login users)
-      // Only block for explicit admin/instructor roles
-      if (user.userType === 'admin' || user.userType === 'instructor') {
-        console.log('User is not an attendee, skipping attendance check');
-        return;
-      }
-      // For undefined/null userType, default to allowing attendance (treat as attendee)
-      console.log('User type not set, defaulting to attendee for attendance');
-    }
-
     try {
-      // Use the AttendanceService with daily reset logic
       const attendanceState = await attendanceService.getAttendanceStateWithDayCheck(user.uid);
       
       setCheckedIn(attendanceState.isCheckedIn);
@@ -585,7 +561,6 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
       setCanCheckIn(attendanceState.canCheckIn);
       setCanCheckOut(attendanceState.canCheckOut);
       
-      // Update status text
       if (attendanceState.isNewDay && !attendanceState.isCheckedIn) {
         setStats(prev => ({
           ...prev,
@@ -598,7 +573,6 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
           lastCheckIn: attendanceState.checkInTime
         }));
       } else if (!attendanceState.canCheckIn) {
-        // Already checked out today
         setStats(prev => ({
           ...prev,
           todayStatus: 'Completed for Today'
@@ -618,42 +592,6 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
     }
   }, [user, attendanceService]);
 
-  const loadStudentData = useCallback(async () => {
-    if (!user) return;
-
-    try {
-      // Test connection and load stats
-      await dataService.testConnection();
-      const studentStats = await dataService.getStudentStats(user.uid);
-      
-      setStats(prevStats => ({
-        totalCheckIns: studentStats.totalCheckIns,
-        currentStreak: studentStats.currentStreak,
-        todayStatus: prevStats.todayStatus,
-        lastCheckIn: prevStats.lastCheckIn
-      }));
-
-      const dailyStatsData = await dailyAttendanceService.getAttendanceStats(user.uid, 30);
-      setDailyStats(dailyStatsData);
-
-      // Load recent attendance activity
-      const recentAttendanceActivity = await dailyAttendanceService.getRecentActivity(user.uid, 5);
-      setRecentActivity(recentAttendanceActivity.map((activity, index) => ({
-        id: `activity_${index}`,
-        type: activity.type,
-        description: activity.description,
-        date: activity.date,
-        time: activity.markedAt as Date | undefined,
-        studentName: user.displayName,
-      })));
-
-    } catch (error) {
-      console.error('Error loading student data:', error);
-      // Suppress user-facing toast for dashboard load failures so UI isn't noisy.
-      // DataService already falls back to mock data when Firebase is unavailable.
-    }
-  }, [user, dataService, dailyAttendanceService]);
-
   const handleCheckInInternal = async (isAutomatic: boolean = false) => {
     console.log('handleCheckInInternal called - user:', !!user, 'canCheckIn:', canCheckIn, 'isAutomatic:', isAutomatic);
 
@@ -665,14 +603,6 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
       return;
     }
 
-    // Debug: Check if user has required properties
-    console.log('User details for check-in:', {
-      uid: user.uid,
-      displayName: user.displayName,
-      email: user.email,
-      userType: user.userType
-    });
-
     if (!canCheckIn) {
       uniqueToast.info('You cannot check in right now. Please try again or refresh the page.', {
         autoClose: 4000,
@@ -683,7 +613,6 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
 
     setAttendanceLoading(true);
     try {
-      // Validate QR Code first
       if (!qrCodeInput) {
         uniqueToast.error('Please enter the daily check-in code');
         return;
@@ -697,7 +626,6 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
         return;
       }
 
-      // Get minimal network info (non-blocking)
       let location: any = { ip: '0.0.0.0', timestamp: Date.now() };
       try {
         const ipResponse = await fetch('https://api.ipify.org?format=json');
@@ -710,19 +638,13 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
       }
       
       const now = new Date();
-      // CRITICAL FIX: Use Harare time for late check, not local browser time
       const timeService = TimeService.getInstance();
       const harareNow = timeService.getCurrentTime();
       const currentTime = harareNow.getHours() * 60 + harareNow.getMinutes(); // Convert to minutes
       const nineAM = 9 * 60; // 9:00 AM in minutes
       
-      // Check if checking in after 9 AM
       const isLate = currentTime > nineAM;
       
-      // Use AttendanceService to check in with location
-      console.log('Calling attendanceService.checkIn with location...');
-      
-      // Wrap the check-in call in a retry mechanism for database flakiness
       let attendanceRecord;
       let retries = 0;
       const maxRetries = 2;
@@ -749,38 +671,16 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
         location: attendanceRecord.location?.address || 'No location'
       });
       
-      // Double verify by fetching the record we just created
-      let verified = false;
-      for (let i = 0; i < 3; i++) { // 3 attempts to verify with small delay
-        const verifyRecord = await attendanceService.getTodayAttendance(user.uid);
-        if (verifyRecord) {
-          verified = true;
-          break;
-        }
-        await new Promise(r => setTimeout(r, 500));
-      }
-
-      if (!verified) {
-        console.warn('⚠️ Attendance verification failed - record not found in initial fetch');
-        // We don't throw here to avoid user confusion if it's just a laggy read, 
-        // but we log it for admin investigation.
-      }
-
-      // Update local state immediately
       setCheckedIn(true);
       setCheckInTime(now);
       setCanCheckIn(false);
       setCanCheckOut(true);
       
-      // Update stats locally first for instant feedback
       setStats(prev => ({
         ...prev,
         todayStatus: isLate ? 'Checked In (Late)' : 'Checked In',
         lastCheckIn: now,
       }));
-
-      // Background reload stats and recent activity
-      loadStudentData().catch(e => console.error('Background load failed:', e));
 
       if (isLate) {
         uniqueToast.warning('Checked in (Late). Recorded after 9:00 AM.', {
@@ -805,7 +705,6 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
             autoClose: 4000,
             position: 'top-center',
           });
-          // Refresh state to sync with database
           checkTodayAttendance();
       } else {
         uniqueToast.error(`Failed to check in: ${errorCode ? `${errorCode} - ` : ''}${errorMessage}`, {
@@ -850,45 +749,14 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
   useEffect(() => {
     console.log('StudentDashboard useEffect - user:', !!user, user?.uid);
     if (user) {
-      loadStudentData();
       checkTodayAttendance();
     }
-  }, [user]);
+  }, [user, checkTodayAttendance]);
 
-  // Calculate total school days (Mon-Fri) in current month
-  const getTotalSchoolDaysInMonth = () => {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth();
-    let total = 0;
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    for (let day = 1; day <= daysInMonth; day++) {
-      const d = new Date(year, month, day);
-      const weekday = d.getDay();
-      if (weekday !== 0 && weekday !== 6) total++; // Exclude weekends
-    }
-    return total;
-  };
-
-  // Fetch attendance stats from Firebase for selected range
-  const fetchAttendanceStats = useCallback(async () => {
-    if (!user) return;
-    const dailyAttendanceService = DailyAttendanceService.getInstance();
-    let daysToCheck = 30;
-    await dailyAttendanceService.getAttendanceStats(user.uid, daysToCheck);
-  }, [user]);
-
-  useEffect(() => {
-    fetchAttendanceStats();
-  }, [fetchAttendanceStats]);
-
-  // Update stats after check-in
   const handleCheckIn = async () => {
     await handleCheckInInternal(false);
-    await fetchAttendanceStats();
   };
 
-  // Optionally update on check-out if needed
   const handleCheckOut = async () => {
     if (!user || !canCheckOut) return;
     setAttendanceLoading(true);
@@ -912,8 +780,6 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
       setCanCheckIn(false);
       setCanCheckOut(false);
       setStats(prev => ({ ...prev, todayStatus: 'Completed for Today' }));
-      await loadStudentData();
-      await fetchAttendanceStats(); // update stats after check-out
       uniqueToast.success('Checked out successfully! See you tomorrow.', { autoClose: 3000, position: 'top-center' });
     } catch (error) {
       console.error('Check-out error:', error);
@@ -936,7 +802,6 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
     }
   };
 
-  // Debug current state
   useEffect(() => {
     console.log('Current state:', {
       checkedIn,
@@ -946,7 +811,6 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
       todayStatus: stats.todayStatus
     });
   }, [checkedIn, canCheckIn, canCheckOut, checkInTime, stats.todayStatus]);
-
 
   return (
     <DashboardContainer>
