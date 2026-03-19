@@ -96,25 +96,35 @@ const CustomTooltip = ({ active, payload, label }: ChartTooltipProps) => {
 const Page = styled.div`
   display: flex;
   flex-direction: column;
-  gap: ${theme.spacing.md};
+  gap: ${theme.spacing.xl};
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
-  padding: 0;
+  padding: ${theme.spacing.lg};
   
   @media (max-width: ${theme.breakpoints.tablet}) {
-    gap: ${theme.spacing.sm};
+    gap: ${theme.spacing.lg};
+    padding: ${theme.spacing.md};
+  }
+
+  @media (max-width: ${theme.breakpoints.mobile}) {
+    padding: ${theme.spacing.sm};
   }
 `;
 
 const FilterRow = styled.div`
   display: flex;
-  gap: ${theme.spacing.md};
+  gap: ${theme.spacing.lg};
   flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
+  align-items: flex-end;
+  background: ${theme.colors.white};
+  padding: ${theme.spacing.lg};
+  border-radius: ${theme.borderRadius.xl};
+  border: 1px solid ${theme.colors.gray200};
+  box-shadow: ${theme.shadows.sm};
 
   @media (max-width: ${theme.breakpoints.tablet}) {
+    padding: ${theme.spacing.md};
     gap: ${theme.spacing.md};
   }
 `;
@@ -124,7 +134,7 @@ const FilterRow = styled.div`
 const StatRow = styled.div`
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: ${theme.spacing.md};
+  gap: ${theme.spacing.lg};
 
   @media (max-width: ${theme.breakpoints.mobile}) {
     grid-template-columns: 1fr 1fr;
