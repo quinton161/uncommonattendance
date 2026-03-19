@@ -207,7 +207,7 @@ export function StudentDashboard({ onNavigateToProfile }: StudentDashboardProps)
         timestamp: Date.now(),
       };
 
-      const attendance = await attendanceService.checkIn(user.uid, user.displayName, locationData);
+      const attendance = await attendanceService.checkIn(user.uid, user.displayName, undefined, locationData);
       setTodayAttendance(attendance);
       await loadAttendanceHistory();
     } catch (err: any) {

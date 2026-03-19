@@ -40,9 +40,22 @@ export class AttendanceService {
   async checkIn(
     studentId: string,
     studentName: string,
+    qrCode?: string,
     location?: LocationData
   ): Promise<AttendanceRecord> {
-    console.log('AttendanceService.checkIn called with:', { studentId, studentName, location });
+    console.log('AttendanceService.checkIn called with:', { studentId, studentName, qrCode, location });
+    
+    // Validate QR Code if provided (already validated in UI, but good for service integrity)
+    if (qrCode) {
+      const { qrCodeService } = await import('./qrCodeService');
+      const isValid = await qrCodeService.validateCode(qrCode);
+      if (!isValid) {
+        throw new Error('Invalid or expired check-in code');
+      }
+    } else {
+      // In a strict system, we might want to require QR code here
+      // throw new Error('Check-in code is required');
+    }
     
     // Validate inputs
     if (!studentId || typeof studentId !== 'string') {
