@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { FiAlertTriangle, FiUser } from 'react-icons/fi';
 import styled from 'styled-components';
 import { theme } from '../../styles/theme';
 import { Button } from '../Common/Button';
@@ -164,7 +165,7 @@ export const DeleteUserModal: React.FC<DeleteUserModalProps> = ({ user, onClose,
       <ModalContent>
         <ModalHeader>
           <IconContainer>
-            <PersonIcon size={24} />
+            <FiUser size={24} />
           </IconContainer>
           <div>
             <ModalTitle>Delete User</ModalTitle>
@@ -198,7 +199,8 @@ export const DeleteUserModal: React.FC<DeleteUserModalProps> = ({ user, onClose,
 
         <WarningBox>
           <p>
-            ⚠️ This will mark the user as deleted and remove their access to the system. 
+            <FiAlertTriangle style={{ color: theme.colors.error, marginRight: '8px' }} />
+            This will mark the user as deleted and remove their access to the system. 
             Their attendance records will be preserved for historical purposes.
           </p>
         </WarningBox>

@@ -15,8 +15,6 @@ import { auth, db } from '../services/firebase';
 import { User, AuthContextType } from '../types';
 import { uniqueToast } from '../utils/toastUtils';
 import DataService from '../services/DataService';
-import { callService } from '../services/callService';
-import { presenceService } from '../services/presenceService';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -78,8 +76,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             
             // Initialize call and presence services for logged-in user
             const displayName = firebaseUser.displayName || userData.displayName || 'User';
-            callService.initialize(firebaseUser.uid, displayName);
-            presenceService.initialize(firebaseUser.uid, displayName);
           } else {
             console.warn('🔐 AuthContext: User document not found in Firestore after retries');
             
@@ -305,10 +301,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const logout = async () => {
     try {
-      // Clean up call and presence services before logout
-      callService.cleanup();
-      await presenceService.cleanup();
-      
       await signOut(auth);
       uniqueToast.info('Successfully logged out. See you next time!', { autoClose: 3000 });
     } catch (error) {

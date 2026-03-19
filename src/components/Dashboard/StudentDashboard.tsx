@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import styled from 'styled-components';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../Common/Button';
 import { theme } from '../../styles/theme';
@@ -13,24 +14,39 @@ import DataService from '../../services/DataService';
 import { AttendanceService } from '../../services/attendanceService';
 import { DailyAttendanceService, DailyAttendanceStats } from '../../services/dailyAttendanceService';
 import { TimeService } from '../../services/timeService';
-import { MyAttendancePage } from '../Student/MyAttendancePage';
 import { ProfileUpload } from '../Profile/ProfileUpload';
-import { ChatWindow } from '../Common/ChatWindow';
-import { chatService, Conversation } from '../../services/chatService';
-import { notificationService } from '../../services/notificationService';
 import { UncommonLogo } from '../Common/UncommonLogo';
 import StarField from '../Common/StarField';
 import TimeSyncStatus from '../Common/TimeSyncStatus';
 import { uniqueToast } from '../../utils/toastUtils';
 import { StudentAttendanceAnalytics } from '../Analytics/StudentAttendanceAnalytics';
-import {
-  DashboardIcon,
-  CheckCircleIcon,
-  LogoutIcon,
-  LoginIcon,
-  BarChartIcon,
-  PersonIcon,
-} from '../Common/Icons';
+import { qrCodeService, DailyQRCode } from '../../services/qrCodeService';
+import { 
+  FiLogOut, 
+  FiUser, 
+  FiCalendar, 
+  FiBarChart2, 
+  FiMessageSquare, 
+  FiCheckCircle, 
+  FiXCircle, 
+  FiAward, 
+  FiTrendingUp,
+  FiClock,
+  FiStar,
+  FiTarget,
+  FiMenu,
+  FiBarChart,
+  FiLogIn,
+  FiUsers,
+  FiActivity,
+  FiInfo,
+  FiChevronLeft,
+  FiTrendingDown,
+  FiCamera,
+  FiX
+} from 'react-icons/fi';
+import { GiTrophy } from 'react-icons/gi';
+import { QRCodeSVG } from 'qrcode.react';
 
 const DashboardContainer = styled.div`
   display: flex;
@@ -340,7 +356,6 @@ const AttendanceCard = styled(StatCard)`
   }
 `;
 
-
 const AttendanceControls = styled.div`
   display: flex;
   align-items: center;
@@ -542,10 +557,9 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
     lastAttendanceDate: null,
   });
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
-  const [selectedAdmin, setSelectedAdmin] = useState<any>(null);
-  const [admins, setAdmins] = useState<any[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [studentConversations, setStudentConversations] = useState<Conversation[]>([]);
+  const [showScanner, setShowScanner] = useState(false);
+  const [qrCodeInput, setQrCodeInput] = useState('');
+  const [isVerifyingQR, setIsVerifyingQR] = useState(false);
   const dataService = DataService.getInstance();
   const attendanceService = AttendanceService.getInstance();
   const dailyAttendanceService = DailyAttendanceService.getInstance();
@@ -644,13 +658,6 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
         studentName: user.displayName,
       })));
 
-      // Load all staff (admins and instructors) for chat
-      const allStaff = await chatService.getAllStaff();
-      setAdmins(allStaff);
-      if (allStaff.length > 0 && !selectedAdmin) {
-        setSelectedAdmin(allStaff[0]);
-      }
-
     } catch (error) {
       console.error('Error loading student data:', error);
       // Suppress user-facing toast for dashboard load failures so UI isn't noisy.
@@ -687,6 +694,20 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
 
     setAttendanceLoading(true);
     try {
+      // Validate QR Code first
+      if (!qrCodeInput) {
+        uniqueToast.error('Please enter the daily check-in code');
+        return;
+      }
+
+      setIsVerifyingQR(true);
+      const isValid = await qrCodeService.validateCode(qrCodeInput);
+      if (!isValid) {
+        uniqueToast.error('Invalid check-in code. Please ask your instructor for the current code.');
+        setIsVerifyingQR(false);
+        return;
+      }
+
       // Get minimal network info (non-blocking)
       let location: any = { ip: '0.0.0.0', timestamp: Date.now() };
       try {
@@ -719,7 +740,7 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
       
       while (retries <= maxRetries) {
         try {
-          attendanceRecord = await attendanceService.checkIn(user.uid, user.displayName || 'Student', location);
+          attendanceRecord = await attendanceService.checkIn(user.uid, user.displayName || 'Student', qrCodeInput, location);
           break; // Success
         } catch (err: any) {
           if (err.message === 'Already checked in today' || retries === maxRetries) throw err;
@@ -819,198 +840,11 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
 
   const renderCurrentPage = () => {
     switch (activeNav) {
-      case 'attendance':
-        return (
-          <div style={{ padding: theme.spacing.lg }}>
-            <MyAttendancePage onBack={() => setActiveNav('dashboard')} isEmbedded={true} />
-          </div>
-        );
       case 'analytics':
         return (
           <div style={{ padding: theme.spacing.lg }}>
             <h2 style={{ marginBottom: theme.spacing.lg, color: theme.colors.textPrimary }}>My Analytics</h2>
             <StudentAttendanceAnalytics studentId={user?.uid || ''} />
-          </div>
-        );
-      case 'chat':
-        return (
-          <div style={{ padding: theme.spacing.lg }}>
-            <h2 style={{ marginBottom: theme.spacing.lg, color: theme.colors.textPrimary }}>Messages</h2>
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: '320px 1fr', 
-              gap: theme.spacing.lg, 
-              height: 'calc(100vh - 200px)',
-              overflow: 'hidden'
-            }}>
-              <div style={{ 
-                display: 'flex', 
-                flexDirection: 'column', 
-                gap: theme.spacing.md,
-                height: '100%',
-                overflow: 'hidden'
-              }}>
-                <Card style={{ 
-                  flex: 1, 
-                  padding: theme.spacing.sm,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  overflow: 'hidden'
-                }}>
-                  <div style={{ 
-                    flex: 1,
-                    overflowY: 'auto',
-                    paddingRight: '4px'
-                  }}>
-                    <AttendanceList>
-                      {admins.map((admin) => {
-                        const convId = user?.uid ? `${user.uid}_${admin.uid}` : '';
-                        const conv = convId ? studentConversations.find(c => c.id === convId) : undefined;
-                        const unread = conv?.unreadCount || 0;
-                        
-                        // Parse date for comparison
-                        const parseDate = (d: any) => {
-                          if (!d) return null;
-                          if (d.toDate) return d.toDate();
-                          return new Date(d);
-                        };
-
-                        const time = parseDate(conv?.lastMessageTime);
-                        const previewText = conv?.lastMessage || `Chat with ${admin.displayName || 'Admin'}`;
-
-                        return (
-                        <AttendanceItem 
-                          key={admin.uid}
-                          onClick={async () => {
-                            setSelectedAdmin(admin);
-                            if (convId && unread > 0) {
-                              try {
-                                await chatService.markAsRead(convId);
-                              } catch (error) {
-                                console.error('Failed to mark as read:', error);
-                              }
-                            }
-                          }}
-                          style={{ 
-                            cursor: 'pointer', 
-                            transition: 'all 0.2s',
-                            background: selectedAdmin?.uid === admin.uid ? 'rgba(6, 71, 161, 0.1)' : 'transparent',
-                            borderLeft: selectedAdmin?.uid === admin.uid ? `4px solid ${theme.colors.primary}` : '4px solid transparent',
-                            padding: theme.spacing.md,
-                            // Ensure newest appear top if we sort later
-                            order: time ? -time.getTime() : 0 
-                          }}
-                        >
-                          <UserAvatar>
-                            {conv?.isGroup ? (
-                              conv.groupPhotoUrl ? (
-                                <img 
-                                  src={conv.groupPhotoUrl} 
-                                  alt="" 
-                                  style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} 
-                                />
-                              ) : (
-                                <div style={{ background: theme.colors.secondary, width: '100%', height: '100%', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>👥</div>
-                              )
-                            ) : admin.photoUrl ? (
-                              <img 
-                                src={admin.photoUrl} 
-                                alt="" 
-                                style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} 
-                              />
-                            ) : (
-                              getInitials(admin.displayName || 'Admin')
-                            )}
-                          </UserAvatar>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontWeight: theme.fontWeights.semibold, color: theme.colors.textPrimary, fontSize: theme.fontSizes.sm, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              {conv?.isGroup && <span>👥</span>}
-                              {conv?.isGroup ? conv.groupName : (admin.displayName || 'Admin')}
-                            </div>
-                            <div style={{ 
-                              fontSize: theme.fontSizes.xs, 
-                              color: theme.colors.textSecondary,
-                              whiteSpace: 'nowrap',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis'
-                            }}>
-                              {previewText}
-                            </div>
-                          </div>
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
-                            <div style={{ fontSize: '10px', color: theme.colors.textLight }}>
-                              {time ? time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              {conv && conv.lastSenderId === user?.uid && conv.lastMessageTime && (
-                                <span style={{ color: conv.unreadCount === 0 ? '#34B7F1' : 'rgba(0, 0, 0, 0.45)', fontSize: '14px', lineHeight: 1, display: 'flex', alignItems: 'center' }}>
-                                  {conv.unreadCount === 0 ? (
-                                    <svg viewBox="0 0 16 15" width="16" height="15">
-                                      <path fill="currentColor" d="M15.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L8.666 9.879a.32.32 0 0 1-.484.033l-.358-.325a.319.329 0 0 0-.484.032l-.378.483a.418.418 0 0 0 .036.541l1.32 1.266a.32.32 0 0 0 .484-.032l6.272-8.048a.366.365 0 0 0-.063-.512zm-4.1 0l-.478-.372a.365.365 0 0 0-.51.063L5.066 9.879a.32.32 0 0 1-.484.033L1.091 6.839a.365.365 0 0 0-.51.063l-.478.371a.365.365 0 0 0 .063.51l4.737 3.699a.32.32 0 0 0 .484-.033l6.272-8.048a.366.365 0 0 0-.063-.512z"></path>
-                                    </svg>
-                                  ) : (
-                                    <svg viewBox="0 0 16 15" width="16" height="15">
-                                      <path fill="currentColor" d="M10.91 3.316l-.478-.372a.365.365 0 0 0-.51.063L4.566 9.879a.32.32 0 0 1-.484.033L.591 6.839a.365.365 0 0 0-.51.063l-.478.371a.365.365 0 0 0 .063.51l4.737 3.699a.32.32 0 0 0 .484-.033l6.272-8.048a.366.365 0 0 0-.063-.512z"></path>
-                                    </svg>
-                                  )}
-                                </span>
-                              )}
-                              {unread > 0 && (
-                                <Badge style={{ 
-                                  background: theme.colors.success, 
-                                  color: 'white',
-                                  borderRadius: '10px',
-                                  padding: '2px 6px',
-                                  fontSize: '10px',
-                                  fontWeight: 'bold',
-                                  minWidth: '18px',
-                                  height: '18px',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center'
-                                }}>
-                                  {unread}
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
-                        </AttendanceItem>
-                        );
-                      })}
-                    </AttendanceList>
-                  </div>
-                </Card>
-              </div>
-
-              <div style={{ 
-                display: 'flex', 
-                flexDirection: 'column', 
-                height: '100%',
-                overflow: 'hidden'
-              }}>
-                <h3 style={{ color: theme.colors.textPrimary, margin: `0 0 ${theme.spacing.md} 0` }}>
-                  {selectedAdmin ? `Chat with ${selectedAdmin.displayName}` : 'Select an Admin'}
-                </h3>
-                <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', height: '100%' }}>
-                      {selectedAdmin && (
-                    <ChatWindow 
-                      studentId={user?.uid || ''} 
-                      studentName={user?.displayName || 'Student'} 
-                      currentUserUid={user?.uid || ''}
-                      currentUserName={user?.displayName || 'Student'}
-                      studentPhotoUrl={user?.photoUrl}
-                      currentUserPhotoUrl={user?.photoUrl}
-                      adminUid={selectedAdmin.uid}
-                      adminPhotoUrl={selectedAdmin.photoUrl}
-                      adminName={selectedAdmin.displayName}
-                      isGroup={selectedAdmin.isGroup}
-                      groupId={selectedAdmin.id}
-                      groupName={selectedAdmin.groupName}
-                    />
-                  )}
-                </div>
-              </div>
-            </div>
           </div>
         );
       case 'profile':
@@ -1024,70 +858,13 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
     }
   };
 
-
   useEffect(() => {
     console.log('StudentDashboard useEffect - user:', !!user, user?.uid);
     if (user) {
-      // Request notification permission
-      notificationService.requestPermission();
-
       loadStudentData();
       checkTodayAttendance();
-
-      // Subscribe to this student's specific conversations
-      const unsubscribe = chatService.subscribeToConversationsByStudent(user.uid, async (conversations) => {
-        setStudentConversations(conversations);
-        // Mark selected conversation as read if it has unread messages
-        if (selectedAdmin) {
-          const currentConv = conversations.find(c => c.id === `${user.uid}_${selectedAdmin.uid}`);
-          if (currentConv && currentConv.unreadCount && currentConv.unreadCount > 0) {
-            await chatService.markAsRead(currentConv.id!);
-          }
-        }
-
-        // Find if any conversation has a new unread message where the student is NOT the sender
-        const prevTotal = unreadCount;
-        const newTotal = conversations.reduce((sum, conv) => sum + (conv.unreadCount || 0), 0);
-
-        if (newTotal > prevTotal) {
-          // Find the specific conversation that got a new message
-          const newMsgConv = conversations.find(c => {
-            const prevConv = admins.find(a => `${user.uid}_${a.uid}` === c.id);
-            
-            // 1. Unread count must have increased
-            const countIncreased = (c.unreadCount || 0) > (prevConv?.unreadCount || 0);
-            // 2. We are NOT the sender
-            const notMe = c.lastSenderId !== user.uid;
-            // 3. This admin is NOT currently selected
-            const notSelected = selectedAdmin?.uid !== c.adminId;
-
-            return countIncreased && notMe && notSelected;
-          });
-
-          if (newMsgConv) {
-            // Play notification sound
-            const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3');
-            audio.play().catch(e => console.log('Audio play failed:', e));
-
-            // Show toast notification
-            uniqueToast.info(`New message from ${newMsgConv.adminName || 'Admin'}: ${newMsgConv.lastMessage}`, {
-              position: 'top-right',
-              autoClose: 5000
-            });
-
-            // Send system push notification
-            notificationService.sendNotification(
-              `New Message from ${newMsgConv.adminName || 'Admin'}`,
-              newMsgConv.lastMessage
-            );
-          }
-        }
-        setUnreadCount(newTotal);
-      });
-
-      return () => unsubscribe();
     }
-  }, [user, loadStudentData, checkTodayAttendance]);
+  }, [user]);
 
   // Calculate total school days (Mon-Fri) in current month
   const getTotalSchoolDaysInMonth = () => {
@@ -1208,49 +985,40 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
       <Sidebar $isOpen={mobileMenuOpen}>
         <StarField density="low" speed="slow" />
         <Logo>
-          <img src="/shapes.svg" alt="Logo" style={{ width: 24, height: 24, marginRight: theme.spacing.sm }} />
-          Student Hub
+          <UncommonLogo size="sm" showSubtitle={false} />
         </Logo>
-
         <SidebarContent>
           <NavItem active={activeNav === 'dashboard'} onClick={() => handleNavClick('dashboard')}>
-            <DashboardIcon size={20} />
+            <FiBarChart2 size={20} />
             Dashboard
           </NavItem>
-          <NavItem active={activeNav === 'attendance'} onClick={() => handleNavClick('attendance')}>
-            <CheckCircleIcon size={20} />
-            Attendance
-          </NavItem>
-        <NavItem active={activeNav === 'analytics'} onClick={() => handleNavClick('analytics')}>
-          <BarChartIcon size={20} />
-          Analytics
-        </NavItem>
-          <NavItem 
-            active={activeNav === 'chat'} 
-            onClick={async () => {
-              handleNavClick('chat');
-            }}
-          >
-            <PersonIcon size={20} />
-            Chat with Admin
-            {unreadCount > 0 && <Badge style={{ marginLeft: 'auto' }}>{unreadCount}</Badge>}
+          <NavItem active={activeNav === 'analytics'} onClick={() => handleNavClick('analytics')}>
+            <FiBarChart size={20} />
+            My Analytics
           </NavItem>
           <NavItem active={activeNav === 'profile'} onClick={() => handleNavClick('profile')}>
-            <PersonIcon size={20} />
-            Profile
+            <FiUser size={20} />
+            My Profile
           </NavItem>
         </SidebarContent>
-
         <SidebarFooter>
           <NavItem onClick={logout}>
-            <LogoutIcon size={20} />
+            <FiLogOut size={20} />
             Logout
           </NavItem>
         </SidebarFooter>
       </Sidebar>
 
       <MainContent style={{ padding: 0 }}>
-        {renderCurrentPage() || (
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeNav}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.18 }}
+          >
+            {renderCurrentPage() || (
           <div style={{ padding: 0 }}>
           <Header style={{ padding: theme.spacing.lg }}>
             <HeaderTitle>
@@ -1263,7 +1031,7 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
                 }}
               >
                 <UncommonLogo size="lg" showSubtitle={false} />
-                <span>Dashboard</span>
+                <span>Student Dashboard</span>
               </h1>
               <p>Welcome back, {user?.displayName}!</p>
             </HeaderTitle>
@@ -1285,37 +1053,10 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
             </HeaderActions>
           </Header>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing.md, marginBottom: theme.spacing.lg, padding: theme.spacing.lg }}>
-            <span style={{ fontWeight: 500 }}>Attendance Stats for:</span>
-            <button
-              style={{ padding: '6px 12px', borderRadius: 6, border: 'none', background: statsRange === 'week' ? theme.colors.primary : theme.colors.gray200, color: statsRange === 'week' ? '#fff' : theme.colors.textPrimary, cursor: 'pointer' }}
-              onClick={() => setStatsRange('week')}
-            >
-              This Week
-            </button>
-            <button
-              style={{ padding: '6px 12px', borderRadius: 6, border: 'none', background: statsRange === 'month' ? theme.colors.primary : theme.colors.gray200, color: statsRange === 'month' ? '#fff' : theme.colors.textPrimary, cursor: 'pointer' }}
-              onClick={() => setStatsRange('month')}
-            >
-              This Month
-            </button>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <input
-                type="number"
-                min={1}
-                max={90}
-                value={statsRange === 'custom' ? customDays : ''}
-                onChange={e => { setCustomDays(Number(e.target.value)); setStatsRange('custom'); }}
-                style={{ width: 56, padding: 4, borderRadius: 4, border: '1px solid #ccc' }}
-                placeholder="N"
-              />
-              days
-            </label>
-          </div>
           <StatsGrid style={{ padding: theme.spacing.lg }}>
             <AttendanceCard variant="primary">
               <StatIcon>
-                <CheckCircleIcon size={32} />
+                <FiCheckCircle size={32} />
               </StatIcon>
               <StatLabel>Daily Attendance</StatLabel>
               <StatusIndicator isCheckedIn={checkedIn}>
@@ -1337,41 +1078,82 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
                   </span>
                 )}
               </StatusIndicator>
-              <AttendanceControls>
-                {checkedIn && canCheckOut ? (
-                  <Button
-                    variant="outline"
+              
+              {!checkedIn && showScanner && (
+                <div style={{ marginTop: theme.spacing.md, width: '100%' }}>
+                  <input
+                    type="text"
+                    placeholder="Enter Daily Code"
+                    value={qrCodeInput}
+                    onChange={(e) => setQrCodeInput(e.target.value.toUpperCase())}
+                    style={{
+                      width: '100%',
+                      padding: theme.spacing.sm,
+                      borderRadius: theme.borderRadius.md,
+                      border: `1px solid ${theme.colors.gray300}`,
+                      marginBottom: theme.spacing.sm,
+                      textAlign: 'center',
+                      fontSize: theme.fontSizes.lg,
+                      letterSpacing: '4px'
+                    }}
+                  />
+                  <div style={{ display: 'flex', gap: theme.spacing.sm }}>
+                    <Button 
+                      variant="primary" 
+                      onClick={handleCheckIn}
+                      disabled={attendanceLoading || isVerifyingQR || !qrCodeInput}
+                      style={{ flex: 1 }}
+                    >
+                      Verify & Check In
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => { setShowScanner(false); setQrCodeInput(''); }}
+                      style={{ padding: theme.spacing.sm }}
+                    >
+                      <FiX size={20} />
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              <div style={{ marginTop: theme.spacing.lg }}>
+                {checkedIn ? (
+                  <Button 
+                    variant="outline" 
                     onClick={handleCheckOut}
                     disabled={attendanceLoading || !canCheckOut}
                   >
-                    <LogoutIcon size={16} style={{ marginRight: theme.spacing.xs }} />
+                    <FiLogOut size={16} style={{ marginRight: theme.spacing.xs }} />
                     {attendanceLoading ? 'Checking Out...' : 'Check Out'}
                   </Button>
                 ) : canCheckIn ? (
-                  <Button
-                    variant="primary"
-                    onClick={handleCheckIn}
-                    disabled={attendanceLoading || !canCheckIn}
-                  >
-                    <LoginIcon size={16} style={{ marginRight: theme.spacing.xs }} />
-                    {attendanceLoading ? 'Checking In...' : 'Check In'}
-                  </Button>
+                  !showScanner ? (
+                    <Button 
+                      variant="primary" 
+                      onClick={() => setShowScanner(true)}
+                      disabled={attendanceLoading}
+                    >
+                      <FiCamera size={16} style={{ marginRight: theme.spacing.xs }} />
+                      Check In with Code
+                    </Button>
+                  ) : null
                 ) : (
                   <Button variant="secondary" disabled>
-                    <CheckCircleIcon size={16} style={{ marginRight: theme.spacing.xs }} />
+                    <FiCheckCircle size={16} style={{ marginRight: theme.spacing.xs }} />
                     {stats.todayStatus}
                   </Button>
                 )}
-              </AttendanceControls>
-              <StatValue>
-                {daysPresent}/{totalSchoolDays}
-              </StatValue>
-              <StatLabel>Days Present</StatLabel>
-              <StatChange positive>
-                Attendance Rate: {attendanceRate}%
-              </StatChange>
+              </div>
             </AttendanceCard>
           </StatsGrid>
+
+          {false && (<><div style={{ padding: theme.spacing.lg }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing.md, marginBottom: theme.spacing.lg }}>
+              <span style={{ fontWeight: 500 }}>Attendance Rate: {attendanceRate}%</span>
+            </div>
+          </div>
+
 
           {/* Achievement Badges Section */}
           <Card style={{ marginBottom: theme.spacing.lg, padding: theme.spacing.lg }}>
@@ -1534,7 +1316,7 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
                   }}
                 >
                   Last attended:{' '}
-                  {new Date(dailyStats.lastAttendanceDate).toLocaleDateString('en-US', {
+                  {new Date(dailyStats.lastAttendanceDate as string).toLocaleDateString('en-US', {
                     weekday: 'long',
                     month: 'long',
                     day: 'numeric',
@@ -1600,10 +1382,12 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
                 )}
               </ActivityList>
             </Card>
-          </ContentGrid>
+          </ContentGrid></>)}
 
         </div>
-      )}
+            )}
+          </motion.div>
+        </AnimatePresence>
       </MainContent>
     </DashboardContainer>
   );

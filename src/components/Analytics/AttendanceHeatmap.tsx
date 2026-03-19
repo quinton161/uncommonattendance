@@ -30,15 +30,8 @@ const TitleRow = styled.div`
 
 const Grid = styled.div`
   display: grid;
-  grid-template-columns: repeat(14, 1fr);
-  gap: 6px;
-
-  @media (max-width: ${theme.breakpoints.tablet}) {
-    grid-template-columns: repeat(10, 1fr);
-  }
-  @media (max-width: ${theme.breakpoints.mobile}) {
-    grid-template-columns: repeat(7, 1fr);
-  }
+  grid-template-columns: repeat(auto-fit, minmax(14px, 1fr));
+  gap: clamp(4px, 0.7vw, 6px);
 `;
 
 const Cell = styled.div<{ $v: number }>`

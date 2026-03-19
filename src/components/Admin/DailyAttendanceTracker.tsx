@@ -7,19 +7,20 @@ import { AttendanceService } from '../../services/attendanceService';
 import DataService from '../../services/DataService';
 import { TimeService } from '../../services/timeService';
 import { uniqueToast } from '../../utils/toastUtils';
-import {
-  CheckCircleIcon,
-  CancelIcon,
-  TodayIcon,
-  CalendarIcon,
-  ArrowBackIcon,
-  ArrowForwardIcon,
-  PersonIcon,
-  LoginIcon,
-  LogoutIcon,
-  LocationOnIcon,
-  TrendingUpIcon
-} from '../Common/Icons';
+import { 
+  FiChevronLeft,
+  FiCalendar,
+  FiUser,
+  FiCheckCircle,
+  FiClock,
+  FiXCircle,
+  FiTrendingUp,
+  FiLogIn,
+  FiLogOut,
+  FiMapPin,
+  FiSearch,
+  FiDownload
+} from 'react-icons/fi';
 
 const PageContainer = styled.div<{ isEmbedded?: boolean }>`
   padding: ${props => props.isEmbedded ? '0' : theme.spacing.xl};
@@ -242,7 +243,7 @@ const AttendanceTable = styled.div`
 
 const TableHeader = styled.div`
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
+  grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr;
   gap: ${theme.spacing.md};
   padding: ${theme.spacing.md} ${theme.spacing.lg};
   background: ${theme.colors.gray100};
@@ -259,7 +260,7 @@ const TableHeader = styled.div`
 
 const TableRow = styled.div<{ isPresent?: boolean }>`
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
+  grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr;
   gap: ${theme.spacing.md};
   padding: ${theme.spacing.lg};
   border-bottom: 1px solid ${theme.colors.gray100};
@@ -422,6 +423,7 @@ interface StudentAttendanceData {
   checkInTime?: Date;
   checkOutTime?: Date;
   location?: string;
+  deviceIp?: string;
 }
 
 export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({ onBack, isEmbedded = true }) => {
@@ -505,6 +507,7 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({ 
             checkInTime: record.checkInTime,
             checkOutTime: record.checkOutTime,
             location: record.location?.address || 'Unknown',
+            deviceIp: record.location?.ip || '-',
           };
         } else {
           return {
@@ -638,10 +641,10 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({ 
         <ControlsSection>
           <DateNavigation>
             <NavButton onClick={() => navigateDate('prev')}>
-              <ArrowBackIcon size={16} />
+              <FiChevronLeft size={16} />
             </NavButton>
             <DateDisplay>
-              <TodayIcon size={20} style={{ marginRight: theme.spacing.xs }} />
+              <FiCalendar size={20} style={{ marginRight: theme.spacing.xs }} />
               {formatDate(selectedDate)}
               {isWeekend(selectedDate) && (
                 <span style={{ 
@@ -654,7 +657,7 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({ 
               )}
             </DateDisplay>
             <NavButton onClick={() => navigateDate('next')}>
-              <ArrowForwardIcon size={16} />
+              <FiChevronLeft size={16} style={{ transform: 'rotate(180deg)' }} />
             </NavButton>
           </DateNavigation>
           
@@ -669,25 +672,25 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({ 
 
         <StatsGrid>
           <StatCard variant="total">
-            <StatIcon><PersonIcon size={24} /></StatIcon>
+            <StatIcon><FiUser size={24} /></StatIcon>
             <StatValue>{stats.total}</StatValue>
             <StatLabel>Total Students</StatLabel>
           </StatCard>
           
           <StatCard variant="present">
-            <StatIcon><CheckCircleIcon size={24} /></StatIcon>
+            <StatIcon><FiCheckCircle size={24} /></StatIcon>
             <StatValue>{stats.present}</StatValue>
             <StatLabel>Present (On Time)</StatLabel>
           </StatCard>
           
           <StatCard variant="late">
-            <StatIcon><TrendingUpIcon size={24} /></StatIcon>
+            <StatIcon><FiClock size={24} /></StatIcon>
             <StatValue>{stats.late}</StatValue>
             <StatLabel>Present (Late)</StatLabel>
           </StatCard>
           
           <StatCard variant="absent">
-            <StatIcon><CancelIcon size={24} /></StatIcon>
+            <StatIcon><FiXCircle size={24} /></StatIcon>
             <StatValue>{stats.absent}</StatValue>
             <StatLabel>Absent</StatLabel>
           </StatCard>
@@ -696,14 +699,14 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({ 
         <AttendanceSection>
           <SectionHeader>
             <h3>
-              <CalendarIcon size={20} />
+              <FiCalendar size={20} />
               Student Attendance Details
             </h3>
           </SectionHeader>
           
           {attendanceData.length === 0 ? (
             <EmptyState>
-              <PersonIcon size={64} />
+              <FiUser size={64} />
               <h3>No Students Found</h3>
               <p>No student records available for this date.</p>
             </EmptyState>
@@ -714,6 +717,7 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({ 
                 <div>Status</div>
                 <div>Check In</div>
                 <div>Check Out</div>
+                <div>PC / IP</div>
                 <div>Location</div>
               </TableHeader>
               
@@ -732,24 +736,28 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({ 
                     </StudentInfo>
                     
                     <StatusBadge status={student.status}>
-                      {student.status === 'present' && <CheckCircleIcon size={12} />}
-                      {student.status === 'late' && <TrendingUpIcon size={12} />}
-                      {student.status === 'absent' && <CancelIcon size={12} />}
+                      {student.status === 'present' && <FiCheckCircle size={12} />}
+                      {student.status === 'late' && <FiTrendingUp size={12} />}
+                      {student.status === 'absent' && <FiXCircle size={12} />}
                       {student.status.charAt(0).toUpperCase() + student.status.slice(1)}
                     </StatusBadge>
                     
                     <TimeDisplay>
-                      {student.checkInTime && <LoginIcon size={14} />}
+                      {student.checkInTime && <FiLogIn size={14} />}
                       <span className="time">{formatTime(student.checkInTime)}</span>
                     </TimeDisplay>
                     
                     <TimeDisplay>
-                      {student.checkOutTime && <LogoutIcon size={14} />}
+                      {student.checkOutTime && <FiLogOut size={14} />}
                       <span className="time">{formatTime(student.checkOutTime)}</span>
                     </TimeDisplay>
                     
                     <TimeDisplay>
-                      {student.location && <LocationOnIcon size={14} />}
+                      <span className="time" style={{ fontSize: '11px' }}>{student.deviceIp || '-'}</span>
+                    </TimeDisplay>
+                    
+                    <TimeDisplay>
+                      {student.location && <FiMapPin size={14} />}
                       <span className="time">{student.location || '-'}</span>
                     </TimeDisplay>
                   </TableRow>
@@ -767,20 +775,20 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({ 
                         </StudentDetails>
                       </StudentInfo>
                       <StatusBadge status={student.status}>
-                        {student.status === 'present' && <CheckCircleIcon size={12} />}
-                        {student.status === 'late' && <TrendingUpIcon size={12} />}
-                        {student.status === 'absent' && <CancelIcon size={12} />}
+                        {student.status === 'present' && <FiCheckCircle size={12} />}
+                        {student.status === 'late' && <FiTrendingUp size={12} />}
+                        {student.status === 'absent' && <FiXCircle size={12} />}
                         {student.status.charAt(0).toUpperCase() + student.status.slice(1)}
                       </StatusBadge>
                     </MobileCardHeader>
                     
                     <MobileCardBody>
                       <TimeDisplay>
-                        <LoginIcon size={14} />
+                        <FiLogIn size={14} />
                         <span>In: {formatTime(student.checkInTime)}</span>
                       </TimeDisplay>
                       <TimeDisplay>
-                        <LogoutIcon size={14} />
+                        <FiLogOut size={14} />
                         <span>Out: {formatTime(student.checkOutTime)}</span>
                       </TimeDisplay>
                     </MobileCardBody>

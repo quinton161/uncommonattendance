@@ -1,11 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import styled from 'styled-components';
 import { motion } from 'framer-motion';
-import { theme } from '../../styles/theme';
-import DataService from '../../services/DataService';
-import { attendanceAnalyticsService, AdminAnalytics, DateRange } from '../../services/attendanceAnalyticsService';
-import { DateRangeFilter } from './DateRangeFilter';
-import { AttendanceHeatmap } from './AttendanceHeatmap';
 import {
   ResponsiveContainer,
   LineChart,
@@ -22,178 +17,34 @@ import {
   Cell,
 } from 'recharts';
 
-// Enhanced color palette with gradients and modern colors
-const COLORS = {
-  present: '#22c55e', // Green to match student dashboard success
-  late: '#f59e0b',
-  absent: '#ef4444',
-  presentGradient: ['#22c55e', '#16a34a'],
-  lateGradient: ['#fbbf24', '#d97706'],
-  absentGradient: ['#f87171', '#dc2626'],
-};
-
-// Custom tooltip component for charts
-const CustomTooltipWrapper = styled.div`
-  background: ${theme.colors.white};
-  border: 1px solid ${theme.colors.gray200};
-  border-radius: ${theme.borderRadius.lg};
-  padding: ${theme.spacing.md};
-  box-shadow: ${theme.shadows.lg};
-`;
-
-const TooltipTitle = styled.div`
-  font-weight: ${theme.fontWeights.semibold};
-  color: ${theme.colors.textPrimary};
-  margin-bottom: ${theme.spacing.xs};
-  font-size: ${theme.fontSizes.sm};
-`;
-
-const TooltipItem = styled.div<{ $color: string }>`
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: ${theme.colors.textSecondary};
-  font-size: ${theme.fontSizes.xs};
-  
-  .dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: ${({ $color }) => $color};
-  }
-  
-  .value {
-    font-weight: ${theme.fontWeights.semibold};
-    color: ${theme.colors.textPrimary};
-    margin-left: auto;
-  }
-`;
-
-interface ChartTooltipProps {
-  active?: boolean;
-  payload?: Array<{ name: string; value: number; color: string }>;
-  label?: string;
-}
-
-const CustomTooltip = ({ active, payload, label }: ChartTooltipProps) => {
-  if (active && payload && payload.length) {
-    return (
-      <CustomTooltipWrapper>
-        <TooltipTitle>{label}</TooltipTitle>
-        {payload.map((entry, index) => (
-          <TooltipItem key={index} $color={entry.color}>
-            <span className="dot" />
-            <span>{entry.name}</span>
-            <span className="value">{entry.value}</span>
-          </TooltipItem>
-        ))}
-      </CustomTooltipWrapper>
-    );
-  }
-  return null;
-};
+import DataService from '../../services/DataService';
+import { attendanceAnalyticsService, AdminAnalytics, DateRange } from '../../services/attendanceAnalyticsService';
+import { theme } from '../../styles/theme';
+import { DateRangeFilter } from './DateRangeFilter';
+import { AttendanceHeatmap } from './AttendanceHeatmap';
 
 const Page = styled.div`
   display: flex;
   flex-direction: column;
-  gap: ${theme.spacing.xl};
-  width: 100%;
-  max-width: 100%;
-  box-sizing: border-box;
-  padding: ${theme.spacing.lg};
-  
-  @media (max-width: ${theme.breakpoints.tablet}) {
-    gap: ${theme.spacing.lg};
-    padding: ${theme.spacing.md};
-  }
-
-  @media (max-width: ${theme.breakpoints.mobile}) {
-    padding: ${theme.spacing.sm};
-  }
+  gap: ${theme.spacing.lg};
 `;
 
 const FilterRow = styled.div`
   display: flex;
   gap: ${theme.spacing.lg};
-  flex-wrap: wrap;
   align-items: flex-end;
-  background: ${theme.colors.white};
-  padding: ${theme.spacing.lg};
-  border-radius: ${theme.borderRadius.xl};
-  border: 1px solid ${theme.colors.gray200};
-  box-shadow: ${theme.shadows.sm};
-
-  @media (max-width: ${theme.breakpoints.tablet}) {
-    padding: ${theme.spacing.md};
-    gap: ${theme.spacing.md};
-  }
+  flex-wrap: wrap;
 `;
 
-// SummaryCard removed to fix ESLint unused variable warnings.
-
-const StatRow = styled.div`
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: ${theme.spacing.lg};
-
-  @media (max-width: ${theme.breakpoints.mobile}) {
-    grid-template-columns: 1fr 1fr;
-  }
-`;
-
-const Stat = styled.div`
-  background: linear-gradient(135deg, ${theme.colors.primary}10 0%, ${theme.colors.primaryLight}18 100%);
-  border: 1px solid ${theme.colors.primary}20;
+const Select = styled.select`
+  padding: ${theme.spacing.sm};
+  border: 1px solid ${theme.colors.gray300};
   border-radius: ${theme.borderRadius.lg};
-  padding: ${theme.spacing.md};
-  min-height: 86px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-
-  .v {
-    font-weight: ${theme.fontWeights.bold};
-    font-size: ${theme.fontSizes['2xl']};
-    color: ${theme.colors.textPrimary};
-    line-height: 1;
-  }
-  .l {
-    margin-top: ${theme.spacing.xs};
-    font-size: ${theme.fontSizes.sm};
-    color: ${theme.colors.textSecondary};
-    font-weight: ${theme.fontWeights.medium};
-  }
-
-  @media (max-width: ${theme.breakpoints.tablet}) {
-    min-height: 70px;
-    .v {
-      font-size: ${theme.fontSizes.xl};
-    }
-  }
-`;
-
-const ChartContainer = styled.div`
-  width: 100%;
-  height: 320px;
-  min-width: 0;
-  min-height: 0;
-  
-  @media (max-width: ${theme.breakpoints.tablet}) {
-    height: 280px;
-  }
-  
-  @media (max-width: ${theme.breakpoints.mobile}) {
-    height: 240px;
-  }
-`;
-
-const EmptyState = styled.div`
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: ${theme.colors.textSecondary};
+  background: ${theme.colors.white};
   font-size: ${theme.fontSizes.sm};
+  min-height: 40px;
+  color: ${theme.colors.textPrimary};
+  width: 260px;
 `;
 
 const Card = styled(motion.div)`
@@ -203,54 +54,58 @@ const Card = styled(motion.div)`
   box-shadow: ${theme.shadows.sm};
   padding: ${theme.spacing.lg};
   overflow: hidden;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  
-  &:hover {
-    box-shadow: ${theme.shadows.md};
-  }
-  
-  @media (max-width: ${theme.breakpoints.tablet}) {
-    padding: ${theme.spacing.md};
-    border-radius: ${theme.borderRadius.lg};
-  }
 `;
 
 const Title = styled.div`
   display: flex;
-  align-items: center;
+  align-items: baseline;
   justify-content: space-between;
-  margin-bottom: ${theme.spacing.lg};
+  margin-bottom: ${theme.spacing.md};
 
   h3 {
     margin: 0;
     font-size: ${theme.fontSizes.lg};
-    font-weight: ${theme.fontWeights.semibold};
     color: ${theme.colors.textPrimary};
+    font-weight: ${theme.fontWeights.semibold};
   }
+
   span {
     font-size: ${theme.fontSizes.xs};
     color: ${theme.colors.textSecondary};
   }
 `;
 
-const Select = styled.select`
-  padding: ${theme.spacing.sm} ${theme.spacing.md};
-  border: 1px solid ${theme.colors.gray300};
-  border-radius: ${theme.borderRadius.lg};
-  min-height: 44px;
-  background: ${theme.colors.white};
-  font-size: ${theme.fontSizes.sm};
-  color: ${theme.colors.textPrimary};
-  cursor: pointer;
-  transition: border-color 0.2s;
-  
-  &:focus {
-    outline: none;
-    border-color: ${theme.colors.primary};
+const StatRow = styled.div`
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: ${theme.spacing.md};
+
+  @media (max-width: ${theme.breakpoints.mobile}) {
+    grid-template-columns: 1fr 1fr;
   }
 `;
 
-const Grid = styled.div`
+const Stat = styled.div<{ $grad: string }>`
+  background: ${({ $grad }) => $grad};
+  border-radius: ${theme.borderRadius.lg};
+  border: 1px solid rgba(0,0,0,0.04);
+  padding: ${theme.spacing.md};
+  min-height: 86px;
+
+  .v {
+    font-weight: ${theme.fontWeights.bold};
+    font-size: ${theme.fontSizes.xl};
+    color: ${theme.colors.textPrimary};
+  }
+
+  .l {
+    margin-top: 4px;
+    font-size: ${theme.fontSizes.xs};
+    color: ${theme.colors.textSecondary};
+  }
+`;
+
+const TwoCol = styled.div`
   display: grid;
   grid-template-columns: 2fr 1fr;
   gap: ${theme.spacing.lg};
@@ -258,31 +113,23 @@ const Grid = styled.div`
   @media (max-width: ${theme.breakpoints.desktop}) {
     grid-template-columns: 1fr;
   }
-
-  @media (max-width: ${theme.breakpoints.tablet}) {
-    gap: ${theme.spacing.md};
-  }
 `;
 
 const Table = styled.div`
   display: flex;
   flex-direction: column;
-  gap: ${theme.spacing.sm};
+  gap: ${theme.spacing.xs};
 `;
 
 const Row = styled.div`
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 1fr 90px;
   gap: ${theme.spacing.md};
   align-items: center;
-  padding: ${theme.spacing.md};
+  padding: ${theme.spacing.sm} ${theme.spacing.md};
   border-radius: ${theme.borderRadius.lg};
-  background: ${theme.colors.backgroundSecondary};
-  transition: transform 0.2s;
-  
-  &:hover {
-    transform: translateX(4px);
-  }
+  background: ${theme.colors.gray50};
+  border: 1px solid ${theme.colors.gray100};
 `;
 
 const BarWrap = styled.div`
@@ -290,14 +137,24 @@ const BarWrap = styled.div`
   border-radius: 999px;
   background: ${theme.colors.gray200};
   overflow: hidden;
-  margin-top: ${theme.spacing.sm};
+  margin-top: ${theme.spacing.xs};
 `;
 
 const BarFill = styled.div<{ $p: number; $kind: 'good' | 'bad' }>`
   height: 100%;
   width: ${({ $p }) => `${Math.max(0, Math.min(100, $p))}%`};
-  background: ${({ $kind }) => ($kind === 'good' ? `linear-gradient(90deg, ${theme.colors.success}, #16a34a)` : 'linear-gradient(90deg, #ef4444, #dc2626)')};
-  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  background: ${({ $kind }) =>
+    $kind === 'good'
+      ? `linear-gradient(90deg, ${theme.colors.success}, #16a34a)`
+      : `linear-gradient(90deg, #ef4444, ${theme.colors.error})`};
+  transition: width 0.5s ease;
+`;
+
+const ChartContainer = styled.div`
+  width: 100%;
+  height: clamp(220px, 34vh, 360px);
+  min-width: 0;
+  min-height: 0;
 `;
 
 function fmtShort(dateIso: string) {
@@ -307,29 +164,31 @@ function fmtShort(dateIso: string) {
 
 export function AdminAttendanceAnalytics(): React.ReactElement {
   const dataService = DataService.getInstance();
+
   const [range, setRange] = useState<DateRange>(attendanceAnalyticsService.getDefaultRange('week'));
   const [students, setStudents] = useState<any[]>([]);
   const [selectedStudentId, setSelectedStudentId] = useState<string>('all');
   const [analytics, setAnalytics] = useState<AdminAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const cardAnim = useMemo(() => ({ initial: { opacity: 0, y: 8 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.25 } }), []);
+  const cardAnim = useMemo(
+    () => ({ initial: { opacity: 0, y: 8 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.25 } }),
+    []
+  );
 
   useEffect(() => {
     (async () => {
       await dataService.testConnection();
       const users = await dataService.getUsers();
-      const list = users.filter((u: any) => !u.userType || u.userType === 'attendee');
-      setStudents(list);
+      // Treat missing userType as a student for backward-compat.
+      setStudents(users.filter((u: any) => !u.userType || u.userType === 'attendee'));
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [dataService]);
 
+  // If a preset was selected, normalize to concrete dates.
   useEffect(() => {
-    // auto-resolve preset to concrete dates
     if (range.preset !== 'custom') {
-      const next = attendanceAnalyticsService.getDefaultRange(range.preset);
-      setRange(next);
+      setRange(attendanceAnalyticsService.getDefaultRange(range.preset));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [range.preset]);
@@ -337,92 +196,119 @@ export function AdminAttendanceAnalytics(): React.ReactElement {
   useEffect(() => {
     let mounted = true;
     setLoading(true);
-    (async () => {
-      const res = await attendanceAnalyticsService.getAdminAnalytics(range, {
-        studentId: selectedStudentId === 'all' ? undefined : selectedStudentId,
+    attendanceAnalyticsService
+      .getAdminAnalytics(range, { studentId: selectedStudentId === 'all' ? undefined : selectedStudentId })
+      .then((res) => {
+        if (!mounted) return;
+        setAnalytics(res);
+        setLoading(false);
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setAnalytics(null);
+        setLoading(false);
       });
-      if (!mounted) return;
-      setAnalytics(res);
-      setLoading(false);
-    })().catch(() => {
-      if (!mounted) return;
-      setLoading(false);
-    });
     return () => {
       mounted = false;
     };
   }, [range.startDate, range.endDate, selectedStudentId]);
 
-  const pieData = analytics?.distribution || [];
-  const dailyData = (analytics?.daily || []).map(d => ({
-    ...d,
-    name: fmtShort(d.date),
-  }));
+  const dailyData =
+    (analytics?.daily || []).map((d) => ({
+      name: fmtShort(d.date),
+      present: d.present,
+      late: d.late,
+      absent: d.absent,
+    })) || [];
 
-  // Debug logging for chart data issues
-  console.log('[AdminAnalytics] Debug - Analytics data:', {
-    hasData: !!analytics,
-    dailyCount: analytics?.daily?.length || 0,
-    pieData,
-    distribution: analytics?.distribution,
-    totals: analytics?.totals,
-    heatmapCount: analytics?.heatmap?.length || 0,
-    leaderboardCount: analytics?.leaderboardTop?.length || 0,
-  });
+  const pieData = analytics?.distribution || [];
+  const heatmapCells = analytics?.heatmap || [];
+  const leaderboard = analytics?.leaderboardTop || [];
+  const mostAbsent = analytics?.mostAbsent || [];
+
+  const totals = analytics?.totals;
+  const attendanceRate = Math.round(totals?.attendanceRate || 0);
+
+  const COLORS = {
+    present: '#22c55e',
+    late: '#f59e0b',
+    absent: '#ef4444',
+  };
 
   return (
     <Page>
       <FilterRow>
         <DateRangeFilter value={range} onChange={setRange} />
-        <div style={{ display: 'flex', flexDirection: 'column', gap: theme.spacing.xs, flex: '1 1 240px' }}>
-          <label style={{ fontSize: theme.fontSizes.xs, color: theme.colors.textSecondary, fontWeight: theme.fontWeights.medium }}>Student</label>
-          <Select value={selectedStudentId} onChange={(e) => setSelectedStudentId(e.target.value)} style={{ width: '100%' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: theme.spacing.xs }}>
+          <label style={{ fontSize: theme.fontSizes.xs, color: theme.colors.textSecondary, fontWeight: theme.fontWeights.medium }}>
+            Student
+          </label>
+          <Select value={selectedStudentId} onChange={(e) => setSelectedStudentId(e.target.value)}>
             <option value="all">All students</option>
-            {students.map(s => (
-              <option key={s.uid || s.id} value={s.uid || s.id}>
-                {s.displayName || s.email || (s.uid || s.id)}
-              </option>
-            ))}
+            {students.map((s: any) => {
+              const id = s.uid || s.id;
+              return (
+                <option key={id} value={id}>
+                  {s.displayName || s.email || id}
+                </option>
+              );
+            })}
           </Select>
         </div>
       </FilterRow>
 
       <Card {...cardAnim}>
         <Title>
-          <h3>Attendance overview</h3>
-          <span>{loading ? 'Updating…' : `${analytics?.range.startDate} → ${analytics?.range.endDate}`}</span>
+          <h3>Overview</h3>
+          <span>{loading ? 'Updating…' : `${range.startDate} → ${range.endDate}`}</span>
         </Title>
         <StatRow>
-          <Stat><div className="v">{Math.round(analytics?.totals.attendanceRate || 0)}%</div><div className="l">Attendance rate</div></Stat>
-          <Stat><div className="v">{analytics?.totals.present ?? 0}</div><div className="l">Present</div></Stat>
-          <Stat><div className="v">{analytics?.totals.late ?? 0}</div><div className="l">Late</div></Stat>
-          <Stat><div className="v">{analytics?.totals.absent ?? 0}</div><div className="l">Absent</div></Stat>
+          <Stat
+            $grad={`linear-gradient(135deg, ${theme.colors.primary}10 0%, ${theme.colors.primaryLight}18 100%)`}
+          >
+            <div className="v">{attendanceRate}%</div>
+            <div className="l">Attendance rate</div>
+          </Stat>
+          <Stat
+            $grad={`linear-gradient(135deg, rgba(34,197,94,0.10) 0%, rgba(34,197,94,0.18) 100%)`}
+          >
+            <div className="v">{totals?.present ?? 0}</div>
+            <div className="l">Present</div>
+          </Stat>
+          <Stat
+            $grad={`linear-gradient(135deg, rgba(245,158,11,0.10) 0%, rgba(245,158,11,0.18) 100%)`}
+          >
+            <div className="v">{totals?.late ?? 0}</div>
+            <div className="l">Late</div>
+          </Stat>
+          <Stat
+            $grad={`linear-gradient(135deg, rgba(239,68,68,0.10) 0%, rgba(239,68,68,0.18) 100%)`}
+          >
+            <div className="v">{totals?.absent ?? 0}</div>
+            <div className="l">Absent</div>
+          </Stat>
         </StatRow>
       </Card>
 
-      <Grid>
+      <TwoCol>
         <Card {...cardAnim}>
           <Title>
             <h3>Daily trend</h3>
-            <span>{loading ? 'Updating…' : `Range: ${analytics?.range.startDate} → ${analytics?.range.endDate}`}</span>
+            <span>Hover for exact values</span>
           </Title>
           <ChartContainer>
-            {dailyData.length === 0 ? (
-              <EmptyState>No attendance data for this period</EmptyState>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={dailyData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={theme.colors.gray200} />
-                  <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fill: theme.colors.textSecondary, fontSize: 12 }} />
-                  <YAxis tickLine={false} axisLine={false} tick={{ fill: theme.colors.textSecondary, fontSize: 12 }} />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Legend wrapperStyle={{ paddingTop: 10 }} />
-                  <Line type="monotone" dataKey="present" name="Present" stroke={COLORS.present} strokeWidth={3} dot={{ fill: COLORS.present, strokeWidth: 2, r: 4 }} activeDot={{ r: 6 }} />
-                  <Line type="monotone" dataKey="late" name="Late" stroke={COLORS.late} strokeWidth={3} dot={{ fill: COLORS.late, strokeWidth: 2, r: 4 }} activeDot={{ r: 6 }} />
-                  <Line type="monotone" dataKey="absent" name="Absent" stroke={COLORS.absent} strokeWidth={3} dot={{ fill: COLORS.absent, strokeWidth: 2, r: 4 }} activeDot={{ r: 6 }} />
-                </LineChart>
-              </ResponsiveContainer>
-            )}
+            <ResponsiveContainer>
+              <LineChart data={dailyData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="name" tickLine={false} axisLine={false} />
+                <YAxis tickLine={false} axisLine={false} />
+                <Tooltip />
+                <Legend />
+                <Line type="monotone" dataKey="present" name="Present" stroke={COLORS.present} strokeWidth={3} dot={false} />
+                <Line type="monotone" dataKey="late" name="Late" stroke={COLORS.late} strokeWidth={3} dot={false} />
+                <Line type="monotone" dataKey="absent" name="Absent" stroke={COLORS.absent} strokeWidth={3} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
           </ChartContainer>
         </Card>
 
@@ -432,38 +318,24 @@ export function AdminAttendanceAnalytics(): React.ReactElement {
             <span>Present vs late vs absent</span>
           </Title>
           <ChartContainer>
-            {pieData.every(d => d.value === 0) ? (
-              <EmptyState>No attendance data for this period</EmptyState>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Tooltip content={<CustomTooltip />} />
-                  <Pie 
-                    data={pieData} 
-                    dataKey="value" 
-                    nameKey="name" 
-                    innerRadius={60} 
-                    outerRadius={100} 
-                    paddingAngle={3}
-                    animationDuration={800}
-                    animationEasing="ease-out"
-                  >
-                    {pieData.map((entry) => (
-                      <Cell
-                        key={entry.name}
-                        fill={entry.name === 'Present' ? COLORS.present : entry.name === 'Late' ? COLORS.late : COLORS.absent}
-                        stroke={theme.colors.white}
-                        strokeWidth={2}
-                      />
-                    ))}
-                  </Pie>
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            )}
+            <ResponsiveContainer>
+              <PieChart>
+                <Tooltip />
+                <Pie data={pieData} dataKey="value" nameKey="name" innerRadius={70} outerRadius={110} paddingAngle={2}>
+                  {pieData.map((entry) => (
+                    <Cell
+                      key={entry.name}
+                      fill={
+                        entry.name === 'Present' ? COLORS.present : entry.name === 'Late' ? COLORS.late : COLORS.absent
+                      }
+                    />
+                  ))}
+                </Pie>
+              </PieChart>
+            </ResponsiveContainer>
           </ChartContainer>
         </Card>
-      </Grid>
+      </TwoCol>
 
       <Card {...cardAnim}>
         <Title>
@@ -471,27 +343,23 @@ export function AdminAttendanceAnalytics(): React.ReactElement {
           <span>Present / late / absent per day</span>
         </Title>
         <ChartContainer>
-          {dailyData.length === 0 ? (
-            <EmptyState>No attendance data for this period</EmptyState>
-          ) : (
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={dailyData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={theme.colors.gray200} />
-                <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fill: theme.colors.textSecondary, fontSize: 12 }} />
-                <YAxis tickLine={false} axisLine={false} tick={{ fill: theme.colors.textSecondary, fontSize: 12 }} />
-                <Tooltip content={<CustomTooltip />} />
-                <Legend wrapperStyle={{ paddingTop: 10 }} />
-                <Bar dataKey="present" stackId="a" name="Present" fill={COLORS.present} radius={[6, 6, 0, 0]} animationDuration={800} />
-                <Bar dataKey="late" stackId="a" name="Late" fill={COLORS.late} animationDuration={800} />
-                <Bar dataKey="absent" stackId="a" name="Absent" fill={COLORS.absent} radius={[0, 0, 6, 6]} animationDuration={800} />
-              </BarChart>
-            </ResponsiveContainer>
-          )}
+          <ResponsiveContainer>
+            <BarChart data={dailyData}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="name" tickLine={false} axisLine={false} />
+              <YAxis tickLine={false} axisLine={false} />
+              <Tooltip />
+              <Legend />
+              <Bar dataKey="present" stackId="a" name="Present" fill={COLORS.present} radius={[6, 6, 0, 0]} />
+              <Bar dataKey="late" stackId="a" name="Late" fill={COLORS.late} />
+              <Bar dataKey="absent" stackId="a" name="Absent" fill={COLORS.absent} radius={[0, 0, 6, 6]} />
+            </BarChart>
+          </ResponsiveContainer>
         </ChartContainer>
       </Card>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: theme.spacing.lg }}>
-        <AttendanceHeatmap title="Low-attendance heatmap" cells={analytics?.heatmap || []} />
+      <TwoCol>
+        <AttendanceHeatmap title="Low-attendance heatmap" cells={heatmapCells} />
 
         <Card {...cardAnim}>
           <Title>
@@ -499,10 +367,18 @@ export function AdminAttendanceAnalytics(): React.ReactElement {
             <span>Leaderboard (top 10)</span>
           </Title>
           <Table>
-            {(analytics?.leaderboardTop || []).map((r) => (
+            {leaderboard.map((r) => (
               <Row key={r.studentId}>
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontWeight: theme.fontWeights.semibold, color: theme.colors.textPrimary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <div
+                    style={{
+                      fontWeight: theme.fontWeights.semibold,
+                      color: theme.colors.textPrimary,
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}
+                  >
                     {r.studentName}
                   </div>
                   <div style={{ fontSize: theme.fontSizes.xs, color: theme.colors.textSecondary }}>
@@ -512,12 +388,15 @@ export function AdminAttendanceAnalytics(): React.ReactElement {
                     <BarFill $p={r.attendanceRate} $kind="good" />
                   </BarWrap>
                 </div>
-                <div style={{ textAlign: 'right', fontWeight: theme.fontWeights.bold }}>{r.attendanceRate}%</div>
+                <div style={{ textAlign: 'right', fontWeight: theme.fontWeights.bold }}>
+                  {r.attendanceRate}%
+                </div>
               </Row>
             ))}
+            {leaderboard.length === 0 && <div style={{ color: theme.colors.textSecondary }}>No data.</div>}
           </Table>
         </Card>
-      </div>
+      </TwoCol>
 
       <Card {...cardAnim}>
         <Title>
@@ -525,29 +404,34 @@ export function AdminAttendanceAnalytics(): React.ReactElement {
           <span>Quick identification (top 10)</span>
         </Title>
         <Table>
-          {(analytics?.mostAbsent || []).map((r) => (
+          {mostAbsent.map((r) => (
             <Row key={r.studentId}>
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontWeight: theme.fontWeights.semibold, color: theme.colors.textPrimary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                <div
+                  style={{
+                    fontWeight: theme.fontWeights.semibold,
+                    color: theme.colors.textPrimary,
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                  }}
+                >
                   {r.studentName}
                 </div>
                 <div style={{ fontSize: theme.fontSizes.xs, color: theme.colors.textSecondary }}>
                   Absent {r.absent}/{r.totalDays} • {r.attendanceRate}% rate
                 </div>
                 <BarWrap>
-                  <BarFill $p={clamp(100 - r.attendanceRate, 0, 100)} $kind="bad" />
+                  <BarFill $p={Math.round(100 - r.attendanceRate)} $kind="bad" />
                 </BarWrap>
               </div>
               <div style={{ textAlign: 'right', fontWeight: theme.fontWeights.bold }}>{r.absent}</div>
             </Row>
           ))}
+          {mostAbsent.length === 0 && <div style={{ color: theme.colors.textSecondary }}>No data.</div>}
         </Table>
       </Card>
     </Page>
   );
-}
-
-function clamp(n: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, n));
 }
 

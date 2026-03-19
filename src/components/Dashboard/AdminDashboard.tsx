@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../Common/Button';
 import { UsersPage } from '../Admin/UsersPage';
-import { AttendancePage } from '../Admin/AttendancePage';
-import { DailyAttendanceTracker } from '../Admin/DailyAttendanceTracker';
 import { UncommonLogo } from '../Common/UncommonLogo';
 import { StarField } from '../Common/StarField';
 import { theme } from '../../styles/theme';
@@ -16,10 +15,9 @@ import {
 } from '../../styles/animations';
 import DataService from '../../services/DataService';
 import { TimeService } from '../../services/timeService';
+import { AttendanceService } from '../../services/attendanceService';
+import { AttendanceAnalyticsService } from '../../services/attendanceAnalyticsService';
 import { uniqueToast } from '../../utils/toastUtils';
-import { ChatWindow } from '../Common/ChatWindow';
-import { chatService, Conversation } from '../../services/chatService';
-import { notificationService } from '../../services/notificationService';
 import { saveAs } from 'file-saver';
 import { ProfileUpload } from '../Profile/ProfileUpload';
 import { AdminAttendanceAnalytics } from '../Analytics/AdminAttendanceAnalytics';
@@ -34,15 +32,21 @@ import {
   ResponsiveContainer,
   Legend
 } from 'recharts';
-import {
-  DashboardIcon,
-  CheckCircleIcon,
-  BarChartIcon,
-  PeopleIcon,
-  PersonIcon,
-  LogoutIcon,
-  TodayIcon
-} from '../Common/Icons';
+import { qrCodeService, DailyQRCode } from '../../services/qrCodeService';
+import { 
+  FiLogOut, 
+  FiUser, 
+  FiBarChart2, 
+  FiMessageSquare, 
+  FiUsers,
+  FiSettings,
+  FiTrendingUp,
+  FiMenu,
+  FiX,
+  FiRefreshCw,
+  FiMaximize
+} from 'react-icons/fi';
+import { QRCodeSVG } from 'qrcode.react';
 
 const DashboardContainer = styled.div`
   display: flex;
@@ -449,12 +453,27 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
     attendanceRate: 0
   });
   const [recentAttendance, setRecentAttendance] = useState<any[]>([]);
-  const [conversations, setConversations] = useState<Conversation[]>([]);
   const [allStudents, setAllStudents] = useState<any[]>([]);
   const [weeklyData, setWeeklyData] = useState<any[]>([]);
-  const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
-  const [totalUnread, setTotalUnread] = useState(0);
+  const [todayAttendanceList, setTodayAttendanceList] = useState<any[]>([]);
+  const [atRiskStudents, setAtRiskStudents] = useState<any[]>([]);
+  const [dailyQR, setDailyQR] = useState<DailyQRCode | null>(null);
+  const [showQRModal, setShowQRModal] = useState(false);
   const dataService = DataService.getInstance();
+  const attendanceService = AttendanceService.getInstance();
+  const analyticsService = AttendanceAnalyticsService.getInstance();
+  const [markingStudentId, setMarkingStudentId] = useState<string | null>(null);
+  const [markAllLoading, setMarkAllLoading] = useState(false);
+
+  const handleGenerateQR = async () => {
+    try {
+      await qrCodeService.generateDailyCode();
+      uniqueToast.success('New daily code generated!');
+    } catch (error) {
+      console.error('Error generating QR:', error);
+      uniqueToast.error('Failed to generate daily code');
+    }
+  };
 
   const handleDownloadAttendanceCSV = async () => {
     try {
@@ -485,6 +504,50 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
     } catch (error) {
       console.error('Error generating attendance CSV:', error);
       uniqueToast.error('Failed to generate CSV');
+    }
+  };
+
+  const handleMarkStudentPresent = async (student: any) => {
+    if (!student?.userId || !student?.userName) return;
+    if (markingStudentId) return;
+
+    setMarkingStudentId(student.userId);
+    try {
+      await attendanceService.checkIn(student.userId, student.userName);
+      uniqueToast.success(`Marked ${student.userName} as present.`);
+    } catch (e) {
+      console.error('Failed to mark present:', e);
+      uniqueToast.error(`Failed to mark ${student.userName} as present.`);
+    } finally {
+      setMarkingStudentId(null);
+    }
+  };
+
+  const handleMarkAllPresent = async () => {
+    if (markAllLoading) return;
+    const targets = (todayAttendanceList || [])
+      .filter((s: any) => s.status === 'absent' && s.userId && s.userName)
+      .slice(0, 50);
+
+    if (targets.length === 0) {
+      uniqueToast.info('No absent students to mark present.');
+      return;
+    }
+
+    setMarkAllLoading(true);
+    try {
+      // Batch to reduce Firestore write pressure.
+      const batchSize = 5;
+      for (let i = 0; i < targets.length; i += batchSize) {
+        const batch = targets.slice(i, i + batchSize);
+        await Promise.all(batch.map((s: any) => attendanceService.checkIn(s.userId, s.userName)));
+      }
+      uniqueToast.success('Marked absent students as present.');
+    } catch (e) {
+      console.error('Failed to mark all present:', e);
+      uniqueToast.error('Failed to mark all present.');
+    } finally {
+      setMarkAllLoading(false);
     }
   };
 
@@ -533,6 +596,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
       });
       setWeeklyData(weeklyTrends);
 
+      // At-risk students (low attendance) for the dashboard side panel.
+      try {
+        const range = analyticsService.getDefaultRange('week');
+        const analytics = await analyticsService.getAdminAnalytics(range);
+        const atRisk = analytics.mostAbsent
+          .filter((r: any) => r.attendanceRate < 85 || r.absent >= 3)
+          .slice(0, 5);
+        setAtRiskStudents(atRisk);
+      } catch (e) {
+        console.error('Failed to load at-risk students:', e);
+      }
+
       uniqueToast.success('Dashboard data loaded successfully!', { autoClose: 2000 });
     } catch (error) {
       console.error('Error loading dashboard data:', error);
@@ -566,9 +641,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
   };
 
   useEffect(() => {
-    // Request permission for push notifications
-    notificationService.requestPermission();
-
     // Subscribe to today's attendance in real-time
     console.log('📊 AdminDashboard: Subscribing to real-time attendance...');
     const unsubscribeAttendance = dataService.subscribeToTodayAttendance((summary) => {
@@ -581,6 +653,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
         absentCount: summary.absentCount,
         attendanceRate: Math.round((summary.presentCount / (summary.totalUsers || 1)) * 100)
       }));
+
+      if (summary.attendanceList) {
+        setTodayAttendanceList(summary.attendanceList);
+      }
       
       if (summary.recentAttendance) {
         setRecentAttendance(summary.recentAttendance);
@@ -590,70 +666,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
     // Load static dashboard stats on mount
     loadDashboardData();
 
-    // Subscribe to ALL conversations so admins can see messages from any student
-    const unsubscribeChat = chatService.subscribeToAllConversations(async (data) => {
-      // Use functional state update to ensure we have the most current conversations
-      setConversations(prevConversations => {
-        // Mark selected conversation as read if it has unread messages
-        if (selectedConversation) {
-          const currentConv = data.find(c => c.id === selectedConversation.id);
-          if (currentConv && currentConv.unreadCount && currentConv.unreadCount > 0) {
-            chatService.markAsRead(currentConv.id!).catch(e => console.error('Failed to mark as read:', e));
-          }
-        }
-
-        // Calculate unread only for conversations belonging to THIS admin
-        const myConvs = data.filter(c => c.adminId === user?.uid);
-        const prevTotal = prevConversations.reduce((sum, conv) => sum + (conv.unreadCount || 0), 0);
-        const newTotal = data.reduce((sum, conv) => sum + (conv.unreadCount || 0), 0);
-        
-        console.log('Chat debug - prevTotal:', prevTotal, 'newTotal:', newTotal);
-
-        if (newTotal > prevTotal) {
-          // Find the specific conversation that got a new message
-          const newMsgConv = data.find(c => {
-            const prevConv = prevConversations.find(p => p.id === c.id);
-            
-            // 1. Unread count must have increased
-            const countIncreased = (c.unreadCount || 0) > (prevConv?.unreadCount || 0);
-            // 2. We are NOT the sender
-            const notMe = c.lastSenderId !== user?.uid;
-            // 3. This conversation is NOT currently open/selected
-            const notSelected = selectedConversation?.id !== c.id;
-
-            return countIncreased && notMe && notSelected;
-          });
-
-          if (newMsgConv) {
-            console.log('Chat debug - New message detected for admin!');
-            // Play notification sound
-            const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3');
-            audio.play().catch(e => console.log('Audio play failed:', e));
-            
-            console.log('Chat debug - Showing toast for:', newMsgConv.studentName);
-            uniqueToast.info(`New message from ${newMsgConv.studentName}: ${newMsgConv.lastMessage}`, {
-              position: 'top-right',
-              autoClose: 5000
-            });
-
-            // Send system push notification
-            notificationService.sendNotification(
-              `New message from ${newMsgConv.studentName}`,
-              newMsgConv.lastMessage
-            );
-          }
-        }
-        
-        // Update total unread based on all conversations this admin is part of
-        const myTotalUnread = myConvs.reduce((sum, conv) => sum + (conv.unreadCount || 0), 0);
-        setTotalUnread(myTotalUnread);
-        return data;
-      });
+    // Subscribe to daily QR code
+    const unsubscribeQR = qrCodeService.subscribeToDailyCode((qr) => {
+      setDailyQR(qr);
     });
 
     return () => {
       unsubscribeAttendance();
-      unsubscribeChat();
+      unsubscribeQR();
     };
   }, []);
 
@@ -664,19 +684,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
 
   // Handle chat initiation from UsersPage
   const handleChatFromUsers = (studentId: string, studentName: string, studentPhotoUrl?: string) => {
-    // Create a conversation object from the student data
-    const newConversation = {
-      id: `${studentId}_${user?.uid}`,
-      studentId,
-      studentName,
-      studentPhotoUrl,
-      adminId: user?.uid || '',
-      adminName: user?.displayName || 'Admin',
-      lastMessage: '',
-      lastMessageTime: null
-    };
-    setSelectedConversation(newConversation as Conversation);
-    setActiveNav('chat');
+    // Chat functionality removed
   };
 
   const toggleMobileMenu = () => {
@@ -692,254 +700,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
             <AdminAttendanceAnalytics />
           </div>
         );
-      case 'attendance':
-        return (
-          <div style={{ padding: theme.spacing.lg }}>
-            <AttendancePage onBack={() => setActiveNav('dashboard')} />
-          </div>
-        );
-      case 'daily-tracker':
-        return (
-          <div style={{ padding: theme.spacing.lg }}>
-            <DailyAttendanceTracker onBack={() => setActiveNav('dashboard')} isEmbedded={true} />
-          </div>
-        );
       case 'users':
         return (
           <div style={{ padding: theme.spacing.lg }}>
             <UsersPage onBack={() => setActiveNav('dashboard')} onChat={handleChatFromUsers} />
-          </div>
-        );
-      case 'chat':
-        // 1. Create a map of existing conversations by studentId
-        const convMap = new Map<string, Conversation>();
-        conversations.forEach(conv => {
-          convMap.set(conv.studentId, conv);
-        });
-
-        // 2. Combine all students with their conversations (if any)
-        const displayConversations = allStudents.map(student => {
-          const existingConv = convMap.get(student.uid || student.id);
-          if (existingConv) {
-            return {
-              ...existingConv,
-              id: existingConv.id || `${existingConv.studentId}_${existingConv.adminId}`
-            };
-          }
-          // Placeholder for students with no chat history yet
-          return {
-            id: `${student.uid || student.id}_${user?.uid}`,
-            studentId: student.uid || student.id,
-            studentName: student.displayName || 'Student',
-            studentPhotoUrl: student.photoUrl,
-            adminId: user?.uid || '',
-            lastMessage: 'No messages yet',
-            lastMessageTime: null,
-            lastSenderId: undefined,
-            unreadCount: 0,
-            isGroup: false,
-            groupPhotoUrl: undefined,
-            groupName: undefined
-          };
-        }).sort((a, b) => {
-          // Sort: Recent messages first, then students with no messages
-          if (!a.lastMessageTime && !b.lastMessageTime) return 0;
-          if (!a.lastMessageTime) return 1;
-          if (!b.lastMessageTime) return -1;
-          const timeA = a.lastMessageTime.toDate ? a.lastMessageTime.toDate() : new Date(a.lastMessageTime);
-          const timeB = b.lastMessageTime.toDate ? b.lastMessageTime.toDate() : new Date(b.lastMessageTime);
-          return timeB.getTime() - timeA.getTime();
-        });
-
-        return (
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: '320px 1fr', 
-            gap: theme.spacing.lg, 
-            height: 'calc(100vh - 140px)',
-            overflow: 'hidden',
-            padding: 0
-          }}>
-            <div style={{ 
-              display: 'flex', 
-              flexDirection: 'column', 
-              gap: theme.spacing.md,
-              height: '100%',
-              overflow: 'hidden'
-            }}>
-              <h2 style={{ color: theme.colors.textPrimary, margin: 0, padding: theme.spacing.lg }}>Messages</h2>
-              <Card style={{ 
-                flex: 1, 
-                padding: theme.spacing.sm,
-                display: 'flex',
-                flexDirection: 'column',
-                overflow: 'hidden'
-              }}>
-                <div style={{ 
-                  flex: 1,
-                  overflowY: 'auto',
-                  paddingRight: '4px'
-                }}>
-                  <AttendanceList>
-                    {displayConversations.map((conv) => (
-                        <AttendanceItem 
-                          key={conv.id} 
-                          style={{ 
-                            cursor: 'pointer', 
-                            transition: 'all 0.2s',
-                            background: selectedConversation?.id === conv.id ? 'rgba(6, 71, 161, 0.1)' : 'transparent',
-                            borderLeft: selectedConversation?.id === conv.id ? `4px solid ${theme.colors.primary}` : '4px solid transparent',
-                            padding: theme.spacing.md
-                          }}
-                          onClick={async () => {
-                            setSelectedConversation(conv as any);
-                            if (conv.unreadCount && conv.unreadCount > 0) {
-                              try {
-                                await chatService.markAsRead(conv.id!);
-                              } catch (error) {
-                                console.error('Failed to mark as read:', error);
-                              }
-                            }
-                          }}
-                        >
-                          <UserAvatar>
-                            {conv.isGroup ? (
-                              conv.groupPhotoUrl ? (
-                                <img 
-                                  src={conv.groupPhotoUrl} 
-                                  alt="" 
-                                  style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} 
-                                />
-                              ) : (
-                                <div style={{ background: theme.colors.secondary, width: '100%', height: '100%', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>👥</div>
-                              )
-                            ) : conv.studentPhotoUrl ? (
-                              <img 
-                                src={conv.studentPhotoUrl} 
-                                alt="" 
-                                style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} 
-                              />
-                            ) : (
-                              getInitials(conv.studentName)
-                            )}
-                          </UserAvatar>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontWeight: theme.fontWeights.semibold, color: theme.colors.textPrimary, fontSize: theme.fontSizes.sm, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              {conv.isGroup && <span>👥</span>}
-                              {conv.isGroup ? conv.groupName : conv.studentName}
-                            </div>
-                            <div style={{ 
-                              fontSize: theme.fontSizes.xs, 
-                              color: theme.colors.textSecondary,
-                              whiteSpace: 'nowrap',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis'
-                            }}>
-                              {conv.lastMessage}
-                            </div>
-                          </div>
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
-                          <div style={{ fontSize: '10px', color: theme.colors.textLight }}>
-                            {conv.lastMessageTime?.toDate ? conv.lastMessageTime.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 
-                             conv.lastMessageTime ? new Date(conv.lastMessageTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            {conv.lastSenderId === user?.uid && conv.lastMessageTime && (
-                              <span style={{ color: conv.unreadCount === 0 ? '#34B7F1' : 'rgba(0, 0, 0, 0.45)', fontSize: '14px', lineHeight: 1, display: 'flex', alignItems: 'center' }}>
-                                {conv.unreadCount === 0 ? (
-                                  <svg viewBox="0 0 16 15" width="16" height="15">
-                                    <path fill="currentColor" d="M15.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L8.666 9.879a.32.32 0 0 1-.484.033l-.358-.325a.319.329 0 0 0-.484.032l-.378.483a.418.418 0 0 0 .036.541l1.32 1.266a.32.32 0 0 0 .484-.032l6.272-8.048a.366.365 0 0 0-.063-.512zm-4.1 0l-.478-.372a.365.365 0 0 0-.51.063L5.066 9.879a.32.32 0 0 1-.484.033L1.091 6.839a.365.365 0 0 0-.51.063l-.478.371a.365.365 0 0 0 .063.51l4.737 3.699a.32.32 0 0 0 .484-.033l6.272-8.048a.366.365 0 0 0-.063-.512z"></path>
-                                  </svg>
-                                ) : (
-                                  <svg viewBox="0 0 16 15" width="16" height="15">
-                                    <path fill="currentColor" d="M10.91 3.316l-.478-.372a.365.365 0 0 0-.51.063L4.566 9.879a.32.32 0 0 1-.484.033L.591 6.839a.365.365 0 0 0-.51.063l-.478.371a.365.365 0 0 0 .063.51l4.737 3.699a.32.32 0 0 0 .484-.033l6.272-8.048a.366.365 0 0 0-.063-.512z"></path>
-                                  </svg>
-                                )}
-                              </span>
-                            )}
-                            {conv.unreadCount !== undefined && conv.unreadCount > 0 && (
-                              <Badge style={{ 
-                                background: theme.colors.success, 
-                                color: 'white',
-                                borderRadius: '10px',
-                                padding: '2px 6px',
-                                fontSize: '10px',
-                                fontWeight: 'bold',
-                                minWidth: '18px',
-                                height: '18px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center'
-                              }}>
-                                {conv.unreadCount}
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                      </AttendanceItem>
-                    ))}
-                    {displayConversations.length === 0 && (
-                      <p style={{ textAlign: 'center', color: theme.colors.textSecondary, padding: theme.spacing.lg }}>
-                        No students found.
-                      </p>
-                    )}
-                  </AttendanceList>
-                </div>
-              </Card>
-            </div>
-
-            <div style={{ 
-              display: 'flex', 
-              flexDirection: 'column', 
-              height: '100%',
-              overflow: 'hidden'
-            }}>
-              {selectedConversation ? (
-                <>
-                  <h2 style={{ 
-                    color: theme.colors.textPrimary, 
-                    margin: `0 0 ${theme.spacing.md} 0`,
-                    fontSize: theme.fontSizes.xl,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: theme.spacing.lg
-                  }}>
-                    {selectedConversation.isGroup && <span>👥</span>}
-                    Chatting with {selectedConversation.isGroup ? selectedConversation.groupName : selectedConversation.studentName}
-                  </h2>
-                  <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-                    <ChatWindow 
-                      studentId={selectedConversation.studentId}
-                      studentName={selectedConversation.studentName}
-                      studentPhotoUrl={selectedConversation.studentPhotoUrl}
-                      currentUserPhotoUrl={user?.photoUrl}
-                      currentUserUid={user?.uid || ''}
-                      currentUserName={user?.displayName || 'Admin'}
-                      isAdmin={true}
-                      adminUid={selectedConversation.adminId || user?.uid}
-                      isGroup={selectedConversation.isGroup}
-                      groupId={selectedConversation.id}
-                      groupName={selectedConversation.groupName}
-                    />
-                  </div>
-                </>
-              ) : (
-                <div style={{ 
-                  flex: 1, 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center', 
-                  background: theme.colors.white,
-                  borderRadius: theme.borderRadius.lg,
-                  border: `1px solid ${theme.colors.gray200}`,
-                  color: theme.colors.textSecondary,
-                  padding: theme.spacing.lg
-                }}>
-                  Select a student to start chatting
-                </div>
-              )}
-            </div>
           </div>
         );
       case 'profile':
@@ -963,65 +727,55 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
       <MobileHeader>
         <UncommonLogo size="sm" showSubtitle={false} />
         <MobileMenuButton onClick={toggleMobileMenu}>
-          ☰
+          {mobileMenuOpen ? <FiX size={24} /> : <FiMenu size={24} />}
         </MobileMenuButton>
       </MobileHeader>
       
       <MobileOverlay isOpen={mobileMenuOpen} onClick={() => setMobileMenuOpen(false)} />
       
       <Sidebar isOpen={mobileMenuOpen}>
-        <StarField density="low" speed="slow" />
-        <Logo>
-          <img src="/shapes.svg" alt="Logo" style={{ width: 24, height: 24, marginRight: theme.spacing.sm }} />
-          Admin Panel
-        </Logo>
         
-        <NavItem active={activeNav === 'dashboard'} onClick={() => handleNavClick('dashboard')}>
-          <DashboardIcon size={20} />
-          {user?.userType === 'instructor' ? 'Instructor Dashboard' : 'Admin Dashboard'}
-        </NavItem>
-        <NavItem active={activeNav === 'attendance'} onClick={() => handleNavClick('attendance')}>
-          <CheckCircleIcon size={20} />
-          Attendance
-        </NavItem>
-        <NavItem active={activeNav === 'analytics'} onClick={() => handleNavClick('analytics')}>
-          <BarChartIcon size={20} />
-          Analytics
-        </NavItem>
-        <NavItem active={activeNav === 'daily-tracker'} onClick={() => handleNavClick('daily-tracker')}>
-          <TodayIcon size={20} />
-          Daily Tracker
-        </NavItem>
-        <NavItem active={activeNav === 'users'} onClick={() => handleNavClick('users')}>
-          <PeopleIcon size={20} />
-          Users
-        </NavItem>
-        <NavItem active={activeNav === 'chat'} onClick={() => handleNavClick('chat')}>
-          <PersonIcon size={20} />
-          {user?.userType === 'instructor' ? 'Student Chat' : 'Student Chat'}
-          {totalUnread > 0 && <Badge style={{ marginLeft: 'auto' }}>{totalUnread}</Badge>}
-        </NavItem>
-        <NavItem active={activeNav === 'profile'} onClick={() => handleNavClick('profile')}>
-          <PersonIcon size={20} />
-          My Profile
-        </NavItem>
+      <NavItem active={activeNav === 'dashboard'} onClick={() => handleNavClick('dashboard')}>
+        <FiBarChart2 size={20} />
+        {user?.userType === 'instructor' ? 'Instructor Dashboard' : 'Admin Dashboard'}
+      </NavItem>
+      <NavItem active={activeNav === 'analytics'} onClick={() => handleNavClick('analytics')}>
+        <FiTrendingUp size={20} />
+        Analytics
+      </NavItem>
+      <NavItem active={activeNav === 'users'} onClick={() => handleNavClick('users')}>
+        <FiUsers size={20} />
+        Users
+      </NavItem>
+      <NavItem active={activeNav === 'profile'} onClick={() => handleNavClick('profile')}>
+        <FiUser size={20} />
+        My Profile
+      </NavItem>
         
-        <div style={{ marginTop: 'auto', paddingTop: theme.spacing.xl }}>
-          {onNavigateToProfile && (
-            <NavItem onClick={onNavigateToProfile}>
-              <PersonIcon size={20} />
-              Profile
+      <div style={{ marginTop: 'auto', paddingTop: theme.spacing.xl }}>
+        {onNavigateToProfile && (
+          <NavItem onClick={onNavigateToProfile}>
+            <FiUser size={20} />
+            Profile
             </NavItem>
           )}
           <NavItem onClick={logout}>
-            <LogoutIcon size={20} />
+            <FiLogOut size={20} />
             Logout
           </NavItem>
         </div>
       </Sidebar>
 
       <MainContent style={{ padding: 0 }}>
-        {renderCurrentPage() || (
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeNav}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.18 }}
+          >
+            {renderCurrentPage() || (
           <div style={{ padding: theme.spacing.lg, display: 'flex', flexDirection: 'column', gap: theme.spacing.lg }}>
             <Header>
               <HeaderTitle>
@@ -1040,25 +794,103 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
                 <Button variant="primary" onClick={handleDownloadAttendanceCSV}>
                   Download Attendance CSV
                 </Button>
+                <Button variant="outline" onClick={() => setShowQRModal(true)}>
+                  <FiMaximize size={16} style={{ marginRight: theme.spacing.xs }} />
+                  Daily QR Code
+                </Button>
               </HeaderActions>
             </Header>
 
+            {showQRModal && (
+              <div style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                background: 'rgba(0,0,0,0.8)',
+                zIndex: 2000,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: theme.spacing.xl
+              }}>
+                <Card style={{ 
+                  maxWidth: '500px', 
+                  width: '100%', 
+                  textAlign: 'center',
+                  position: 'relative',
+                  padding: theme.spacing.xl
+                }}>
+                  <button 
+                    onClick={() => setShowQRModal(false)}
+                    style={{
+                      position: 'absolute',
+                      top: theme.spacing.md,
+                      right: theme.spacing.md,
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: theme.colors.textSecondary
+                    }}
+                  >
+                    <FiX size={24} />
+                  </button>
+                  <h2 style={{ marginBottom: theme.spacing.lg }}>Daily Attendance QR Code</h2>
+                  <div style={{ 
+                    background: 'white', 
+                    padding: theme.spacing.xl, 
+                    borderRadius: theme.borderRadius.lg,
+                    display: 'inline-block',
+                    marginBottom: theme.spacing.lg,
+                    boxShadow: theme.shadows.md
+                  }}>
+                    {dailyQR ? (
+                      <QRCodeSVG 
+                        value={dailyQR.code} 
+                        size={256}
+                        level="H"
+                        includeMargin={true}
+                      />
+                    ) : (
+                      <div style={{ width: 256, height: 256, display: 'flex', alignItems: 'center', justifyContent: 'center', color: theme.colors.textSecondary }}>
+                        No QR Code Generated for Today
+                      </div>
+                    )}
+                  </div>
+                  {dailyQR && (
+                    <div style={{ marginBottom: theme.spacing.lg }}>
+                      <p style={{ fontSize: theme.fontSizes.sm, color: theme.colors.textSecondary, marginBottom: theme.spacing.xs }}>Code:</p>
+                      <h1 style={{ letterSpacing: '8px', color: theme.colors.primary }}>{dailyQR.code}</h1>
+                    </div>
+                  )}
+                  <Button variant="primary" onClick={handleGenerateQR} style={{ width: '100%' }}>
+                    <FiRefreshCw size={16} style={{ marginRight: theme.spacing.xs }} />
+                    {dailyQR ? 'Regenerate Code' : 'Generate Daily Code'}
+                  </Button>
+                  <p style={{ marginTop: theme.spacing.md, fontSize: theme.fontSizes.xs, color: theme.colors.textLight }}>
+                    Students must scan this code or enter it manually to check in.
+                  </p>
+                </Card>
+              </div>
+            )}
+
             <StatsGrid>
-              <StatCard variant="primary">
-                <StatValue>{stats.totalAttendees}</StatValue>
-                <StatLabel>Total Students</StatLabel>
-              </StatCard>
               <StatCard variant="accent">
                 <StatValue>{stats.todayAttendance}</StatValue>
                 <StatLabel>Present Today</StatLabel>
+              </StatCard>
+              <StatCard style={{ background: stats.absentCount > 0 ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)' : theme.colors.white, color: stats.absentCount > 0 ? 'white' : theme.colors.textPrimary }}>
+                <StatValue>{stats.absentCount}</StatValue>
+                <StatLabel>Absent Today</StatLabel>
               </StatCard>
               <StatCard style={{ background: stats.lateCount > 0 ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' : theme.colors.white, color: stats.lateCount > 0 ? 'white' : theme.colors.textPrimary }}>
                 <StatValue>{stats.lateCount}</StatValue>
                 <StatLabel>Late Arrivals</StatLabel>
               </StatCard>
-              <StatCard style={{ background: stats.absentCount > 0 ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)' : theme.colors.white, color: stats.absentCount > 0 ? 'white' : theme.colors.textPrimary }}>
-                <StatValue>{stats.absentCount}</StatValue>
-                <StatLabel>Absent Students</StatLabel>
+              <StatCard variant="primary">
+                <StatValue>{(stats.todayAttendance || 0) + (stats.lateCount || 0)}</StatValue>
+                <StatLabel>Active Students</StatLabel>
               </StatCard>
               <StatCard variant="secondary">
                 <StatValue>{stats.attendanceRate}%</StatValue>
@@ -1068,54 +900,183 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
 
             <ContentGrid>
               <Card>
-                <CardTitle>Attendance Trends (Last 7 Days)</CardTitle>
+                <CardTitle>Attendance Trend (This Week)</CardTitle>
                 <div style={{ width: '100%', height: 300 }}>
                   <ResponsiveContainer>
-                    <BarChart data={weeklyData}>
+                    <BarChart
+                      data={weeklyData.map((d: any) => ({
+                        ...d,
+                        absent: Math.max(
+                          0,
+                          (stats.totalAttendees || 0) - ((d.present || 0) + (d.late || 0))
+                        )
+                      }))}
+                    >
                       <CartesianGrid strokeDasharray="3 3" vertical={false} />
                       <XAxis dataKey="name" axisLine={false} tickLine={false} />
                       <YAxis axisLine={false} tickLine={false} />
-                      <Tooltip 
+                      <Tooltip
                         contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: theme.shadows.md }}
                         cursor={{ fill: 'rgba(0,0,0,0.05)' }}
                       />
                       <Legend iconType="circle" verticalAlign="top" align="right" height={36} />
                       <Bar dataKey="present" name="Present" fill={theme.colors.primary} radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="late" name="Late" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="absent" name="Absent" fill="#ef4444" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
               </Card>
 
               <Card>
-                <CardTitle>Recent Check-ins</CardTitle>
+                <CardTitle>At Risk Students</CardTitle>
                 <AttendanceList>
-                  {recentAttendance.map((attendance: any) => (
-                    <AttendanceItem key={attendance.id}>
-                      <UserAvatar>
-                        {getInitials(attendance.studentName || 'User')}
-                      </UserAvatar>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: theme.fontWeights.medium, color: theme.colors.textPrimary, fontSize: theme.fontSizes.sm }}>
-                          {attendance.studentName}
+                  {atRiskStudents.length > 0 ? (
+                    atRiskStudents.map((s: any) => (
+                      <AttendanceItem key={s.studentId}>
+                        <UserAvatar>{getInitials(s.studentName || 'Student')}</UserAvatar>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: theme.fontWeights.medium, color: theme.colors.textPrimary, fontSize: theme.fontSizes.sm }}>
+                            {s.studentName}
+                          </div>
+                          <div style={{ color: theme.colors.textSecondary, fontSize: theme.fontSizes.xs }}>
+                            {Math.round(s.attendanceRate || 0)}% attendance • {s.absent} absences
+                          </div>
                         </div>
-                        <div style={{ color: theme.colors.textSecondary, fontSize: theme.fontSizes.xs }}>
-                          {attendance.checkInTime?.toLocaleTimeString()}
-                        </div>
-                      </div>
-                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.colors.success }} />
-                    </AttendanceItem>
-                  ))}
-                  {recentAttendance.length === 0 && (
+                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.colors.warning }} />
+                      </AttendanceItem>
+                    ))
+                  ) : (
                     <p style={{ color: theme.colors.textSecondary, textAlign: 'center', padding: theme.spacing.lg }}>
-                      No recent check-ins
+                      Loading at-risk data...
                     </p>
                   )}
                 </AttendanceList>
               </Card>
             </ContentGrid>
+
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+              gap: theme.spacing.lg,
+              marginTop: theme.spacing.lg
+            }}>
+              <Card>
+                <CardTitle>Quick Student List</CardTitle>
+                <AttendanceList>
+                  {(todayAttendanceList || [])
+                    .slice()
+                    .sort((a: any, b: any) => {
+                      const sa = a.status === 'absent' ? 0 : a.status === 'late' ? 1 : 2;
+                      const sb = b.status === 'absent' ? 0 : b.status === 'late' ? 1 : 2;
+                      return sa - sb;
+                    })
+                    .slice(0, 8)
+                    .map((s: any) => {
+                      const statusLabel = s.status === 'absent' ? 'Absent' : s.status === 'late' ? 'Late' : 'Present';
+                      const statusColor =
+                        s.status === 'absent' ? theme.colors.warning :
+                        s.status === 'late' ? '#f59e0b' :
+                        theme.colors.success;
+
+                      return (
+                        <AttendanceItem key={s.userId}>
+                          <UserAvatar>{getInitials(s.userName || 'Student')}</UserAvatar>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontWeight: theme.fontWeights.medium, color: theme.colors.textPrimary, fontSize: theme.fontSizes.sm }}>
+                              {s.userName}
+                            </div>
+                            <div style={{ color: theme.colors.textSecondary, fontSize: theme.fontSizes.xs }}>
+                              {statusLabel}
+                              {s.checkInTime ? ` • ${new Date(s.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: theme.spacing.xs }}>
+                            <div style={{ width: 8, height: 8, borderRadius: 999, background: statusColor }} />
+                            <Button
+                              variant={s.status === 'absent' ? 'primary' : 'secondary'}
+                              disabled={s.status !== 'absent' || markingStudentId === s.userId}
+                              onClick={() => handleMarkStudentPresent(s)}
+                              style={{ padding: '6px 10px', borderRadius: theme.borderRadius.md }}
+                            >
+                              {s.status === 'absent' ? (markingStudentId === s.userId ? 'Marking...' : 'Mark Present') : 'Checked'}
+                            </Button>
+                          </div>
+                        </AttendanceItem>
+                      );
+                    })}
+
+                  {(todayAttendanceList || []).length === 0 && (
+                    <p style={{ color: theme.colors.textSecondary, textAlign: 'center', padding: theme.spacing.lg }}>
+                      Loading today’s attendance...
+                    </p>
+                  )}
+                </AttendanceList>
+              </Card>
+
+              <Card>
+                <CardTitle>Session Info & Quick Actions</CardTitle>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: theme.spacing.md }}>
+                  <div>
+                    <div style={{ color: theme.colors.textSecondary, fontSize: theme.fontSizes.xs }}>Current session</div>
+                    <div style={{ fontWeight: theme.fontWeights.semibold, color: theme.colors.textPrimary, fontSize: theme.fontSizes.sm }}>
+                      Daily Attendance • {user?.userType === 'instructor' ? 'Teacher' : 'Admin'}
+                    </div>
+                    <div style={{ color: theme.colors.textSecondary, fontSize: theme.fontSizes.xs, marginTop: theme.spacing.xs }}>
+                      {dailyQR ? `QR: ${dailyQR.code}` : 'QR will generate shortly'}
+                    </div>
+                  </div>
+
+                  <div style={{ 
+                    background: theme.colors.gray50,
+                    borderRadius: theme.borderRadius.lg,
+                    padding: theme.spacing.md
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing.sm, marginBottom: theme.spacing.sm }}>
+                      <div style={{ color: theme.colors.textSecondary, fontSize: theme.fontSizes.xs }}>Engagement</div>
+                      <div style={{ fontWeight: theme.fontWeights.semibold, color: theme.colors.textPrimary, fontSize: theme.fontSizes.xs }}>
+                        {stats.totalAttendees > 0
+                          ? Math.round(((stats.todayAttendance + stats.lateCount) / stats.totalAttendees) * 100)
+                          : 0}
+                        % active
+                      </div>
+                    </div>
+                    <div style={{ height: 8, background: theme.colors.gray200, borderRadius: 999, overflow: 'hidden' }}>
+                      <div
+                        style={{ 
+                          width: stats.totalAttendees > 0
+                            ? `${Math.round(((stats.todayAttendance + stats.lateCount) / stats.totalAttendees) * 100)}%`
+                            : '0%',
+                          height: '100%',
+                          background: theme.colors.primary,
+                          transition: 'width 0.35s ease'
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: theme.spacing.sm, flexWrap: 'wrap' }}>
+                    <Button variant="primary" onClick={() => setShowQRModal(true)} style={{ flex: 1, minWidth: 160 }}>
+                      Start Session
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={handleMarkAllPresent}
+                      disabled={markAllLoading}
+                      style={{ flex: 1, minWidth: 160 }}
+                    >
+                      {markAllLoading ? 'Marking...' : 'Mark All Present'}
+                    </Button>
+                    <Button variant="secondary" onClick={handleDownloadAttendanceCSV} style={{ flex: 1, minWidth: 160 }}>
+                      Export
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            </div>
           </div>
-        )}
+            )}
+          </motion.div>
+        </AnimatePresence>
       </MainContent>
     </DashboardContainer>
   );

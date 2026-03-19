@@ -40,6 +40,11 @@ const Group = styled.div`
       box-shadow: 0 0 0 2px ${theme.colors.primary}20;
     }
   }
+
+  @media (max-width: ${theme.breakpoints.mobile}) {
+    min-width: 100%;
+    width: 100%;
+  }
 `;
 
 export function DateRangeFilter(props: {

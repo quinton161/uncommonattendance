@@ -185,17 +185,9 @@ const Badge = styled.div<{ $kind: 'good' | 'warn' }>`
 
 const ChartContainer = styled.div`
   width: 100%;
-  height: 320px;
+  height: clamp(220px, 34vh, 360px);
   min-width: 0;
   min-height: 0;
-  
-  @media (max-width: ${theme.breakpoints.tablet}) {
-    height: 280px;
-  }
-  
-  @media (max-width: ${theme.breakpoints.mobile}) {
-    height: 240px;
-  }
 `;
 
 const EmptyState = styled.div`
@@ -352,7 +344,7 @@ export function StudentAttendanceAnalytics(props: { studentId: string }): React.
           <h3>Weekly view</h3>
           <span>Last 7 business days</span>
         </Title>
-        <ChartContainer style={{ height: 300 }}>
+          <ChartContainer>
           {weekly.length === 0 ? (
             <EmptyState>No attendance data for this period</EmptyState>
           ) : (
@@ -369,7 +361,7 @@ export function StudentAttendanceAnalytics(props: { studentId: string }): React.
               </BarChart>
             </ResponsiveContainer>
           )}
-        </ChartContainer>
+          </ChartContainer>
       </Card>
 
       <Card {...cardAnim}>
@@ -377,7 +369,7 @@ export function StudentAttendanceAnalytics(props: { studentId: string }): React.
           <h3>Progress</h3>
           <span>Attendance rate over time</span>
         </Title>
-        <ChartContainer style={{ height: 280 }}>
+        <ChartContainer>
           {dailyData.length === 0 ? (
             <EmptyState>No attendance data for this period</EmptyState>
           ) : (
