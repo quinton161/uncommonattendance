@@ -6,7 +6,6 @@ import { theme } from '../../styles/theme';
 import { 
   staggeredAnimation, 
   pageTransition, 
-  containerAnimation,
   respectMotionPreference 
 } from '../../styles/animations';
 import DataService from '../../services/DataService';
@@ -201,30 +200,7 @@ const MobileOverlay = styled.div<{ $isOpen: boolean }>`
   }
 `;
 
-const MainContent = styled.div`
-  flex: 1;
-  padding: 0;
-  height: 100vh;
-  height: 100svh; /* Modern mobile browsers */
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  box-sizing: border-box;
-  padding-top: 60px;
-  margin-left: 280px;
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  ${containerAnimation}
-  ${respectMotionPreference}
-  @media (max-width: ${theme.breakpoints.tablet}) {
-    padding: 0;
-    padding-top: 70px;
-    margin-left: 0;
-    height: calc(100vh - 60px);
-    height: calc(100svh - 60px);
-    gap: 0;
-  }
-`;
+// MainContent styled component was removed because it was replaced by inline styles on a <div> to fix ESLint unused variable warnings.
 
 const Header = styled.div`
   display: flex;

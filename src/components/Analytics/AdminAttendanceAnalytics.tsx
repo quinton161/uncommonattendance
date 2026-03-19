@@ -119,62 +119,7 @@ const FilterRow = styled.div`
   }
 `;
 
-const OverviewGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: ${theme.spacing.lg};
-
-  @media (max-width: ${theme.breakpoints.mobile}) {
-    grid-template-columns: 1fr;
-    gap: ${theme.spacing.md};
-  }
-`;
-
-const OverviewCard = styled(motion.div)<{ $variant?: 'primary' | 'secondary' | 'accent' | 'error' }>`
-  background: ${props => {
-    switch (props.$variant) {
-      case 'primary': return `linear-gradient(135deg, ${theme.colors.primary} 0%, ${theme.colors.primaryDark} 100%)`;
-      case 'accent': return `linear-gradient(135deg, ${theme.colors.success} 0%, #16a34a 100%)`;
-      case 'secondary': return `linear-gradient(135deg, #f59e0b 0%, #d97706 100%)`;
-      case 'error': return `linear-gradient(135deg, #ef4444 0%, #dc2626 100%)`;
-      default: return theme.colors.white;
-    }
-  }};
-  color: ${props => props.$variant ? theme.colors.white : theme.colors.textPrimary};
-  border: 1px solid ${props => props.$variant ? 'transparent' : theme.colors.gray200};
-  border-radius: ${theme.borderRadius.xl};
-  padding: ${theme.spacing.lg};
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  min-height: 120px;
-  box-shadow: ${theme.shadows.md};
-  position: relative;
-  overflow: hidden;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  
-  &:hover {
-    transform: translateY(-4px);
-    box-shadow: ${theme.shadows.lg};
-  }
-  
-  .v {
-    font-weight: ${theme.fontWeights.bold};
-    font-size: ${theme.fontSizes['3xl']};
-    line-height: 1;
-    margin-bottom: ${theme.spacing.xs};
-  }
-  .l {
-    font-size: ${theme.fontSizes.sm};
-    opacity: 0.9;
-    font-weight: ${theme.fontWeights.medium};
-  }
-
-  @media (max-width: ${theme.breakpoints.tablet}) {
-    padding: ${theme.spacing.md};
-    min-height: 100px;
-  }
-`;
+// SummaryCard removed to fix ESLint unused variable warnings.
 
 const StatRow = styled.div`
   display: grid;
