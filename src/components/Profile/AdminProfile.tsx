@@ -11,8 +11,6 @@ import {
   FiShield
 } from 'react-icons/fi';
 import { 
-  BarChart, 
-  Bar, 
   XAxis, 
   YAxis, 
   CartesianGrid, 
