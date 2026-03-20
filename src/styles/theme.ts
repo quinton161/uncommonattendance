@@ -89,6 +89,7 @@ export const theme = {
     lg: '0.5rem',
     xl: '0.75rem',
     '2xl': '1rem',
+    '3xl': '1.5rem',
     full: '9999px',
   },
   
@@ -101,10 +102,22 @@ export const theme = {
   },
   
   breakpoints: {
-    mobile: '480px',
+    // Small phones
+    xs: '320px',
+    // Large phones / small tablets
+    sm: '480px',
+    // Tablets
     tablet: '768px',
-    desktop: '1024px',
-    wide: '1280px',
+    // Small laptops
+    laptop: '1024px',
+    // Desktop monitors
+    desktop: '1280px',
+    // Large monitors
+    wide: '1440px',
+    // Extra wide / TVs
+    tv: '1920px',
+    // Aliases for common use
+    mobile: '480px',
   },
   
   zIndex: {

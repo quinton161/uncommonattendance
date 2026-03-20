@@ -40,9 +40,22 @@ const ProfileContainer = styled.div`
   margin: 0 auto;
   width: 100%;
 
+  /* Tablet and smaller */
   @media (max-width: ${theme.breakpoints.tablet}) {
     padding: ${theme.spacing.md};
     gap: ${theme.spacing.lg};
+  }
+
+  /* Large screens (TVs) */
+  @media (min-width: ${theme.breakpoints.tv}) {
+    padding: ${theme.spacing['3xl']};
+    gap: ${theme.spacing['3xl']};
+    max-width: 2400px;
+  }
+
+  /* Extra large screens */
+  @media (min-width: ${theme.breakpoints.wide}) {
+    max-width: 1800px;
   }
 `;
 
@@ -62,6 +75,17 @@ const AdminHero = styled(motion.div)`
     flex-direction: column;
     padding: ${theme.spacing.xl};
     text-align: center;
+    gap: ${theme.spacing.xl};
+  }
+
+  @media (min-width: ${theme.breakpoints.tv}) {
+    padding: ${theme.spacing['3xl']};
+    border-radius: ${theme.borderRadius['3xl']};
+  }
+
+  @media (max-width: ${theme.breakpoints.xs}) {
+    padding: ${theme.spacing.lg};
+    gap: ${theme.spacing.lg};
   }
 `;
 
@@ -86,6 +110,22 @@ const StatsGrid = styled.div`
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: ${theme.spacing.lg};
+
+  /* Large screens - show more columns */
+  @media (min-width: ${theme.breakpoints.tv}) {
+    grid-template-columns: repeat(4, 1fr);
+    gap: ${theme.spacing.xl};
+  }
+
+  /* Wide screens */
+  @media (min-width: ${theme.breakpoints.wide}) {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  /* Small phones - single column */
+  @media (max-width: ${theme.breakpoints.xs}) {
+    grid-template-columns: 1fr;
+  }
 `;
 
 const StatCard = styled(motion.div)`
@@ -106,6 +146,18 @@ const ChartsSection = styled.div`
   @media (max-width: ${theme.breakpoints.desktop}) {
     grid-template-columns: 1fr;
   }
+
+  /* Large screens (TVs) - more spacing */
+  @media (min-width: ${theme.breakpoints.tv}) {
+    gap: ${theme.spacing['3xl']};
+    grid-template-columns: 1fr 1fr;
+  }
+
+  /* Small phones - single column */
+  @media (max-width: ${theme.breakpoints.xs}) {
+    grid-template-columns: 1fr;
+    gap: ${theme.spacing.lg};
+  }
 `;
 
 const ChartCard = styled(motion.div)`
@@ -119,6 +171,23 @@ const ActionGrid = styled.div`
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
   gap: ${theme.spacing.lg};
+
+  /* Large screens (TVs) */
+  @media (min-width: ${theme.breakpoints.tv}) {
+    grid-template-columns: repeat(4, 1fr);
+    gap: ${theme.spacing.xl};
+  }
+
+  /* Wide screens */
+  @media (min-width: ${theme.breakpoints.wide}) {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  /* Small phones - single column */
+  @media (max-width: ${theme.breakpoints.xs}) {
+    grid-template-columns: 1fr;
+    gap: ${theme.spacing.md};
+  }
 `;
 
 const ActionCard = styled(Button)`
@@ -161,6 +230,28 @@ const StudentListGrid = styled.div`
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: ${theme.spacing.lg};
+
+  /* Large screens (TVs) - more columns */
+  @media (min-width: ${theme.breakpoints.tv}) {
+    grid-template-columns: repeat(4, 1fr);
+    gap: ${theme.spacing.xl};
+  }
+
+  /* Wide screens */
+  @media (min-width: ${theme.breakpoints.wide}) {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  /* Desktop */
+  @media (min-width: ${theme.breakpoints.desktop}) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* Small phones - single column */
+  @media (max-width: ${theme.breakpoints.xs}) {
+    grid-template-columns: 1fr;
+    gap: ${theme.spacing.md};
+  }
 `;
 
 const StudentCard = styled(motion.div)`
@@ -171,12 +262,30 @@ const StudentCard = styled(motion.div)`
   display: flex;
   flex-direction: column;
   gap: ${theme.spacing.sm};
+
+  /* Large screens */
+  @media (min-width: ${theme.breakpoints.tv}) {
+    padding: ${theme.spacing.xl};
+    border-radius: ${theme.borderRadius['2xl']};
+  }
+
+  /* Small phones */
+  @media (max-width: ${theme.breakpoints.xs}) {
+    padding: ${theme.spacing.md};
+  }
 `;
 
 const StudentHeader = styled.div`
   display: flex;
   align-items: center;
   gap: ${theme.spacing.md};
+
+  /* Small phones - stack on very small screens */
+  @media (max-width: ${theme.breakpoints.xs}) {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: ${theme.spacing.sm};
+  }
 `;
 
 const StudentAvatar = styled.div`
