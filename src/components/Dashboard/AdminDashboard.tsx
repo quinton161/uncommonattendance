@@ -20,6 +20,7 @@ import { AttendanceAnalyticsService } from '../../services/attendanceAnalyticsSe
 import { uniqueToast } from '../../utils/toastUtils';
 import { saveAs } from 'file-saver';
 import { ProfileUpload } from '../Profile/ProfileUpload';
+import { AdminProfile } from '../Profile/AdminProfile';
 import { AdminAttendanceAnalytics } from '../Analytics/AdminAttendanceAnalytics';
 
 import { 
@@ -666,7 +667,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
       case 'profile':
         return (
           <div style={{ padding: 0 }}>
-            <ProfileUpload />
+            <AdminProfile />
           </div>
         );
       default:

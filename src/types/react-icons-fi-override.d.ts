@@ -55,5 +55,13 @@ declare module 'react-icons/fi' {
   export const FiLogOutIcon: any;
   export const FiDownload: any;
   export const FiMapPin: any;
+
+  // Missing icons used in Profile components
+  export const FiUserPlus: any;
+  export const FiPlayCircle: any;
+  export const FiShield: any;
+  export const FiAtSign: any;
+  export const FiBookOpen: any;
+  export const FiEdit2: any;
 }
 

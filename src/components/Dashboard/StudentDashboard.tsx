@@ -19,6 +19,7 @@ import StarField from '../Common/StarField';
 import TimeSyncStatus from '../Common/TimeSyncStatus';
 import { uniqueToast } from '../../utils/toastUtils';
 import { StudentAttendanceAnalytics } from '../Analytics/StudentAttendanceAnalytics';
+import { StudentProfile } from '../Profile/StudentProfile';
 import { 
   FiLogOut, 
   FiUser, 
@@ -564,8 +565,8 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
         );
       case 'profile':
         return (
-          <div style={{ padding: theme.spacing.lg }}>
-            <ProfileUpload />
+          <div style={{ padding: 0 }}>
+            <StudentProfile />
           </div>
         );
       default:
