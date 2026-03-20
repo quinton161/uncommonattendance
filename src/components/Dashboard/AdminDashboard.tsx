@@ -282,6 +282,8 @@ const StatCard = styled.div<{ variant?: 'primary' | 'secondary' | 'accent' }>`
   border-radius: ${theme.borderRadius.xl};
   box-shadow: ${theme.shadows.md};
   border: 1px solid ${theme.colors.gray200};
+  position: relative;
+  overflow: hidden;
   ${staggeredAnimation(0.1)}
   ${respectMotionPreference}
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -302,21 +304,6 @@ const StatLabel = styled.div`
   font-size: ${theme.fontSizes.sm};
   opacity: 0.9;
   margin-bottom: ${theme.spacing.sm};
-`;
-
-const Badge = styled.div`
-  background-color: ${theme.colors.success};
-  color: white;
-  font-size: 10px;
-  font-weight: bold;
-  min-width: 18px;
-  height: 18px;
-  border-radius: 9px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 5px;
-  margin-top: 4px;
 `;
 
 const MobileHeader = styled.div`
@@ -552,9 +539,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
       uniqueToast.info('Loading dashboard data...', { autoClose: 2000 });
       // Test connection and load stats
       await dataService.testConnection();
-      
-      const users = await dataService.getUsers();
-      // Backward compat: some legacy users may not have userType set; treat them as students.
       
       const dashboardStats = await dataService.getDashboardStats();
       

@@ -114,21 +114,6 @@ const SidebarFooter = styled.div`
   padding-top: ${theme.spacing.xl};
 `;
 
-const Badge = styled.div`
-  background-color: ${theme.colors.success};
-  color: white;
-  font-size: 10px;
-  font-weight: bold;
-  min-width: 18px;
-  height: 18px;
-  border-radius: 9px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 5px;
-  margin-top: 4px;
-`;
-
 const NavItem = styled.div<{ active?: boolean }>`
   display: flex;
   align-items: center;
@@ -302,57 +287,11 @@ const StatCard = styled.div<{ variant?: 'primary' | 'secondary' | 'accent' }>`
   }
 `;
 
-const StatValue = styled.div`
-  font-size: ${theme.fontSizes['3xl']};
-  font-weight: ${theme.fontWeights.bold};
-  margin-bottom: ${theme.spacing.xs};
-`;
-
-const StatLabel = styled.div`
-  font-size: ${theme.fontSizes.sm};
-  opacity: 0.9;
-  margin-bottom: ${theme.spacing.sm};
-`;
-
-const StatIcon = styled.div`
-  position: absolute;
-  top: ${theme.spacing.md};
-  right: ${theme.spacing.md};
-  font-size: ${theme.fontSizes['2xl']};
-  opacity: 0.3;
-`;
-
-const StatChange = styled.div<{ positive?: boolean }>`
-  font-size: ${theme.fontSizes.xs};
-  color: ${({ positive }) => positive ? theme.colors.success : theme.colors.error};
-  margin-top: ${theme.spacing.xs};
-  font-weight: ${theme.fontWeights.medium};
-`;
-
 const AttendanceCard = styled(StatCard)`
   grid-column: span 2;
   
   @media (max-width: 768px) {
     grid-column: span 1;
-  }
-`;
-
-const AttendanceControls = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: ${theme.spacing.lg};
-  
-  @media (max-width: ${theme.breakpoints.tablet}) {
-    flex-direction: column;
-    gap: ${theme.spacing.md};
-    align-items: stretch;
-    margin-top: ${theme.spacing.md};
-  }
-  
-  @media (max-width: ${theme.breakpoints.mobile}) {
-    gap: ${theme.spacing.sm};
-    margin-top: ${theme.spacing.sm};
   }
 `;
 
@@ -387,126 +326,6 @@ const StatusIndicator = styled.div<{ isCheckedIn: boolean }>`
       height: 8px;
     }
   }
-`;
-
-const ContentGrid = styled.div`
-  display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: ${theme.spacing.lg};
-  
-  @media (max-width: ${theme.breakpoints.desktop}) {
-    grid-template-columns: 1fr;
-    gap: ${theme.spacing.md};
-  }
-  
-  @media (max-width: ${theme.breakpoints.mobile}) {
-    gap: ${theme.spacing.sm};
-  }
-`;
-
-const Card = styled.div`
-  background: ${theme.colors.white};
-  border-radius: ${theme.borderRadius.xl};
-  padding: ${theme.spacing.lg};
-  box-shadow: ${theme.shadows.sm};
-  border: 1px solid ${theme.colors.gray200};
-  ${staggeredAnimation(0.2)}
-  ${respectMotionPreference}
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  
-  &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12);
-  }
-  
-  @media (max-width: ${theme.breakpoints.tablet}) {
-    padding: ${theme.spacing.md};
-    border-radius: ${theme.borderRadius.lg};
-  }
-  
-  @media (max-width: ${theme.breakpoints.mobile}) {
-    padding: ${theme.spacing.sm};
-    border-radius: ${theme.borderRadius.md};
-  }
-`;
-
-const CardTitle = styled.h3`
-  font-size: ${theme.fontSizes.lg};
-  font-weight: ${theme.fontWeights.semibold};
-  color: ${theme.colors.textPrimary};
-  margin: 0 0 ${theme.spacing.lg} 0;
-  
-  @media (max-width: ${theme.breakpoints.tablet}) {
-    font-size: ${theme.fontSizes.base};
-    margin: 0 0 ${theme.spacing.md} 0;
-  }
-  
-  @media (max-width: ${theme.breakpoints.mobile}) {
-    font-size: ${theme.fontSizes.sm};
-    margin: 0 0 ${theme.spacing.sm} 0;
-  }
-`;
-
-const ActivityList = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: ${theme.spacing.sm};
-`;
-
-const ActivityItem = styled.div`
-  display: flex;
-  align-items: center;
-  gap: ${theme.spacing.md};
-  padding: ${theme.spacing.sm};
-  border-radius: ${theme.borderRadius.md};
-  background: ${theme.colors.backgroundSecondary};
-`;
-
-const ActivityIcon = styled.div<{ type: 'checkin' | 'checkout' | 'evt' }>`
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: ${theme.fontSizes.sm};
-  background: ${props => {
-    switch (props.type) {
-      case 'checkin': return theme.colors.success;
-      case 'checkout': return theme.colors.warning;
-      case 'evt': return theme.colors.primary;
-      default: return theme.colors.gray400;
-    }
-  }};
-  color: ${theme.colors.white};
-`;
-
-const UserAvatar = styled.div`
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: ${theme.colors.primary};
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: ${theme.colors.white};
-  font-weight: ${theme.fontWeights.medium};
-  font-size: ${theme.fontSizes.sm};
-`;
-
-const AttendanceList = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: ${theme.spacing.sm};
-`;
-
-const AttendanceItem = styled.div`
-  display: flex;
-  align-items: center;
-  gap: ${theme.spacing.md};
-  padding: ${theme.spacing.sm};
-  border-radius: ${theme.borderRadius.md};
-  background: ${theme.colors.backgroundSecondary};
 `;
 
 interface StudentDashboardProps {
@@ -879,10 +698,7 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
 
           <StatsGrid style={{ padding: theme.spacing.lg }}>
             <AttendanceCard variant="primary">
-              <StatIcon>
-                <FiCheckCircle size={32} />
-              </StatIcon>
-              <StatLabel>Daily Attendance</StatLabel>
+              <div style={{ fontSize: theme.fontSizes.sm, opacity: 0.9, marginBottom: theme.spacing.sm }}>Daily Attendance</div>
               <StatusIndicator isCheckedIn={checkedIn}>
                 {checkedIn ? 'Checked In' : 'Not Checked In'}
                 {checkInTime && (
