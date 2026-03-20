@@ -1,19 +1,14 @@
-import React, { useState } from 'react';
+import React from 'react';
 import styled from 'styled-components';
 import { motion } from 'framer-motion';
 import { 
-  FiUser, 
   FiActivity, 
   FiUsers, 
-  FiCalendar, 
   FiDownload, 
   FiTrendingUp,
-  FiAward,
-  FiCheckCircle,
   FiUserPlus,
   FiPlayCircle,
-  FiShield,
-  FiClock
+  FiShield
 } from 'react-icons/fi';
 import { 
   BarChart, 
@@ -24,10 +19,7 @@ import {
   Tooltip, 
   ResponsiveContainer,
   LineChart,
-  Line,
-  Cell,
-  PieChart,
-  Pie
+  Line
 } from 'recharts';
 import { theme } from '../../styles/theme';
 import { useAuth } from '../../contexts/AuthContext';

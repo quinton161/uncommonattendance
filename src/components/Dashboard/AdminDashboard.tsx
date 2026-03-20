@@ -19,7 +19,7 @@ import { AttendanceService } from '../../services/attendanceService';
 import { AttendanceAnalyticsService } from '../../services/attendanceAnalyticsService';
 import { uniqueToast } from '../../utils/toastUtils';
 import { saveAs } from 'file-saver';
-import { ProfileUpload } from '../Profile/ProfileUpload';
+
 import { AdminProfile } from '../Profile/AdminProfile';
 import { AdminAttendanceAnalytics } from '../Analytics/AdminAttendanceAnalytics';
 

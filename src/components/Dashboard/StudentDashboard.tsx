@@ -13,7 +13,7 @@ import {
 import { AttendanceService } from '../../services/attendanceService';
 import { TimeService } from '../../services/timeService';
 import { qrCodeService, DailyQRCode } from '../../services/qrCodeService';
-import { ProfileUpload } from '../Profile/ProfileUpload';
+
 import { UncommonLogo } from '../Common/UncommonLogo';
 import StarField from '../Common/StarField';
 import TimeSyncStatus from '../Common/TimeSyncStatus';
@@ -362,6 +362,10 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
     const unsubscribe = qrCodeService.subscribeToDailyCode((qrData: DailyQRCode | null) => {
       if (qrData) {
         setDailyQRCode(qrData.code);
+        // Auto-fill the input field if it's empty
+        if (!qrCodeInput && qrData.code) {
+          setQrCodeInput(qrData.code);
+        }
       } else {
         setDailyQRCode(null);
       }

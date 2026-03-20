@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import styled from 'styled-components';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -11,8 +11,6 @@ import {
   FiAlertCircle, 
   FiCheckCircle, 
   FiClock,
-  FiMessageSquare,
-  FiEdit2,
   FiCamera
 } from 'react-icons/fi';
 import { 
@@ -25,11 +23,9 @@ import {
   ResponsiveContainer,
   PieChart,
   Pie,
-  Cell,
-  BarChart,
-  Bar
+  Cell
 } from 'recharts';
-import { format, subDays, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay } from 'date-fns';
+import { format } from 'date-fns';
 import { theme } from '../../styles/theme';
 import { useAuth } from '../../contexts/AuthContext';
 import { ProfileUpload } from './ProfileUpload';
