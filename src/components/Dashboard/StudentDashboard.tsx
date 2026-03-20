@@ -10,9 +10,7 @@ import {
   containerAnimation,
   respectMotionPreference 
 } from '../../styles/animations';
-import DataService from '../../services/DataService';
 import { AttendanceService } from '../../services/attendanceService';
-import { DailyAttendanceService, DailyAttendanceStats } from '../../services/dailyAttendanceService';
 import { TimeService } from '../../services/timeService';
 import { ProfileUpload } from '../Profile/ProfileUpload';
 import { UncommonLogo } from '../Common/UncommonLogo';
@@ -26,16 +24,10 @@ import {
   FiUser, 
   FiBarChart2, 
   FiCheckCircle, 
-  FiTrendingUp,
-  FiClock,
-  FiStar,
-  FiTarget,
-  FiMenu,
   FiBarChart,
   FiCamera,
   FiX
 } from 'react-icons/fi';
-import { QRCodeSVG } from 'qrcode.react';
 
 const DashboardContainer = styled.div`
   display: flex;
@@ -535,15 +527,6 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
     currentStreak: 0,
     todayStatus: 'Not Checked In',
     lastCheckIn: null as Date | null
-  });
-  const [dailyStats] = useState<DailyAttendanceStats>({
-    totalDays: 0,
-    presentDays: 0,
-    absentDays: 0,
-    currentStreak: 0,
-    longestStreak: 0,
-    attendanceRate: 0,
-    lastAttendanceDate: null,
   });
   const [showScanner, setShowScanner] = useState(false);
   const [qrCodeInput, setQrCodeInput] = useState('');

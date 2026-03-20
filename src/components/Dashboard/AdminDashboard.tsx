@@ -555,7 +555,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
       
       const users = await dataService.getUsers();
       // Backward compat: some legacy users may not have userType set; treat them as students.
-      const students = users.filter((u: any) => !u.userType || u.userType === 'attendee');
       
       const dashboardStats = await dataService.getDashboardStats();
       
