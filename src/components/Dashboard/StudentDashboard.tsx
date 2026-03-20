@@ -12,13 +12,13 @@ import {
 } from '../../styles/animations';
 import { AttendanceService } from '../../services/attendanceService';
 import { TimeService } from '../../services/timeService';
+import { qrCodeService, DailyQRCode } from '../../services/qrCodeService';
 import { ProfileUpload } from '../Profile/ProfileUpload';
 import { UncommonLogo } from '../Common/UncommonLogo';
 import StarField from '../Common/StarField';
 import TimeSyncStatus from '../Common/TimeSyncStatus';
 import { uniqueToast } from '../../utils/toastUtils';
 import { StudentAttendanceAnalytics } from '../Analytics/StudentAttendanceAnalytics';
-import { qrCodeService } from '../../services/qrCodeService';
 import { 
   FiLogOut, 
   FiUser, 
@@ -28,6 +28,8 @@ import {
   FiCamera,
   FiX
 } from 'react-icons/fi';
+import { Copy } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 
 const DashboardContainer = styled.div`
   display: flex;
@@ -350,7 +352,30 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
   const [showScanner, setShowScanner] = useState(false);
   const [qrCodeInput, setQrCodeInput] = useState('');
   const [isVerifyingQR, setIsVerifyingQR] = useState(false);
+  const [dailyQRCode, setDailyQRCode] = useState<string | null>(null);
   const attendanceService = AttendanceService.getInstance();
+
+  useEffect(() => {
+    if (!user) return;
+    
+    const unsubscribe = qrCodeService.subscribeToDailyCode((qrData: DailyQRCode | null) => {
+      if (qrData) {
+        setDailyQRCode(qrData.code);
+      } else {
+        setDailyQRCode(null);
+      }
+    });
+    
+    return () => unsubscribe();
+  }, [user]);
+
+  const handleCopyCode = () => {
+    if (dailyQRCode) {
+      navigator.clipboard.writeText(dailyQRCode);
+      uniqueToast.success('Check-in code copied to clipboard!');
+      setQrCodeInput(dailyQRCode);
+    }
+  };
 
   const checkTodayAttendance = useCallback(async () => {
     if (!user) return;
@@ -718,6 +743,62 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
                   </span>
                 )}
               </StatusIndicator>
+              
+              {!checkedIn && dailyQRCode && (
+                <div style={{ 
+                  marginTop: theme.spacing.lg, 
+                  padding: theme.spacing.md,
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  borderRadius: theme.borderRadius.lg,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: theme.spacing.md
+                }}>
+                  <div style={{ color: theme.colors.white, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.medium }}>
+                    Today's Check-in QR Code
+                  </div>
+                  <div style={{ 
+                    background: 'white', 
+                    padding: theme.spacing.sm, 
+                    borderRadius: theme.borderRadius.md,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <QRCodeSVG value={dailyQRCode} size={150} level="H" />
+                  </div>
+                  <div style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: theme.spacing.sm,
+                    width: '100%' 
+                  }}>
+                    <code style={{ 
+                      flex: 1,
+                      background: 'rgba(0,0,0,0.2)', 
+                      padding: theme.spacing.sm, 
+                      borderRadius: theme.borderRadius.sm,
+                      textAlign: 'center',
+                      fontSize: theme.fontSizes.lg,
+                      letterSpacing: '2px',
+                      color: theme.colors.white
+                    }}>
+                      {dailyQRCode}
+                    </code>
+                    <Button 
+                      variant="outline" 
+                      onClick={handleCopyCode}
+                      style={{ padding: theme.spacing.sm, minWidth: 'auto', border: '1px solid rgba(255,255,255,0.3)', color: 'white' }}
+                    >
+                      <Copy size={20} />
+                    </Button>
+                  </div>
+                  <p style={{ fontSize: '11px', opacity: 0.7, textAlign: 'center', margin: 0 }}>
+                    Copy this code and paste it below to check in
+                  </p>
+                </div>
+              )}
               
               {!checkedIn && showScanner && (
                 <div style={{ marginTop: theme.spacing.md, width: '100%' }}>
