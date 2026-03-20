@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { motion } from 'framer-motion';
 import { 
@@ -24,6 +24,7 @@ import {
 import { theme } from '../../styles/theme';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../Common/Button';
+import DataService from '../../services/DataService';
 
 const ProfileContainer = styled.div`
   padding: ${theme.spacing.xl};
@@ -122,31 +123,82 @@ const ActionCard = styled(Button)`
   gap: ${theme.spacing.sm};
   text-align: center;
   border-radius: ${theme.borderRadius.xl};
+  background: white;
+  color: ${theme.colors.primary};
+  border: 1px solid ${theme.colors.gray200};
+  box-shadow: ${theme.shadows.sm};
+  
+  &:hover {
+    background: ${theme.colors.gray50};
+    transform: translateY(-2px);
+    box-shadow: ${theme.shadows.md};
+  }
+  
+  span {
+    color: ${theme.colors.primary};
+    font-weight: ${theme.fontWeights.medium};
+  }
   
   svg {
     width: 24px;
     height: 24px;
+    color: ${theme.colors.primary};
   }
 `;
 
 export const AdminProfile: React.FC = () => {
   const { user } = useAuth();
+  const [stats, setStats] = useState({
+    totalEvents: 0,
+    totalAttendees: 0,
+    todayAttendance: 0,
+    attendanceRate: 0,
+    engagementRate: 0,
+  });
+  const [activityData, setActivityData] = useState<any[]>([]);
 
-  // Mock data
-  const classStats = [
-    { name: 'Web Dev A', attendance: 94, engagement: 88 },
-    { name: 'Web Dev B', attendance: 82, engagement: 75 },
-    { name: 'Design A', attendance: 91, engagement: 92 },
-    { name: 'Design B', attendance: 88, engagement: 84 },
-  ];
+  useEffect(() => {
+    const ds = DataService.getInstance();
+    
+    const fetchStats = async () => {
+      const dashboardStats = await ds.getDashboardStats();
+      const attendance = await ds.getAttendance();
+      
+      // Group attendance by day for the line chart
+      const last7Days = Array.from({ length: 7 }, (_, i) => {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        return d.toISOString().split('T')[0];
+      }).reverse();
 
-  const activityData = [
-    { name: 'Mon', sessions: 4 },
-    { name: 'Tue', sessions: 6 },
-    { name: 'Wed', sessions: 3 },
-    { name: 'Thu', sessions: 5 },
-    { name: 'Fri', sessions: 7 },
-  ];
+      const chartData = last7Days.map(date => ({
+        name: new Date(date).toLocaleDateString('en-US', { weekday: 'short' }),
+        sessions: attendance.filter(a => a.date === date).length
+      }));
+
+      setActivityData(chartData);
+      setStats({
+        totalEvents: dashboardStats.totalEvents,
+        totalAttendees: dashboardStats.totalAttendees,
+        todayAttendance: dashboardStats.todayAttendance,
+        attendanceRate: Math.round((dashboardStats.todayAttendance / (dashboardStats.totalAttendees || 1)) * 100),
+        engagementRate: 85, // Placeholder until real engagement logic is added to DataService
+      });
+    };
+
+    fetchStats();
+
+    // Subscribe to real-time updates for today's attendance
+    const unsubscribe = ds.subscribeToTodayAttendance((summary) => {
+      setStats(prev => ({
+        ...prev,
+        todayAttendance: summary.presentCount,
+        attendanceRate: Math.round((summary.presentCount / (summary.totalUsers || 1)) * 100)
+      }));
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   return (
     <ProfileContainer>
@@ -160,25 +212,25 @@ export const AdminProfile: React.FC = () => {
         <AdminInfo>
           <RoleBadge>{user?.userType || 'Administrator'}</RoleBadge>
           <h1 style={{ fontSize: theme.fontSizes['4xl'], margin: '0 0 8px 0' }}>{user?.displayName}</h1>
-          <p style={{ opacity: 0.8 }}>Managing 4 Active Classes • 124 Total Students</p>
+          <p style={{ opacity: 0.8 }}>Managing {stats.totalEvents} Active Classes • {stats.totalAttendees} Total Students</p>
         </AdminInfo>
       </AdminHero>
 
       <StatsGrid>
         <StatCard whileHover={{ y: -5 }}>
           <span style={{ color: theme.colors.textSecondary, fontSize: theme.fontSizes.sm }}>Total Sessions</span>
-          <span style={{ fontSize: theme.fontSizes['3xl'], fontWeight: 'bold' }}>42</span>
-          <span style={{ color: theme.colors.success, fontSize: theme.fontSizes.xs }}>+12% from last month</span>
+          <span style={{ fontSize: theme.fontSizes['3xl'], fontWeight: 'bold' }}>{stats.totalEvents}</span>
+          <span style={{ color: theme.colors.success, fontSize: theme.fontSizes.xs }}>Active program</span>
         </StatCard>
         <StatCard whileHover={{ y: -5 }}>
-          <span style={{ color: theme.colors.textSecondary, fontSize: theme.fontSizes.sm }}>Avg. Attendance</span>
-          <span style={{ fontSize: theme.fontSizes['3xl'], fontWeight: 'bold' }}>89%</span>
-          <span style={{ color: theme.colors.success, fontSize: theme.fontSizes.xs }}>Stable performance</span>
+          <span style={{ color: theme.colors.textSecondary, fontSize: theme.fontSizes.sm }}>Today's Attendance</span>
+          <span style={{ fontSize: theme.fontSizes['3xl'], fontWeight: 'bold' }}>{stats.attendanceRate}%</span>
+          <span style={{ color: theme.colors.success, fontSize: theme.fontSizes.xs }}>{stats.todayAttendance} students present</span>
         </StatCard>
         <StatCard whileHover={{ y: -5 }}>
           <span style={{ color: theme.colors.textSecondary, fontSize: theme.fontSizes.sm }}>Engagement Rate</span>
-          <span style={{ fontSize: theme.fontSizes['3xl'], fontWeight: 'bold' }}>84%</span>
-          <span style={{ color: theme.colors.warning, fontSize: theme.fontSizes.xs }}>-2% dip detected</span>
+          <span style={{ fontSize: theme.fontSizes['3xl'], fontWeight: 'bold' }}>{stats.engagementRate}%</span>
+          <span style={{ color: theme.colors.success, fontSize: theme.fontSizes.xs }}>Overall participation</span>
         </StatCard>
       </StatsGrid>
 
@@ -189,19 +241,16 @@ export const AdminProfile: React.FC = () => {
         >
           <h3 style={{ marginBottom: theme.spacing.xl, display: 'flex', alignItems: 'center', gap: '8px' }}>
             <FiTrendingUp color={theme.colors.primary} />
-            Class Performance
+            Real-time Insights
           </h3>
-          <div style={{ height: 300 }}>
-            <ResponsiveContainer>
-              <BarChart data={classStats}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="attendance" fill={theme.colors.primary} radius={[4, 4, 0, 0]} name="Attendance %" />
-                <Bar dataKey="engagement" fill={theme.colors.secondary} radius={[4, 4, 0, 0]} name="Engagement %" />
-              </BarChart>
-            </ResponsiveContainer>
+          <p style={{ color: theme.colors.textSecondary, fontSize: theme.fontSizes.sm }}>
+            Live data reflecting student presence and program engagement across all active sessions.
+          </p>
+          <div style={{ height: 250, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '48px', fontWeight: 'bold', color: theme.colors.primary }}>{stats.todayAttendance}</div>
+              <div style={{ color: theme.colors.textSecondary }}>Students Present Today</div>
+            </div>
           </div>
         </ChartCard>
 
@@ -211,7 +260,7 @@ export const AdminProfile: React.FC = () => {
         >
           <h3 style={{ marginBottom: theme.spacing.xl, display: 'flex', alignItems: 'center', gap: '8px' }}>
             <FiActivity color={theme.colors.primary} />
-            Weekly Activity
+            Weekly Attendance Trend
           </h3>
           <div style={{ height: 300 }}>
             <ResponsiveContainer>
@@ -229,19 +278,19 @@ export const AdminProfile: React.FC = () => {
 
       <h2 style={{ fontSize: theme.fontSizes.xl, marginTop: theme.spacing.lg }}>Quick Actions</h2>
       <ActionGrid>
-        <ActionCard variant="primary">
+        <ActionCard>
           <FiPlayCircle />
           <span>Start New Session</span>
         </ActionCard>
-        <ActionCard variant="outline">
+        <ActionCard>
           <FiUserPlus />
           <span>Add New Student</span>
         </ActionCard>
-        <ActionCard variant="outline">
+        <ActionCard>
           <FiDownload />
           <span>Export Monthly Report</span>
         </ActionCard>
-        <ActionCard variant="outline">
+        <ActionCard>
           <FiUsers />
           <span>Manage Instructor Team</span>
         </ActionCard>
