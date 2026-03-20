@@ -1,7 +1,9 @@
+import { db } from './firebase';
 import { AttendanceService } from './attendanceService';
 import DataService from './DataService';
 import { TimeService } from './timeService';
 import { AttendanceRecord, AttendanceStatus } from '../types';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
 
 export type DateRangePreset = 'today' | 'week' | 'month' | 'custom';
 
@@ -372,6 +374,51 @@ export class AttendanceAnalyticsService {
       streak: { current, longest },
       warning: { isBelowThreshold: attendanceRate < warningThreshold, threshold: warningThreshold },
     };
+  }
+
+  // Subscribe to real-time analytics updates for a specific student
+  subscribeToStudentAnalytics(studentId: string, range: DateRange, callback: (analytics: StudentAnalytics) => void): () => void {
+    // Listen for attendance changes in the specified range
+    const attendanceQuery = query(
+      collection(db, 'attendance'),
+      where('studentId', '==', studentId),
+      where('date', '>=', range.startDate),
+      where('date', '<=', range.endDate)
+    );
+
+    console.log(`📡 Setting up real-time analytics listener for student ${studentId}`);
+
+    const unsubscribe = onSnapshot(attendanceQuery, async () => {
+      try {
+        const analytics = await this.getStudentAnalytics(studentId, range);
+        callback(analytics);
+      } catch (error) {
+        console.error('❌ Error updating real-time student analytics:', error);
+      }
+    });
+
+    return unsubscribe;
+  }
+  // Subscribe to real-time analytics updates for admin (all students)
+  subscribeToAdminAnalytics(range: DateRange, callback: (analytics: AdminAnalytics) => void): () => void {
+    const attendanceQuery = query(
+      collection(db, 'attendance'),
+      where('date', '>=', range.startDate),
+      where('date', '<=', range.endDate)
+    );
+
+    console.log(`📡 Setting up real-time admin analytics listener for range: ${range.startDate} to ${range.endDate}`);
+
+    const unsubscribe = onSnapshot(attendanceQuery, async () => {
+      try {
+        const analytics = await this.getAdminAnalytics(range);
+        callback(analytics);
+      } catch (error) {
+        console.error('❌ Error updating real-time admin analytics:', error);
+      }
+    });
+
+    return unsubscribe;
   }
 }
 

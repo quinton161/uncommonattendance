@@ -221,6 +221,8 @@ export function StudentAttendanceAnalytics(props: { studentId: string }): React.
   useEffect(() => {
     let mounted = true;
     setLoading(true);
+
+    // Initial fetch
     attendanceAnalyticsService.getStudentAnalytics(props.studentId, range).then((res) => {
       if (!mounted) return;
       setAnalytics(res);
@@ -229,7 +231,22 @@ export function StudentAttendanceAnalytics(props: { studentId: string }): React.
       if (!mounted) return;
       setLoading(false);
     });
-    return () => { mounted = false; };
+
+    // Real-time subscription
+    const unsubscribe = attendanceAnalyticsService.subscribeToStudentAnalytics(
+      props.studentId,
+      range,
+      (updatedAnalytics) => {
+        if (!mounted) return;
+        setAnalytics(updatedAnalytics);
+        setLoading(false);
+      }
+    );
+
+    return () => { 
+      mounted = false; 
+      unsubscribe();
+    };
   }, [props.studentId, range.startDate, range.endDate]);
 
   const dailyData = (analytics?.daily || []).map(d => ({

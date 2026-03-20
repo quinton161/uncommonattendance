@@ -469,13 +469,7 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
         // Ignore IP failures
       }
       
-      const now = new Date();
-      const timeService = TimeService.getInstance();
-      const harareNow = timeService.getCurrentTime();
-      const currentTime = harareNow.getHours() * 60 + harareNow.getMinutes(); // Convert to minutes
-      const nineAM = 9 * 60; // 9:00 AM in minutes
-      
-      const isLate = currentTime > nineAM;
+      // Note: Time validation (9:00 AM + 5 min grace) is handled in attendanceService.checkIn()
       
       let attendanceRecord;
       let retries = 0;
@@ -503,15 +497,20 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
         location: attendanceRecord.location?.address || 'No location'
       });
       
+      const currentTime = new Date();
+      const timeService = TimeService.getInstance();
+      const harareNow = timeService.getCurrentTime();
+      const isLate = timeService.isLate(harareNow);
+      
       setCheckedIn(true);
-      setCheckInTime(now);
+      setCheckInTime(currentTime);
       setCanCheckIn(false);
       setCanCheckOut(true);
       
       setStats(prev => ({
         ...prev,
         todayStatus: isLate ? 'Checked In (Late)' : 'Checked In',
-        lastCheckIn: now,
+        lastCheckIn: currentTime,
       }));
 
       if (isLate) {

@@ -286,8 +286,13 @@ export class InternetTimeService {
     return `${y}-${m}-${d}`;
   }
 
+  private readonly CHECK_IN_START_HOUR = 7;
+  private readonly CHECK_IN_END_HOUR = 9;
+  private readonly LATE_HOUR = 9;
+  private readonly GRACE_PERIOD_MINUTES = 5;
+  
   /**
-   * Check if it's after 9 AM Harare time
+   * Check if it's 9:00 AM or later Harare time (late check-in)
    */
   isLate(checkInTime: Date): boolean {
     const parts = new Intl.DateTimeFormat('en-US', {
@@ -303,12 +308,47 @@ export class InternetTimeService {
     const minutes = minuteStr ? Number(minuteStr) : NaN;
 
     if (!Number.isFinite(hours) || !Number.isFinite(minutes)) {
-      // If formatting fails for some reason, default to "not late" rather than blocking check-in.
       return false;
     }
     
-    // Consider late if after 9:00 AM
-    return hours > 9 || (hours === 9 && minutes > 0);
+    // Late if exactly 9:00 AM or after
+    return hours >= this.LATE_HOUR;
+  }
+  
+  /**
+   * Check if check-in is allowed (between 7:00 AM and 9:05 AM)
+   * Returns true if student can check in, false otherwise
+   */
+  canCheckIn(checkInTime: Date): boolean {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Africa/Harare',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    }).formatToParts(checkInTime);
+
+    const hourStr = parts.find(p => p.type === 'hour')?.value;
+    const minuteStr = parts.find(p => p.type === 'minute')?.value;
+    const hours = hourStr ? Number(hourStr) : NaN;
+    const minutes = minuteStr ? Number(minuteStr) : NaN;
+
+    if (!Number.isFinite(hours) || !Number.isFinite(minutes)) {
+      return false;
+    }
+    
+    const checkInMinutes = hours * 60 + minutes;
+    const startMinutes = this.CHECK_IN_START_HOUR * 60;
+    const endMinutes = this.CHECK_IN_END_HOUR * 60 + this.GRACE_PERIOD_MINUTES;
+
+    return checkInMinutes >= startMinutes && checkInMinutes <= endMinutes;
+  }
+  
+  /**
+   * Check if student should be marked as absent (after 9:05 AM and no check-in)
+   */
+  shouldMarkAbsent(): boolean {
+    const now = this.getCurrentTime();
+    return !this.canCheckIn(now);
   }
 
   /**

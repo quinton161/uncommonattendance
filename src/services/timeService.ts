@@ -35,9 +35,19 @@ export class TimeService {
     return this.internetTimeService.getCurrentDateString();
   }
 
-  // Check if it's after 9 AM Harare time
+  // Check if it's after 9:05 AM Harare time (late check-in)
   isLate(checkInTime: Date): boolean {
     return this.internetTimeService.isLate(checkInTime);
+  }
+  
+  // Check if check-in is still allowed (before 9:05 AM)
+  canCheckIn(checkInTime: Date): boolean {
+    return this.internetTimeService.canCheckIn(checkInTime);
+  }
+  
+  // Check if student should be marked as absent (after 9:05 AM)
+  shouldMarkAbsent(): boolean {
+    return this.internetTimeService.shouldMarkAbsent();
   }
 
   // Get time zone info

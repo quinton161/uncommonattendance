@@ -11,7 +11,8 @@ import {
   FiShield,
   FiUser,
   FiCheckCircle,
-  FiClock
+  FiClock,
+  FiRefreshCw
 } from 'react-icons/fi';
 import { 
   XAxis, 
@@ -27,6 +28,8 @@ import { theme } from '../../styles/theme';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../Common/Button';
 import DataService from '../../services/DataService';
+import { attendanceAnalyticsService } from '../../services/attendanceAnalyticsService';
+import { AttendanceService } from '../../services/attendanceService';
 
 const ProfileContainer = styled.div`
   padding: ${theme.spacing.xl};
@@ -354,6 +357,7 @@ export const AdminProfile: React.FC = () => {
     totalEvents: 0,
     totalAttendees: 0,
     todayAttendance: 0,
+    todayAbsent: 0,
     avgAttendanceRate: 0,
     engagementRate: 0,
   });
@@ -364,64 +368,74 @@ export const AdminProfile: React.FC = () => {
     const ds = DataService.getInstance();
     
     const fetchAdminData = async () => {
-      const dashboardStats = await ds.getDashboardStats();
-      const users = await ds.getUsers();
-      const students = users.filter(u => u.userType === 'attendee' || !u.userType);
-      
-      // Calculate average attendance rate across all students using the same logic as StudentProfile
-      const studentStatsPromises = students.map(s => ds.getStudentStats(s.id || s.uid));
-      const allStudentStats = await Promise.all(studentStatsPromises);
-      
-      const totalRate = allStudentStats.reduce((acc, curr) => acc + curr.attendanceRate, 0);
-      const avgRate = Math.round(totalRate / (students.length || 1));
+      try {
+        const dashboardStats = await ds.getDashboardStats();
+        const users = await ds.getUsers();
+        
+        // Use consistent student filtering logic
+        const students = users.filter((u: any) => {
+          const userType = (u?.userType || '').toString().toLowerCase();
+          if (!u.id && !u.uid) return false;
+          return userType === 'attendee' || userType === 'student' || userType === '';
+        });
+        
+        // Calculate cohort metrics using StudentProfile logic
+        const studentStatsPromises = students.map(s => ds.getStudentStats(s.id || s.uid));
+        const allStudentStats = await Promise.all(studentStatsPromises);
+        
+        const totalRate = allStudentStats.reduce((acc, curr) => acc + (curr.attendanceRate || 0), 0);
+        const avgRate = students.length > 0 ? Math.round(totalRate / students.length) : 0;
 
-      // Unified weekly trend (last 7 days)
-      const last7Days = Array.from({ length: 7 }, (_, i) => {
-        const d = new Date();
-        d.setDate(d.getDate() - i);
-        return d.toISOString().split('T')[0];
-      }).reverse();
+        // Unified engagement score (Cohort average)
+        // Student logic: (attendanceRate * 0.7) + (85 * 0.3)
+        const cohortEngagement = students.length > 0 
+          ? Math.round((avgRate * 0.7) + (85 * 0.3)) 
+          : 0;
 
-      const attendance = await ds.getAttendance();
-      const chartData = last7Days.map(date => ({
-        name: new Date(date).toLocaleDateString('en-US', { weekday: 'short' }),
-        sessions: attendance.filter(a => {
-          const aDate = a.date || (a.checkInTime ? a.checkInTime.toISOString().split('T')[0] : '');
-          return aDate === date;
-        }).length
-      }));
+        // Unified weekly trend (last 7 days)
+        const last7DaysInterval = eachDayOfInterval({
+          start: subDays(new Date(), 6),
+          end: new Date(),
+        });
 
-      setActivityData(chartData);
-      setStats({
-        totalEvents: dashboardStats.totalEvents,
-        totalAttendees: students.length,
-        todayAttendance: dashboardStats.todayAttendance,
-        avgAttendanceRate: avgRate,
-        engagementRate: Math.round((avgRate * 0.7) + (85 * 0.3)), // Unified engagement calculation
-      });
-
-      // Build student analytics data (same logic as StudentProfile)
-      const studentAnalyticsData = await Promise.all(
-        students.map(async (student) => {
-          const studentId = student.id || student.uid;
-          const studentStats = await ds.getStudentStats(studentId);
-          const studentAttendance = await ds.getAttendance(studentId);
-          
-          // Calculate daily trend (last 7 days) - same as StudentProfile
-          const last7Days = eachDayOfInterval({
-            start: subDays(new Date(), 6),
-            end: new Date(),
+        const attendance = await ds.getAttendance();
+        const chartData = last7DaysInterval.map(date => {
+          const dateStr = format(date, 'yyyy-MM-dd');
+          const dayAttendance = attendance.filter(a => {
+            const aDate = a.date || (a.checkInTime ? format(new Date(a.checkInTime), 'yyyy-MM-dd') : '');
+            return aDate === dateStr;
           });
+          return {
+            name: format(date, 'EEE'),
+            sessions: dayAttendance.length
+          };
+        });
 
-          const trendData = last7Days.map(date => {
+        setActivityData(chartData);
+        setStats({
+          totalEvents: dashboardStats.totalEvents || 0,
+          totalAttendees: students.length,
+          todayAttendance: dashboardStats.todayAttendance || 0,
+          todayAbsent: students.length - (dashboardStats.todayAttendance || 0),
+          avgAttendanceRate: avgRate,
+          engagementRate: cohortEngagement,
+        });
+
+        // Build individual student analytics cards
+        const studentAnalyticsData = allStudentStats.map((sStats, index) => {
+          const student = students[index];
+          const studentId = student.id || student.uid;
+          
+          const trend = last7DaysInterval.map(date => {
             const dateStr = format(date, 'yyyy-MM-dd');
-            const present = studentAttendance.some((a: any) => {
+            const wasPresent = attendance.some(a => {
+              const isSameStudent = a.studentId === studentId || a.userId === studentId;
               const aDate = a.date || (a.checkInTime ? format(new Date(a.checkInTime), 'yyyy-MM-dd') : '');
-              return aDate === dateStr;
+              return isSameStudent && aDate === dateStr;
             });
             return {
               name: format(date, 'EEE'),
-              rate: present ? 100 : 0
+              rate: wasPresent ? 100 : 0
             };
           });
 
@@ -429,79 +443,57 @@ export const AdminProfile: React.FC = () => {
             id: studentId,
             name: student.displayName || student.name || 'Unknown',
             email: student.email || '',
-            attendanceRate: studentStats.attendanceRate,
-            totalSessions: studentStats.totalSessions || 0,
-            trendData,
-            recentActivity: (studentStats.recentActivity || []).slice(0, 5).map((a: any) => ({
+            attendanceRate: sStats.attendanceRate || 0,
+            totalSessions: sStats.totalCheckIns || 0,
+            trendData: trend,
+            recentActivity: (sStats.recentActivity || []).slice(0, 5).map((a: any) => ({
               date: a.checkInTime,
               status: a.status || 'present'
             }))
           };
-        })
-      );
+        });
 
-      // Sort by attendance rate (highest first)
-      setStudentAnalytics(studentAnalyticsData.sort((a, b) => b.attendanceRate - a.attendanceRate));
+        setStudentAnalytics(studentAnalyticsData.sort((a, b) => b.attendanceRate - a.attendanceRate));
+      } catch (error) {
+        console.error('❌ Admin data synchronization error:', error);
+      }
     };
 
     fetchAdminData();
 
-    // Real-time subscription for today's summary
-    const unsubscribe = ds.subscribeToTodayAttendance(async (summary) => {
-      // Update today's attendance count immediately
+    // Subscribe to real-time check-ins for the summary cards and student list
+    const unsubscribeSummary = ds.subscribeToTodayAttendance(async (summary) => {
       setStats(prev => ({
         ...prev,
-        todayAttendance: summary.presentCount,
+        todayAttendance: summary?.presentCount || 0,
+        todayAbsent: (prev.totalAttendees || 0) - (summary?.presentCount || 0),
       }));
-
-      // Also refresh student analytics to show real-time check-ins
-      // This ensures admin sees the same data as students when they check in
-      const users = await ds.getUsers();
-      const students = users.filter(u => u.userType === 'attendee' || !u.userType);
-      const attendance = await ds.getAttendance();
-
-      const last7Days = eachDayOfInterval({
-        start: subDays(new Date(), 6),
-        end: new Date(),
-      });
-
-      const updatedStudentAnalytics = await Promise.all(
-        students.map(async (student) => {
-          const studentId = student.id || student.uid;
-          const studentStats = await ds.getStudentStats(studentId);
-          const studentAttendance = attendance.filter((a: any) => a.studentId === studentId || a.userId === studentId);
-
-          const trendData = last7Days.map(date => {
-            const dateStr = format(date, 'yyyy-MM-dd');
-            const present = studentAttendance.some((a: any) => {
-              const aDate = a.date || (a.checkInTime ? format(new Date(a.checkInTime), 'yyyy-MM-dd') : '');
-              return aDate === dateStr;
-            });
-            return {
-              name: format(date, 'EEE'),
-              rate: present ? 100 : 0
-            };
-          });
-
-          return {
-            id: studentId,
-            name: student.displayName || student.name || 'Unknown',
-            email: student.email || '',
-            attendanceRate: studentStats.attendanceRate,
-            totalSessions: studentStats.totalSessions || 0,
-            trendData,
-            recentActivity: (studentStats.recentActivity || []).slice(0, 5).map((a: any) => ({
-              date: a.checkInTime,
-              status: a.status || 'present'
-            }))
-          };
-        })
-      );
-
-      setStudentAnalytics(updatedStudentAnalytics.sort((a, b) => b.attendanceRate - a.attendanceRate));
+      // Refresh list to show new check-ins immediately
+      fetchAdminData();
     });
 
-    return () => unsubscribe();
+    // Subscribe to real-time analytics for the charts (Weekly Volume)
+    const currentRange = {
+      preset: 'week' as const,
+      startDate: format(subDays(new Date(), 6), 'yyyy-MM-dd'),
+      endDate: format(new Date(), 'yyyy-MM-dd')
+    };
+    
+    const unsubscribeAnalytics = attendanceAnalyticsService.subscribeToAdminAnalytics(
+      currentRange,
+      (analytics: any) => {
+        const chartData = analytics.daily.map((d: any) => ({
+          name: format(new Date(d.date), 'EEE'),
+          sessions: d.present + d.late
+        }));
+        setActivityData(chartData);
+      }
+    );
+
+    return () => {
+      unsubscribeSummary();
+      unsubscribeAnalytics();
+    };
   }, []);
 
   return (
@@ -522,19 +514,24 @@ export const AdminProfile: React.FC = () => {
 
       <StatsGrid>
         <StatCard whileHover={{ y: -5 }}>
-          <span style={{ color: theme.colors.textSecondary, fontSize: theme.fontSizes.sm }}>Total Sessions</span>
-          <span style={{ fontSize: theme.fontSizes['3xl'], fontWeight: 'bold' }}>{stats.totalEvents}</span>
-          <span style={{ color: theme.colors.success, fontSize: theme.fontSizes.xs }}>Program Overview</span>
+          <span style={{ color: theme.colors.textSecondary, fontSize: theme.fontSizes.sm }}>Total Students</span>
+          <span style={{ fontSize: theme.fontSizes['3xl'], fontWeight: 'bold' }}>{stats.totalAttendees}</span>
+          <span style={{ color: theme.colors.primary, fontSize: theme.fontSizes.xs }}>Registered Attendees</span>
+        </StatCard>
+        <StatCard whileHover={{ y: -5 }}>
+          <span style={{ color: theme.colors.textSecondary, fontSize: theme.fontSizes.sm }}>Present Today</span>
+          <span style={{ fontSize: theme.fontSizes['3xl'], fontWeight: 'bold', color: theme.colors.success }}>{stats.todayAttendance}</span>
+          <span style={{ color: theme.colors.success, fontSize: theme.fontSizes.xs }}>Checked in today</span>
+        </StatCard>
+        <StatCard whileHover={{ y: -5 }}>
+          <span style={{ color: theme.colors.textSecondary, fontSize: theme.fontSizes.sm }}>Absent Today</span>
+          <span style={{ fontSize: theme.fontSizes['3xl'], fontWeight: 'bold', color: theme.colors.error }}>{stats.todayAbsent}</span>
+          <span style={{ color: theme.colors.error, fontSize: theme.fontSizes.xs }}>Not yet checked in</span>
         </StatCard>
         <StatCard whileHover={{ y: -5 }}>
           <span style={{ color: theme.colors.textSecondary, fontSize: theme.fontSizes.sm }}>Avg. Attendance</span>
           <span style={{ fontSize: theme.fontSizes['3xl'], fontWeight: 'bold' }}>{stats.avgAttendanceRate}%</span>
           <span style={{ color: theme.colors.success, fontSize: theme.fontSizes.xs }}>Historical average</span>
-        </StatCard>
-        <StatCard whileHover={{ y: -5 }}>
-          <span style={{ color: theme.colors.textSecondary, fontSize: theme.fontSizes.sm }}>Engagement Rate</span>
-          <span style={{ fontSize: theme.fontSizes['3xl'], fontWeight: 'bold' }}>{stats.engagementRate}%</span>
-          <span style={{ color: theme.colors.success, fontSize: theme.fontSizes.xs }}>System-wide score</span>
         </StatCard>
       </StatsGrid>
 
@@ -678,6 +675,21 @@ export const AdminProfile: React.FC = () => {
         <ActionCard>
           <FiUsers />
           <span>Manage Instructor Team</span>
+        </ActionCard>
+        <ActionCard onClick={async () => {
+          if (window.confirm('🚨 WARNING: This will permanently delete ALL attendance records and reset all student statistics to zero. This action cannot be undone. Are you absolutely sure?')) {
+            try {
+              const as = AttendanceService.getInstance();
+              const result = await as.masterResetAttendance();
+              alert(`✅ Success: ${result.deletedCount} records deleted. All statistics have been reset to zero.`);
+              window.location.reload();
+            } catch (error) {
+              alert('❌ Error: Failed to reset data.');
+            }
+          }
+        }}>
+          <FiRefreshCw style={{ color: theme.colors.error }} />
+          <span style={{ color: theme.colors.error }}>Master Reset</span>
         </ActionCard>
       </ActionGrid>
     </ProfileContainer>

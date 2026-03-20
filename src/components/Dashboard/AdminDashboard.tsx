@@ -22,6 +22,7 @@ import { saveAs } from 'file-saver';
 
 import { AdminProfile } from '../Profile/AdminProfile';
 import { AdminAttendanceAnalytics } from '../Analytics/AdminAttendanceAnalytics';
+import { MasterResetModal } from '../Admin/MasterResetModal';
 
 import { 
   BarChart, 
@@ -448,6 +449,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
   const analyticsService = AttendanceAnalyticsService.getInstance();
   const [markingStudentId, setMarkingStudentId] = useState<string | null>(null);
   const [markAllLoading, setMarkAllLoading] = useState(false);
+  const [showMasterResetModal, setShowMasterResetModal] = useState(false);
+  const [masterResetStats, setMasterResetStats] = useState({ deletedUsers: 0, deletedAttendance: 0, preservedUsers: 0 });
 
   const handleGenerateQR = async () => {
     try {
@@ -713,6 +716,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
         <FiUser size={20} />
         My Profile
       </NavItem>
+      {user?.userType === 'admin' && (
+        <NavItem 
+          onClick={() => setShowMasterResetModal(true)}
+          style={{ color: '#dc2626' }}
+        >
+          <FiRefreshCw size={20} />
+          Master Reset
+        </NavItem>
+      )}
         
       <div style={{ marginTop: 'auto', paddingTop: theme.spacing.xl }}>
         {onNavigateToProfile && (
@@ -1040,6 +1052,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
           </motion.div>
         </AnimatePresence>
       </MainContent>
+      
+      {showMasterResetModal && (
+        <MasterResetModal
+          onClose={() => setShowMasterResetModal(false)}
+          onConfirm={async () => {
+            const result = await dataService.masterReset();
+            setMasterResetStats(result);
+          }}
+          userCount={masterResetStats.deletedUsers}
+          attendanceCount={masterResetStats.deletedAttendance}
+        />
+      )}
     </DashboardContainer>
   );
 };

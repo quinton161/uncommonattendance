@@ -11,7 +11,8 @@ import {
   addDoc,
   Timestamp, 
   deleteDoc,
-  onSnapshot 
+  onSnapshot,
+  serverTimestamp 
 } from 'firebase/firestore';
 import { ref, deleteObject } from 'firebase/storage';
 import { db, storage } from './firebase';
@@ -141,7 +142,8 @@ class DataService {
     const t = (user?.userType || '').toString().toLowerCase();
     // Backward compat: treat missing userType as attendee/student.
     if (!t) return true;
-    return t === 'attendee';
+    // Include both 'attendee' and 'student' user types
+    return t === 'attendee' || t === 'student';
   }
 
   private isInstructorUser(user: any): boolean {
@@ -431,20 +433,35 @@ class DataService {
   // Dashboard Stats
   async getDashboardStats(): Promise<any> {
     const events = await this.getEvents();
-    const attendance = await this.getAttendance();
     const users = await this.getUsers();
+    const students = users.filter(u => this.isStudentUser(u));
 
     const timeService = TimeService.getInstance();
     const today = timeService.getCurrentDateString();
-    const todayAttendance = attendance.filter(a => a.date === today);
+    
+    // FETCH TODAY'S UNIQUE ATTENDANCE
+    const attendanceQuery = query(
+      collection(db, 'attendance'),
+      where('date', '==', today)
+    );
+    const attendanceSnapshot = await getDocs(attendanceQuery);
+    
+    // Since we now enforce unique IDs (YYYY-MM-DD_studentId), 
+    // the number of documents is the number of unique students present.
+    const todayAttendanceCount = attendanceSnapshot.size;
 
     return {
       totalEvents: events.length,
       activeEvents: events.filter(e => e.eventStatus === 'published').length,
-      totalAttendees: users.filter(u => this.isStudentUser(u)).length,
+      totalAttendees: students.length,
       totalInstructors: users.filter(u => this.isInstructorUser(u)).length,
-      todayAttendance: todayAttendance.length,
-      recentAttendance: attendance.slice(0, 10) // Show more recent activity
+      todayAttendance: todayAttendanceCount,
+      recentAttendance: attendanceSnapshot.docs.slice(0, 10).map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        checkInTime: doc.data().checkInTime?.toDate(),
+        checkOutTime: doc.data().checkOutTime?.toDate()
+      }))
     };
   }
 
@@ -516,14 +533,27 @@ class DataService {
       });
     }
 
+    // ENSURE UNIQUE ATTENDANCE RECORDS (Fix for 167 present / 174 absent issue)
+    // We create a map of studentId -> most recent attendance record for the target date
+    const uniqueAttendanceMap = new Map();
+    if (currentAttendance) {
+      currentAttendance.forEach(record => {
+        const studentId = record.studentId || record.userId;
+        if (studentId) {
+          // If we have multiple records, keep the one with checkInTime (or latest if both have it)
+          const existing = uniqueAttendanceMap.get(studentId);
+          if (!existing || (record.checkInTime && (!existing.checkInTime || record.checkInTime > existing.checkInTime))) {
+            uniqueAttendanceMap.set(studentId, record);
+          }
+        }
+      });
+    }
+
     const attendanceSummary = users
       .filter(user => this.isStudentUser(user))
       .map(user => {
         const studentUid = user.uid || user.id;
-        const userAttendance = currentAttendance?.find(a => 
-          a.studentId === studentUid || 
-          a.userId === studentUid
-        );
+        const userAttendance = uniqueAttendanceMap.get(studentUid);
         
         let status: 'present' | 'late' | 'absent' | 'completed' = 'absent';
         let checkInTime = null;
@@ -559,60 +589,56 @@ class DataService {
     callback({
       date,
       totalUsers: attendanceSummary.length,
-      presentCount: attendanceSummary.filter(a => a.status === 'present' || a.status === 'completed').length,
+      presentCount: attendanceSummary.filter(a => a.status === 'present' || a.status === 'completed' || a.status === 'late').length,
       absentCount: attendanceSummary.filter(a => a.status === 'absent').length,
       lateCount: attendanceSummary.filter(a => a.status === 'late' || a.isLate).length,
       attendanceList: attendanceSummary,
-      recentAttendance: currentAttendance?.slice(0, 10) || []
+      recentAttendance: Array.from(uniqueAttendanceMap.values()).slice(0, 10)
     });
   }
   async getStudentStats(userId: string): Promise<any> {
     const userAttendance = await this.getAttendance(userId);
     const events = await this.getEvents();
 
-    // Calculate streak
-    let currentStreak = 0;
-    // Filter out duplicates for the same day and sort by date descending
-    const uniqueDaysAttendance = Array.from(new Map(
-      userAttendance
-        .filter(a => a.date || a.checkInTime)
-        .map(a => [a.date || (a.checkInTime.toISOString ? a.checkInTime.toISOString().split('T')[0] : new Date(a.checkInTime).toISOString().split('T')[0]), a])
-    ).values()).sort((a, b) => 
+    // ENSURE UNIQUE DAILY RECORDS (Fix for inflated stats)
+    // Filter duplicates: keep the best record for each unique date
+    const uniqueDailyAttendance = Array.from(
+      userAttendance.reduce((map, record) => {
+        const dateStr = record.date || (record.checkInTime ? (record.checkInTime.toISOString ? record.checkInTime.toISOString().split('T')[0] : new Date(record.checkInTime).toISOString().split('T')[0]) : '');
+        if (!dateStr) return map;
+        
+        const existing = map.get(dateStr);
+        // Keep 'completed' over 'present', or just keep the first one found
+        if (!existing || record.status === 'completed' || (!existing.checkOutTime && record.checkOutTime)) {
+          map.set(dateStr, record);
+        }
+        return map;
+      }, new Map()).values()
+    ).sort((a: any, b: any) => 
       new Date(b.date || b.checkInTime).getTime() - new Date(a.date || a.checkInTime).getTime()
     );
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    // Streak logic: A streak is alive if the user checked in today OR yesterday.
-    // If the most recent check-in is before yesterday, the streak is 0.
-    if (uniqueDaysAttendance.length === 0) {
-      currentStreak = 0;
-    } else {
-      const mostRecentDateStr = uniqueDaysAttendance[0].date || new Date(uniqueDaysAttendance[0].checkInTime).toISOString().split('T')[0];
+    // Calculate streak using unique records
+    let currentStreak = 0;
+    if (uniqueDailyAttendance.length > 0) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      const mostRecentDateStr = (uniqueDailyAttendance[0] as any).date || new Date((uniqueDailyAttendance[0] as any).checkInTime).toISOString().split('T')[0];
       const mostRecentDate = new Date(mostRecentDateStr);
       mostRecentDate.setHours(0, 0, 0, 0);
       
       const diffInDays = Math.floor((today.getTime() - mostRecentDate.getTime()) / (1000 * 60 * 60 * 24));
       
-      if (diffInDays > 1) {
-        // Streak broken (more than 1 day since last check-in)
-        currentStreak = 0;
-      } else {
-        // Streak continues: walk back from the most recent check-in date
+      if (diffInDays <= 1) {
         currentStreak = 1;
-        for (let i = 1; i < uniqueDaysAttendance.length; i++) {
-          const currentDateStr = uniqueDaysAttendance[i-1].date || new Date(uniqueDaysAttendance[i-1].checkInTime).toISOString().split('T')[0];
-          const prevDateStr = uniqueDaysAttendance[i].date || new Date(uniqueDaysAttendance[i].checkInTime).toISOString().split('T')[0];
-          
-          const current = new Date(currentDateStr);
-          const previous = new Date(prevDateStr);
+        for (let i = 1; i < uniqueDailyAttendance.length; i++) {
+          const current = new Date((uniqueDailyAttendance[i-1] as any).date || (uniqueDailyAttendance[i-1] as any).checkInTime);
+          const previous = new Date((uniqueDailyAttendance[i] as any).date || (uniqueDailyAttendance[i] as any).checkInTime);
           current.setHours(0, 0, 0, 0);
           previous.setHours(0, 0, 0, 0);
           
-          const gap = Math.floor((current.getTime() - previous.getTime()) / (1000 * 60 * 60 * 24));
-          
-          if (gap === 1) {
+          if (Math.floor((current.getTime() - previous.getTime()) / (1000 * 60 * 60 * 24)) === 1) {
             currentStreak++;
           } else {
             break;
@@ -621,47 +647,34 @@ class DataService {
       }
     }
 
-    // Calculate attendance rate
-    const totalPossibleDays = 30; // Last 30 days
-    const attendanceRate = Math.min(100, (userAttendance.length / totalPossibleDays) * 100);
+    // Calculate attendance rate (based on unique days present vs target)
+    const totalPossibleDays = 30; // Last 30 days target
+    const attendanceRate = Math.min(100, (uniqueDailyAttendance.length / totalPossibleDays) * 100);
 
-    // Calculate average check-in time
-    const checkInTimes = userAttendance
-      .filter(a => a.checkInTime)
-      .map(a => new Date(a.checkInTime).getHours() * 60 + new Date(a.checkInTime).getMinutes());
+    // Calculate average check-in time using unique records
+    const checkInTimes = uniqueDailyAttendance
+      .filter((a: any) => a.checkInTime)
+      .map((a: any) => new Date(a.checkInTime).getHours() * 60 + new Date(a.checkInTime).getMinutes());
     
-    const averageCheckInMinutes = checkInTimes.length > 0 
-      ? checkInTimes.reduce((sum, time) => sum + time, 0) / checkInTimes.length
-      : 9 * 60; // Default 9:00 AM
-
-    const averageHours = Math.floor(averageCheckInMinutes / 60);
-    const averageMinutes = Math.floor(averageCheckInMinutes % 60);
-    const averageCheckInTime = `${averageHours}:${averageMinutes.toString().padStart(2, '0')} ${averageHours >= 12 ? 'PM' : 'AM'}`;
-
-    // Calculate monthly progress
-    const currentMonth = new Date().getMonth();
-    const currentYear = new Date().getFullYear();
-    const monthlyAttendance = userAttendance.filter(a => {
-      const attendanceDate = new Date(a.date || a.checkInTime);
-      return attendanceDate.getMonth() === currentMonth && attendanceDate.getFullYear() === currentYear;
-    });
+    let averageCheckInTime = '9:00 AM';
+    if (checkInTimes.length > 0) {
+      const avgMins = checkInTimes.reduce((sum, t) => sum + t, 0) / checkInTimes.length;
+      const hours = Math.floor(avgMins / 60);
+      const mins = Math.floor(avgMins % 60);
+      averageCheckInTime = `${hours % 12 || 12}:${mins.toString().padStart(2, '0')} ${hours >= 12 ? 'PM' : 'AM'}`;
+    }
 
     return {
-      totalCheckIns: userAttendance.length,
+      totalCheckIns: uniqueDailyAttendance.length,
       currentStreak,
       attendanceRate: Math.round(attendanceRate),
       averageCheckInTime,
-      monthlyAttendance: monthlyAttendance.length,
-      eventsAttended: events.filter(e => e.instructorId === userId).length, // Events they might have organized
-      recentActivity: userAttendance.slice(0, 10).map(a => ({
+      recentActivity: uniqueDailyAttendance.slice(0, 10).map((a: any) => ({
         ...a,
         type: 'checkin',
         id: a.id || `activity-${Date.now()}-${Math.random()}`
       })),
-      lateCheckIns: userAttendance.filter(a => {
-        const checkInTime = new Date(a.checkInTime);
-        return checkInTime.getHours() >= 9; // After 9 AM is considered late
-      }).length
+      lateCheckIns: uniqueDailyAttendance.filter((a: any) => a.status === 'late').length
     };
   }
 
@@ -674,16 +687,28 @@ class DataService {
     
     // Filter attendance for the target date
     const dailyAttendance = allAttendance.filter(a => {
-      // Handle both string dates and Firestore Timestamps/Date objects
       const attendanceDate = a.date || (a.checkInTime ? (a.checkInTime.toISOString ? a.checkInTime.toISOString().split('T')[0] : new Date(a.checkInTime).toISOString().split('T')[0]) : '');
       return attendanceDate === targetDate;
+    });
+
+    // ENSURE UNIQUE ATTENDANCE RECORDS (Fix for 167 present / 174 absent issue)
+    const uniqueAttendanceMap = new Map();
+    dailyAttendance.forEach(record => {
+      const studentId = record.studentId || record.userId;
+      if (studentId) {
+        const existing = uniqueAttendanceMap.get(studentId);
+        if (!existing || (record.checkInTime && (!existing.checkInTime || record.checkInTime > existing.checkInTime))) {
+          uniqueAttendanceMap.set(studentId, record);
+        }
+      }
     });
 
     // Create summary for each user
     const attendanceSummary = allUsers
       .filter(user => this.isStudentUser(user)) // Only students (missing userType treated as student)
       .map(user => {
-        const userAttendance = dailyAttendance.find(a => a.userId === user.uid || a.studentId === user.uid || a.studentId === user.id || a.userId === user.id);
+        const studentUid = user.uid || user.id;
+        const userAttendance = uniqueAttendanceMap.get(studentUid);
         
         let status: 'present' | 'late' | 'absent' | 'completed' = 'absent';
         let checkInTime = null;
@@ -702,7 +727,7 @@ class DataService {
         }
 
         return {
-          userId: user.uid || user.id,
+          userId: studentUid,
           userName: user.displayName || 'Unknown',
           userEmail: user.email,
           userType: user.userType,
@@ -717,11 +742,158 @@ class DataService {
     return {
       date: targetDate,
       totalUsers: attendanceSummary.length,
-      presentCount: attendanceSummary.filter(a => a.status === 'present' || a.status === 'completed').length,
+      presentCount: attendanceSummary.filter(a => a.status === 'present' || a.status === 'completed' || a.status === 'late').length,
       absentCount: attendanceSummary.filter(a => a.status === 'absent').length,
       lateCount: attendanceSummary.filter(a => a.status === 'late' || a.isLate).length,
       attendanceList: attendanceSummary
     };
+  }
+  
+  // Log admin actions for attendance changes (for tracking and audit)
+  async logAdminAction(
+    adminId: string,
+    adminName: string,
+    action: 'update' | 'delete' | 'mark_present' | 'mark_absent' | 'edit',
+    targetUserId: string,
+    targetUserName: string,
+    details: {
+      previousStatus?: string;
+      newStatus?: string;
+      previousCheckInTime?: Date;
+      newCheckInTime?: Date;
+      reason?: string;
+      date?: string;
+    }
+  ): Promise<void> {
+    if (!this.useFirebase) {
+      console.log('Admin action logged (mock):', { adminId, action, targetUserId, details });
+      return;
+    }
+    
+    try {
+      await addDoc(collection(db, 'admin_actions'), {
+        actionType: 'attendance',
+        action,
+        adminId,
+        adminName,
+        targetUserId,
+        targetUserName,
+        details: {
+          ...details,
+          previousStatus: details.previousStatus || null,
+          newStatus: details.newStatus || null,
+          reason: details.reason || null
+        },
+        timestamp: serverTimestamp(),
+        date: details.date || this.getCurrentDateString()
+      });
+      console.log('✅ Admin action logged:', action, 'on', targetUserName);
+    } catch (error) {
+      console.error('❌ Failed to log admin action:', error);
+      // Don't throw - logging failure shouldn't block the main operation
+    }
+  }
+  
+  // Helper to get current date string
+  private getCurrentDateString(): string {
+    const timeService = TimeService.getInstance();
+    return timeService.getCurrentDateString();
+  }
+
+  // MASTER RESET: Delete all attendees and attendance records, keep admins and instructors
+  async masterReset(): Promise<{ deletedUsers: number; deletedAttendance: number; preservedUsers: number }> {
+    console.log('⚠️ DataService: Starting MASTER RESET...');
+    
+    if (!this.useFirebase) {
+      // Mock mode: filter and clear mock data
+      const initialCount = mockUsers.length;
+      const attendees = mockUsers.filter(u => this.isStudentUser(u));
+      const preserved = mockUsers.filter(u => !this.isStudentUser(u));
+      
+      // Clear all attendees and attendance
+      mockUsers.length = 0;
+      mockUsers.push(...preserved);
+      mockAttendance.length = 0;
+      
+      console.log('✅ Mock Master Reset complete:', { 
+        deletedUsers: attendees.length, 
+        deletedAttendance: 'all (mock)', 
+        preservedUsers: preserved.length 
+      });
+      
+      return { 
+        deletedUsers: attendees.length, 
+        deletedAttendance: 0, // Mock mode doesn't track this
+        preservedUsers: preserved.length 
+      };
+    }
+
+    try {
+      // 1. Get all users
+      const usersSnapshot = await getDocs(collection(db, 'users'));
+      const allUsers = usersSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+
+      // 2. Separate users into attendees (to delete) and protected (admins/instructors)
+      const usersToDelete = allUsers.filter((user: any) => {
+        const userType = (user.userType || '').toString().toLowerCase();
+        // Delete if attendee/student, keep if admin or instructor
+        return userType === 'attendee' || userType === 'student' || userType === '' || !userType;
+      });
+
+      const usersToPreserve = allUsers.filter((user: any) => {
+        const userType = (user.userType || '').toString().toLowerCase();
+        return userType === 'admin' || userType === 'instructor';
+      });
+
+      console.log(`📊 Master Reset Analysis: ${usersToDelete.length} attendees to delete, ${usersToPreserve.length} users to preserve`);
+
+      // 3. Delete all attendees
+      const userDeletePromises = usersToDelete.map((user: any) => 
+        deleteDoc(doc(db, 'users', user.id))
+      );
+      await Promise.all(userDeletePromises);
+      console.log('🗑️ Deleted:', usersToDelete.length, 'attendee accounts');
+
+      // 4. Delete ALL attendance records (no records should be kept)
+      const attendanceSnapshot = await getDocs(collection(db, 'attendance'));
+      const attendanceDeletePromises = attendanceSnapshot.docs.map(doc => 
+        deleteDoc(doc.ref)
+      );
+      await Promise.all(attendanceDeletePromises);
+      console.log('🗑️ Deleted:', attendanceSnapshot.size, 'attendance records');
+
+      // 5. Delete registrations
+      const registrationsSnapshot = await getDocs(collection(db, 'registrations'));
+      const registrationDeletePromises = registrationsSnapshot.docs.map(doc => 
+        deleteDoc(doc.ref)
+      );
+      await Promise.all(registrationDeletePromises);
+      console.log('🗑️ Deleted:', registrationsSnapshot.size, 'registrations');
+
+      // 6. Delete conversations
+      const conversationsSnapshot = await getDocs(collection(db, 'conversations'));
+      const conversationDeletePromises = conversationsSnapshot.docs.map(doc => 
+        deleteDoc(doc.ref)
+      );
+      await Promise.all(conversationDeletePromises);
+      console.log('🗑️ Deleted:', conversationsSnapshot.size, 'conversations');
+
+      console.log('✅ Master Reset completed successfully!');
+      uniqueToast.success(`Master Reset complete! Deleted ${usersToDelete.length} attendees and all attendance records.`);
+
+      return {
+        deletedUsers: usersToDelete.length,
+        deletedAttendance: attendanceSnapshot.size,
+        preservedUsers: usersToPreserve.length
+      };
+    } catch (error) {
+      console.error('❌ Master Reset failed:', error);
+      uniqueToast.error('Master Reset failed. Please try again.');
+      throw error;
+    }
   }
 }
 

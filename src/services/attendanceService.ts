@@ -90,61 +90,40 @@ export class AttendanceService {
     console.log('  - getCurrentDateString() (Harare date):', today);
     console.log('  - Today from toISOString (may differ at midnight):', harareTime.toISOString().split('T')[0]);
     
-    // Validate the generated IDs
-    if (!today || today.includes('NaN')) {
-      throw new Error('Invalid date generated');
+    // Check if check-in is still allowed (before 9:05 AM)
+    // If after 9:05 AM, block check-in and mark as absent
+    if (!this.timeService.canCheckIn(harareTime)) {
+      console.log('❌ Check-in blocked: Too late (after 9:05 AM)');
+      throw new Error('Check-in is closed. The attendance deadline has passed (9:05 AM). You will be marked as absent.');
     }
     
-    if (!today.match(/^\d{4}-\d{2}-\d{2}$/)) {
-      console.error('Invalid date format:', today);
-      throw new Error('Invalid date format');
-    }
-    
-    const attendanceId = `${studentId}_${today}`;
-    
-    // Validate document ID doesn't contain invalid characters
-    const invalidChars = ['/', '\\', '#', '%'];
-    const hasInvalidChar = invalidChars.some(char => attendanceId.includes(char));
-    if (hasInvalidChar) {
-      console.error('Invalid attendance ID generated:', attendanceId);
-      throw new Error('Failed to generate valid attendance ID');
-    }
-    
-    console.log('Generated attendanceId:', attendanceId);
+    // Generate a unique document ID for this attendance record (YYYY-MM-DD_studentId)
+    const attendanceDocId = `${today}_${studentId}`;
+    const attendanceRef = doc(db, 'attendance', attendanceDocId);
 
-    // Check if already checked in today
-    console.log('Checking for existing record...');
-    const existingRecord = await this.getTodayAttendance(studentId);
-    console.log('Existing record:', existingRecord);
-    
-    // Additional check: verify the record is actually for today (not yesterday with same ID)
-    if (existingRecord && existingRecord.checkInTime) {
-      const recordDate = existingRecord.date;
-      const todayDate = today;
-      console.log('Comparing dates - Record date:', recordDate, 'vs Today:', todayDate);
-      
-      if (recordDate !== todayDate) {
-        console.log('Existing record is from a different day, allowing check-in');
-        // Record exists but is from a different day - this is fine, allow check-in
-      } else {
-        console.log('Already checked in today, throwing error');
-        throw new Error('Already checked in today');
-      }
+    // Verify if already checked in using the unique ID
+    const existingDoc = await getDoc(attendanceRef);
+    if (existingDoc.exists() && existingDoc.data().checkInTime) {
+      throw new Error('You have already checked in for today.');
     }
 
-    const status: AttendanceStatus = this.timeService.isLate(harareTime) ? 'late' : 'present';
+    const harareNow = this.timeService.getCurrentTime();
+    const isLate = this.timeService.isLate(harareNow);
+    const status: AttendanceStatus = isLate ? 'late' : 'present';
+
     const attendanceRecord: any = {
-      id: attendanceId,
+      id: attendanceDocId,
       studentId,
       studentName,
-      // Use a timezone-consistent timestamp for business logic (late/present),
-      // plus a server timestamp for auditing.
-      checkInTime: Timestamp.fromDate(harareTime),
+      checkInTime: Timestamp.fromDate(harareNow),
       serverReceivedAt: serverTimestamp(),
       date: today,
       isPresent: true,
       status,
-      createdAt: serverTimestamp(), // For analytics tracking
+      method: 'qr',
+      deviceId: 'web-app',
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
     };
 
     // Firestore does not allow `undefined` values. Only include `location`
@@ -157,62 +136,26 @@ export class AttendanceService {
       };
     }
 
-    console.log('📝 Saving detailed attendance record to Firebase:', {
-      collection: 'attendance',
-      documentId: attendanceId,
-      studentId,
-      studentName,
-      date: today
-    });
-    
-    // Save detailed attendance record
     try {
-      await setDoc(doc(db, 'attendance', attendanceId), attendanceRecord);
+      await setDoc(attendanceRef, attendanceRecord);
+      console.log('✅ Attendance recorded with unique ID:', attendanceDocId);
       
-      // Log analytics event for check-in
-      await setDoc(doc(collection(db, 'attendance_analytics')), {
-        eventId: `checkin_${attendanceId}_${Date.now()}`,
-        type: 'check_in',
-        studentId,
-        studentName,
-        timestamp: serverTimestamp(),
-        date: today,
-        attendanceId
-      });
-      
-      console.log('✅ Detailed attendance record and analytics saved to Firebase');
-    } catch (firestoreError: any) {
-      console.error('❌ Firestore error saving attendance:', firestoreError);
-      console.error('Error code:', firestoreError.code);
-      console.error('Error message:', firestoreError.message);
-      // Re-throw with more context
-      throw new Error(`Firestore error: ${firestoreError.message} (code: ${firestoreError.code})`);
-    }
-
-    // Mark student as present for today in daily attendance tracking
-    console.log('📊 Marking student as present in daily attendance tracking...');
-    const dailyService = DailyAttendanceService.getInstance();
-    try {
+      // Mark student as present for today in daily attendance tracking
+      const dailyService = DailyAttendanceService.getInstance();
       await dailyService.markPresentToday(studentId, studentName);
-      console.log('✅ Daily attendance record saved');
-    } catch (dailyError) {
-      console.warn('⚠️ Daily attendance record failed to save (continuing):', dailyError);
-    }
 
-    // Verify both records were saved
-    try {
+      // Verify records were saved
       let verified = false;
       for (let i = 0; i < 3; i++) {
-        const savedDetailedRecord = await getDoc(doc(db, 'attendance', attendanceId));
+        const savedDoc = await getDoc(attendanceRef);
         const isPresentToday = await dailyService.isPresentToday(studentId);
         
-        if (savedDetailedRecord.exists() && isPresentToday) {
+        if (savedDoc.exists() && isPresentToday) {
           verified = true;
           console.log('🎉 ATTENDANCE RECORDING COMPLETE:', {
             detailedRecord: '✅ Saved',
             dailyRecord: '✅ Saved',
-            studentMarkedPresent: '✅ Yes',
-            attendanceId,
+            attendanceId: attendanceDocId,
             date: today
           });
           break;
@@ -224,53 +167,40 @@ export class AttendanceService {
       if (!verified) {
         console.warn('⚠️ Attendance verification did not fully succeed after retries (continuing).');
       }
-    } catch (verificationError) {
-      console.warn('⚠️ Attendance verification encountered an error (continuing):', verificationError);
-    }
 
-    // Send email notification to student's Gmail
-    try {
-      const dataService = DataService.getInstance();
-      const users = await dataService.getUsers();
-      const student = users.find((u: any) => u.uid === studentId);
-      if (student && student.email) {
-        await this.emailService.sendCheckInNotification(
-          student.email,
-          studentName,
-          harareTime
-        );
+      // Send email notification to student's Gmail
+      try {
+        const dataService = DataService.getInstance();
+        const users = await dataService.getUsers();
+        const student = users.find((u: any) => u.uid === studentId || u.id === studentId);
+        if (student && student.email) {
+          await this.emailService.sendCheckInNotification(
+            student.email,
+            studentName,
+            harareNow
+          );
+        }
+      } catch (emailError) {
+        console.warn('⚠️ Failed to send email notification:', emailError);
       }
-    } catch (emailError) {
-      console.warn('⚠️ Failed to send email notification:', emailError);
-    }
 
-    // Return a normalized record with JS Date fields (so UI doesn’t get Firestore Timestamps)
-    const saved = await getDoc(doc(db, 'attendance', attendanceId));
-    const savedData: any = saved.exists() ? saved.data() : attendanceRecord;
-    return {
-      ...savedData,
-      checkInTime: savedData.checkInTime?.toDate ? savedData.checkInTime.toDate() : harareTime,
-      checkOutTime: savedData.checkOutTime?.toDate ? savedData.checkOutTime.toDate() : undefined,
-    } as AttendanceRecord;
+      return {
+        ...attendanceRecord,
+        checkInTime: harareNow,
+      } as AttendanceRecord;
+    } catch (error: any) {
+      console.error('❌ Failed to record attendance:', error);
+      throw new Error(`Database error: ${error.message}`);
+    }
   }
 
   async checkOut(studentId: string, location?: LocationData): Promise<AttendanceRecord> {
-    if (!location || !location.ip) {
-      // console.warn('WiFi connection verification is recommended for check out.');
-    }
-
-    /*
-    if (!isOnSchoolWifi(location.ip)) {
-      throw new Error('You must be connected to the school WiFi to check out');
-    }
-    */
-
     const harareTime = this.timeService.getCurrentTime();
-    // CRITICAL FIX: Use consistent date string from TimeService
     const today = this.timeService.getCurrentDateString();
-    const attendanceId = `${studentId}_${today}`;
+    const attendanceDocId = `${today}_${studentId}`;
+    const attendanceRef = doc(db, 'attendance', attendanceDocId);
 
-    const attendanceDoc = await getDoc(doc(db, 'attendance', attendanceId));
+    const attendanceDoc = await getDoc(attendanceRef);
     
     if (!attendanceDoc.exists()) {
       throw new Error('No check-in record found for today');
@@ -282,11 +212,10 @@ export class AttendanceService {
       throw new Error('Already checked out today');
     }
 
-    const checkOutTime = harareTime;
-
     const updateData: any = {
-      checkOutTime: Timestamp.fromDate(checkOutTime),
-      status: 'completed'
+      checkOutTime: Timestamp.fromDate(harareTime),
+      status: 'completed',
+      updatedAt: serverTimestamp()
     };
 
     const resolvedLocation = (location && typeof location.latitude === 'number' && typeof location.longitude === 'number') ? {
@@ -299,23 +228,21 @@ export class AttendanceService {
       updateData.location = resolvedLocation;
     }
 
-    await updateDoc(doc(db, 'attendance', attendanceId), updateData);
+    await updateDoc(attendanceRef, updateData);
 
     return {
       ...attendanceData,
       checkInTime: attendanceData.checkInTime.toDate(),
-      checkOutTime,
+      checkOutTime: harareTime,
     } as AttendanceRecord;
   }
 
   async getTodayAttendance(studentId?: string): Promise<AttendanceRecord | null> {
-    // Use consistent date from TimeService
     const today = this.timeService.getCurrentDateString();
-    console.log('getTodayAttendance - Using date:', today);
     
     if (studentId) {
-      const attendanceId = `${studentId}_${today}`;
-      const attendanceDoc = await getDoc(doc(db, 'attendance', attendanceId));
+      const attendanceDocId = `${today}_${studentId}`;
+      const attendanceDoc = await getDoc(doc(db, 'attendance', attendanceDocId));
       
       if (!attendanceDoc.exists()) {
         return null;
@@ -332,7 +259,6 @@ export class AttendanceService {
     return null;
   }
 
-  // New method to check if user is currently checked in
   async isCurrentlyCheckedIn(studentId: string): Promise<boolean> {
     const todayAttendance = await this.getTodayAttendance(studentId);
     
@@ -346,17 +272,34 @@ export class AttendanceService {
     checkInTime: Date | null;
     canCheckIn: boolean;
     canCheckOut: boolean;
+    status: 'not_checked_in' | 'checked_in' | 'checked_out' | 'absent' | 'late';
+    isTooLateToCheckIn: boolean;
   }> {
     const todayAttendance = await this.getTodayAttendance(studentId);
+    const now = this.timeService.getCurrentTime();
+    const isTooLate = !this.timeService.canCheckIn(now);
     
     const isCheckedIn = todayAttendance?.checkInTime && !todayAttendance?.checkOutTime;
     const hasCheckedOut = todayAttendance?.checkOutTime;
+    const hasCheckedIn = !!todayAttendance?.checkInTime;
+    
+    // Determine status
+    let status: 'not_checked_in' | 'checked_in' | 'checked_out' | 'absent' | 'late' = 'not_checked_in';
+    if (hasCheckedOut) {
+      status = 'checked_out';
+    } else if (isCheckedIn) {
+      status = todayAttendance?.status === 'late' ? 'late' : 'checked_in';
+    } else if (isTooLate && !hasCheckedIn) {
+      status = 'absent';
+    }
     
     return {
       isCheckedIn: !!isCheckedIn,
       checkInTime: todayAttendance?.checkInTime || null,
-      canCheckIn: !todayAttendance?.checkInTime, // Can check in if no check-in today
-      canCheckOut: !!isCheckedIn && !hasCheckedOut // Can check out if checked in but not checked out
+      canCheckIn: !todayAttendance?.checkInTime && !isTooLate, // Can check in only if no check-in today AND not too late
+      canCheckOut: !!isCheckedIn && !hasCheckedOut, // Can check out if checked in but not checked out
+      status,
+      isTooLateToCheckIn: isTooLate
     };
   }
 
@@ -383,18 +326,25 @@ export class AttendanceService {
     canCheckIn: boolean;
     canCheckOut: boolean;
     isNewDay: boolean;
+    status: 'not_checked_in' | 'checked_in' | 'checked_out' | 'absent' | 'late';
+    isTooLateToCheckIn: boolean;
   }> {
     const isNewDay = await this.checkForNewDay(studentId);
     const currentState = await this.getCurrentAttendanceState(studentId);
     
     // If it's a new day, reset the state to allow check-in
     if (isNewDay) {
+      const now = this.timeService.getCurrentTime();
+      const isTooLate = !this.timeService.canCheckIn(now);
+      
       return {
         isCheckedIn: false,
         checkInTime: null,
-        canCheckIn: true,
+        canCheckIn: !isTooLate, // Only allow if not too late
         canCheckOut: false,
-        isNewDay: true
+        isNewDay: true,
+        status: isTooLate ? 'absent' : 'not_checked_in',
+        isTooLateToCheckIn: isTooLate
       };
     }
     
@@ -564,6 +514,42 @@ export class AttendanceService {
     await Promise.all(deletePromises);
     console.log('🗑️ Cleared', deletedCount, 'attendance records for', today);
     return deletedCount;
+  }
+
+  // Master Reset: Clear all attendance records and daily status for a fresh start (Admin only)
+  async masterResetAttendance(): Promise<{ deletedCount: number }> {
+    console.log('🚨 MASTER RESET INITIATED: Clearing all attendance data...');
+    
+    try {
+      // 1. Get all records from the 'attendance' collection
+      const attendanceRef = collection(db, 'attendance');
+      const attendanceSnapshot = await getDocs(attendanceRef);
+      
+      // 2. Get all records from the 'daily_attendance' collection
+      const dailyAttendanceRef = collection(db, 'daily_attendance');
+      const dailySnapshot = await getDocs(dailyAttendanceRef);
+      
+      let deletedCount = 0;
+      
+      // 3. Delete all attendance records
+      const attendanceDeletePromises = attendanceSnapshot.docs.map(doc => {
+        deletedCount++;
+        return deleteDoc(doc.ref);
+      });
+      
+      // 4. Delete all daily attendance records
+      const dailyDeletePromises = dailySnapshot.docs.map(doc => {
+        return deleteDoc(doc.ref);
+      });
+      
+      await Promise.all([...attendanceDeletePromises, ...dailyDeletePromises]);
+      
+      console.log(`✅ MASTER RESET COMPLETE: ${deletedCount} records deleted.`);
+      return { deletedCount };
+    } catch (error) {
+      console.error('❌ Master reset failed:', error);
+      throw error;
+    }
   }
 
   private async getAddressFromCoordinates(
