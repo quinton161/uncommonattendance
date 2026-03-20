@@ -598,7 +598,6 @@ class DataService {
   }
   async getStudentStats(userId: string): Promise<any> {
     const userAttendance = await this.getAttendance(userId);
-    const events = await this.getEvents();
 
     // ENSURE UNIQUE DAILY RECORDS (Fix for inflated stats)
     // Filter duplicates: keep the best record for each unique date
@@ -806,7 +805,6 @@ class DataService {
     
     if (!this.useFirebase) {
       // Mock mode: filter and clear mock data
-      const initialCount = mockUsers.length;
       const attendees = mockUsers.filter(u => this.isStudentUser(u));
       const preserved = mockUsers.filter(u => !this.isStudentUser(u));
       
