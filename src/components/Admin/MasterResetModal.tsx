@@ -168,7 +168,6 @@ export const MasterResetModal: React.FC<MasterResetModalProps> = ({
 }) => {
   const [loading, setLoading] = useState(false);
   const [confirmText, setConfirmText] = useState('');
-  const [completed, setCompleted] = useState(false);
 
   const isConfirmValid = confirmText.toLowerCase() === 'reset';
 
@@ -178,57 +177,13 @@ export const MasterResetModal: React.FC<MasterResetModalProps> = ({
     setLoading(true);
     try {
       await onConfirm();
-      setCompleted(true);
+      // Immediately reload the page to fetch fresh data from Firebase
+      window.location.reload();
     } catch (error) {
       console.error('Master reset error:', error);
-    } finally {
       setLoading(false);
     }
   };
-
-  const handleClose = () => {
-    if (completed) {
-      window.location.reload();
-    } else {
-      onClose();
-    }
-  };
-
-  if (completed) {
-    return (
-      <ModalOverlay onClick={(e) => e.target === e.currentTarget && handleClose()}>
-        <ModalContent>
-          <ModalHeader>
-            <IconContainer>
-              <FiCheckCircle size={28} />
-            </IconContainer>
-            <ModalTitle>Master Reset Complete</ModalTitle>
-          </ModalHeader>
-          
-          <ModalDescription>
-            All attendees and attendance records have been successfully deleted. Only admins and instructors have been preserved.
-          </ModalDescription>
-          
-          <InfoBox>
-            <InfoRow>
-              <InfoLabel><FiUsers size={16} /> Deleted Attendees</InfoLabel>
-              <InfoValue>{userCount}</InfoValue>
-            </InfoRow>
-            <InfoRow>
-              <InfoLabel><FiAlertTriangle size={16} /> Deleted Records</InfoLabel>
-              <InfoValue>{attendanceCount}</InfoValue>
-            </InfoRow>
-          </InfoBox>
-          
-          <ButtonGroup>
-            <Button onClick={handleClose}>
-              Close and Reload
-            </Button>
-          </ButtonGroup>
-        </ModalContent>
-      </ModalOverlay>
-    );
-  }
 
   return (
     <ModalOverlay onClick={(e) => e.target === e.currentTarget && onClose()}>

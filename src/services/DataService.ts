@@ -253,7 +253,8 @@ class DataService {
         checkOutTime: doc.data().checkOutTime?.toDate()
       }));
       
-      return attendance.length > 0 ? attendance : (userId ? mockAttendance.filter(a => a.studentId === userId) : mockAttendance);
+      // After master reset, Firebase may be empty - return empty array instead of mock data
+      return attendance.length > 0 ? attendance : (userId ? [] : []);
     } catch (error) {
       console.error('Error fetching attendance:', error);
       return userId ? mockAttendance.filter(a => a.studentId === userId) : mockAttendance;
@@ -340,7 +341,8 @@ class DataService {
         createdAt: doc.data().createdAt?.toDate()
       }));
       
-      return users.length > 0 ? users : mockUsers;
+      // After master reset, Firebase may be empty - return empty array instead of mock data
+      return users.length > 0 ? users : [];
     } catch (error) {
       console.error('Error fetching users:', error);
       return mockUsers;
