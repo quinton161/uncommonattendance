@@ -20,10 +20,7 @@ import {
   Tooltip, 
   ResponsiveContainer,
   LineChart,
-  Line,
-  PieChart,
-  Pie,
-  Cell
+  Line
 } from 'recharts';
 import { eachDayOfInterval, subDays, format } from 'date-fns';
 import { theme } from '../../styles/theme';
@@ -350,8 +347,6 @@ const ActivityItem = styled.div`
     border-bottom: none;
   }
 `;
-
-const PIE_COLORS = [theme.colors.primary, theme.colors.gray200];
 
 export const AdminProfile: React.FC = () => {
   const { user } = useAuth();
