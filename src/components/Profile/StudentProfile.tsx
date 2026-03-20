@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -25,11 +25,12 @@ import {
   Pie,
   Cell
 } from 'recharts';
-import { format } from 'date-fns';
+import { format, subDays, eachDayOfInterval } from 'date-fns';
 import { theme } from '../../styles/theme';
 import { useAuth } from '../../contexts/AuthContext';
 import { ProfileUpload } from './ProfileUpload';
 import { Button } from '../Common/Button';
+import DataService from '../../services/DataService';
 
 const ProfileContainer = styled.div`
   padding: ${theme.spacing.xl};
@@ -372,39 +373,73 @@ const ScoreCircle = styled.div`
 export const StudentProfile: React.FC = () => {
   const { user } = useAuth();
   const [showPhotoUpload, setShowPhotoPhotoUpload] = useState(false);
+  const [stats, setStats] = useState({
+    attendanceRate: 0,
+    currentStreak: 0,
+    engagementScore: 0,
+    status: 'on-track' as 'on-track' | 'warning' | 'at-risk',
+    course: 'Full Stack Web Development',
+  });
+  const [trendData, setTrendData] = useState<any[]>([]);
+  const [pieData, setPieData] = useState<any[]>([]);
+  const [sessions, setSessions] = useState<any[]>([]);
 
-  // Mock data for initial implementation
-  const attendanceRate = 92;
-  const participationRate = 85;
-  const engagementScore = Math.round((attendanceRate * 0.7) + (participationRate * 0.3));
-  const status = 'on-track';
-  const course = 'Full Stack Web Development';
-  
-  const trendData = [
-    { name: 'Mon', rate: 100 },
-    { name: 'Tue', rate: 100 },
-    { name: 'Wed', rate: 80 },
-    { name: 'Thu', rate: 90 },
-    { name: 'Fri', rate: 100 },
-    { name: 'Mon', rate: 100 },
-    { name: 'Tue', rate: 95 },
-  ];
+  useEffect(() => {
+    const ds = DataService.getInstance();
+    
+    const fetchStudentData = async () => {
+      if (!user?.uid) return;
 
-  const pieData = [
-    { name: 'Present', value: 92, color: theme.colors.primary },
-    { name: 'Absent', value: 8, color: theme.colors.gray200 },
-  ];
+      const studentStats = await ds.getStudentStats(user.uid);
+      const attendance = await ds.getAttendance(user.uid);
+      
+      // Calculate trend data (last 7 days)
+      const last7Days = eachDayOfInterval({
+        start: subDays(new Date(), 6),
+        end: new Date(),
+      });
 
-  const sessions = [
-    { date: '2024-03-20', session: 'Web Development', status: 'present' },
-    { date: '2024-03-19', session: 'UI/UX Design', status: 'late' },
-    { date: '2024-03-18', session: 'Web Development', status: 'present' },
-    { date: '2024-03-15', session: 'Web Development', status: 'present' },
-    { date: '2024-03-14', session: 'Professional Skills', status: 'absent' },
-  ];
+      const chartData = last7Days.map(date => {
+        const dateStr = format(date, 'yyyy-MM-dd');
+        const present = attendance.some(a => {
+          const aDate = a.date || (a.checkInTime ? format(new Date(a.checkInTime), 'yyyy-MM-dd') : '');
+          return aDate === dateStr;
+        });
+        return {
+          name: format(date, 'EEE'),
+          rate: present ? 100 : 0
+        };
+      });
+
+      setTrendData(chartData);
+
+      // Pie chart data
+      setPieData([
+        { name: 'Present', value: studentStats.attendanceRate, color: theme.colors.primary },
+        { name: 'Absent', value: 100 - studentStats.attendanceRate, color: theme.colors.gray200 },
+      ]);
+
+      // Recent sessions
+      setSessions(studentStats.recentActivity.map((a: any) => ({
+        date: a.checkInTime,
+        session: 'General Session', // Placeholder
+        status: a.status || 'present'
+      })));
+
+      setStats({
+        attendanceRate: studentStats.attendanceRate,
+        currentStreak: studentStats.currentStreak,
+        engagementScore: Math.round((studentStats.attendanceRate * 0.7) + (85 * 0.3)), // Real attendance + placeholder participation
+        status: studentStats.attendanceRate >= 80 ? 'on-track' : studentStats.attendanceRate >= 60 ? 'warning' : 'at-risk',
+        course: 'Full Stack Web Development',
+      });
+    };
+
+    fetchStudentData();
+  }, [user]);
   
   const circumference = 2 * Math.PI * 85;
-  const offset = circumference - (attendanceRate / 100) * circumference;
+  const offset = circumference - (stats.attendanceRate / 100) * circumference;
 
   return (
     <ProfileContainer>
@@ -498,12 +533,12 @@ export const StudentProfile: React.FC = () => {
         <InfoWrapper>
           <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing.md, flexWrap: 'wrap', marginBottom: theme.spacing.xs }}>
             <Name>{user?.displayName || 'Student Name'}</Name>
-            <Badge status={status}>{status.replace('-', ' ')}</Badge>
+            <Badge status={stats.status}>{stats.status.replace('-', ' ')}</Badge>
           </div>
           
           <Course>
             <FiBookOpen size={20} />
-            {course}
+            {stats.course}
           </Course>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing.md, color: theme.colors.textSecondary, fontSize: theme.fontSizes.sm }}>
@@ -515,15 +550,15 @@ export const StudentProfile: React.FC = () => {
 
           <QuickStats>
             <StatItem>
-              <StatValue>{attendanceRate}%</StatValue>
+              <StatValue>{stats.attendanceRate}%</StatValue>
               <StatLabel>Attendance</StatLabel>
             </StatItem>
             <StatItem>
-              <StatValue>12</StatValue>
+              <StatValue>{stats.currentStreak}</StatValue>
               <StatLabel>Day Streak</StatLabel>
             </StatItem>
             <StatItem>
-              <StatValue>{engagementScore}</StatValue>
+              <StatValue>{stats.engagementScore}</StatValue>
               <StatLabel>Engagement</StatLabel>
             </StatItem>
           </QuickStats>
@@ -532,15 +567,20 @@ export const StudentProfile: React.FC = () => {
 
       <InsightsGrid>
         <InsightCard
-          type="warning"
+          type={stats.status === 'on-track' ? 'success' : 'warning'}
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.5, delay: 0.2 }}
         >
           <FiAlertCircle size={24} />
           <div>
-            <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>Risk Insight</div>
-            <div style={{ fontSize: theme.fontSizes.sm }}>Attendance dropped slightly this week. Try to maintain your streak!</div>
+            <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>Performance Insight</div>
+            <div style={{ fontSize: theme.fontSizes.sm }}>
+              {stats.status === 'on-track' 
+                ? "Excellent work! Your consistency is helping you stay on top of the program."
+                : "Your attendance is below target. Try attending more sessions to improve your standing."
+              }
+            </div>
           </div>
         </InsightCard>
 
@@ -551,7 +591,7 @@ export const StudentProfile: React.FC = () => {
           style={{ padding: theme.spacing.lg, flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xl }}
         >
           <ScoreCircle>
-            <div style={{ fontSize: theme.fontSizes['3xl'], fontWeight: 'bold', color: theme.colors.primary }}>{engagementScore}</div>
+            <div style={{ fontSize: theme.fontSizes['3xl'], fontWeight: 'bold', color: theme.colors.primary }}>{stats.engagementScore}</div>
             <div style={{ fontSize: '10px', color: theme.colors.textSecondary, textTransform: 'uppercase' }}>Score</div>
           </ScoreCircle>
           <div>
@@ -638,7 +678,7 @@ export const StudentProfile: React.FC = () => {
               </PieChart>
             </ResponsiveContainer>
             <div style={{ textAlign: 'center', marginTop: -160 }}>
-              <div style={{ fontSize: theme.fontSizes['2xl'], fontWeight: 'bold', color: theme.colors.textPrimary }}>{attendanceRate}%</div>
+              <div style={{ fontSize: theme.fontSizes['2xl'], fontWeight: 'bold', color: theme.colors.textPrimary }}>{stats.attendanceRate}%</div>
               <div style={{ fontSize: theme.fontSizes.xs, color: theme.colors.textSecondary }}>Present</div>
             </div>
           </div>
@@ -655,24 +695,30 @@ export const StudentProfile: React.FC = () => {
           Session History
         </ChartTitle>
         <TimelineList>
-          {sessions.map((session, index) => (
-            <TimelineItem
-              key={index}
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.7 + (index * 0.1) }}
-            >
-              <StatusDot status={session.status as any}>
-                {session.status === 'present' && <FiCheckCircle size={16} />}
-                {session.status === 'late' && <FiClock size={16} />}
-                {session.status === 'absent' && <FiAlertCircle size={16} />}
-              </StatusDot>
-              <TimelineContent>
-                <TimelineDate>{format(new Date(session.date), 'EEEE, MMMM do')}</TimelineDate>
-                <TimelineSession>{session.session}</TimelineSession>
-              </TimelineContent>
-            </TimelineItem>
-          ))}
+          {sessions.length > 0 ? (
+            sessions.map((session, index) => (
+              <TimelineItem
+                key={index}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.7 + (index * 0.1) }}
+              >
+                <StatusDot status={session.status as any}>
+                  {session.status === 'present' && <FiCheckCircle size={16} />}
+                  {session.status === 'late' && <FiClock size={16} />}
+                  {session.status === 'absent' && <FiAlertCircle size={16} />}
+                </StatusDot>
+                <TimelineContent>
+                  <TimelineDate>{format(new Date(session.date), 'EEEE, MMMM do')}</TimelineDate>
+                  <TimelineSession>{session.session}</TimelineSession>
+                </TimelineContent>
+              </TimelineItem>
+            ))
+          ) : (
+            <div style={{ textAlign: 'center', padding: theme.spacing.xl, color: theme.colors.textSecondary }}>
+              No session history found.
+            </div>
+          )}
         </TimelineList>
       </TimelineContainer>
     </ProfileContainer>
