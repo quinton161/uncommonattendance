@@ -189,59 +189,6 @@ const RoleButton = styled.button<{ $active: boolean }>`
   }
 `;
 
-const _InstructorGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: ${theme.spacing.md};
-  margin-bottom: ${theme.spacing.xl};
-
-  @media (max-width: ${theme.breakpoints.mobile}) {
-    grid-template-columns: 1fr;
-  }
-`;
-
-const _InstructorCard = styled.div<{ $selected: boolean }>`
-  padding: ${theme.spacing.md};
-  border-radius: 16px;
-  border: 2px solid ${props => props.$selected ? theme.colors.primary : theme.colors.gray200};
-  background: ${props => props.$selected ? 'rgba(59, 130, 246, 0.05)' : theme.colors.white};
-  cursor: pointer;
-  transition: all 0.25s ease;
-  text-align: center;
-
-  &:hover {
-    transform: translateY(-2px);
-    border-color: ${theme.colors.primary};
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.06);
-  }
-
-  h4 {
-    margin: ${theme.spacing.sm} 0 ${theme.spacing.xs};
-    font-weight: 600;
-    color: ${theme.colors.textPrimary};
-  }
-
-  p {
-    margin: 0;
-    font-size: 0.8rem;
-    color: ${theme.colors.textSecondary};
-  }
-`;
-
-const _Avatar = styled.div`
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  background: ${theme.colors.primary};
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0 auto;
-  font-weight: 700;
-  font-size: 1.1rem;
-`;
-
 const HelperText = styled.p`
   font-size: 0.85rem;
   color: ${theme.colors.textSecondary};
@@ -249,24 +196,6 @@ const HelperText = styled.p`
   display: flex;
   align-items: center;
   gap: ${theme.spacing.xs};
-`;
-
-const _ChangeProfileButton = styled.button`
-  background: none;
-  border: none;
-  color: ${theme.colors.primary};
-  font-weight: 600;
-  font-size: 0.9rem;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: ${theme.spacing.xs};
-  margin-bottom: ${theme.spacing.md};
-  padding: 0;
-
-  &:hover {
-    text-decoration: underline;
-  }
 `;
 
 const ErrorMessage = styled.div`
@@ -319,19 +248,6 @@ const FooterText = styled.p`
   color: ${theme.colors.textSecondary};
   font-size: 0.95rem;
 `;
-
-interface InstructorType {
-  id: string;
-  name: string;
-  username: string;
-}
-
-const _INSTRUCTORS: InstructorType[] = [
-  { id: '1', name: 'Mr. Moyo', username: 'moyo' },
-  { id: '2', name: 'Ms. Dube', username: 'dube' },
-  { id: '3', name: 'Mr. Ncube', username: 'ncube' },
-  { id: '4', name: 'Ms. Sibanda', username: 'sibanda' },
-];
 
 interface RegisterPageProps {
   onToggleMode: () => void;

@@ -116,12 +116,6 @@ const SidebarContent = styled.div`
   }
 `;
 
-const _SidebarFooter = styled.div`
-  flex-shrink: 0;
-  margin-top: auto;
-  padding-top: ${theme.spacing.xl};
-`;
-
 const NavItem = styled.div<{ active?: boolean }>`
   display: flex;
   align-items: center;
