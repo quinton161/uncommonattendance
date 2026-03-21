@@ -1,13 +1,13 @@
 export const theme = {
   colors: {
     // Uncommon.org Brand Colors
-    primary: '#0647a1',        // Uncommon blue
-    primaryLight: '#1976d2',   // Lighter blue
-    primaryDark: '#01579b',    // Darker blue
+    primary: '#0052CC',        // Uncommon blue (more vibrant/standard blue)
+    primaryLight: '#0747A6',   // Lighter blue
+    primaryDark: '#003D99',    // Darker blue
     
     // Secondary colors
-    secondary: '#2c3e50', // Dark blue-gray
-    secondaryDark: '#1a252f', // Darker blue-gray
+    secondary: '#0052CC', // Match uncommon blue
+    secondaryDark: '#003D99', // Darker uncommon blue
     accent: '#f39c12', // Warm orange
     
     // Status colors

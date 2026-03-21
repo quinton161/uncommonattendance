@@ -5,7 +5,6 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../Common/Button';
 import { UsersPage } from '../Admin/UsersPage';
 import { UncommonLogo } from '../Common/UncommonLogo';
-import { StarField } from '../Common/StarField';
 import { theme } from '../../styles/theme';
 import { 
   staggeredAnimation, 
@@ -23,6 +22,7 @@ import { saveAs } from 'file-saver';
 import { AdminProfile } from '../Profile/AdminProfile';
 import { AdminAttendanceAnalytics } from '../Analytics/AdminAttendanceAnalytics';
 import { MasterResetModal } from '../Admin/MasterResetModal';
+import { Sidebar } from '../Common/Sidebar';
 
 import { 
   BarChart, 
@@ -36,15 +36,10 @@ import {
 } from 'recharts';
 import { qrCodeService, DailyQRCode } from '../../services/qrCodeService';
 import { 
-  FiLogOut, 
-  FiUser, 
-  FiBarChart2, 
-  FiUsers,
-  FiTrendingUp,
   FiMenu,
   FiX,
-  FiRefreshCw,
-  FiMaximize
+  FiMaximize,
+  FiRefreshCw
 } from 'react-icons/fi';
 import { QRCodeSVG } from 'qrcode.react';
 
@@ -58,10 +53,11 @@ const DashboardContainer = styled.div`
   overflow: hidden;
   @media (max-width: ${theme.breakpoints.tablet}) {
     flex-direction: column;
+    padding-top: 60px; /* Space for MobileHeader */
   }
 `;
 
-const Sidebar = styled.div<{ isOpen?: boolean }>`
+const MobileSidebar = styled.div<{ $isOpen?: boolean }>`
   width: 280px;
   background: linear-gradient(180deg, ${theme.colors.primary} 0%, ${theme.colors.primaryDark} 100%);
   color: ${theme.colors.white};
@@ -84,7 +80,7 @@ const Sidebar = styled.div<{ isOpen?: boolean }>`
   @media (max-width: ${theme.breakpoints.tablet}) {
     position: fixed;
     top: 0;
-    left: ${props => props.isOpen ? '0' : '-100%'};
+    left: ${props => props.$isOpen ? '0' : '-100%'};
     height: 100vh;
     z-index: ${theme.zIndex.modal};
     transition: left 0.3s ease;
@@ -111,14 +107,20 @@ const Logo = styled.div`
   z-index: 20;
 `;
 
-const NavItem = styled.div<{ active?: boolean }>`
+const NavList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${theme.spacing.sm};
+`;
+
+const NavItem = styled.div<{ $active?: boolean }>`
   display: flex;
   align-items: center;
   gap: ${theme.spacing.md};
   padding: ${theme.spacing.md};
   border-radius: ${theme.borderRadius.lg};
-  color: ${props => props.active ? theme.colors.white : theme.colors.gray300};
-  background: ${props => props.active ? 'rgba(255, 255, 255, 0.1)' : 'transparent'};
+  color: ${props => props.$active ? theme.colors.white : theme.colors.gray300};
+  background: ${props => props.$active ? 'rgba(255, 255, 255, 0.1)' : 'transparent'};
   cursor: pointer;
   transition: all 0.2s ease;
   margin-bottom: ${theme.spacing.sm};
@@ -139,11 +141,11 @@ const MainContent = styled.div`
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   box-sizing: border-box;
-  padding-top: 80px; /* Increased to align with sidebar top */
-  margin-left: 280px;
+  padding-top: 20px;
   display: flex;
   flex-direction: column;
   gap: 0;
+  margin-left: 72px;
   ${containerAnimation}
   ${respectMotionPreference}
   @media (max-width: ${theme.breakpoints.tablet}) {
@@ -341,11 +343,11 @@ const MobileMenuButton = styled.button`
   }
 `;
 
-const MobileOverlay = styled.div<{ isOpen: boolean }>`
+const MobileOverlay = styled.div<{ $isOpen: boolean }>`
   display: none;
   
   @media (max-width: ${theme.breakpoints.tablet}) {
-    display: ${props => props.isOpen ? 'block' : 'none'};
+    display: ${props => props.$isOpen ? 'block' : 'none'};
     position: fixed;
     top: 0;
     left: 0;
@@ -593,14 +595,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
       console.error('Error loading dashboard data:', error);
       uniqueToast.error('Failed to load some data, using fallback');
       
-      // Fallback data
+      // Fallback data (shown when database is empty or loading fails)
       setStats({
-        totalAttendees: 25,
-        totalInstructors: 5,
-        todayAttendance: 18,
-        lateCount: 3,
-        absentCount: 7,
-        attendanceRate: 72
+        totalAttendees: 0,
+        totalInstructors: 0,
+        todayAttendance: 0,
+        lateCount: 0,
+        absentCount: 0,
+        attendanceRate: 0
       });
     }
   };
@@ -686,59 +688,44 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
   return (
     <DashboardContainer>
       <MobileHeader>
-        <UncommonLogo size="sm" showSubtitle={false} />
         <MobileMenuButton onClick={toggleMobileMenu}>
           {mobileMenuOpen ? <FiX size={24} /> : <FiMenu size={24} />}
         </MobileMenuButton>
+        <UncommonLogo size="sm" showSubtitle={false} />
+        <div style={{ width: 40 }} /> {/* Spacer for alignment */}
       </MobileHeader>
       
-      <MobileOverlay isOpen={mobileMenuOpen} onClick={() => setMobileMenuOpen(false)} />
+      <MobileOverlay $isOpen={mobileMenuOpen} onClick={() => setMobileMenuOpen(false)} />
       
-      <Sidebar isOpen={mobileMenuOpen}>
-        <StarField />
-        <Logo>
-          <UncommonLogo size="sm" showSubtitle={false} />
-        </Logo>
-        
-      <NavItem active={activeNav === 'dashboard'} onClick={() => handleNavClick('dashboard')}>
-        <FiBarChart2 size={20} />
-        {user?.userType === 'instructor' ? 'Instructor Dashboard' : 'Admin Dashboard'}
-      </NavItem>
-      <NavItem active={activeNav === 'analytics'} onClick={() => handleNavClick('analytics')}>
-        <FiTrendingUp size={20} />
-        Analytics
-      </NavItem>
-      <NavItem active={activeNav === 'users'} onClick={() => handleNavClick('users')}>
-        <FiUsers size={20} />
-        Users
-      </NavItem>
-      <NavItem active={activeNav === 'profile'} onClick={() => handleNavClick('profile')}>
-        <FiUser size={20} />
-        My Profile
-      </NavItem>
-      {user?.userType === 'admin' && (
-        <NavItem 
-          onClick={() => setShowMasterResetModal(true)}
-          style={{ color: '#dc2626' }}
-        >
-          <FiRefreshCw size={20} />
-          Master Reset
-        </NavItem>
+      {mobileMenuOpen && (
+        <MobileSidebar $isOpen={mobileMenuOpen}>
+          <div style={{ padding: theme.spacing.lg }}>
+            <Logo>Menu</Logo>
+            <NavList>
+              {[
+                { id: 'dashboard', label: 'Dashboard' },
+                { id: 'analytics', label: 'Analytics' },
+                { id: 'users', label: 'Users' },
+                { id: 'profile', label: 'Profile' },
+              ].map((item) => (
+                <NavItem 
+                  key={item.id}
+                  $active={activeNav === item.id}
+                  onClick={() => handleNavClick(item.id)}
+                >
+                  {item.label}
+                </NavItem>
+              ))}
+            </NavList>
+          </div>
+        </MobileSidebar>
       )}
-        
-      <div style={{ marginTop: 'auto', paddingTop: theme.spacing.xl }}>
-        {onNavigateToProfile && (
-          <NavItem onClick={onNavigateToProfile}>
-            <FiUser size={20} />
-            Profile
-            </NavItem>
-          )}
-          <NavItem onClick={logout}>
-            <FiLogOut size={20} />
-            Logout
-          </NavItem>
-        </div>
-      </Sidebar>
+      
+      <Sidebar 
+        activeNav={activeNav} 
+        onNavClick={handleNavClick} 
+        onMasterReset={user?.userType === 'admin' ? () => setShowMasterResetModal(true) : undefined}
+      />
 
       <MainContent style={{ padding: 0 }}>
         <AnimatePresence mode="wait">

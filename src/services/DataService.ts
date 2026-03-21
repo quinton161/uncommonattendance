@@ -801,6 +801,29 @@ class DataService {
     return timeService.getCurrentDateString();
   }
 
+  // Get all instructors for profile selection
+  async getInstructors(): Promise<any[]> {
+    if (!this.useFirebase) {
+      return mockUsers.filter(u => this.isInstructorUser(u));
+    }
+
+    try {
+      const usersSnapshot = await getDocs(
+        query(collection(db, 'users'), where('userType', '==', 'instructor'))
+      );
+      
+      const instructors = usersSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      
+      return instructors.length > 0 ? instructors : [];
+    } catch (error) {
+      console.error('Error fetching instructors:', error);
+      return [];
+    }
+  }
+
   // MASTER RESET: Delete all attendees and attendance records, keep admins and instructors
   async masterReset(): Promise<{ deletedUsers: number; deletedAttendance: number; preservedUsers: number }> {
     console.log('⚠️ DataService: Starting MASTER RESET...');
@@ -836,16 +859,18 @@ class DataService {
         ...doc.data()
       }));
 
-      // 2. Separate users into attendees (to delete) and protected (admins/instructors)
+      // 2. Delete all users EXCEPT the specific admin email
+      const ADMIN_EMAIL = 'quintonndlovu161@gmail.com';
       const usersToDelete = allUsers.filter((user: any) => {
-        const userType = (user.userType || '').toString().toLowerCase();
-        // Delete if attendee/student, keep if admin or instructor
-        return userType === 'attendee' || userType === 'student' || userType === '' || !userType;
+        const email = (user.email || '').toString().toLowerCase();
+        // Delete if not the admin email
+        return email !== ADMIN_EMAIL.toLowerCase();
       });
 
       const usersToPreserve = allUsers.filter((user: any) => {
-        const userType = (user.userType || '').toString().toLowerCase();
-        return userType === 'admin' || userType === 'instructor';
+        const email = (user.email || '').toString().toLowerCase();
+        // Preserve the admin email
+        return email === ADMIN_EMAIL.toLowerCase();
       });
 
       console.log(`📊 Master Reset Analysis: ${usersToDelete.length} attendees to delete, ${usersToPreserve.length} users to preserve`);

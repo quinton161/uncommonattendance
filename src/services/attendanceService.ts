@@ -45,77 +45,43 @@ export class AttendanceService {
   ): Promise<AttendanceRecord> {
     console.log('AttendanceService.checkIn called with:', { studentId, studentName, qrCode, location });
     
-    // Validate QR Code if provided (already validated in UI, but good for service integrity)
-    if (qrCode) {
-      const { qrCodeService } = await import('./qrCodeService');
-      const isValid = await qrCodeService.validateCode(qrCode);
-      if (!isValid) {
-        throw new Error('Invalid or expired check-in code');
-      }
-    } else {
-      // In a strict system, we might want to require QR code here
-      // throw new Error('Check-in code is required');
-    }
-    
-    // Validate inputs
-    if (!studentId || typeof studentId !== 'string') {
-      throw new Error('Invalid student ID');
-    }
-    if (!studentName || typeof studentName !== 'string') {
-      throw new Error('Invalid student name');
-    }
-    if (!studentId.trim()) {
-      throw new Error('Student ID cannot be empty');
-    }
-    
-    if (!location || !location.ip) {
-      // console.warn('WiFi connection verification is recommended for check in.');
+    // 1. Basic Validation
+    if (!studentId?.trim() || !studentName?.trim()) {
+      throw new Error('Student identification is missing');
     }
 
-    /* 
-    console.log('🌐 Checking IP against school WiFi...');
-    if (!isOnSchoolWifi(location.ip)) {
-      throw new Error('You must be connected to the school WiFi to check in');
-    }
-    console.log('✅ User is on school WiFi');
-    */
-    
-    
+    // 2. Time & Date Logic
     const harareTime = this.timeService.getCurrentTime();
-    // CRITICAL FIX: Use consistent date string from TimeService to avoid timezone mismatches
-    // Previously used harareTime.toISOString().split('T')[0] which could cause UTC/Harare date mismatch
-    const today = this.timeService.getCurrentDateString(); // Use this instead - it's timezone-aware
-    console.log('🔍 ATTENDANCE SERVICE CHECK-IN DEBUG:');
-    console.log('  - harareTime (raw):', harareTime.toISOString());
-    console.log('  - getCurrentDateString() (Harare date):', today);
-    console.log('  - Today from toISOString (may differ at midnight):', harareTime.toISOString().split('T')[0]);
+    const today = this.timeService.getCurrentDateString();
     
-    // Check if check-in is still allowed (before 9:05 AM)
-    // If after 9:05 AM, block check-in and mark as absent
     if (!this.timeService.canCheckIn(harareTime)) {
-      console.log('❌ Check-in blocked: Too late (after 9:05 AM)');
-      throw new Error('Check-in is closed. The attendance deadline has passed (9:05 AM). You will be marked as absent.');
+      throw new Error('Check-in is closed. The attendance deadline has passed (9:05 AM).');
     }
-    
-    // Generate a unique document ID for this attendance record (YYYY-MM-DD_studentId)
+
+    // 3. Prevent Duplicates with Unique ID (YYYY-MM-DD_studentId)
     const attendanceDocId = `${today}_${studentId}`;
     const attendanceRef = doc(db, 'attendance', attendanceDocId);
 
-    // Verify if already checked in using the unique ID
     const existingDoc = await getDoc(attendanceRef);
     if (existingDoc.exists() && existingDoc.data().checkInTime) {
       throw new Error('You have already checked in for today.');
     }
 
-    const harareNow = this.timeService.getCurrentTime();
-    const isLate = this.timeService.isLate(harareNow);
+    // 4. QR Validation (if enabled)
+    if (qrCode) {
+      const { qrCodeService } = await import('./qrCodeService');
+      const isValid = await qrCodeService.validateCode(qrCode);
+      if (!isValid) throw new Error('Invalid or expired check-in code');
+    }
+
+    const isLate = this.timeService.isLate(harareTime);
     const status: AttendanceStatus = isLate ? 'late' : 'present';
 
     const attendanceRecord: any = {
       id: attendanceDocId,
       studentId,
       studentName,
-      checkInTime: Timestamp.fromDate(harareNow),
+      checkInTime: Timestamp.fromDate(harareTime),
       serverReceivedAt: serverTimestamp(),
       date: today,
       isPresent: true,
@@ -126,9 +92,7 @@ export class AttendanceService {
       updatedAt: serverTimestamp()
     };
 
-    // Firestore does not allow `undefined` values. Only include `location`
-    // when we have a valid latitude/longitude.
-    if (location && typeof location.latitude === 'number' && typeof location.longitude === 'number') {
+    if (location?.latitude && location?.longitude) {
       attendanceRecord.location = {
         latitude: location.latitude,
         longitude: location.longitude,
@@ -136,62 +100,13 @@ export class AttendanceService {
       };
     }
 
-    try {
-      await setDoc(attendanceRef, attendanceRecord);
-      console.log('✅ Attendance recorded with unique ID:', attendanceDocId);
-      
-      // Mark student as present for today in daily attendance tracking
-      const dailyService = DailyAttendanceService.getInstance();
-      await dailyService.markPresentToday(studentId, studentName);
+    await setDoc(attendanceRef, attendanceRecord);
+    
+    // 5. Sync with Daily Tracking
+    const dailyService = DailyAttendanceService.getInstance();
+    await dailyService.markPresentToday(studentId, studentName);
 
-      // Verify records were saved
-      let verified = false;
-      for (let i = 0; i < 3; i++) {
-        const savedDoc = await getDoc(attendanceRef);
-        const isPresentToday = await dailyService.isPresentToday(studentId);
-        
-        if (savedDoc.exists() && isPresentToday) {
-          verified = true;
-          console.log('🎉 ATTENDANCE RECORDING COMPLETE:', {
-            detailedRecord: '✅ Saved',
-            dailyRecord: '✅ Saved',
-            attendanceId: attendanceDocId,
-            date: today
-          });
-          break;
-        }
-        console.warn(`⚠️ Verification attempt ${i + 1} failed, retrying...`);
-        await new Promise(r => setTimeout(r, 1000));
-      }
-      
-      if (!verified) {
-        console.warn('⚠️ Attendance verification did not fully succeed after retries (continuing).');
-      }
-
-      // Send email notification to student's Gmail
-      try {
-        const dataService = DataService.getInstance();
-        const users = await dataService.getUsers();
-        const student = users.find((u: any) => u.uid === studentId || u.id === studentId);
-        if (student && student.email) {
-          await this.emailService.sendCheckInNotification(
-            student.email,
-            studentName,
-            harareNow
-          );
-        }
-      } catch (emailError) {
-        console.warn('⚠️ Failed to send email notification:', emailError);
-      }
-
-      return {
-        ...attendanceRecord,
-        checkInTime: harareNow,
-      } as AttendanceRecord;
-    } catch (error: any) {
-      console.error('❌ Failed to record attendance:', error);
-      throw new Error(`Database error: ${error.message}`);
-    }
+    return { ...attendanceRecord, checkInTime: harareTime } as AttendanceRecord;
   }
 
   async checkOut(studentId: string, location?: LocationData): Promise<AttendanceRecord> {
@@ -201,15 +116,13 @@ export class AttendanceService {
     const attendanceRef = doc(db, 'attendance', attendanceDocId);
 
     const attendanceDoc = await getDoc(attendanceRef);
-    
     if (!attendanceDoc.exists()) {
-      throw new Error('No check-in record found for today');
+      throw new Error('No check-in record found for today. You must check in first.');
     }
 
     const attendanceData = attendanceDoc.data();
-    
     if (attendanceData.checkOutTime) {
-      throw new Error('Already checked out today');
+      throw new Error('You have already checked out for today.');
     }
 
     const updateData: any = {
@@ -218,14 +131,13 @@ export class AttendanceService {
       updatedAt: serverTimestamp()
     };
 
-    const resolvedLocation = (location && typeof location.latitude === 'number' && typeof location.longitude === 'number') ? {
-      latitude: location.latitude,
-      longitude: location.longitude,
-      address: location.address || 'Unknown'
-    } : attendanceData.location;
-
-    if (resolvedLocation) {
-      updateData.location = resolvedLocation;
+    if (location?.latitude && location?.longitude) {
+      updateData.location = {
+        ...attendanceData.location,
+        latitude: location.latitude,
+        longitude: location.longitude,
+        address: location.address || attendanceData.location?.address
+      };
     }
 
     await updateDoc(attendanceRef, updateData);
@@ -234,6 +146,7 @@ export class AttendanceService {
       ...attendanceData,
       checkInTime: attendanceData.checkInTime.toDate(),
       checkOutTime: harareTime,
+      status: 'completed'
     } as AttendanceRecord;
   }
 

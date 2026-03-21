@@ -15,19 +15,17 @@ import { TimeService } from '../../services/timeService';
 import { qrCodeService, DailyQRCode } from '../../services/qrCodeService';
 
 import { UncommonLogo } from '../Common/UncommonLogo';
-import StarField from '../Common/StarField';
+import { Sidebar } from '../Common/Sidebar';
 import TimeSyncStatus from '../Common/TimeSyncStatus';
 import { uniqueToast } from '../../utils/toastUtils';
 import { StudentAttendanceAnalytics } from '../Analytics/StudentAttendanceAnalytics';
 import { StudentProfile } from '../Profile/StudentProfile';
 import { 
-  FiLogOut, 
-  FiUser, 
-  FiBarChart2, 
-  FiCheckCircle, 
-  FiBarChart,
   FiCamera,
-  FiX
+  FiX,
+  FiMenu,
+  FiLogOut,
+  FiCheckCircle
 } from 'react-icons/fi';
 import { Copy } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
@@ -42,10 +40,11 @@ const DashboardContainer = styled.div`
   overflow: hidden;
   @media (max-width: ${theme.breakpoints.tablet}) {
     flex-direction: column;
+    padding-top: 60px; /* Space for MobileHeader */
   }
 `;
 
-const Sidebar = styled.aside<{ $isOpen: boolean }>`
+const MobileSidebar = styled.aside<{ $isOpen: boolean }>`
   width: 280px;
   background: linear-gradient(180deg, ${theme.colors.primary} 0%, ${theme.colors.primaryDark} 100%);
   color: ${theme.colors.white};
@@ -94,6 +93,12 @@ const Logo = styled.div`
   position: relative;
   z-index: 20;
   flex-shrink: 0;
+`;
+
+const SidebarNav = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${theme.spacing.sm};
 `;
 
 const SidebarContent = styled.div`
@@ -194,11 +199,11 @@ const MainContent = styled.div`
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   box-sizing: border-box;
-  padding-top: 80px; /* Increased to align with sidebar top */
-  margin-left: 280px;
+  padding-top: 20px;
   display: flex;
   flex-direction: column;
   gap: 0;
+  margin-left: 72px;
   ${containerAnimation}
   ${respectMotionPreference}
   @media (max-width: ${theme.breakpoints.tablet}) {
@@ -646,40 +651,42 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
   return (
     <DashboardContainer>
       <MobileHeader>
-        <UncommonLogo size="sm" showSubtitle={false} />
         <MobileMenuButton onClick={toggleMobileMenu}>
-          ☰
+          {mobileMenuOpen ? <FiX size={24} /> : <FiMenu size={24} />}
         </MobileMenuButton>
+        <UncommonLogo size="sm" showSubtitle={false} />
+        <div style={{ width: 40 }} />
       </MobileHeader>
 
       <MobileOverlay $isOpen={mobileMenuOpen} onClick={() => setMobileMenuOpen(false)} />
+      
+      {mobileMenuOpen && (
+        <MobileSidebar $isOpen={mobileMenuOpen}>
+          <SidebarContent>
+            <Logo>Menu</Logo>
+            <SidebarNav>
+              {[
+                { id: 'dashboard', label: 'Dashboard' },
+                { id: 'analytics', label: 'Analytics' },
+                { id: 'profile', label: 'Profile' },
+              ].map((item) => (
+                <NavItem 
+                  key={item.id}
+                  active={activeNav === item.id}
+                  onClick={() => handleNavClick(item.id)}
+                >
+                  {item.label}
+                </NavItem>
+              ))}
+            </SidebarNav>
+          </SidebarContent>
+        </MobileSidebar>
+      )}
 
-      <Sidebar $isOpen={mobileMenuOpen}>
-        <StarField density="low" speed="slow" />
-        <Logo>
-          <UncommonLogo size="sm" showSubtitle={false} />
-        </Logo>
-        <SidebarContent>
-          <NavItem active={activeNav === 'dashboard'} onClick={() => handleNavClick('dashboard')}>
-            <FiBarChart2 size={20} />
-            Dashboard
-          </NavItem>
-          <NavItem active={activeNav === 'analytics'} onClick={() => handleNavClick('analytics')}>
-            <FiBarChart size={20} />
-            My Analytics
-          </NavItem>
-          <NavItem active={activeNav === 'profile'} onClick={() => handleNavClick('profile')}>
-            <FiUser size={20} />
-            My Profile
-          </NavItem>
-        </SidebarContent>
-        <SidebarFooter>
-          <NavItem onClick={logout}>
-            <FiLogOut size={20} />
-            Logout
-          </NavItem>
-        </SidebarFooter>
-      </Sidebar>
+      <Sidebar 
+        activeNav={activeNav} 
+        onNavClick={handleNavClick} 
+      />
 
       <MainContent style={{ padding: 0 }}>
         <AnimatePresence mode="wait">

@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../Common/Button';
 import { Input } from '../Common/Input';
 import { Card } from '../Common/Card';
 import { theme } from '../../styles/theme';
+import { FiAlertTriangle, FiCheckCircle } from 'react-icons/fi';
+
 
 interface LoginFormProps {
   onToggleMode: () => void;
@@ -14,6 +16,18 @@ const FormContainer = styled.div`
   width: 100%;
   max-width: 400px;
   margin: 0 auto;
+  animation: fadeIn 0.4s ease;
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
 `;
 
 const Form = styled.form`
@@ -95,6 +109,23 @@ const ErrorMessage = styled.div`
   border-radius: ${theme.borderRadius.md};
   font-size: ${theme.fontSizes.sm};
   text-align: center;
+  animation: shake 0.5s ease;
+
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    75% { transform: translateX(5px); }
+  }
+`;
+
+const SuccessMessage = styled.div`
+  background-color: ${theme.colors.success}10;
+  border: 1px solid ${theme.colors.success}30;
+  color: ${theme.colors.success};
+  padding: ${theme.spacing.sm};
+  border-radius: ${theme.borderRadius.md};
+  font-size: ${theme.fontSizes.sm};
+  text-align: center;
 `;
 
 const Divider = styled.div`
@@ -125,16 +156,174 @@ const GoogleButton = styled(Button)`
   align-items: center;
   justify-content: center;
   gap: ${theme.spacing.sm};
+  transition: all 0.2s ease;
   
   &:hover {
     background-color: ${theme.colors.gray50};
     border-color: ${theme.colors.gray400};
+    transform: translateY(-1px);
+    box-shadow: ${theme.shadows.md};
+  }
+
+  &:active {
+    transform: translateY(0);
   }
 
   img {
     width: 20px;
     height: 20px;
   }
+`;
+
+const RoleToggleWrapper = styled.div`
+  display: flex;
+  gap: ${theme.spacing.sm};
+  margin-bottom: ${theme.spacing.lg};
+`;
+
+const RoleButton = styled.button<{ $active?: boolean }>`
+  flex: 1;
+  padding: ${theme.spacing.md};
+  border: 2px solid ${props => props.$active ? theme.colors.primary : theme.colors.gray300};
+  border-radius: ${theme.borderRadius.md};
+  background: ${props => props.$active ? theme.colors.primary + '10' : 'white'};
+  color: ${props => props.$active ? theme.colors.primary : theme.colors.textSecondary};
+  font-weight: ${theme.fontWeights.medium};
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: ${theme.spacing.sm};
+
+  &:hover {
+    border-color: ${theme.colors.primary};
+    background: ${theme.colors.primary + '05'};
+  }
+`;
+
+const InstructorGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: ${theme.spacing.md};
+  margin-bottom: ${theme.spacing.lg};
+  animation: fadeIn 0.3s ease;
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+`;
+
+const InstructorCard = styled.div<{ $selected?: boolean }>`
+  padding: ${theme.spacing.md};
+  border: 2px solid ${props => props.$selected ? theme.colors.primary : theme.colors.gray200};
+  border-radius: ${theme.borderRadius.md};
+  background: ${props => props.$selected ? theme.colors.primary + '10' : 'white'};
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+
+  &:hover {
+    border-color: ${theme.colors.primary};
+    transform: translateY(-2px);
+    box-shadow: ${theme.shadows.md};
+  }
+
+  h4 {
+    margin: 0;
+    color: ${theme.colors.textPrimary};
+    font-size: ${theme.fontSizes.sm};
+  }
+
+  p {
+    margin: ${theme.spacing.xs} 0 0 0;
+    color: ${theme.colors.textSecondary};
+    font-size: ${theme.fontSizes.xs};
+  }
+`;
+
+const BackButton = styled.button`
+  background: none;
+  border: none;
+  color: ${theme.colors.textSecondary};
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: ${theme.spacing.xs};
+  font-size: ${theme.fontSizes.sm};
+  margin-bottom: ${theme.spacing.md};
+  
+  &:hover {
+    color: ${theme.colors.primary};
+  }
+`;
+
+const PasswordWrapper = styled.div`
+  position: relative;
+`;
+
+const PasswordToggle = styled.button`
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: ${theme.colors.textSecondary};
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  &:hover {
+    color: ${theme.colors.primary};
+  }
+`;
+
+const ValidationIcon = styled.span<{ $isValid?: boolean }>`
+  position: absolute;
+  right: 40px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: ${props => props.$isValid ? theme.colors.success : theme.colors.danger};
+  display: flex;
+  align-items: center;
+`;
+
+const RememberMeWrapper = styled.label`
+  display: flex;
+  align-items: center;
+  gap: ${theme.spacing.sm};
+  cursor: pointer;
+  font-size: ${theme.fontSizes.sm};
+  color: ${theme.colors.textSecondary};
+  margin-top: ${theme.spacing.xs};
+
+  input {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    accent-color: ${theme.colors.primary};
+  }
+
+  &:hover {
+    color: ${theme.colors.textPrimary};
+  }
+`;
+
+const NetworkWarning = styled.div`
+  background: #fff3cd;
+  border: 1px solid #ffc107;
+  color: #856404;
+  padding: ${theme.spacing.sm};
+  border-radius: ${theme.borderRadius.md};
+  font-size: ${theme.fontSizes.sm};
+  display: flex;
+  align-items: center;
+  gap: ${theme.spacing.sm};
+  margin-bottom: ${theme.spacing.md};
 `;
 
 export const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode }) => {
@@ -145,6 +334,43 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode }) => {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [emailValid, setEmailValid] = useState<boolean | null>(null);
+
+  // Monitor network status
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Auto-clear error after 5 seconds
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => setError(''), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [error]);
+
+  // Email validation
+  useEffect(() => {
+    if (formData.email) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      setEmailValid(emailRegex.test(formData.email));
+    } else {
+      setEmailValid(null);
+    }
+  }, [formData.email]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -152,11 +378,25 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode }) => {
       ...prev,
       [name]: value,
     }));
-    setError('');
+    if (error) setError('');
+    if (success) setSuccess('');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Check network status
+    if (!navigator.onLine) {
+      setError('No internet connection. Please check your network and try again.');
+      return;
+    }
+
+    // Validate email
+    if (!emailValid) {
+      setError('Please enter a valid email address');
+      return;
+    }
+
     setLoading(true);
     setError('');
 
@@ -165,7 +405,6 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode }) => {
     } catch (err: any) {
       console.error('Login error:', err);
       
-      // Provide specific error messages
       let errorMessage = 'Failed to log in';
       
       if (err.code === 'auth/invalid-credential') {
@@ -176,6 +415,8 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode }) => {
         errorMessage = 'Incorrect password. Please try again.';
       } else if (err.code === 'auth/too-many-requests') {
         errorMessage = 'Too many failed attempts. Please try again later or reset your password.';
+      } else if (err.code === 'auth/network-request-failed') {
+        errorMessage = 'Network error. Please check your connection and try again.';
       } else if (err.message) {
         errorMessage = err.message;
       }
@@ -192,19 +433,38 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode }) => {
       return;
     }
 
+    if (!emailValid) {
+      setError('Please enter a valid email address first');
+      return;
+    }
+
+    setError('');
+    setSuccess('');
+
     try {
       await resetPassword(formData.email);
+      setSuccess('Password reset email sent! Check your inbox.');
     } catch (err: any) {
       setError(err.message || 'Failed to send reset email');
     }
   };
+
+  const isFormValid = emailValid && formData.password.length > 0;
 
   return (
     <FormContainer>
       <Card padding="lg">
         <Title>Welcome Back</Title>
         
+        {!isOnline && (
+          <NetworkWarning>
+            <span style={{ marginRight: '8px' }}>⚠️</span>
+            You're offline. Some features may not work.
+          </NetworkWarning>
+        )}
+        
         {error && <ErrorMessage>{error}</ErrorMessage>}
+        {success && <SuccessMessage>{success}</SuccessMessage>}
         
         {error && error.includes('Invalid email or password') && (
           <HelpText>
@@ -218,27 +478,52 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode }) => {
         )}
         
         <Form onSubmit={handleSubmit}>
-          <Input
-            label="Email"
-            type="email"
-            name="email"
-            value={formData.email}
-            onChange={handleChange}
-            placeholder="Enter your email"
-            required
-            fullWidth
-          />
+          <div style={{ position: 'relative' }}>
+            <Input
+              label="Email"
+              type="email"
+              name="email"
+              value={formData.email}
+              onChange={handleChange}
+              placeholder="Enter your email"
+              required
+              fullWidth
+            />
+            {emailValid !== null && (
+              <ValidationIcon $isValid={emailValid}>
+                {emailValid ? <FiCheckCircle size={16} /> : <FiAlertTriangle size={16} />}
+              </ValidationIcon>
+            )}
+          </div>
           
-          <Input
-            label="Password"
-            type="password"
-            name="password"
-            value={formData.password}
-            onChange={handleChange}
-            placeholder="Enter your password"
-            required
-            fullWidth
-          />
+          <PasswordWrapper>
+            <Input
+              label="Password"
+              type={showPassword ? 'text' : 'password'}
+              name="password"
+              value={formData.password}
+              onChange={handleChange}
+              placeholder="Enter your password"
+              required
+              fullWidth
+            />
+            <PasswordToggle
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              tabIndex={-1}
+            >
+              {showPassword ? 'Hide' : 'Show'}
+            </PasswordToggle>
+          </PasswordWrapper>
+
+          <RememberMeWrapper>
+            <input
+              type="checkbox"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+            />
+            Remember me
+          </RememberMeWrapper>
           
           <Button
             type="submit"
@@ -246,7 +531,10 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode }) => {
             size="lg"
             fullWidth
             loading={loading}
-            disabled={!formData.email || !formData.password}
+            disabled={!isFormValid || !isOnline}
+            style={{
+              transition: 'transform 0.1s ease',
+            }}
           >
             Sign In
           </Button>
@@ -261,7 +549,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode }) => {
           variant="outline"
           fullWidth
           onClick={loginWithGoogle}
-          disabled={loading}
+          disabled={loading || !isOnline}
         >
           <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" />
           Sign in with Google

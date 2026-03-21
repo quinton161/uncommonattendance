@@ -28,6 +28,7 @@ import {
 import { format, subDays, eachDayOfInterval } from 'date-fns';
 import { theme } from '../../styles/theme';
 import { useAuth } from '../../contexts/AuthContext';
+import { uniqueToast } from '../../utils/toastUtils';
 import { ProfileUpload } from './ProfileUpload';
 import { Button } from '../Common/Button';
 import DataService from '../../services/DataService';
@@ -379,10 +380,48 @@ export const StudentProfile: React.FC = () => {
     engagementScore: 0,
     status: 'on-track' as 'on-track' | 'warning' | 'at-risk',
     course: 'Full Stack Web Development',
+    profession: '',
+    displayName: '',
+    bio: ''
+  });
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValues, setEditValues] = useState({
+    displayName: '',
+    course: '',
+    profession: '',
+    bio: ''
   });
   const [trendData, setTrendData] = useState<any[]>([]);
   const [pieData, setPieData] = useState<any[]>([]);
   const [sessions, setSessions] = useState<any[]>([]);
+
+  useEffect(() => {
+    const userAsAny = user as any;
+    if (user) {
+      const initialValues = {
+        displayName: user.displayName || '',
+        course: userAsAny?.course || 'Full Stack Web Development',
+        profession: userAsAny?.profession || '',
+        bio: userAsAny?.bio || ''
+      };
+      setStats(prev => ({ ...prev, ...initialValues }));
+      setEditValues(initialValues);
+    }
+  }, [user]);
+
+  const handleUpdateProfile = async () => {
+    if (!user) return;
+    try {
+      const dataService = DataService.getInstance();
+      await dataService.updateUser(user.uid, editValues);
+      setStats(prev => ({ ...prev, ...editValues }));
+      setIsEditing(false);
+      uniqueToast.success('Profile updated successfully!');
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      uniqueToast.error('Failed to update profile');
+    }
+  };
 
   useEffect(() => {
     const ds = DataService.getInstance();
@@ -432,6 +471,9 @@ export const StudentProfile: React.FC = () => {
         engagementScore: Math.round((studentStats.attendanceRate * 0.7) + (85 * 0.3)), // Real attendance + placeholder participation
         status: studentStats.attendanceRate >= 80 ? 'on-track' : studentStats.attendanceRate >= 60 ? 'warning' : 'at-risk',
         course: 'Full Stack Web Development',
+        profession: '',
+        displayName: '',
+        bio: '',
       });
     };
 
@@ -532,20 +574,112 @@ export const StudentProfile: React.FC = () => {
 
         <InfoWrapper>
           <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing.md, flexWrap: 'wrap', marginBottom: theme.spacing.xs }}>
-            <Name>{user?.displayName || 'Student Name'}</Name>
+            {isEditing ? (
+              <input
+                type="text"
+                value={editValues.displayName}
+                onChange={(e) => setEditValues({ ...editValues, displayName: e.target.value })}
+                placeholder="Full Name"
+                style={{
+                  fontSize: theme.fontSizes['2xl'],
+                  fontWeight: theme.fontWeights.bold,
+                  padding: '4px 8px',
+                  borderRadius: theme.borderRadius.sm,
+                  border: `1px solid ${theme.colors.gray300}`,
+                  width: '100%',
+                  maxWidth: '300px'
+                }}
+              />
+            ) : (
+              <Name>{stats.displayName || 'Student Name'}</Name>
+            )}
             <Badge status={stats.status}>{stats.status.replace('-', ' ')}</Badge>
           </div>
           
           <Course>
             <FiBookOpen size={20} />
-            {stats.course}
+            {isEditing ? (
+              <input
+                type="text"
+                value={editValues.course}
+                onChange={(e) => setEditValues({ ...editValues, course: e.target.value })}
+                placeholder="Course"
+                style={{
+                  padding: '4px 8px',
+                  borderRadius: theme.borderRadius.sm,
+                  border: `1px solid ${theme.colors.gray300}`,
+                  fontSize: theme.fontSizes.sm
+                }}
+              />
+            ) : (
+              stats.course
+            )}
           </Course>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing.md, color: theme.colors.textSecondary, fontSize: theme.fontSizes.sm }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing.sm, color: theme.colors.textSecondary, marginBottom: theme.spacing.md }}>
+            <FiUser size={20} />
+            {isEditing ? (
+              <input
+                type="text"
+                value={editValues.profession}
+                onChange={(e) => setEditValues({ ...editValues, profession: e.target.value })}
+                placeholder="Profession"
+                style={{
+                  padding: '4px 8px',
+                  borderRadius: theme.borderRadius.sm,
+                  border: `1px solid ${theme.colors.gray300}`,
+                  fontSize: theme.fontSizes.sm
+                }}
+              />
+            ) : (
+              <span>{stats.profession || 'No profession set'}</span>
+            )}
+          </div>
+
+          {isEditing && (
+            <div style={{ marginBottom: theme.spacing.md }}>
+              <textarea
+                value={editValues.bio}
+                onChange={(e) => setEditValues({ ...editValues, bio: e.target.value })}
+                placeholder="Tell us about yourself..."
+                style={{
+                  width: '100%',
+                  minHeight: '80px',
+                  padding: '8px',
+                  borderRadius: theme.borderRadius.sm,
+                  border: `1px solid ${theme.colors.gray300}`,
+                  fontSize: theme.fontSizes.sm,
+                  resize: 'vertical'
+                }}
+              />
+            </div>
+          )}
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing.md, color: theme.colors.textSecondary, fontSize: theme.fontSizes.sm, marginBottom: theme.spacing.md }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing.xs }}>
               <FiAtSign size={16} />
               {user?.email}
+              <span style={{ fontSize: '10px', opacity: 0.6 }}>(Not editable)</span>
             </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: theme.spacing.sm, marginBottom: theme.spacing.lg }}>
+            {isEditing ? (
+              <>
+                <Button variant="primary" size="sm" onClick={handleUpdateProfile}>Save Changes</Button>
+                <Button variant="outline" size="sm" onClick={() => setIsEditing(false)}>Cancel</Button>
+              </>
+            ) : (
+              <Button variant="outline" size="sm" onClick={() => {
+                setEditValues({
+                  displayName: stats.displayName,
+                  course: stats.course,
+                  profession: stats.profession,
+                  bio: stats.bio
+                });
+                setIsEditing(true);
+              }}>Edit Profile</Button>
+            )}
           </div>
 
           <QuickStats>

@@ -1,6 +1,7 @@
 import React from 'react';
 import styled from 'styled-components';
 import { theme } from '../../styles/theme';
+import { Sidebar } from './Sidebar';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -15,7 +16,6 @@ interface ContainerProps {
 const LayoutWrapper = styled.div`
   min-height: 100vh;
   display: flex;
-  flex-direction: column;
   background-color: ${theme.colors.background};
 `;
 
@@ -23,12 +23,11 @@ const Main = styled.main`
   flex: 1;
   display: flex;
   flex-direction: column;
-  /* Add top padding to account for the sticky header so content is not hidden behind it */
-  padding-top: 64px;
+  margin-left: 72px;
+  transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 
   @media (max-width: ${theme.breakpoints.tablet}) {
-    /* Mobile/tablet header uses a slightly smaller height in other components */
-    padding-top: 60px;
+    margin-left: 0;
   }
 `;
 
@@ -103,6 +102,7 @@ const Nav = styled.nav`
 export const Layout: React.FC<LayoutProps> = ({ children }) => {
   return (
     <LayoutWrapper>
+      <Sidebar />
       <Main>{children}</Main>
     </LayoutWrapper>
   );

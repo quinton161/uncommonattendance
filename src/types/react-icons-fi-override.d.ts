@@ -63,5 +63,9 @@ declare module 'react-icons/fi' {
   export const FiAtSign: any;
   export const FiBookOpen: any;
   export const FiEdit2: any;
+
+  // Missing icons used in Auth components
+  export const FiMail: any;
+  export const FiLock: any;
 }
 

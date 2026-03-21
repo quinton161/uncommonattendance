@@ -17,6 +17,7 @@ interface InputProps {
   required?: boolean;
   id?: string;
   name?: string;
+  icon?: React.ReactNode;
 }
 
 const InputContainer = styled.div<{ fullWidth?: boolean }>`
@@ -29,6 +30,22 @@ const InputContainer = styled.div<{ fullWidth?: boolean }>`
     css`
       width: 100%;
     `}
+`;
+
+const InputWrapper = styled.div<{ hasError?: boolean }>`
+  position: relative;
+  display: flex;
+  align-items: center;
+`;
+
+const IconContainer = styled.div<{ position: 'left' | 'right' }>`
+  position: absolute;
+  ${({ position }) => position}: ${theme.spacing.sm};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: ${theme.colors.textLight};
+  pointer-events: none;
 `;
 
 const Label = styled.label`
@@ -91,6 +108,14 @@ const StyledInput = styled.input<{ hasError?: boolean; size?: string }>`
   }
 `;
 
+const StyledInputWithIcon = styled(StyledInput)<{ hasIcon: boolean; iconPosition: 'left' | 'right' }>`
+  ${({ hasIcon, iconPosition }) =>
+    hasIcon &&
+    css`
+      padding-${iconPosition}: 40px;
+    `}
+`;
+
 const HelperText = styled.span<{ isError?: boolean }>`
   font-size: ${theme.fontSizes.xs};
   color: ${({ isError }) => 
@@ -111,6 +136,7 @@ export const Input: React.FC<InputProps> = ({
   required = false,
   id,
   name,
+  icon,
   ...props
 }) => {
   const inputId = id || name || `input-${Math.random().toString(36).substr(2, 9)}`;
@@ -123,14 +149,19 @@ export const Input: React.FC<InputProps> = ({
           {required && <RequiredIndicator>*</RequiredIndicator>}
         </Label>
       )}
-      <StyledInput
-        id={inputId}
-        name={name}
-        hasError={!!error}
-        size={size}
-        required={required}
-        {...props}
-      />
+      <InputWrapper hasError={!!error}>
+        {icon && <IconContainer position="left">{icon}</IconContainer>}
+        <StyledInputWithIcon
+          id={inputId}
+          name={name}
+          hasError={!!error}
+          size={size}
+          required={required}
+          hasIcon={!!icon}
+          iconPosition="left"
+          {...props}
+        />
+      </InputWrapper>
       {(error || helperText) && (
         <HelperText isError={!!error}>
           {error || helperText}

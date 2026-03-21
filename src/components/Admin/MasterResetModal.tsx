@@ -222,7 +222,7 @@ export const MasterResetModal: React.FC<MasterResetModalProps> = ({
           </InfoRow>
           <InfoRow>
             <InfoLabel><FiCheckCircle size={16} /> Preserved</InfoLabel>
-            <InfoValue $preserve>Admins and Instructors</InfoValue>
+            <InfoValue $preserve>Admin (quintonndlovu161@gmail.com)</InfoValue>
           </InfoRow>
         </InfoBox>
 
