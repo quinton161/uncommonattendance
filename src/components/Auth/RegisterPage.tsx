@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import styled, { keyframes } from 'styled-components';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../Common/Button';
 import { Input } from '../Common/Input';
 import { Card } from '../Common/Card';
 import { theme } from '../../styles/theme';
-import { FiUser, FiCheckCircle, FiChevronLeft, FiUsers, FiClock, FiMail, FiLock } from 'react-icons/fi';
-import { UncommonLogo } from '../Common/UncommonLogo';
+import { FiUser, FiCheckCircle, FiMail, FiLock } from 'react-icons/fi';
+
 import { Rocket } from 'lucide-react';
 
 const fadeIn = keyframes`
@@ -189,7 +189,7 @@ const RoleButton = styled.button<{ $active: boolean }>`
   }
 `;
 
-const InstructorGrid = styled.div`
+const _InstructorGrid = styled.div`
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: ${theme.spacing.md};
@@ -200,7 +200,7 @@ const InstructorGrid = styled.div`
   }
 `;
 
-const InstructorCard = styled.div<{ $selected: boolean }>`
+const _InstructorCard = styled.div<{ $selected: boolean }>`
   padding: ${theme.spacing.md};
   border-radius: 16px;
   border: 2px solid ${props => props.$selected ? theme.colors.primary : theme.colors.gray200};
@@ -228,7 +228,7 @@ const InstructorCard = styled.div<{ $selected: boolean }>`
   }
 `;
 
-const Avatar = styled.div`
+const _Avatar = styled.div`
   width: 44px;
   height: 44px;
   border-radius: 50%;
@@ -251,7 +251,7 @@ const HelperText = styled.p`
   gap: ${theme.spacing.xs};
 `;
 
-const ChangeProfileButton = styled.button`
+const _ChangeProfileButton = styled.button`
   background: none;
   border: none;
   color: ${theme.colors.primary};
@@ -326,7 +326,7 @@ interface InstructorType {
   username: string;
 }
 
-const INSTRUCTORS: InstructorType[] = [
+const _INSTRUCTORS: InstructorType[] = [
   { id: '1', name: 'Mr. Moyo', username: 'moyo' },
   { id: '2', name: 'Ms. Dube', username: 'dube' },
   { id: '3', name: 'Mr. Ncube', username: 'ncube' },

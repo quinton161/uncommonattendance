@@ -430,7 +430,7 @@ interface AdminDashboardProps {
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) => {
 
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const [activeNav, setActiveNav] = useState('dashboard');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [stats, setStats] = useState({

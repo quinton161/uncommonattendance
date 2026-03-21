@@ -116,7 +116,7 @@ const SidebarContent = styled.div`
   }
 `;
 
-const SidebarFooter = styled.div`
+const _SidebarFooter = styled.div`
   flex-shrink: 0;
   margin-top: auto;
   padding-top: ${theme.spacing.xl};
@@ -341,7 +341,7 @@ interface StudentDashboardProps {
 }
 
 export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps): React.ReactElement => {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const [activeNav, setActiveNav] = useState('dashboard');
   const [checkedIn, setCheckedIn] = useState(false);
   const [checkInTime, setCheckInTime] = useState<Date | null>(null);

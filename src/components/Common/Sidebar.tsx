@@ -2,12 +2,8 @@ import React, { useState } from 'react';
 import styled from 'styled-components';
 import { theme } from '../../styles/theme';
 import { 
-  DashboardIcon, 
-  CalendarIcon, 
-  MessageIcon, 
   PersonIcon,
   LogoutIcon,
-  EventIcon,
   BarChartIcon,
   PeopleIcon,
   TrendingUpIcon,

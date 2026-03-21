@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import styled, { keyframes } from 'styled-components';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../Common/Button';
 import { Input } from '../Common/Input';
 import { Card } from '../Common/Card';
 import { theme } from '../../styles/theme';
-import { FiCheckCircle, FiAlertTriangle, FiClock } from 'react-icons/fi';
+import { FiCheckCircle, FiAlertTriangle } from 'react-icons/fi';
 import { Rocket } from 'lucide-react';
 
 const fadeIn = keyframes`
