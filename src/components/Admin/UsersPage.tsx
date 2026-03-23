@@ -5,7 +5,6 @@ import { theme } from '../../styles/theme';
 import { Button } from '../Common/Button';
 import DataService from '../../services/DataService';
 import { TimeService } from '../../services/timeService';
-import { DailyAttendanceService } from '../../services/dailyAttendanceService';
 import { AttendanceService } from '../../services/attendanceService';
 import { DeleteUserModal } from './DeleteUserModal';
 import { uniqueToast } from '../../utils/toastUtils';
@@ -515,7 +514,6 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const dataService = DataService.getInstance();
-  const dailyService = DailyAttendanceService.getInstance();
 
   useEffect(() => {
     // Intentionally run only once on mount; loadData handles its own dependencies.
