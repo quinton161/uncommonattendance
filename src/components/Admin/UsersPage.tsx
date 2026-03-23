@@ -162,22 +162,6 @@ const UserAvatar = styled.div<{ isActive?: boolean }>`
   }
 `;
 
-const ChatButton = styled(Button)`
-  border-radius: 999px;
-  font-weight: ${theme.fontWeights.medium};
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  padding: 8px 20px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-
-  &:hover {
-    transform: scale(1.05);
-    background: ${theme.colors.primary};
-    color: white;
-  }
-`;
-
 const UserType = styled.div<{ type: string }>`
   display: inline-flex;
   align-items: center;
