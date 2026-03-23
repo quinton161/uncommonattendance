@@ -502,11 +502,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
 
     setMarkingStudentId(student.userId);
     try {
-      await attendanceService.checkIn(student.userId, student.userName);
+      // Use attendanceService to create proper attendance record
+      // skipTimeCheck=true allows admin to mark students present anytime
+      // method='admin' indicates admin-marked attendance
+      await attendanceService.checkIn(student.userId, student.userName, undefined, undefined, true, 'admin');
       uniqueToast.success(`Marked ${student.userName} as present.`);
-    } catch (e) {
-      console.error('Failed to mark present:', e);
-      uniqueToast.error(`Failed to mark ${student.userName} as present.`);
+    } catch (e: any) {
+      console.error('Failed to mark student present:', e.message);
+      uniqueToast.error(`Failed to mark ${student.userName} as present: ${e.message}`);
     } finally {
       setMarkingStudentId(null);
     }
@@ -526,10 +529,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
     setMarkAllLoading(true);
     try {
       // Batch to reduce Firestore write pressure.
+      // skipTimeCheck=true allows admin to mark all students present anytime
+      // method='admin' indicates admin-marked attendance
       const batchSize = 5;
       for (let i = 0; i < targets.length; i += batchSize) {
         const batch = targets.slice(i, i + batchSize);
-        await Promise.all(batch.map((s: any) => attendanceService.checkIn(s.userId, s.userName)));
+        await Promise.all(batch.map((s: any) => attendanceService.checkIn(s.userId, s.userName, undefined, undefined, true, 'admin')));
       }
       uniqueToast.success('Marked absent students as present.');
     } catch (e) {

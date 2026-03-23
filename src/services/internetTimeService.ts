@@ -291,6 +291,9 @@ export class InternetTimeService {
   private readonly LATE_HOUR = 9;
   private readonly GRACE_PERIOD_MINUTES = 5;
   
+  // Admin can override time check for marking students present
+  public allowAdminOverride = false;
+  
   /**
    * Check if it's 9:00 AM or later Harare time (late check-in)
    */

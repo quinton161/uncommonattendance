@@ -39,9 +39,11 @@ export class AttendanceService {
     studentId: string,
     studentName: string,
     qrCode?: string,
-    location?: LocationData
+    location?: LocationData,
+    skipTimeCheck: boolean = false,
+    method: string = 'qr'
   ): Promise<AttendanceRecord> {
-    console.log('AttendanceService.checkIn called with:', { studentId, studentName, qrCode, location });
+    console.log('AttendanceService.checkIn called with:', { studentId, studentName, qrCode, location, skipTimeCheck, method });
     
     // 1. Basic Validation
     if (!studentId?.trim() || !studentName?.trim()) {
@@ -52,7 +54,8 @@ export class AttendanceService {
     const harareTime = this.timeService.getCurrentTime();
     const today = this.timeService.getCurrentDateString();
     
-    if (!this.timeService.canCheckIn(harareTime)) {
+    // Skip time check if admin override is enabled
+    if (!skipTimeCheck && !this.timeService.canCheckIn(harareTime)) {
       throw new Error('Check-in is closed. The attendance deadline has passed (9:05 AM).');
     }
 
@@ -65,7 +68,7 @@ export class AttendanceService {
       throw new Error('You have already checked in for today.');
     }
 
-    // 4. QR Validation (if enabled)
+    // 4. QR Validation (if enabled and provided)
     if (qrCode) {
       const { qrCodeService } = await import('./qrCodeService');
       const isValid = await qrCodeService.validateCode(qrCode);
@@ -84,7 +87,7 @@ export class AttendanceService {
       date: today,
       isPresent: true,
       status,
-      method: 'qr',
+      method,
       deviceId: 'web-app',
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
