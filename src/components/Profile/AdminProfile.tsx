@@ -474,7 +474,7 @@ export const AdminProfile: React.FC = () => {
 
     // Subscribe to real-time analytics for the charts (Weekly Volume)
     const currentRange = {
-      preset: 'week' as const,
+      preset: { label: 'This Week', value: 'week' } as import('../../services/attendanceAnalyticsService').DateRangePreset,
       startDate: format(subDays(new Date(), 6), 'yyyy-MM-dd'),
       endDate: format(new Date(), 'yyyy-MM-dd')
     };

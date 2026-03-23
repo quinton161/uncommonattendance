@@ -205,15 +205,16 @@ function fmtShort(dateIso: string) {
 }
 
 export function StudentAttendanceAnalytics(props: { studentId: string }): React.ReactElement {
-  const [range, setRange] = useState<DateRange>(attendanceAnalyticsService.getDefaultRange('month'));
+  const [range, setRange] = useState<DateRange>(attendanceAnalyticsService.getDefaultRange('student'));
   const [analytics, setAnalytics] = useState<StudentAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
 
   const cardAnim = useMemo(() => ({ initial: { opacity: 0, y: 8 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.25 } }), []);
 
   useEffect(() => {
-    if (range.preset !== 'custom') {
-      setRange(attendanceAnalyticsService.getDefaultRange(range.preset));
+    if (range.preset && range.preset.value !== 'custom') {
+      const newRange = attendanceAnalyticsService.presetToRange(range.preset);
+      setRange(newRange);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [range.preset]);
@@ -252,7 +253,7 @@ export function StudentAttendanceAnalytics(props: { studentId: string }): React.
   const dailyData = (analytics?.daily || []).map(d => ({
     ...d,
     name: fmtShort(d.date),
-    rate: d.total > 0 ? (d.present + d.late) * 100 : 0,
+    rate: d.status === 'present' || d.status === 'late' ? 100 : 0,
   }));
   const pieData = analytics?.distribution || [];
   const weekly = analytics?.weekly || [];

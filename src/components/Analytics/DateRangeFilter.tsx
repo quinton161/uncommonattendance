@@ -52,19 +52,30 @@ export function DateRangeFilter(props: {
   onChange: (next: DateRange) => void;
   presets?: DateRangePreset[];
 }): React.ReactElement {
-  const presets = props.presets || ['today', 'week', 'month', 'custom'];
+  const presets = props.presets || [
+    { label: 'Today', value: 'today' as string },
+    { label: 'This Week', value: 'week' as string },
+    { label: 'This Month', value: 'month' as string },
+    { label: 'Custom', value: 'custom' as string }
+  ];
 
   return (
     <Wrap>
       <Group>
         <label>Range</label>
         <select
-          value={props.value.preset}
-          onChange={(e) => props.onChange({ ...props.value, preset: e.target.value as DateRangePreset })}
+          value={typeof props.value.preset === 'string' ? props.value.preset : props.value.preset?.value}
+          onChange={(e) => {
+            const presetValue = e.target.value;
+            const preset = presets.find(p => p.value === presetValue) as DateRangePreset | undefined;
+            if (preset) {
+              props.onChange({ ...props.value, preset });
+            }
+          }}
         >
           {presets.map(p => (
-            <option key={p} value={p}>
-              {p === 'today' ? 'Today' : p === 'week' ? 'This Week' : p === 'month' ? 'This Month' : 'Custom'}
+            <option key={typeof p === 'string' ? p : p.value} value={typeof p === 'string' ? p : p.value}>
+              {typeof p === 'string' ? (p === 'today' ? 'Today' : p === 'week' ? 'This Week' : p === 'month' ? 'This Month' : 'Custom') : p.label}
             </option>
           ))}
         </select>
@@ -76,7 +87,7 @@ export function DateRangeFilter(props: {
           type="date"
           value={props.value.startDate}
           onChange={(e) => props.onChange({ ...props.value, startDate: e.target.value })}
-          disabled={props.value.preset !== 'custom'}
+          disabled={props.value.preset && props.value.preset.value !== 'custom'}
         />
       </Group>
 
@@ -86,7 +97,7 @@ export function DateRangeFilter(props: {
           type="date"
           value={props.value.endDate}
           onChange={(e) => props.onChange({ ...props.value, endDate: e.target.value })}
-          disabled={props.value.preset !== 'custom'}
+          disabled={props.value.preset && props.value.preset.value !== 'custom'}
         />
       </Group>
     </Wrap>

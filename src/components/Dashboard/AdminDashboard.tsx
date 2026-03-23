@@ -585,7 +585,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
 
       // At-risk students (low attendance) for the dashboard side panel.
       try {
-        const range = analyticsService.getDefaultRange('week');
+        const range = analyticsService.getDefaultRange('admin');
         const analytics = await analyticsService.getAdminAnalytics(range);
         const atRisk = analytics.mostAbsent
           .filter((r: any) => r.attendanceRate < 85 || r.absent >= 3)
@@ -932,16 +932,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
                   {(todayAttendanceList || [])
                     .slice()
                     .sort((a: any, b: any) => {
-                      const sa = a.status === 'absent' ? 0 : a.status === 'late' ? 1 : 2;
-                      const sb = b.status === 'absent' ? 0 : b.status === 'late' ? 1 : 2;
+                      const sa = a.status === 'absent' ? 0 : (a.status === 'late' || a.isLate) ? 1 : 2;
+                      const sb = b.status === 'absent' ? 0 : (b.status === 'late' || b.isLate) ? 1 : 2;
                       return sa - sb;
                     })
                     .slice(0, 8)
                     .map((s: any) => {
-                      const statusLabel = s.status === 'absent' ? 'Absent' : s.status === 'late' ? 'Late' : 'Present';
+                      const isLateStudent = s.status === 'late' || s.isLate;
+                      const statusLabel = s.status === 'absent' ? 'Absent' : isLateStudent ? 'Late' : 'Present';
                       const statusColor =
                         s.status === 'absent' ? theme.colors.warning :
-                        s.status === 'late' ? '#f59e0b' :
+                        isLateStudent ? '#f59e0b' :
                         theme.colors.success;
 
                       return (

@@ -18,7 +18,9 @@ import {
 } from 'recharts';
 
 import DataService from '../../services/DataService';
-import { attendanceAnalyticsService, AdminAnalytics, DateRange } from '../../services/attendanceAnalyticsService';
+import { attendanceAnalyticsService } from '../../services/attendanceAnalyticsService';
+import { AdminAnalytics } from '../../services/attendanceAnalyticsService';
+import type { DateRange } from '../../services/attendanceAnalyticsService';
 import { theme } from '../../styles/theme';
 import { DateRangeFilter } from './DateRangeFilter';
 import { AttendanceHeatmap } from './AttendanceHeatmap';
@@ -165,7 +167,7 @@ function fmtShort(dateIso: string) {
 export function AdminAttendanceAnalytics(): React.ReactElement {
   const dataService = DataService.getInstance();
 
-  const [range, setRange] = useState<DateRange>(attendanceAnalyticsService.getDefaultRange('month'));
+  const [range, setRange] = useState<DateRange>(attendanceAnalyticsService.getDefaultRange('admin' as any) as any);
   const [students, setStudents] = useState<any[]>([]);
   const [selectedStudentId, setSelectedStudentId] = useState<string>('all');
   const [analytics, setAnalytics] = useState<AdminAnalytics | null>(null);
@@ -187,8 +189,8 @@ export function AdminAttendanceAnalytics(): React.ReactElement {
 
   // If a preset was selected, normalize to concrete dates.
   useEffect(() => {
-    if (range.preset !== 'custom') {
-      setRange(attendanceAnalyticsService.getDefaultRange(range.preset));
+    if (range.preset && range.preset.value) {
+      setRange(attendanceAnalyticsService.presetToRange(range.preset));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [range.preset]);
@@ -197,8 +199,8 @@ export function AdminAttendanceAnalytics(): React.ReactElement {
     let mounted = true;
     setLoading(true);
     attendanceAnalyticsService
-      .getAdminAnalytics(range, { studentId: selectedStudentId === 'all' ? undefined : selectedStudentId })
-      .then((res) => {
+      .getAdminAnalytics(range)
+      .then((res: AdminAnalytics) => {
         if (!mounted) return;
         setAnalytics(res);
         setLoading(false);
@@ -214,7 +216,7 @@ export function AdminAttendanceAnalytics(): React.ReactElement {
   }, [range.startDate, range.endDate, selectedStudentId]);
 
   const dailyData =
-    (analytics?.daily || []).map((d) => ({
+    (analytics?.daily || []).map((d: { date: string; present: number; late: number; absent: number }) => ({
       name: fmtShort(d.date),
       present: d.present,
       late: d.late,
@@ -222,12 +224,16 @@ export function AdminAttendanceAnalytics(): React.ReactElement {
     })) || [];
 
   const pieData = analytics?.distribution || [];
-  const heatmapCells = analytics?.heatmap || [];
+  const heatmapCells = (analytics?.heatmap || []).map((h: { date: string; count: number }) => ({
+    date: h.date,
+    value: h.count,
+    label: `${h.count} records`
+  }));
   const leaderboard = analytics?.leaderboardTop || [];
   const mostAbsent = analytics?.mostAbsent || [];
 
   const totals = analytics?.totals;
-  const attendanceRate = Math.round(totals?.attendanceRate || 0);
+  const attendanceRate = analytics && 'attendanceRate' in analytics ? (analytics as any).attendanceRate : 0;
 
   const COLORS = {
     present: '#22c55e',
@@ -238,7 +244,7 @@ export function AdminAttendanceAnalytics(): React.ReactElement {
   return (
     <Page>
       <FilterRow>
-        <DateRangeFilter value={range} onChange={setRange} presets={['month']} />
+        <DateRangeFilter value={range} onChange={setRange} presets={[{ label: 'Month', value: 'month' }]} />
         <div style={{ display: 'flex', flexDirection: 'column', gap: theme.spacing.xs }}>
           <label style={{ fontSize: theme.fontSizes.xs, color: theme.colors.textSecondary, fontWeight: theme.fontWeights.medium }}>
             Student
@@ -322,7 +328,7 @@ export function AdminAttendanceAnalytics(): React.ReactElement {
               <PieChart>
                 <Tooltip />
                 <Pie data={pieData} dataKey="value" nameKey="name" innerRadius={70} outerRadius={110} paddingAngle={2}>
-                  {pieData.map((entry) => (
+                  {pieData.map((entry: { name: string; value: number }) => (
                     <Cell
                       key={entry.name}
                       fill={
@@ -367,7 +373,7 @@ export function AdminAttendanceAnalytics(): React.ReactElement {
             <span>Leaderboard (top 10)</span>
           </Title>
           <Table>
-            {leaderboard.map((r) => (
+            {leaderboard.map((r: { studentId: string; studentName: string; attendanceRate: number; present: number; late: number; totalDays: number }) => (
               <Row key={r.studentId}>
                 <div style={{ minWidth: 0 }}>
                   <div
@@ -404,8 +410,8 @@ export function AdminAttendanceAnalytics(): React.ReactElement {
           <span>Quick identification (top 10)</span>
         </Title>
         <Table>
-          {mostAbsent.map((r) => (
-            <Row key={r.studentId}>
+          {mostAbsent.map((r: { userId: string; userName: string; absent: number; attendanceRate: number }) => (
+            <Row key={r.userId}>
               <div style={{ minWidth: 0 }}>
                 <div
                   style={{
@@ -416,10 +422,10 @@ export function AdminAttendanceAnalytics(): React.ReactElement {
                     textOverflow: 'ellipsis',
                   }}
                 >
-                  {r.studentName}
+                  {r.userName}
                 </div>
                 <div style={{ fontSize: theme.fontSizes.xs, color: theme.colors.textSecondary }}>
-                  Absent {r.absent}/{r.totalDays} • {r.attendanceRate}% rate
+                  Absent {r.absent} days • {r.attendanceRate}% rate
                 </div>
                 <BarWrap>
                   <BarFill $p={Math.round(100 - r.attendanceRate)} $kind="bad" />

@@ -588,7 +588,10 @@ class DataService {
           checkInTime = userAttendance.checkInTime;
           checkOutTime = userAttendance.checkOutTime;
           
-          isLate = status === 'late';
+          // Calculate isLate based on check-in time (if after 9:00 AM)
+          const checkInDate = checkInTime ? new Date(checkInTime) : null;
+          const isLateCheck = checkInDate ? (checkInDate.getHours() > 9 || (checkInDate.getHours() === 9 && checkInDate.getMinutes() > 0)) : false;
+          isLate = status === 'late' || isLateCheck;
         }
 
         return {
@@ -772,7 +775,10 @@ class DataService {
           checkInTime = userAttendance.checkInTime;
           checkOutTime = userAttendance.checkOutTime;
 
-          isLate = status === 'late';
+          // Calculate isLate based on check-in time (if after 9:00 AM)
+          const checkInDate = checkInTime ? new Date(checkInTime) : null;
+          const isLateCheck = checkInDate ? (checkInDate.getHours() > 9 || (checkInDate.getHours() === 9 && checkInDate.getMinutes() > 0)) : false;
+          isLate = status === 'late' || isLateCheck;
         }
 
         return {

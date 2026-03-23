@@ -1,98 +1,103 @@
-import { db } from './firebase';
-import { AttendanceService } from './attendanceService';
-import DataService from './DataService';
-import { TimeService } from './timeService';
 import { AttendanceRecord, AttendanceStatus } from '../types';
-import { collection, query, where, onSnapshot, getDocs } from 'firebase/firestore';
+import { db } from './firebase';
+import { collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
 
-export type DateRangePreset = 'today' | 'week' | 'month' | 'custom';
+// Date range preset type
+export interface DateRangePreset {
+  label: string;
+  value: 'week' | 'month' | 'quarter' | 'custom' | 'today' | 'semester';
+}
 
+// Full date range type with properties
 export interface DateRange {
   preset: DateRangePreset;
-  startDate: string; // YYYY-MM-DD (inclusive)
-  endDate: string;   // YYYY-MM-DD (inclusive)
+  startDate: string;
+  endDate: string;
 }
 
-export interface DailyCounts {
-  date: string;
-  present: number;
-  late: number;
-  absent: number;
-  total: number;
-  attendanceRate: number; // 0..100
-}
-
-export interface StudentRateRow {
-  studentId: string;
-  studentName: string;
-  email?: string;
-  present: number;
-  late: number;
-  absent: number;
-  totalDays: number;
-  attendanceRate: number; // 0..100
-}
-
+// Admin analytics result type
 export interface AdminAnalytics {
-  range: DateRange;
-  totals: { present: number; late: number; absent: number; total: number; attendanceRate: number };
-  daily: DailyCounts[];
-  distribution: { name: 'Present' | 'Late' | 'Absent'; value: number }[];
-  leaderboardTop: StudentRateRow[];
-  mostAbsent: StudentRateRow[];
-  heatmap: { date: string; value: number; label: string }[]; // value 0..1
+  daily: Array<{
+    date: string;
+    present: number;
+    late: number;
+    absent: number;
+  }>;
+  distribution: Array<{
+    name: string;
+    value: number;
+  }>;
+  heatmap: Array<{
+    date: string;
+    count: number;
+  }>;
+  leaderboardTop: Array<{
+    studentId: string;
+    studentName: string;
+    attendanceRate: number;
+    present: number;
+    late: number;
+    totalDays: number;
+  }>;
+  mostAbsent: Array<{
+    userId: string;
+    userName: string;
+    absent: number;
+    attendanceRate: number;
+  }>;
+  attendanceRate?: number;
+  totals?: {
+    present: number;
+    late: number;
+    absent: number;
+    totalDays: number;
+  };
 }
 
+// Student analytics result type
 export interface StudentAnalytics {
-  range: DateRange;
-  totals: { present: number; late: number; absent: number; total: number; attendanceRate: number };
-  daily: DailyCounts[];
-  distribution: { name: 'Present' | 'Late' | 'Absent'; value: number }[];
-  weekly: { name: string; present: number; late: number; absent: number }[];
-  streak: { current: number; longest: number };
-  warning: { isBelowThreshold: boolean; threshold: number };
+  daily: Array<{
+    date: string;
+    status: 'present' | 'late' | 'absent';
+  }>;
+  totals: {
+    present: number;
+    late: number;
+    absent: number;
+    totalDays: number;
+    attendanceRate: number;
+  };
+  streak: {
+    current: number;
+    longest: number;
+  };
+  checkInTimes: string[];
+  distribution: Array<{ name: string; value: number }>;
+  weekly: Array<any>;
+  warning: {
+    isBelowThreshold: boolean;
+    threshold: number;
+  };
+  range: {
+    startDate: string;
+    endDate: string;
+  };
 }
 
-function clamp(n: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, n));
-}
-
-function toIsoDate(d: Date): string {
-  return d.toISOString().split('T')[0];
-}
-
-function parseIsoDate(iso: string): Date {
-  // ISO YYYY-MM-DD
-  const [y, m, day] = iso.split('-').map(Number);
-  return new Date(y, (m || 1) - 1, day || 1);
-}
-
-function enumerateDates(startIso: string, endIso: string): string[] {
-  const start = parseIsoDate(startIso);
-  const end = parseIsoDate(endIso);
-  const dates: string[] = [];
-  const cur = new Date(start);
-  while (cur <= end) {
-    dates.push(toIsoDate(cur));
-    cur.setDate(cur.getDate() + 1);
-  }
-  return dates;
-}
-
+// Helper function to check if a record is late
 function isLateRecord(record: AttendanceRecord): boolean {
-  // First check if status is explicitly 'late'
-  if (record.status === 'late') return true;
-  
+  const status = (record.status || '').toString().toLowerCase().trim();
+  if (status === 'late') return true;
+  if (status.includes('late')) return true;
+    
   const dt = record.checkInTime;
   if (!dt) return false;
-  
-  // Handle different types of checkInTime (Date, Firestore Timestamp, or string)
+   
   let hours: number, minutes: number;
   if (dt instanceof Date && !Number.isNaN(dt.getTime())) {
     hours = dt.getHours();
     minutes = dt.getMinutes();
   } else if (dt && typeof dt === 'object') {
-    // Could be Firestore Timestamp - check for toDate method
     const dateObj = (dt as any).toDate ? (dt as any).toDate() : new Date(dt as any);
     hours = dateObj.getHours();
     minutes = dateObj.getMinutes();
@@ -103,437 +108,364 @@ function isLateRecord(record: AttendanceRecord): boolean {
   } else {
     return false;
   }
-  
-  // Late if after 9:00 AM
+   
   return hours > 9 || (hours === 9 && minutes > 0);
 }
 
+// Helper function to normalize status
 function normalizeStatus(record: AttendanceRecord): AttendanceStatus {
-  // First check if status is explicitly set
   const status = (record.status || '').toString().toLowerCase();
   if (status === 'late') return 'late';
   if (status === 'completed') return 'completed';
   if (status === 'present') return 'present';
+  if (status.includes('late')) return 'late';
   
-  // Fallback: derive from check-in time
   return isLateRecord(record) ? 'late' : 'present';
 }
 
-function calcBusinessDays(startIso: string, endIso: string): number {
-  const dates = enumerateDates(startIso, endIso);
-  return dates.filter(d => {
-    const dt = parseIsoDate(d);
-    const dow = dt.getDay();
-    return dow !== 0 && dow !== 6;
-  }).length;
-}
-
+// Main analytics service class
 export class AttendanceAnalyticsService {
   private static instance: AttendanceAnalyticsService;
-  private attendanceService = AttendanceService.getInstance();
-  private dataService = DataService.getInstance();
-  private timeService = TimeService.getInstance();
 
-  static getInstance(): AttendanceAnalyticsService {
+  private constructor() {}
+
+  public static getInstance(): AttendanceAnalyticsService {
     if (!AttendanceAnalyticsService.instance) {
       AttendanceAnalyticsService.instance = new AttendanceAnalyticsService();
     }
     return AttendanceAnalyticsService.instance;
   }
 
-  getDefaultRange(preset: DateRangePreset): DateRange {
-    const today = this.timeService.getCurrentDateString();
-    if (preset === 'today') return { preset, startDate: today, endDate: today };
-
-    if (preset === 'week') {
-      const end = parseIsoDate(today);
-      const start = new Date(end);
-      start.setDate(end.getDate() - 6);
-      return { preset, startDate: toIsoDate(start), endDate: today };
-    }
-
-    if (preset === 'month') {
-      const harareNow = this.timeService.getCurrentTime();
-      const start = new Date(harareNow.getFullYear(), harareNow.getMonth(), 1);
-      const end = new Date(harareNow.getFullYear(), harareNow.getMonth() + 1, 0);
-      return { preset, startDate: toIsoDate(start), endDate: toIsoDate(end) };
-    }
-
-    // custom fallback: last 30 days
-    const end = parseIsoDate(today);
-    const start = new Date(end);
-    start.setDate(end.getDate() - 29);
-    return { preset: 'custom', startDate: toIsoDate(start), endDate: today };
-  }
-
-  async getAdminAnalytics(range: DateRange, opts?: { studentId?: string }): Promise<AdminAnalytics> {
-    await this.dataService.testConnection();
-    const users = await this.dataService.getUsers();
-    const students = users.filter((u: any) => !u.userType || u.userType === 'attendee');
-
-    console.log('[Analytics] Fetching attendance for range:', range, 'Students count:', students.length);
-    
-    const records = await this.attendanceService.getAttendanceByDateRange(range.startDate, range.endDate);
-    
-    // Also fetch from dailyAttendance collection for comprehensive analytics
-    const dailyAttendanceRef = collection(db, 'dailyAttendance');
-    const dailyQuery = query(
-      dailyAttendanceRef,
-      where('date', '>=', range.startDate),
-      where('date', '<=', range.endDate)
-    );
-    const dailySnap = await getDocs(dailyQuery);
-    const dailyRecords = dailySnap.docs.map((doc: any) => ({
-      studentId: doc.data().studentId,
-      date: doc.data().date,
-      status: doc.data().isPresent ? 'present' : 'absent',
-      checkInTime: doc.data().markedAt?.toDate() || doc.data().createdAt?.toDate() || null
-    }));
-
-    // Merge both sources
-    const mergedRecords = [...records];
-    dailyRecords.forEach((dr: any) => {
-      const exists = mergedRecords.find(mr => mr.studentId === dr.studentId && mr.date === dr.date);
-      if (!exists && dr.status === 'present') {
-        mergedRecords.push(dr as any);
-      }
-    });
-
-    console.log('[Analytics] Merged attendance records count:', mergedRecords.length);
-    
-    const filteredRecords = opts?.studentId ? mergedRecords.filter(r => r.studentId === opts.studentId) : mergedRecords;
-
-    const studentById = new Map<string, any>();
-    students.forEach((s: any) => {
-      const id = s.uid || s.id;
-      studentById.set(id, s);
-    });
-
-    const dates = enumerateDates(range.startDate, range.endDate);
-    const totalStudents = opts?.studentId ? 1 : students.length;
-
-function getRecordDate(r: any): string | undefined {
-  if (r.date) {
-    return r.date;
-  } else if (r.checkInTime) {
-    const checkIn = r.checkInTime;
-    if (checkIn.toDate) { // Firestore Timestamp
-      return checkIn.toDate().toISOString().split('T')[0];
-    } else if (checkIn.toISOString) { // JavaScript Date
-      return checkIn.toISOString().split('T')[0];
-    } else { // Fallback for string or other formats
-      try {
-        return new Date(checkIn).toISOString().split('T')[0];
-      } catch (e) {
-        console.warn("Could not parse date from checkInTime", checkIn);
-      }
-    }
-  }
-  return undefined;
-}
-
-// ... inside getAdminAnalytics ...
-
-    // DEBUG: Log unique dates found in records
-    const uniqueDatesInRecords = Array.from(new Set(filteredRecords.map(r => getRecordDate(r) || '')));
-    console.log('[Analytics] Unique dates in records:', uniqueDatesInRecords);
-    console.log('[Analytics] Requested range dates:', dates);
-
-    const byDate = new Map<string, AttendanceRecord[]>();
-    filteredRecords.forEach(r => {
-      // Ensure we use the same date format as the 'dates' array (YYYY-MM-DD)
-      const recordDate = getRecordDate(r);
-      if (recordDate) {
-        const arr = byDate.get(recordDate) || [];
-        arr.push(r);
-        byDate.set(recordDate, arr);
-      }
-    });
-
-    const daily: DailyCounts[] = dates.map((date: string) => {
-      const dayRecs = byDate.get(date) || [];
-      let present = 0;
-      let late = 0;
-      // de-duplicate per student per day (defensive)
-      const seen = new Set<string>();
-      dayRecs.forEach(r => {
-        if (seen.has(r.studentId)) return;
-        seen.add(r.studentId);
-        
-        // Match the record date with the requested date
-        // Some records might have slightly different date strings or checkInTime formats
-        const recordDate = getRecordDate(r);
-        
-        if (recordDate === date) {
-          const st = normalizeStatus(r);
-          if (st === 'late') late++;
-          else present++;
-        }
-      });
-      const absent = Math.max(0, totalStudents - (present + late));
-      const total = totalStudents;
-      const attendanceRate = total > 0 ? ((present + late) / total) * 100 : 0;
-      return { date, present, late, absent, total, attendanceRate: Math.round(attendanceRate * 100) / 100 };
-    });
-
-    const totals = daily.reduce(
-      (acc, d) => {
-        acc.present += d.present;
-        acc.late += d.late;
-        acc.absent += d.absent;
-        acc.total += totalStudents;
-        return acc;
-      },
-      { present: 0, late: 0, absent: 0, total: 0 }
-    );
-    const attendanceRate = totals.total > 0 ? ((totals.present + totals.late) / totals.total) * 100 : 0;
-
-    const distribution = [
-      { name: 'Present' as const, value: totals.present },
-      { name: 'Late' as const, value: totals.late },
-      { name: 'Absent' as const, value: totals.absent },
-    ];
-
-    // per-student rates across business days
-    const businessDays = Math.max(1, calcBusinessDays(range.startDate, range.endDate));
-    const perStudent = new Map<string, StudentRateRow>();
-    students.forEach((s: any) => {
-      const id = s.uid || s.id;
-      perStudent.set(id, {
-        studentId: id,
-        studentName: s.displayName || 'Student',
-        email: s.email,
-        present: 0,
-        late: 0,
-        absent: 0,
-        totalDays: businessDays,
-        attendanceRate: 0,
-      });
-    });
-
-    // count present/late by student for business days only (Mon-Fri)
-    filteredRecords.forEach(r => {
-      const row = perStudent.get(r.studentId);
-      if (!row) return;
-      const dow = parseIsoDate(r.date).getDay();
-      if (dow === 0 || dow === 6) return;
-      const st = normalizeStatus(r);
-      if (st === 'late') row.late += 1;
-      else row.present += 1;
-    });
-
-    perStudent.forEach(row => {
-      row.absent = clamp(row.totalDays - (row.present + row.late), 0, row.totalDays);
-      row.attendanceRate = row.totalDays > 0 ? Math.round(((row.present + row.late) / row.totalDays) * 10000) / 100 : 0;
-    });
-
-    const rows = Array.from(perStudent.values());
-    const leaderboardTop = rows
-      .slice()
-      .sort((a, b) => b.attendanceRate - a.attendanceRate || (b.present + b.late) - (a.present + a.late))
-      .slice(0, 10);
-    const mostAbsent = rows
-      .slice()
-      .sort((a, b) => b.absent - a.absent || a.attendanceRate - b.attendanceRate)
-      .slice(0, 10);
-
-    // heatmap values: lower attendance rate -> stronger highlight
-    const heatmap = daily.map(d => {
-      const value = 1 - (d.attendanceRate / 100);
-      return {
-        date: d.date,
-        value: clamp(value, 0, 1),
-        label: `${d.date}: ${Math.round(d.attendanceRate)}% attendance`,
-      };
-    });
-
+  // Get default date range with presets
+  getDefaultRange(context: 'admin' | 'student'): DateRange {
+    const now = new Date();
+    const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     return {
-      range,
-      totals: {
-        ...totals,
-        attendanceRate: Math.round(attendanceRate * 100) / 100,
-      },
-      daily,
-      distribution,
-      leaderboardTop,
-      mostAbsent,
-      heatmap,
+      preset: { label: 'Month', value: 'month' },
+      startDate: monthAgo.toISOString().split('T')[0],
+      endDate: now.toISOString().split('T')[0]
     };
   }
 
-  async getStudentAnalytics(studentId: string, range: DateRange, warningThreshold = 85): Promise<StudentAnalytics> {
-    await this.dataService.testConnection();
-    const totalDays = Math.max(1, calcBusinessDays(range.startDate, range.endDate));
-
-    console.log('[StudentAnalytics] Fetching for student:', studentId, 'Range:', range);
-    
-    const records = await this.attendanceService.getAttendanceByDateRange(range.startDate, range.endDate, studentId);
-    
-    // Also fetch from dailyAttendance collection for comprehensive analytics
-    const dailyAttendanceRef = collection(db, 'dailyAttendance');
-    const dailyQuery = query(
-      dailyAttendanceRef,
-      where('studentId', '==', studentId),
-      where('date', '>=', range.startDate),
-      where('date', '<=', range.endDate)
-    );
-    const dailySnap = await getDocs(dailyQuery);
-    const dailyRecords = dailySnap.docs.map((doc: any) => ({
-      studentId: doc.data().studentId,
-      date: doc.data().date,
-      status: doc.data().isPresent ? 'present' : 'absent',
-      checkInTime: doc.data().markedAt?.toDate() || doc.data().createdAt?.toDate() || null
-    }));
-
-    // Merge both sources
-    const mergedRecords = [...records];
-    dailyRecords.forEach((dr: any) => {
-      const exists = mergedRecords.find(mr => mr.date === dr.date);
-      if (!exists && dr.status === 'present') {
-        mergedRecords.push(dr as any);
-      }
-    });
-
-    console.log('[StudentAnalytics] Merged attendance records count:', mergedRecords.length);
-    
-    const byDate = new Map<string, AttendanceRecord>();
-    mergedRecords.forEach(r => {
-      // keep first if duplicates
-      if (!byDate.has(r.date)) byDate.set(r.date, r);
-    });
-
-    const dates = enumerateDates(range.startDate, range.endDate);
-    const daily: DailyCounts[] = dates.map(date => {
-      const dow = parseIsoDate(date).getDay();
-      const isWeekend = dow === 0 || dow === 6;
-      const rec = byDate.get(date);
-      let present = 0;
-      let late = 0;
-      let absent = 0;
-      if (isWeekend) {
-        // exclude weekends from rate, but keep chart continuity as 0 total
-        return { date, present: 0, late: 0, absent: 0, total: 0, attendanceRate: 0 };
-      }
-      if (rec) {
-        const st = normalizeStatus(rec);
-        if (st === 'late') late = 1;
-        else present = 1;
-      } else {
-        absent = 1;
-      }
-      const total = 1;
-      return { date, present, late, absent, total, attendanceRate: (present + late) * 100 };
-    });
-
-    const totals = daily.reduce(
-      (acc, d) => {
-        acc.present += d.present;
-        acc.late += d.late;
-        acc.absent += d.absent;
-        acc.total += d.total;
-        return acc;
-      },
-      { present: 0, late: 0, absent: 0, total: 0 }
-    );
-    const attendanceRate = totalDays > 0 ? ((totals.present + totals.late) / totalDays) * 100 : 0;
-
-    const distribution = [
-      { name: 'Present' as const, value: totals.present },
-      { name: 'Late' as const, value: totals.late },
-      { name: 'Absent' as const, value: totals.absent },
+  // Get preset options
+  getPresets(): DateRangePreset[] {
+    return [
+      { label: 'Week', value: 'week' },
+      { label: 'Month', value: 'month' },
+      { label: 'Quarter', value: 'quarter' }
     ];
+  }
 
-    // weekly bars: last 7 business days within range
-    const last7 = daily
-      .filter(d => d.total > 0)
-      .slice(-7)
-      .map(d => ({
-        name: new Date(d.date).toLocaleDateString('en-US', { weekday: 'short' }),
-        present: d.present,
-        late: d.late,
-        absent: d.absent,
+  // Convert preset to date range
+  presetToRange(preset: DateRangePreset): DateRange {
+    const now = new Date();
+    let startDate: Date;
+    
+    switch (preset.value) {
+      case 'week':
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        break;
+      case 'month':
+        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        break;
+      case 'quarter':
+        startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+        break;
+      default:
+        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    }
+    
+    return {
+      preset,
+      startDate: startDate.toISOString().split('T')[0],
+      endDate: now.toISOString().split('T')[0]
+    };
+  }
+
+  // Get admin analytics
+  async getAdminAnalytics(range: DateRange): Promise<AdminAnalytics> {
+    try {
+      const startDateStr = range.startDate;
+      const endDateStr = range.endDate;
+
+      const attendanceRef = collection(db, 'attendance');
+      const q = query(
+        attendanceRef,
+        where('date', '>=', startDateStr),
+        where('date', '<=', endDateStr)
+      );
+      
+      const snapshot = await getDocs(q);
+      const records = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
       }));
 
-    // streaks (business days only)
-    let current = 0;
-    let longest = 0;
-    let temp = 0;
-    const businessDaily = daily.filter(d => d.total > 0);
-    for (let i = businessDaily.length - 1; i >= 0; i--) {
-      const d = businessDaily[i];
-      const isHere = d.present + d.late > 0;
-      if (isHere) current++;
-      else break;
-    }
-    for (const d of businessDaily) {
-      const isHere = d.present + d.late > 0;
-      if (isHere) {
-        temp++;
-        longest = Math.max(longest, temp);
-      } else {
-        temp = 0;
+      // Calculate daily data
+      const dailyMap = new Map<string, { present: number; late: number; absent: number }>();
+      
+      for (let d = new Date(startDateStr); d <= new Date(endDateStr); d.setDate(d.getDate() + 1)) {
+        const dateStr = d.toISOString().split('T')[0];
+        dailyMap.set(dateStr, { present: 0, late: 0, absent: 0 });
       }
-    }
 
-    return {
-      range,
-      totals: {
-        ...totals,
-        attendanceRate: Math.round(attendanceRate * 100) / 100,
-      },
-      daily,
-      distribution,
-      weekly: last7,
-      streak: { current, longest },
-      warning: { isBelowThreshold: attendanceRate < warningThreshold, threshold: warningThreshold },
-    };
+      records.forEach((record: any) => {
+        const normalized = normalizeStatus(record);
+        const dayData = dailyMap.get(record.date);
+        if (dayData) {
+          if (normalized === 'present' || normalized === 'completed') {
+            dayData.present++;
+          } else if (normalized === 'late') {
+            dayData.late++;
+          }
+        }
+      });
+
+      const daily = Array.from(dailyMap.entries())
+        .map(([date, data]) => ({
+          date,
+          present: data.present,
+          late: data.late,
+          absent: data.absent
+        }))
+        .filter(d => d.present > 0 || d.late > 0)
+        .sort((a, b) => a.date.localeCompare(b.date));
+
+      const totalPresent = daily.reduce((sum, d) => sum + d.present, 0);
+      const totalLate = daily.reduce((sum, d) => sum + d.late, 0);
+      
+      const distribution = [
+        { name: 'Present', value: totalPresent },
+        { name: 'Late', value: totalLate },
+        { name: 'Absent', value: 0 }
+      ];
+
+      // Calculate heatmap data
+      const heatmap = daily.map(d => ({
+        date: d.date,
+        count: d.present + d.late
+      }));
+
+      return {
+        daily,
+        distribution,
+        heatmap,
+        leaderboardTop: [],
+        mostAbsent: [],
+        attendanceRate: totalPresent + totalLate > 0 ? Math.round((totalPresent / (totalPresent + totalLate)) * 100) : 0,
+        totals: {
+          present: totalPresent,
+          late: totalLate,
+          absent: 0,
+          totalDays: daily.length
+        }
+      };
+    } catch (error) {
+      console.error('Error getting admin analytics:', error);
+      return {
+        daily: [],
+        distribution: [],
+        heatmap: [],
+        leaderboardTop: [],
+        mostAbsent: [],
+        attendanceRate: 0,
+        totals: { present: 0, late: 0, absent: 0, totalDays: 0 }
+      };
+    }
   }
 
-  // Subscribe to real-time analytics updates for a specific student
-  subscribeToStudentAnalytics(studentId: string, range: DateRange, callback: (analytics: StudentAnalytics) => void): () => void {
-    // Listen for attendance changes in the specified range
-    const attendanceQuery = query(
-      collection(db, 'attendance'),
-      where('studentId', '==', studentId),
-      where('date', '>=', range.startDate),
-      where('date', '<=', range.endDate)
+  // Get student analytics
+  async getStudentAnalytics(studentId: string, range: DateRange): Promise<StudentAnalytics> {
+    try {
+      const startDateStr = range.startDate;
+      const endDateStr = range.endDate;
+
+      const attendanceRef = collection(db, 'attendance');
+      const q = query(
+        attendanceRef,
+        where('studentId', '==', studentId),
+        where('date', '>=', startDateStr),
+        where('date', '<=', endDateStr)
+      );
+      
+      const snapshot = await getDocs(q);
+      const records = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+
+      const daily = records.map((record: any) => ({
+        date: record.date,
+        status: normalizeStatus(record) as 'present' | 'late' | 'absent'
+      })).sort((a, b) => a.date.localeCompare(b.date));
+
+      const present = daily.filter(d => d.status === 'present').length;
+      const late = daily.filter(d => d.status === 'late').length;
+      const absent = daily.filter(d => d.status === 'absent').length;
+      const totalDays = daily.length;
+      const attendanceRate = totalDays > 0 ? Math.round(((present + late) / totalDays) * 100) : 0;
+
+      return {
+        daily,
+        totals: {
+          present,
+          late,
+          absent,
+          totalDays,
+          attendanceRate
+        },
+        streak: {
+          current: 0,
+          longest: 0
+        },
+        checkInTimes: [],
+        distribution: [
+          { name: 'Present', value: present },
+          { name: 'Late', value: late },
+          { name: 'Absent', value: absent }
+        ],
+        weekly: [],
+        warning: {
+          isBelowThreshold: attendanceRate < 75,
+          threshold: 75
+        },
+        range: {
+          startDate: startDateStr,
+          endDate: endDateStr
+        }
+      };
+    } catch (error) {
+      console.error('Error getting student analytics:', error);
+      return {
+        daily: [],
+        totals: { present: 0, late: 0, absent: 0, totalDays: 0, attendanceRate: 0 },
+        streak: { current: 0, longest: 0 },
+        checkInTimes: [],
+        distribution: [],
+        weekly: [],
+        warning: { isBelowThreshold: false, threshold: 75 },
+        range: { startDate: '', endDate: '' }
+      };
+    }
+  }
+
+  // Subscribe to admin analytics
+  subscribeToAdminAnalytics(range: DateRange, callback: (data: AdminAnalytics) => void): () => void {
+    const startDateStr = range.startDate;
+    const endDateStr = range.endDate;
+
+    const attendanceRef = collection(db, 'attendance');
+    const q = query(
+      attendanceRef,
+      where('date', '>=', startDateStr),
+      where('date', '<=', endDateStr)
     );
 
-    console.log(`📡 Setting up real-time analytics listener for student ${studentId}`);
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const records = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
 
-    const unsubscribe = onSnapshot(attendanceQuery, async () => {
-      try {
-        const analytics = await this.getStudentAnalytics(studentId, range);
-        callback(analytics);
-      } catch (error) {
-        console.error('❌ Error updating real-time student analytics:', error);
+      // Calculate data similar to getAdminAnalytics
+      const dailyMap = new Map<string, { present: number; late: number; absent: number }>();
+      
+      for (let d = new Date(startDateStr); d <= new Date(endDateStr); d.setDate(d.getDate() + 1)) {
+        const dateStr = d.toISOString().split('T')[0];
+        dailyMap.set(dateStr, { present: 0, late: 0, absent: 0 });
       }
+
+      records.forEach((record: any) => {
+        const normalized = normalizeStatus(record);
+        const dayData = dailyMap.get(record.date);
+        if (dayData) {
+          if (normalized === 'present' || normalized === 'completed') {
+            dayData.present++;
+          } else if (normalized === 'late') {
+            dayData.late++;
+          }
+        }
+      });
+
+      const daily = Array.from(dailyMap.entries())
+        .map(([date, data]) => ({ date, ...data }))
+        .sort((a, b) => a.date.localeCompare(b.date));
+
+      const totalPresent = daily.reduce((sum, d) => sum + d.present, 0);
+      const totalLate = daily.reduce((sum, d) => sum + d.late, 0);
+
+      callback({
+        daily,
+        distribution: [
+          { name: 'Present', value: totalPresent },
+          { name: 'Late', value: totalLate },
+          { name: 'Absent', value: 0 }
+        ],
+        heatmap: daily.map(d => ({ date: d.date, count: d.present + d.late })),
+        leaderboardTop: [],
+        mostAbsent: [],
+        attendanceRate: totalPresent + totalLate > 0 ? Math.round((totalPresent / (totalPresent + totalLate)) * 100) : 0,
+        totals: { present: totalPresent, late: totalLate, absent: 0, totalDays: daily.length }
+      });
     });
 
     return unsubscribe;
   }
-  // Subscribe to real-time analytics updates for admin (all students)
-  subscribeToAdminAnalytics(range: DateRange, callback: (analytics: AdminAnalytics) => void): () => void {
-    const attendanceQuery = query(
-      collection(db, 'attendance'),
-      where('date', '>=', range.startDate),
-      where('date', '<=', range.endDate)
+
+  // Subscribe to student analytics
+  subscribeToStudentAnalytics(studentId: string, range: DateRange, callback: (data: StudentAnalytics) => void): () => void {
+    const startDateStr = range.startDate;
+    const endDateStr = range.endDate;
+
+    const attendanceRef = collection(db, 'attendance');
+    const q = query(
+      attendanceRef,
+      where('studentId', '==', studentId),
+      where('date', '>=', startDateStr),
+      where('date', '<=', endDateStr)
     );
 
-    console.log(`📡 Setting up real-time admin analytics listener for range: ${range.startDate} to ${range.endDate}`);
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const records = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
 
-    const unsubscribe = onSnapshot(attendanceQuery, async () => {
-      try {
-        const analytics = await this.getAdminAnalytics(range);
-        callback(analytics);
-      } catch (error) {
-        console.error('❌ Error updating real-time admin analytics:', error);
-      }
+      const daily = records.map((record: any) => ({
+        date: record.date,
+        status: normalizeStatus(record) as 'present' | 'late' | 'absent'
+      })).sort((a, b) => a.date.localeCompare(b.date));
+
+      const present = daily.filter(d => d.status === 'present').length;
+      const late = daily.filter(d => d.status === 'late').length;
+      const absent = daily.filter(d => d.status === 'absent').length;
+      const attendanceRate = daily.length > 0 ? Math.round(((present + late) / daily.length) * 100) : 0;
+
+      callback({
+        daily,
+        totals: { present, late, absent, totalDays: daily.length, attendanceRate },
+        streak: { current: 0, longest: 0 },
+        checkInTimes: [],
+        distribution: [
+          { name: 'Present', value: present },
+          { name: 'Late', value: late },
+          { name: 'Absent', value: absent }
+        ],
+        weekly: [],
+        warning: {
+          isBelowThreshold: attendanceRate < 75,
+          threshold: 75
+        },
+        range: {
+          startDate: startDateStr,
+          endDate: endDateStr
+        }
+      });
     });
 
     return unsubscribe;
   }
 }
 
+// Export singleton instance
 export const attendanceAnalyticsService = AttendanceAnalyticsService.getInstance();
-
