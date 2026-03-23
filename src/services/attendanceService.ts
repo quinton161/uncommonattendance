@@ -15,7 +15,6 @@ import {
 import { db } from './firebase';
 import { AttendanceRecord, AttendanceStatus, LocationData } from '../types';
 import { DailyAttendanceService } from './dailyAttendanceService';
-import { SCHOOL_LOCATION, getLocationDisplayName } from '../config/locationConfig';
 import { BrowserEmailService } from '../services/emailService';
 import { TimeService } from './timeService';
 
@@ -91,11 +90,11 @@ export class AttendanceService {
       updatedAt: serverTimestamp()
     };
 
-    if (location?.latitude && location?.longitude) {
+    // Store IP-based location only (no coordinates to avoid device issues)
+    if (location?.ip && location.ip !== '0.0.0.0') {
       attendanceRecord.location = {
-        latitude: location.latitude,
-        longitude: location.longitude,
-        address: location.address || 'Unknown'
+        ip: location.ip,
+        timestamp: location.timestamp || Date.now()
       };
     }
 
@@ -130,12 +129,12 @@ export class AttendanceService {
       updatedAt: serverTimestamp()
     };
 
-    if (location?.latitude && location?.longitude) {
+    // Store IP-based location only (no coordinates)
+    if (location?.ip && location.ip !== '0.0.0.0') {
       updateData.location = {
         ...attendanceData.location,
-        latitude: location.latitude,
-        longitude: location.longitude,
-        address: location.address || attendanceData.location?.address
+        ip: location.ip,
+        checkOutTimestamp: location.timestamp || Date.now()
       };
     }
 
@@ -464,12 +463,15 @@ export class AttendanceService {
     }
   }
 
+  /**
+   * Resolve address from coordinates (simplified - returns IP-based location)
+   */
   private async getAddressFromCoordinates(
-    latitude: number,
-    longitude: number
+    _latitude: number,
+    _longitude: number
   ): Promise<string> {
-    console.log('🗺️ Resolving address for coordinates:', { latitude, longitude });
-    return getLocationDisplayName(SCHOOL_LOCATION);
+    // Location is now determined by IP address only, not coordinates
+    return 'IP-based Location';
   }
 
   private isInSouthAfrica(latitude: number, longitude: number): boolean {

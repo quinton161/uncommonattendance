@@ -506,7 +506,7 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({ 
             status: isLate ? 'late' : 'present',
             checkInTime: record.checkInTime,
             checkOutTime: record.checkOutTime,
-            location: record.location?.address || 'Unknown',
+            location: record.location?.ip || 'No IP',
             deviceIp: record.location?.ip || '-',
           };
         } else {

@@ -493,7 +493,7 @@ export const StudentDashboard = ({ onNavigateToProfile }: StudentDashboardProps)
         studentId: attendanceRecord.studentId,
         date: attendanceRecord.date,
         checkInTime: attendanceRecord.checkInTime,
-        location: attendanceRecord.location?.address || 'No location'
+        location: attendanceRecord.location?.ip || 'No IP'
       });
       
       const currentTime = new Date();

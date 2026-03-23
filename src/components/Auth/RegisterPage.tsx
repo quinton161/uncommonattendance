@@ -323,7 +323,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onToggleMode }) => {
           </IconWrapper>
           <WelcomeTitle>Welcome to Uncommon Attendance</WelcomeTitle>
           <WelcomeSubtitle>
-            Smart and reliable attendance tracking system for the modern classroom.
+            Smart and reliable attendance tracking system for the modern Hub.
           </WelcomeSubtitle>
         </BrandingContent>
         <CloudDivider>

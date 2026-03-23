@@ -5,6 +5,7 @@ import { theme } from '../../styles/theme';
 import { Button } from '../Common/Button';
 import DataService from '../../services/DataService';
 import { TimeService } from '../../services/timeService';
+import { DailyAttendanceService } from '../../services/dailyAttendanceService';
 import { DeleteUserModal } from './DeleteUserModal';
 import { uniqueToast } from '../../utils/toastUtils';
 import { UncommonLogo } from '../Common/UncommonLogo';
@@ -12,8 +13,10 @@ import {
   PersonIcon,
   CheckCircleIcon,
   TodayIcon,
-  MessageIcon
+  MessageIcon,
+  SearchIcon
 } from '../Common/Icons';
+import { FiClock } from 'react-icons/fi';
 
 const PageContainer = styled.div`
   padding: ${theme.spacing.xl};
@@ -72,62 +75,58 @@ const HeaderTitle = styled.div`
 
 
 
-const UsersTable = styled.div`
-  background: ${theme.colors.white};
-  border-radius: ${theme.borderRadius.lg};
-  box-shadow: ${theme.shadows.md};
-  overflow: hidden;
-  
-  @media (max-width: ${theme.breakpoints.tablet}) {
-    border-radius: ${theme.borderRadius.md};
-  }
-  
-  @media (max-width: ${theme.breakpoints.mobile}) {
-    border-radius: ${theme.borderRadius.md};
-    overflow: visible;
-  }
+const StatusDot = styled.span<{ isActive: boolean }>`
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: ${theme.spacing.xs};
+  background: ${props => props.isActive ? '#16a34a' : '#9ca3af'};
+  box-shadow: ${props => props.isActive ? '0 0 6px rgba(34, 197, 94, 0.4)' : 'none'};
 `;
 
-const TableWrapper = styled.div`
-  @media (max-width: ${theme.breakpoints.mobile}) {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
+const LastActivity = styled.div`
+  font-size: ${theme.fontSizes.xs};
+  color: ${theme.colors.textSecondary};
+  margin-top: ${theme.spacing.xs};
+  display: flex;
+  align-items: center;
+  gap: 4px;
 `;
 
-const TableHeader = styled.div`
-  display: grid;
-  grid-template-columns: 2fr 150px 150px;
-  gap: ${theme.spacing.xl};
-  padding: ${theme.spacing.lg} ${theme.spacing.xl};
-  background: linear-gradient(135deg, ${theme.colors.primary}05 0%, ${theme.colors.primaryLight}10 100%);
-  border-bottom: 2px solid ${theme.colors.primary}20;
+const MiniBadge = styled.span`
+  background: ${theme.colors.primary}10;
+  color: ${theme.colors.primary};
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10px;
   font-weight: ${theme.fontWeights.semibold};
-  color: ${theme.colors.textPrimary};
-  font-size: ${theme.fontSizes.sm};
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  min-width: 500px;
-  
-  @media (max-width: ${theme.breakpoints.tablet}) {
-    display: none;
-  }
+`;
+
+const CardSection = styled.div`
+  padding-top: ${theme.spacing.md};
+  border-top: 1px solid ${theme.colors.gray100};
+  margin-top: ${theme.spacing.md};
 `;
 
 const TableRow = styled.div`
   display: grid;
-  grid-template-columns: 2fr 150px 150px;
+  grid-template-columns: 2fr 150px 150px 200px;
   gap: ${theme.spacing.xl};
   padding: ${theme.spacing.lg} ${theme.spacing.xl};
   border-bottom: 1px solid ${theme.colors.gray100};
-  transition: all 0.2s ease;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   align-items: center;
-  min-width: 500px;
+  min-width: 800px;
+  border-left: 4px solid transparent;
   
   &:hover {
-    background: linear-gradient(135deg, ${theme.colors.primary}02 0%, ${theme.colors.primaryLight}05 100%);
-    transform: translateY(-1px);
-    box-shadow: 0 2px 8px ${theme.colors.primary}10;
+    background: white;
+    transform: translateX(4px);
+    box-shadow: ${theme.shadows.md};
+    border-left: 4px solid ${theme.colors.primary};
+    z-index: 1;
   }
   
   &:last-child {
@@ -135,30 +134,13 @@ const TableRow = styled.div`
   }
   
   @media (max-width: ${theme.breakpoints.tablet}) {
-    display: block;
-    background: ${theme.colors.white};
-    border-radius: ${theme.borderRadius.lg};
-    box-shadow: ${theme.shadows.sm};
-    margin-bottom: ${theme.spacing.md};
-    padding: ${theme.spacing.lg};
-    border-bottom: none;
-    
-    &:hover {
-      transform: translateY(-2px);
-      box-shadow: ${theme.shadows.md};
-    }
+    display: none;
   }
 `;
 
-const UserInfo = styled.div`
-  display: flex;
-  align-items: center;
-  gap: ${theme.spacing.md};
-`;
-
-const UserAvatar = styled.div`
-  width: 40px;
-  height: 40px;
+const UserAvatar = styled.div<{ isActive?: boolean }>`
+  width: 44px;
+  height: 44px;
   border-radius: ${theme.borderRadius.full};
   background: linear-gradient(135deg, ${theme.colors.primary} 0%, ${theme.colors.primaryLight} 100%);
   display: flex;
@@ -167,20 +149,55 @@ const UserAvatar = styled.div`
   color: ${theme.colors.white};
   font-weight: ${theme.fontWeights.semibold};
   font-size: ${theme.fontSizes.sm};
+  border: 2px solid ${props => props.isActive ? '#16a34a' : 'transparent'};
+  box-shadow: ${props => props.isActive ? '0 0 0 2px #dcfce7' : 'none'};
+  transition: all 0.3s ease;
+  position: relative;
+  flex-shrink: 0;
+
+  img {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+  }
 `;
 
-const UserDetails = styled.div`
-  h4 {
-    margin: 0 0 ${theme.spacing.xs} 0;
-    font-size: ${theme.fontSizes.base};
-    font-weight: ${theme.fontWeights.medium};
-    color: ${theme.colors.textPrimary};
-  }
+const MobileUserCardAlt = styled.div`
+  display: none;
   
-  p {
-    margin: 0;
-    font-size: ${theme.fontSizes.sm};
-    color: ${theme.colors.textSecondary};
+  @media (max-width: ${theme.breakpoints.tablet}) {
+    display: block;
+    background: ${theme.colors.white};
+    border-radius: ${theme.borderRadius.xl};
+    padding: ${theme.spacing.xl};
+    margin-bottom: ${theme.spacing.lg};
+    box-shadow: ${theme.shadows.sm};
+    border: 1px solid ${theme.colors.gray100};
+    transition: all 0.25s ease;
+    border-left: 4px solid transparent;
+
+    &:hover {
+      transform: translateY(-4px);
+      box-shadow: ${theme.shadows.lg};
+      border-left: 4px solid ${theme.colors.primary};
+    }
+  }
+`;
+
+const ChatButton = styled(Button)`
+  border-radius: 999px;
+  font-weight: ${theme.fontWeights.medium};
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  padding: 8px 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  &:hover {
+    transform: scale(1.05);
+    background: ${theme.colors.primary};
+    color: white;
   }
 `;
 
@@ -220,17 +237,32 @@ const UserType = styled.div<{ type: string }>`
   }}
 `;
 
-const AttendanceStatus = styled.div<{ isCheckedIn: boolean }>`
-  display: flex;
-  align-items: center;
-  gap: ${theme.spacing.xs};
-  font-size: ${theme.fontSizes.sm};
-  
-  ${props => props.isCheckedIn ? `
-    color: #16a34a;
-  ` : `
-    color: ${theme.colors.textSecondary};
-  `}
+const UsersTable = styled.div`
+  background: ${theme.colors.white};
+  border-radius: ${theme.borderRadius.xl};
+  box-shadow: ${theme.shadows.lg};
+  overflow: hidden;
+  border: 1px solid ${theme.colors.gray100};
+`;
+
+const TableWrapper = styled.div`
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+`;
+
+const TableHeader = styled.div`
+  display: grid;
+  grid-template-columns: 2fr 150px 150px 200px;
+  gap: ${theme.spacing.xl};
+  padding: ${theme.spacing.xl};
+  background: ${theme.colors.gray50};
+  border-bottom: 1px solid ${theme.colors.gray200};
+  font-weight: ${theme.fontWeights.bold};
+  color: ${theme.colors.textSecondary};
+  font-size: ${theme.fontSizes.xs};
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  min-width: 800px;
 `;
 
 const LoadingState = styled.div`
@@ -265,7 +297,7 @@ const DeleteButton = styled(Button)`
   }
 `;
 
-const ChatButton = styled(Button)`
+const ChatButtonOutline = styled(Button)`
   color: ${theme.colors.primary};
   border-color: ${theme.colors.primary};
   padding: 8px 16px;
@@ -290,9 +322,76 @@ const ChatButton = styled(Button)`
   }
 `;
 
+const SearchInput = styled.input`
+  padding: ${theme.spacing.sm} ${theme.spacing.md} ${theme.spacing.sm} 40px;
+  border-radius: ${theme.borderRadius.lg};
+  border: 1px solid ${theme.colors.gray300};
+  font-size: ${theme.fontSizes.sm};
+  width: 300px;
+  background: ${theme.colors.white};
+  transition: all 0.2s ease;
+
+  &:focus {
+    outline: none;
+    border-color: ${theme.colors.primary};
+    box-shadow: 0 0 0 3px ${theme.colors.primary}20;
+  }
+
+  @media (max-width: ${theme.breakpoints.tablet}) {
+    width: 100%;
+  }
+`;
+
+const MarkPresentButton = styled(Button)`
+  background: ${theme.colors.success};
+  border-color: ${theme.colors.success};
+  color: white;
+  padding: 8px 16px;
+  font-size: ${theme.fontSizes.sm};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 120px;
+  
+  &:hover {
+    background: #16a34a;
+    border-color: #16a34a;
+  }
+   
+  span {
+    display: inline !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+`;
+
 const ActionButtons = styled.div`
   display: flex;
   gap: ${theme.spacing.sm};
+`;
+
+const UserInfo = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${theme.spacing.md};
+`;
+
+const UserDetails = styled.div`
+  h4 {
+    margin: 0;
+    font-size: ${theme.fontSizes.base};
+    font-weight: 600;
+    color: ${theme.colors.textPrimary};
+    display: flex;
+    align-items: center;
+    gap: ${theme.spacing.xs};
+  }
+  p {
+    margin: ${theme.spacing.xs} 0 0;
+    font-size: ${theme.fontSizes.sm};
+    color: ${theme.colors.textSecondary};
+  }
 `;
 
 const MobileUserCard = styled.div`
@@ -477,7 +576,9 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
   const [users, setUsers] = useState<any[]>([]);
   const [attendance, setAttendance] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
   const dataService = DataService.getInstance();
+  const dailyService = DailyAttendanceService.getInstance();
 
   useEffect(() => {
     // Intentionally run only once on mount; loadData handles its own dependencies.
@@ -540,9 +641,15 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
     setShowDeleteModal(true);
   };
 
-  const handleChat = (studentId: string, studentName: string, studentPhotoUrl?: string) => {
-    if (onChat) {
-      onChat(studentId, studentName, studentPhotoUrl);
+  const handleMarkPresent = async (studentId: string, studentName: string) => {
+    try {
+      await dailyService.markPresentToday(studentId, studentName);
+      uniqueToast.success(`${studentName} marked as present!`);
+      // Refresh the attendance data
+      loadData();
+    } catch (error) {
+      console.error('Failed to mark present:', error);
+      uniqueToast.error(`Failed to mark ${studentName} as present`);
     }
   };
 
@@ -562,6 +669,39 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
     }
   };
 
+  const handleMarkAllPresent = async () => {
+    const absentStudents = users.filter(userData => {
+      if (userData.userType === 'admin' || userData.userType === 'instructor') return false;
+      const todayAttendance = getTodayAttendance(userData.id);
+      const isPresent = todayAttendance && todayAttendance.checkInTime && !todayAttendance.checkOutTime;
+      return !isPresent;
+    });
+
+    if (absentStudents.length === 0) {
+      uniqueToast.info('All students are already marked as present.');
+      return;
+    }
+
+    if (!window.confirm(`Are you sure you want to mark all ${absentStudents.length} absent students as present?`)) {
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const promises = absentStudents.map(student => 
+        dailyService.markPresentToday(student.id, student.displayName || 'Unknown User')
+      );
+      await Promise.all(promises);
+      uniqueToast.success(`Marked ${absentStudents.length} students as present!`);
+      loadData();
+    } catch (error) {
+      console.error('Failed to mark all present:', error);
+      uniqueToast.error('Failed to mark all students as present');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <PageContainer>
       <Header>
@@ -577,11 +717,30 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
           </h1>
           <p>Manage all users and track their attendance</p>
         </HeaderTitle>
-        {onBack && (
-          <Button variant="outline" onClick={onBack}>
-            Back to Dashboard
+        <div style={{ display: 'flex', gap: theme.spacing.md, alignItems: 'center' }}>
+          <Button 
+            variant="primary" 
+            onClick={handleMarkAllPresent} 
+            disabled={loading}
+            style={{ backgroundColor: theme.colors.success, borderColor: theme.colors.success }}
+          >
+            <CheckCircleIcon size={18} /> Mark All Present
           </Button>
-        )}
+          <div style={{ position: 'relative' }}>
+            <SearchIcon size={20} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: theme.colors.textSecondary }} />
+            <SearchInput
+              type="text"
+              placeholder="Search users..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          {onBack && (
+            <Button variant="outline" onClick={onBack}>
+              Back to Dashboard
+            </Button>
+          )}
+        </div>
       </Header>
 
       <StatsGrid>
@@ -625,19 +784,23 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
             <UsersTable>
               <TableWrapper>
                 <TableHeader>
-                  <div>User</div>
-                  <div>Type</div>
-                  <div>Status</div>
+                  <div>User Information</div>
+                  <div>User Type</div>
+                  <div>Daily Status</div>
+                  <div style={{ textAlign: 'right' }}>Actions</div>
                 </TableHeader>
           
           {users.filter(userData => userData.userType === 'attendee').map((userData) => {
             const todayAttendance = getTodayAttendance(userData.id);
             const isCheckedIn = todayAttendance && todayAttendance.checkInTime && !todayAttendance.checkOutTime;
+            const checkInTimeString = todayAttendance?.checkInTime 
+              ? (todayAttendance.checkInTime.toDate ? todayAttendance.checkInTime.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : new Date(todayAttendance.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))
+              : null;
             
             return (
               <TableRow key={userData.id}>
                 <UserInfo>
-                  <UserAvatar>
+                  <UserAvatar isActive={!!isCheckedIn}>
                     {userData.photoUrl ? (
                       <img src={userData.photoUrl} alt={userData.displayName} />
                     ) : (
@@ -645,8 +808,15 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
                     )}
                   </UserAvatar>
                   <UserDetails>
-                    <h4>{userData.displayName || 'Unknown User'}</h4>
+                    <h4 style={{ display: 'flex', alignItems: 'center', gap: theme.spacing.xs }}>
+                      <PersonIcon size={14} style={{ color: theme.colors.primary }} />
+                      {userData.displayName || 'Unknown User'}
+                    </h4>
                     <p>{userData.email}</p>
+                    <LastActivity>
+                      <FiClock size={12} />
+                      Last check-in: {checkInTimeString || 'No record today'}
+                    </LastActivity>
                   </UserDetails>
                 </UserInfo>
                 
@@ -657,26 +827,18 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
                 </div>
                 
                 <div>
-                  <AttendanceStatus isCheckedIn={!!isCheckedIn}>
-                    {isCheckedIn ? (
-                      <>
-                        <CheckCircleIcon size={16} />
-                        Checked In
-                      </>
-                    ) : (
-                      <>
-                        <PersonIcon size={16} />
-                        Not Present
-                      </>
-                    )}
-                  </AttendanceStatus>
+                  <StatusBadge isActive={!!isCheckedIn}>
+                    <StatusDot isActive={!!isCheckedIn} />
+                    {isCheckedIn ? 'Checked In' : 'Not Present'}
+                  </StatusBadge>
                 </div>
-                <ActionButtons>
-                  <ChatButton onClick={() => handleChat(userData.id, userData.displayName || 'Unknown User', userData.photoUrl)}>
-                    <MessageIcon size={14} /> <span>Chat</span>
-                  </ChatButton>
+                
+                <ActionButtons style={{ justifyContent: 'flex-end' }}>
+                  <MarkPresentButton onClick={() => handleMarkPresent(userData.id, userData.displayName || 'Unknown User')}>
+                    <CheckCircleIcon size={14} /> <span>Mark Present</span>
+                  </MarkPresentButton>
                   {user?.userType === 'admin' && (
-                    <DeleteButton onClick={() => handleOpenDelete(userData)}>
+                    <DeleteButton variant="ghost" onClick={() => handleOpenDelete(userData)}>
                       Delete
                     </DeleteButton>
                   )}
@@ -693,26 +855,32 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
             {users.filter(userData => userData.userType === 'attendee').map((userData) => {
               const todayAttendance = getTodayAttendance(userData.id);
               const isCheckedIn = todayAttendance && todayAttendance.checkInTime && !todayAttendance.checkOutTime;
+              const checkInTimeString = todayAttendance?.checkInTime 
+                ? (todayAttendance.checkInTime.toDate ? todayAttendance.checkInTime.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : new Date(todayAttendance.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))
+                : null;
               
               return (
                 <MobileUserCard key={`mobile-${userData.id}`}>
                   <MobileUserHeader>
-                    <UserAvatar>
+                    <UserAvatar isActive={!!isCheckedIn}>
                       {userData.photoUrl ? (
                         <img 
                           src={userData.photoUrl} 
                           alt={userData.displayName} 
-                          style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }}
                         />
                       ) : (
                         getInitials(userData.displayName || 'Unknown')
                       )}
                     </UserAvatar>
-                    <div>
-                      <h4 style={{ margin: 0, fontSize: theme.fontSizes.base, fontWeight: theme.fontWeights.medium }}>
-                        {userData.displayName || 'Unknown User'}
-                      </h4>
-                      <p style={{ margin: 0, fontSize: theme.fontSizes.sm, color: theme.colors.textSecondary }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <h4 style={{ margin: 0, fontSize: theme.fontSizes.base, fontWeight: theme.fontWeights.bold, display: 'flex', alignItems: 'center', gap: theme.spacing.xs }}>
+                          <PersonIcon size={14} style={{ color: theme.colors.primary }} />
+                          {userData.displayName || 'Unknown User'}
+                        </h4>
+                        <MiniBadge>Active</MiniBadge>
+                      </div>
+                      <p style={{ margin: '2px 0 0 0', fontSize: theme.fontSizes.xs, color: theme.colors.textSecondary }}>
                         {userData.email}
                       </p>
                     </div>
@@ -720,28 +888,37 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
                   
                   <MobileUserDetails>
                     <div>
-                      <strong>Type:</strong><br />
-                      <UserTypeTag type={userData.userType}>
+                      <strong style={{ color: theme.colors.textSecondary, fontSize: '10px', textTransform: 'uppercase' }}>Type</strong><br />
+                      <UserTypeTag type={userData.userType} style={{ marginTop: '4px' }}>
                         {userData.userType}
                       </UserTypeTag>
                     </div>
                     <div>
-                      <strong>Status:</strong><br />
-                      <StatusBadge isActive={isCheckedIn}>
+                      <strong style={{ color: theme.colors.textSecondary, fontSize: '10px', textTransform: 'uppercase' }}>Status</strong><br />
+                      <StatusBadge isActive={isCheckedIn} style={{ marginTop: '4px' }}>
+                        <StatusDot isActive={isCheckedIn} />
                         {isCheckedIn ? 'Checked In' : 'Not Present'}
                       </StatusBadge>
                     </div>
                   </MobileUserDetails>
-                  <ActionButtons style={{ marginTop: theme.spacing.sm }}>
-                    <ChatButton onClick={() => handleChat(userData.id, userData.displayName || 'Unknown User', userData.photoUrl)}>
-                      <MessageIcon size={14} /> <span>Chat</span>
-                    </ChatButton>
-                    {user?.userType === 'admin' && (
-                      <DeleteButton onClick={() => handleOpenDelete(userData)}>
-                        Delete
-                      </DeleteButton>
-                    )}
-                  </ActionButtons>
+
+                  <LastActivity style={{ marginBottom: theme.spacing.md, padding: `${theme.spacing.xs} 0` }}>
+                    <FiClock size={12} />
+                    Last check-in: {checkInTimeString || 'No record today'}
+                  </LastActivity>
+
+                  <CardSection>
+                    <ActionButtons>
+                      <MarkPresentButton onClick={() => handleMarkPresent(userData.id, userData.displayName || 'Unknown User')} style={{ flex: 1 }}>
+                        <CheckCircleIcon size={14} /> <span>Mark Present</span>
+                      </MarkPresentButton>
+                      {user?.userType === 'admin' && (
+                        <DeleteButton variant="outline" size="sm" onClick={() => handleOpenDelete(userData)}>
+                          Delete
+                        </DeleteButton>
+                      )}
+                    </ActionButtons>
+                  </CardSection>
                 </MobileUserCard>
               );
             })}

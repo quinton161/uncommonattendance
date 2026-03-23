@@ -530,8 +530,24 @@ class DataService {
     if (!currentAttendance) {
       const allAttendance = await this.getAttendance();
       currentAttendance = allAttendance.filter(a => {
-        const attendanceDate = a.date || (a.checkInTime ? (a.checkInTime.toISOString ? a.checkInTime.toISOString().split('T')[0] : new Date(a.checkInTime).toISOString().split('T')[0]) : '');
-        return attendanceDate === date;
+        let dateStr: string | undefined;
+        if (a.date) {
+            dateStr = a.date;
+        } else if (a.checkInTime) {
+            const checkIn = a.checkInTime;
+            if (checkIn.toDate) { // Firestore Timestamp
+                dateStr = checkIn.toDate().toISOString().split('T')[0];
+            } else if (checkIn.toISOString) { // JavaScript Date
+                dateStr = checkIn.toISOString().split('T')[0];
+            } else { // Fallback for string or other formats
+                try {
+                    dateStr = new Date(checkIn).toISOString().split('T')[0];
+                } catch (e) {
+                    console.warn("Could not parse date from checkInTime", checkIn);
+                }
+            }
+        }
+        return dateStr === date;
       });
     }
 
@@ -605,7 +621,23 @@ class DataService {
     // Filter duplicates: keep the best record for each unique date
     const uniqueDailyAttendance = Array.from(
       userAttendance.reduce((map, record) => {
-        const dateStr = record.date || (record.checkInTime ? (record.checkInTime.toISOString ? record.checkInTime.toISOString().split('T')[0] : new Date(record.checkInTime).toISOString().split('T')[0]) : '');
+        let dateStr: string | undefined;
+        if (record.date) {
+          dateStr = record.date;
+        } else if (record.checkInTime) {
+          const checkIn = record.checkInTime;
+          if (checkIn.toDate) { // Firestore Timestamp
+            dateStr = checkIn.toDate().toISOString().split('T')[0];
+          } else if (checkIn.toISOString) { // JavaScript Date
+            dateStr = checkIn.toISOString().split('T')[0];
+          } else { // Fallback for string or other formats
+            try {
+              dateStr = new Date(checkIn).toISOString().split('T')[0];
+            } catch (e) {
+              console.warn("Could not parse date from checkInTime", checkIn);
+            }
+          }
+        }
         if (!dateStr) return map;
         
         const existing = map.get(dateStr);
@@ -688,8 +720,24 @@ class DataService {
     
     // Filter attendance for the target date
     const dailyAttendance = allAttendance.filter(a => {
-      const attendanceDate = a.date || (a.checkInTime ? (a.checkInTime.toISOString ? a.checkInTime.toISOString().split('T')[0] : new Date(a.checkInTime).toISOString().split('T')[0]) : '');
-      return attendanceDate === targetDate;
+        let dateStr: string | undefined;
+        if (a.date) {
+          dateStr = a.date;
+        } else if (a.checkInTime) {
+          const checkIn = a.checkInTime;
+          if (checkIn.toDate) { // Firestore Timestamp
+            dateStr = checkIn.toDate().toISOString().split('T')[0];
+          } else if (checkIn.toISOString) { // JavaScript Date
+            dateStr = checkIn.toISOString().split('T')[0];
+          } else { // Fallback for string or other formats
+            try {
+              dateStr = new Date(checkIn).toISOString().split('T')[0];
+            } catch (e) {
+              console.warn("Could not parse date from checkInTime", checkIn);
+            }
+          }
+        }
+        return dateStr === targetDate;
     });
 
     // ENSURE UNIQUE ATTENDANCE RECORDS (Fix for 167 present / 174 absent issue)

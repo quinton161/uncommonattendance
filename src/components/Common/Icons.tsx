@@ -47,3 +47,4 @@ export const WifiOffIcon: React.FC<IconProps> = (props) => <IconFromFi iconName=
 export const MessageIcon: React.FC<IconProps> = (props) => <IconFromFi iconName="FiMessageSquare" {...props} />;
 export const StarIcon: React.FC<IconProps> = (props) => <IconFromFi iconName="FiStar" {...props} />;
 export const RefreshCwIcon: React.FC<IconProps> = (props) => <IconFromFi iconName="FiRefreshCw" {...props} />;
+export const SearchIcon: React.FC<IconProps> = (props) => <IconFromFi iconName="FiSearch" {...props} />;

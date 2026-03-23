@@ -1,5 +1,8 @@
 /**
  * Location Configuration for Vincent Bohlen Hub
+ * 
+ * IMPORTANT: Location is now based on IP address only.
+ * Geolocation coordinates are NOT stored to avoid device compatibility issues.
  */
 
 // List of allowed public IP addresses for the school WiFi
@@ -7,17 +10,15 @@
 export const ALLOWED_WIFI_IPS = [
   '143.105.233.179', // Current IP (Mar 5, 2026)
   '74.244.195.215',  // Previous IP
-  '102.0.0.0/8',     // Example CIDR range for regional ISPs if needed
 ];
 
-export interface LocationConfig {
-  name: string;
-  address?: string;
-}
+// Check-in radius in meters (for future geolocation validation - currently not used)
+export const CHECK_IN_RADIUS_METERS = 500;
 
-export const SCHOOL_LOCATION: LocationConfig = {
-  name: 'School',
-  address: 'School Hub'
+// School coordinates (for reference only - not used for validation)
+export const SCHOOL_COORDINATES = {
+  latitude: -25.7479,  // Example: Pretoria area
+  longitude: 28.2292
 };
 
 /**
@@ -37,10 +38,6 @@ export function isOnSchoolWifi(userIp: string): boolean {
   if (allowedPrefixes.includes(ipPrefix)) return true;
 
   return false;
-}
-
-export function getLocationDisplayName(location: LocationConfig): string {
-  return location.address || location.name;
 }
 
 // Instructions for finding exact IP:

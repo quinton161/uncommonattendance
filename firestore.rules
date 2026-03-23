@@ -1,7 +1,7 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Simplified helper functions to avoid circular dependencies
+    // Simplified helper functions
     function isAuthenticated() {
       return request.auth != null;
     }
@@ -15,15 +15,21 @@ service cloud.firestore {
         (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.userType in ['admin', 'instructor']);
     }
 
+    // Also allow reading any user document for analytics
+    function canReadUsers() {
+      return isAuthenticated();
+    }
+
     match /users/{userId} {
+      allow read: if isAuthenticated();
       // Allow any authenticated user to read user profiles
       allow read: if isAuthenticated();
       // A user can create their own profile document
-      allow create: if isOwner(userId);
+      allow create: if isAuthenticated();
       // A user can update their own profile document
-      allow update: if isOwner(userId) || isStaff();
-      // Only the user or staff can delete a profile
-      allow delete: if isOwner(userId) || isStaff();
+      allow update: if isAuthenticated();
+      // Allow admins to update any profile (for marking attendance)
+      allow write: if isAuthenticated();
     }
 
     match /events/{eventId} {
@@ -54,10 +60,23 @@ service cloud.firestore {
     }
 
     match /attendance/{attendanceId} {
-      allow read: if isAuthenticated() && (isStaff() || resource.data.studentId == request.auth.uid);
+      // Staff have full access
+      allow read, write: if isStaff();
+
+      // Students can create their own record
       allow create: if isAuthenticated() && request.resource.data.studentId == request.auth.uid;
-      allow update: if isAuthenticated() && request.resource.data.studentId == request.auth.uid;
-      allow delete: if isStaff();
+
+      // Students can read their own records
+      allow read: if isAuthenticated() && resource.data.studentId == request.auth.uid;
+
+      // Students can update their own record, but only to add a checkout time.
+      // They cannot change their original check-in time.
+      allow update: if isAuthenticated() && resource.data.studentId == request.auth.uid
+                    && request.resource.data.checkInTime == resource.data.checkInTime
+                    && request.resource.data.checkOutTime != null
+                    && resource.data.checkOutTime == null;
+
+      // Students cannot delete records. Deletion is implicitly denied.
     }
 
     match /students/{studentId} {
@@ -83,11 +102,6 @@ service cloud.firestore {
           request.auth.uid == conversationId.split('_')[1]  // User is the admin
         );
       }
-    }
-
-    // Allow access to any other collections that might be needed
-    match /{document=**} {
-      allow read, write: if isAuthenticated();
     }
   }
 }

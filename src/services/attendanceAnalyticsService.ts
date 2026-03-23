@@ -3,7 +3,7 @@ import { AttendanceService } from './attendanceService';
 import DataService from './DataService';
 import { TimeService } from './timeService';
 import { AttendanceRecord, AttendanceStatus } from '../types';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, getDocs } from 'firebase/firestore';
 
 export type DateRangePreset = 'today' | 'week' | 'month' | 'custom';
 
@@ -150,9 +150,34 @@ export class AttendanceAnalyticsService {
     console.log('[Analytics] Fetching attendance for range:', range, 'Students count:', students.length);
     
     const records = await this.attendanceService.getAttendanceByDateRange(range.startDate, range.endDate);
-    console.log('[Analytics] Raw attendance records found:', records.length, 'Sample:', records.slice(0, 3));
     
-    const filteredRecords = opts?.studentId ? records.filter(r => r.studentId === opts.studentId) : records;
+    // Also fetch from dailyAttendance collection for comprehensive analytics
+    const dailyAttendanceRef = collection(db, 'dailyAttendance');
+    const dailyQuery = query(
+      dailyAttendanceRef,
+      where('date', '>=', range.startDate),
+      where('date', '<=', range.endDate)
+    );
+    const dailySnap = await getDocs(dailyQuery);
+    const dailyRecords = dailySnap.docs.map((doc: any) => ({
+      studentId: doc.data().studentId,
+      date: doc.data().date,
+      status: doc.data().isPresent ? 'present' : 'absent',
+      checkInTime: doc.data().markedAt?.toDate() || doc.data().createdAt?.toDate() || null
+    }));
+
+    // Merge both sources
+    const mergedRecords = [...records];
+    dailyRecords.forEach((dr: any) => {
+      const exists = mergedRecords.find(mr => mr.studentId === dr.studentId && mr.date === dr.date);
+      if (!exists && dr.status === 'present') {
+        mergedRecords.push(dr as any);
+      }
+    });
+
+    console.log('[Analytics] Merged attendance records count:', mergedRecords.length);
+    
+    const filteredRecords = opts?.studentId ? mergedRecords.filter(r => r.studentId === opts.studentId) : mergedRecords;
 
     const studentById = new Map<string, any>();
     students.forEach((s: any) => {
@@ -163,14 +188,45 @@ export class AttendanceAnalyticsService {
     const dates = enumerateDates(range.startDate, range.endDate);
     const totalStudents = opts?.studentId ? 1 : students.length;
 
+function getRecordDate(r: any): string | undefined {
+  if (r.date) {
+    return r.date;
+  } else if (r.checkInTime) {
+    const checkIn = r.checkInTime;
+    if (checkIn.toDate) { // Firestore Timestamp
+      return checkIn.toDate().toISOString().split('T')[0];
+    } else if (checkIn.toISOString) { // JavaScript Date
+      return checkIn.toISOString().split('T')[0];
+    } else { // Fallback for string or other formats
+      try {
+        return new Date(checkIn).toISOString().split('T')[0];
+      } catch (e) {
+        console.warn("Could not parse date from checkInTime", checkIn);
+      }
+    }
+  }
+  return undefined;
+}
+
+// ... inside getAdminAnalytics ...
+
+    // DEBUG: Log unique dates found in records
+    const uniqueDatesInRecords = Array.from(new Set(filteredRecords.map(r => getRecordDate(r) || '')));
+    console.log('[Analytics] Unique dates in records:', uniqueDatesInRecords);
+    console.log('[Analytics] Requested range dates:', dates);
+
     const byDate = new Map<string, AttendanceRecord[]>();
     filteredRecords.forEach(r => {
-      const arr = byDate.get(r.date) || [];
-      arr.push(r);
-      byDate.set(r.date, arr);
+      // Ensure we use the same date format as the 'dates' array (YYYY-MM-DD)
+      const recordDate = getRecordDate(r);
+      if (recordDate) {
+        const arr = byDate.get(recordDate) || [];
+        arr.push(r);
+        byDate.set(recordDate, arr);
+      }
     });
 
-    const daily: DailyCounts[] = dates.map(date => {
+    const daily: DailyCounts[] = dates.map((date: string) => {
       const dayRecs = byDate.get(date) || [];
       let present = 0;
       let late = 0;
@@ -179,9 +235,16 @@ export class AttendanceAnalyticsService {
       dayRecs.forEach(r => {
         if (seen.has(r.studentId)) return;
         seen.add(r.studentId);
-        const st = normalizeStatus(r);
-        if (st === 'late') late++;
-        else present++;
+        
+        // Match the record date with the requested date
+        // Some records might have slightly different date strings or checkInTime formats
+        const recordDate = getRecordDate(r);
+        
+        if (recordDate === date) {
+          const st = normalizeStatus(r);
+          if (st === 'late') late++;
+          else present++;
+        }
       });
       const absent = Math.max(0, totalStudents - (present + late));
       const total = totalStudents;
@@ -194,7 +257,7 @@ export class AttendanceAnalyticsService {
         acc.present += d.present;
         acc.late += d.late;
         acc.absent += d.absent;
-        acc.total += d.total;
+        acc.total += totalStudents;
         return acc;
       },
       { present: 0, late: 0, absent: 0, total: 0 }
@@ -281,10 +344,36 @@ export class AttendanceAnalyticsService {
     console.log('[StudentAnalytics] Fetching for student:', studentId, 'Range:', range);
     
     const records = await this.attendanceService.getAttendanceByDateRange(range.startDate, range.endDate, studentId);
-    console.log('[StudentAnalytics] Records found:', records.length, 'Sample:', records.slice(0, 3));
+    
+    // Also fetch from dailyAttendance collection for comprehensive analytics
+    const dailyAttendanceRef = collection(db, 'dailyAttendance');
+    const dailyQuery = query(
+      dailyAttendanceRef,
+      where('studentId', '==', studentId),
+      where('date', '>=', range.startDate),
+      where('date', '<=', range.endDate)
+    );
+    const dailySnap = await getDocs(dailyQuery);
+    const dailyRecords = dailySnap.docs.map((doc: any) => ({
+      studentId: doc.data().studentId,
+      date: doc.data().date,
+      status: doc.data().isPresent ? 'present' : 'absent',
+      checkInTime: doc.data().markedAt?.toDate() || doc.data().createdAt?.toDate() || null
+    }));
+
+    // Merge both sources
+    const mergedRecords = [...records];
+    dailyRecords.forEach((dr: any) => {
+      const exists = mergedRecords.find(mr => mr.date === dr.date);
+      if (!exists && dr.status === 'present') {
+        mergedRecords.push(dr as any);
+      }
+    });
+
+    console.log('[StudentAnalytics] Merged attendance records count:', mergedRecords.length);
     
     const byDate = new Map<string, AttendanceRecord>();
-    records.forEach(r => {
+    mergedRecords.forEach(r => {
       // keep first if duplicates
       if (!byDate.has(r.date)) byDate.set(r.date, r);
     });

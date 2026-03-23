@@ -85,8 +85,12 @@ export interface AttendanceRecord {
   checkInTime: Date;
   checkOutTime?: Date;
   location?: {
-    latitude: number;
-    longitude: number;
+    // IP-based location (primary)
+    ip?: string;
+    timestamp?: number;
+    // Legacy coordinates (deprecated - kept for backward compatibility)
+    latitude?: number;
+    longitude?: number;
     address?: string;
   };
   date: string; // YYYY-MM-DD format
