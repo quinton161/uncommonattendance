@@ -13,7 +13,6 @@ import {
   PersonIcon,
   CheckCircleIcon,
   TodayIcon,
-  MessageIcon,
   SearchIcon
 } from '../Common/Icons';
 import { FiClock } from 'react-icons/fi';
@@ -163,28 +162,6 @@ const UserAvatar = styled.div<{ isActive?: boolean }>`
   }
 `;
 
-const MobileUserCardAlt = styled.div`
-  display: none;
-  
-  @media (max-width: ${theme.breakpoints.tablet}) {
-    display: block;
-    background: ${theme.colors.white};
-    border-radius: ${theme.borderRadius.xl};
-    padding: ${theme.spacing.xl};
-    margin-bottom: ${theme.spacing.lg};
-    box-shadow: ${theme.shadows.sm};
-    border: 1px solid ${theme.colors.gray100};
-    transition: all 0.25s ease;
-    border-left: 4px solid transparent;
-
-    &:hover {
-      transform: translateY(-4px);
-      box-shadow: ${theme.shadows.lg};
-      border-left: 4px solid ${theme.colors.primary};
-    }
-  }
-`;
-
 const ChatButton = styled(Button)`
   border-radius: 999px;
   font-weight: ${theme.fontWeights.medium};
@@ -294,31 +271,6 @@ const DeleteButton = styled(Button)`
     background: #dc2626;
     color: white;
     border-color: #dc2626;
-  }
-`;
-
-const ChatButtonOutline = styled(Button)`
-  color: ${theme.colors.primary};
-  border-color: ${theme.colors.primary};
-  padding: 8px 16px;
-  font-size: ${theme.fontSizes.sm};
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-width: 100px;
-  opacity: 1;
-  visibility: visible;
-  
-  &:hover {
-    background: ${theme.colors.primary};
-    color: white;
-  }
-
-  span {
-    display: inline !important;
-    visibility: visible !important;
-    opacity: 1 !important;
   }
 `;
 
