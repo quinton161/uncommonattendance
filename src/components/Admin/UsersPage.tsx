@@ -6,6 +6,7 @@ import { Button } from '../Common/Button';
 import DataService from '../../services/DataService';
 import { TimeService } from '../../services/timeService';
 import { DailyAttendanceService } from '../../services/dailyAttendanceService';
+import { AttendanceService } from '../../services/attendanceService';
 import { DeleteUserModal } from './DeleteUserModal';
 import { uniqueToast } from '../../utils/toastUtils';
 import { UncommonLogo } from '../Common/UncommonLogo';
@@ -579,7 +580,9 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
 
   const handleMarkPresent = async (studentId: string, studentName: string) => {
     try {
-      await dailyService.markPresentToday(studentId, studentName);
+      // Use AttendanceService with skipTimeCheck=true to allow marking after deadline
+      const attendanceService = AttendanceService.getInstance();
+      await attendanceService.checkIn(studentId, studentName, undefined, undefined, true, 'admin');
       uniqueToast.success(`${studentName} marked as present!`);
       // Refresh the attendance data
       loadData();
@@ -624,8 +627,10 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
 
     setLoading(true);
     try {
+      // Use AttendanceService with skipTimeCheck=true to allow marking after deadline
+      const attendanceService = AttendanceService.getInstance();
       const promises = absentStudents.map(student => 
-        dailyService.markPresentToday(student.id, student.displayName || 'Unknown User')
+        attendanceService.checkIn(student.id, student.displayName || 'Unknown User', undefined, undefined, true, 'admin')
       );
       await Promise.all(promises);
       uniqueToast.success(`Marked ${absentStudents.length} students as present!`);

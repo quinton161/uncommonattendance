@@ -64,10 +64,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             const isAdminEmail = firebaseUser.email === 'quintonndlovu161@gmail.com';
             const userType = isAdminEmail ? 'admin' : (userData.userType || 'attendee');
 
+            // Use displayName from Firestore document, or from Firebase auth, or fall back
+            const displayName = userData.displayName || firebaseUser.displayName || 'Student';
+            
             setUser({
               uid: firebaseUser.uid,
               email: firebaseUser.email!,
-              displayName: firebaseUser.displayName || userData.displayName,
+              displayName: displayName,
               photoUrl: firebaseUser.photoURL || userData.photoUrl,
               userType: userType,
               bio: userData.bio,

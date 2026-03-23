@@ -80,18 +80,42 @@ function enumerateDates(startIso: string, endIso: string): string[] {
 }
 
 function isLateRecord(record: AttendanceRecord): boolean {
+  // First check if status is explicitly 'late'
   if (record.status === 'late') return true;
+  
   const dt = record.checkInTime;
-  if (!(dt instanceof Date) || Number.isNaN(dt.getTime())) return false;
-  return dt.getHours() > 9 || (dt.getHours() === 9 && dt.getMinutes() > 0);
+  if (!dt) return false;
+  
+  // Handle different types of checkInTime (Date, Firestore Timestamp, or string)
+  let hours: number, minutes: number;
+  if (dt instanceof Date && !Number.isNaN(dt.getTime())) {
+    hours = dt.getHours();
+    minutes = dt.getMinutes();
+  } else if (dt && typeof dt === 'object') {
+    // Could be Firestore Timestamp - check for toDate method
+    const dateObj = (dt as any).toDate ? (dt as any).toDate() : new Date(dt as any);
+    hours = dateObj.getHours();
+    minutes = dateObj.getMinutes();
+  } else if (typeof dt === 'string') {
+    const dateObj = new Date(dt);
+    hours = dateObj.getHours();
+    minutes = dateObj.getMinutes();
+  } else {
+    return false;
+  }
+  
+  // Late if after 9:00 AM
+  return hours > 9 || (hours === 9 && minutes > 0);
 }
 
 function normalizeStatus(record: AttendanceRecord): AttendanceStatus {
+  // First check if status is explicitly set
   const status = (record.status || '').toString().toLowerCase();
   if (status === 'late') return 'late';
   if (status === 'completed') return 'completed';
   if (status === 'present') return 'present';
-  // fallback: derive from check-in time
+  
+  // Fallback: derive from check-in time
   return isLateRecord(record) ? 'late' : 'present';
 }
 
@@ -129,9 +153,9 @@ export class AttendanceAnalyticsService {
     }
 
     if (preset === 'month') {
-      const now = new Date();
-      const start = new Date(now.getFullYear(), now.getMonth(), 1);
-      const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      const harareNow = this.timeService.getCurrentTime();
+      const start = new Date(harareNow.getFullYear(), harareNow.getMonth(), 1);
+      const end = new Date(harareNow.getFullYear(), harareNow.getMonth() + 1, 0);
       return { preset, startDate: toIsoDate(start), endDate: toIsoDate(end) };
     }
 

@@ -48,8 +48,16 @@ export class DailyAttendanceService {
    */
   async markPresentToday(studentId: string, studentName: string): Promise<void> {
     const timeService = TimeService.getInstance();
-    // CRITICAL FIX: Use consistent date string from TimeService to avoid timezone issues
     const today = timeService.getCurrentDateString();
+    
+    // Check if today is a weekend (Saturday=6, Sunday=0)
+    const todayDate = new Date(today);
+    const dayOfWeek = todayDate.getDay();
+    if (dayOfWeek === 0 || dayOfWeek === 6) {
+      console.log('⚠️ Skipping weekend attendance for', studentName);
+      return; // Don't record attendance on weekends
+    }
+    
     console.log('📅 markPresentToday - Using Harare date:', today);
     const dailyRecordId = `${studentId}_${today}`;
 

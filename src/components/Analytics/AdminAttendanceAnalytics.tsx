@@ -165,7 +165,7 @@ function fmtShort(dateIso: string) {
 export function AdminAttendanceAnalytics(): React.ReactElement {
   const dataService = DataService.getInstance();
 
-  const [range, setRange] = useState<DateRange>(attendanceAnalyticsService.getDefaultRange('week'));
+  const [range, setRange] = useState<DateRange>(attendanceAnalyticsService.getDefaultRange('month'));
   const [students, setStudents] = useState<any[]>([]);
   const [selectedStudentId, setSelectedStudentId] = useState<string>('all');
   const [analytics, setAnalytics] = useState<AdminAnalytics | null>(null);
@@ -238,7 +238,7 @@ export function AdminAttendanceAnalytics(): React.ReactElement {
   return (
     <Page>
       <FilterRow>
-        <DateRangeFilter value={range} onChange={setRange} />
+        <DateRangeFilter value={range} onChange={setRange} presets={['month']} />
         <div style={{ display: 'flex', flexDirection: 'column', gap: theme.spacing.xs }}>
           <label style={{ fontSize: theme.fontSizes.xs, color: theme.colors.textSecondary, fontWeight: theme.fontWeights.medium }}>
             Student

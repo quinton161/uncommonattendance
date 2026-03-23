@@ -54,6 +54,12 @@ export class AttendanceService {
     const harareTime = this.timeService.getCurrentTime();
     const today = this.timeService.getCurrentDateString();
     
+    // Check if today is a weekend (Saturday=6, Sunday=0)
+    const dayOfWeek = harareTime.getDay();
+    if (dayOfWeek === 0 || dayOfWeek === 6) {
+      throw new Error('Attendance is not recorded on weekends. Please check in on weekdays.');
+    }
+    
     // Skip time check if admin override is enabled
     if (!skipTimeCheck && !this.timeService.canCheckIn(harareTime)) {
       throw new Error('Check-in is closed. The attendance deadline has passed (9:05 AM).');
