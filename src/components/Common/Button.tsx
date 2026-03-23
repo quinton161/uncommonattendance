@@ -53,22 +53,22 @@ const getVariantStyles = (variant: string) => {
     case 'outline':
       return css`
         background-color: transparent;
-        color: ${theme.colors.white};
-        border: 1px solid ${theme.colors.white};
+        color: ${theme.colors.primary};
+        border: 2px solid ${theme.colors.primary};
 
         &:hover:not(:disabled) {
-          background-color: ${theme.colors.white};
-          color: ${theme.colors.primary};
+          background-color: ${theme.colors.primary};
+          color: ${theme.colors.white};
         }
       `;
     case 'ghost':
       return css`
-        background-color: transparent;
-        color: ${theme.colors.white};
-        border: 1px solid transparent;
+        background-color: ${theme.colors.gray100};
+        color: ${theme.colors.textPrimary};
+        border: 1px solid ${theme.colors.gray200};
 
         &:hover:not(:disabled) {
-          background-color: rgba(255, 255, 255, 0.1);
+          background-color: ${theme.colors.gray200};
         }
       `;
     default:

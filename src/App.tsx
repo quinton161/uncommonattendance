@@ -14,6 +14,7 @@ import { theme } from './styles/theme';
 import { ToastContainer } from 'react-toastify';
 import { uniqueToast } from './utils/toastUtils';
 import DataService from './services/DataService';
+import { qrCodeService } from './services/qrCodeService';
 import 'react-toastify/dist/ReactToastify.css';
 
 const AppRoutes: React.FC = () => {
@@ -117,6 +118,16 @@ function App() {
         
         if (isConnected) {
           console.log('✅ Backend connection successful');
+          
+          // Auto-generate daily QR code if not exists
+          const existingCode = await qrCodeService.getDailyCode();
+          if (!existingCode) {
+            console.log('📱 Auto-generating daily QR code...');
+            await qrCodeService.generateDailyCode();
+            console.log('✅ Daily QR code auto-generated');
+          } else {
+            console.log('📱 Daily QR code already exists:', existingCode.code);
+          }
         } else {
           console.warn('⚠️ Backend connection failed, using offline mode');
         }
