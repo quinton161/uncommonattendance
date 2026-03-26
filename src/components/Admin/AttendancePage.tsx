@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import styled from 'styled-components';
 import { useAuth } from '../../contexts/AuthContext';
 import { theme } from '../../styles/theme';
@@ -679,7 +679,7 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
   // ...rest of hooks and logic...
 
 
-  const loadAttendanceSummary = async () => {
+  const loadAttendanceSummary = useCallback(async () => {
     try {
       setLoading(true);
       await dataService.testConnection();
@@ -691,7 +691,7 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedDate]);
 
   useEffect(() => {
     const today = timeService.getCurrentDateString();
@@ -707,9 +707,8 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
     }
 
     // For non-today dates, do a one-time fetch.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     loadAttendanceSummary();
-  }, [selectedDate]);
+  }, [selectedDate, loadAttendanceSummary]);
 
   const getFilteredAttendance = () => {
     if (!attendanceSummary) return [];

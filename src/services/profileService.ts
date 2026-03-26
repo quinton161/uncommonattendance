@@ -24,6 +24,11 @@ export class ProfileService {
       const base64Data = await this.compressImage(file);
       console.log('✅ Image compressed to base64, size:', base64Data.length);
 
+      // FIX: Check document size limit (Firestore has 1MB limit)
+      if (base64Data.length > 900_000) {
+        throw new Error('Profile picture is too large. Please use a smaller image.');
+      }
+
       // Update user document with photo URL (base64)
       console.log('📝 Updating Firestore user document...');
       const userRef = doc(db, 'users', userId);

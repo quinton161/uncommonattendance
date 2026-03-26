@@ -556,10 +556,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
       setStats({
         totalAttendees: dashboardStats.totalAttendees,
         totalInstructors: dashboardStats.totalInstructors,
-        todayAttendance: dashboardStats.todayAttendance,
-        lateCount: dashboardStats.lateCount || 0,
-        absentCount: dashboardStats.totalAttendees - (dashboardStats.todayAttendance || 0),
-        attendanceRate: Math.round((dashboardStats.todayAttendance / (dashboardStats.totalAttendees || 1)) * 100)
+        // FIX: Let real-time listener handle these fields to avoid flicker
+        todayAttendance: 0,
+        lateCount: 0,
+        absentCount: 0,
+        attendanceRate: 0
       });
       
       // Load weekly data

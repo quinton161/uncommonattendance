@@ -1,48 +1,80 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Simplified helper functions
+
+    // ── Helper functions ──────────────────────────────────────────────────────
     function isAuthenticated() {
       return request.auth != null;
     }
-    
+
     function isOwner(userId) {
       return request.auth != null && request.auth.uid == userId;
     }
 
+    // Guard with exists() first so a missing user doc never throws
     function isStaff() {
       return isAuthenticated() &&
-        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.userType in ['admin', 'instructor']);
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.userType in ['admin', 'instructor'];
     }
 
-    // Also allow reading any user document for analytics
-    function canReadUsers() {
-      return isAuthenticated();
-    }
-
+    // ── Users ─────────────────────────────────────────────────────────────────
     match /users/{userId} {
       allow read: if isAuthenticated();
-      // Allow any authenticated user to read user profiles
-      allow read: if isAuthenticated();
-      // A user can create their own profile document
       allow create: if isAuthenticated();
-      // A user can update their own profile document
       allow update: if isAuthenticated();
-      // Allow admins to update any profile (for marking attendance)
-      allow write: if isAuthenticated();
+      allow delete: if isStaff();
     }
 
+    // ── Attendance ────────────────────────────────────────────────────────────
+    match /attendance/{attendanceId} {
+      allow read, write: if isStaff();
+
+      allow create: if isAuthenticated()
+        && request.resource.data.studentId == request.auth.uid;
+
+      allow read: if isAuthenticated()
+        && resource.data.studentId == request.auth.uid;
+
+      allow update: if isAuthenticated()
+        && resource.data.studentId == request.auth.uid
+        && request.resource.data.checkInTime == resource.data.checkInTime
+        && request.resource.data.studentId == resource.data.studentId
+        && request.resource.data.checkOutTime != null
+        && resource.data.checkOutTime == null;
+    }
+
+    // ── Daily Attendance (was completely missing — caused silent failures) ─────
+    match /dailyAttendance/{recordId} {
+      allow read: if isAuthenticated();
+      allow write: if isStaff();
+      allow create: if isAuthenticated()
+        && request.resource.data.studentId == request.auth.uid;
+      allow update: if isAuthenticated()
+        && resource.data.studentId == request.auth.uid;
+    }
+
+    // ── System Config (QR codes live here — was completely missing) ───────────
+    // Students need READ to validate the daily QR code during check-in.
+    // Only staff can WRITE (generate new codes).
+    match /system_config/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if isStaff();
+    }
+
+    // ── Admin Actions audit log ────────────────────────────────────────────────
+    match /admin_actions/{docId} {
+      allow read, write: if isStaff();
+    }
+
+    // ── Events ────────────────────────────────────────────────────────────────
     match /events/{eventId} {
-      // Allow authenticated users to read events
       allow read: if isAuthenticated();
-      // Allow authenticated users to create events
-      allow create: if isAuthenticated();
-      // Allow authenticated users to update events
-      allow update: if isAuthenticated();
-      // Allow authenticated users to delete events
-      allow delete: if isAuthenticated();
+      allow create, update, delete: if isStaff();
     }
 
+    // ── Supporting collections ─────────────────────────────────────────────────
     match /ticketTypes/{ticketTypeId} {
       allow read, write: if isAuthenticated();
     }
@@ -59,48 +91,21 @@ service cloud.firestore {
       allow read, write: if isAuthenticated();
     }
 
-    match /attendance/{attendanceId} {
-      // Staff have full access
-      allow read, write: if isStaff();
-
-      // Students can create their own record
-      allow create: if isAuthenticated() && request.resource.data.studentId == request.auth.uid;
-
-      // Students can read their own records
-      allow read: if isAuthenticated() && resource.data.studentId == request.auth.uid;
-
-      // Students can update their own record, but only to add a checkout time.
-      // They cannot change their original check-in time.
-      allow update: if isAuthenticated() && resource.data.studentId == request.auth.uid
-                    && request.resource.data.checkInTime == resource.data.checkInTime
-                    && request.resource.data.checkOutTime != null
-                    && resource.data.checkOutTime == null;
-
-      // Students cannot delete records. Deletion is implicitly denied.
-    }
-
     match /students/{studentId} {
       allow read, write: if isAuthenticated();
     }
 
+    // ── Conversations & Messages ───────────────────────────────────────────────
     match /conversations/{conversationId} {
-      // Allow read if user is the student in the conversation OR the specific admin
-      // conversationId format: studentId_adminId (e.g., "abc123_xyz789")
-      allow read: if isAuthenticated() && (
-        request.auth.uid == conversationId.split('_')[0] || // User is the student
-        request.auth.uid == conversationId.split('_')[1]  // User is the admin
-      );
-      
-      allow write: if isAuthenticated() && (
-        request.auth.uid == conversationId.split('_')[0] || // User is the student
-        request.auth.uid == conversationId.split('_')[1]  // User is the admin
-      );
+      function isParticipant() {
+        return request.auth.uid == conversationId.split('_')[0]
+            || request.auth.uid == conversationId.split('_')[1];
+      }
+
+      allow read, write: if isAuthenticated() && isParticipant();
 
       match /messages/{messageId} {
-        allow read, write: if isAuthenticated() && (
-          request.auth.uid == conversationId.split('_')[0] || // User is the student
-          request.auth.uid == conversationId.split('_')[1]  // User is the admin
-        );
+        allow read, write: if isAuthenticated() && isParticipant();
       }
     }
   }

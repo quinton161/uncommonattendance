@@ -544,7 +544,16 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
   const getTodayAttendance = (userId: string) => {
     const timeService = TimeService.getInstance();
     const today = timeService.getCurrentDateString();
-    return attendance.find(a => a.studentId === userId && a.date === today);
+    return attendance.find(a => {
+      if (a.studentId !== userId) return false;
+      if (a.date) return a.date === today;
+      // Fallback for records without a date field
+      if (a.checkInTime) {
+        const checkInDate = a.checkInTime.toDate ? a.checkInTime.toDate() : new Date(a.checkInTime);
+        return checkInDate.toISOString().split('T')[0] === today;
+      }
+      return false;
+    });
   };
 
   // getUserStats and formatTime were previously defined but unused helpers.

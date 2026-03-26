@@ -185,15 +185,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       console.log('🔐 AuthContext: Registration complete!');
       uniqueToast.success('Account created successfully! Welcome!', { autoClose: 4000 });
-
-      // Direct redirection based on user type
-      if (userType === 'admin') {
-        window.location.href = '/admin-dashboard';
-      } else if (userType === 'instructor') {
-        window.location.href = '/instructor-dashboard';
-      } else {
-        window.location.href = '/dashboard';
-      }
+      // Note: Auth state change will automatically trigger navigation to the correct dashboard
+      // No need for window.location.href redirect - the onAuthStateChanged listener handles this
     } catch (error: any) {
       console.error('🔐 AuthContext: Registration error:', error);
       uniqueToast.error('Failed to create account. Please try again.', { autoClose: 4000 });
@@ -259,11 +252,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.log('🔐 AuthContext: Google login successful for:', firebaseUser.email);
       
       uniqueToast.success(`Welcome, ${firebaseUser.displayName}!`, { autoClose: 3000 });
-      
-      // Redirect based on user type after a short delay
-      setTimeout(() => {
-        window.location.href = '/dashboard';
-      }, 500);
+      // Note: Auth state change will automatically trigger navigation - no redirect needed
     } catch (error: any) {
       console.error('🔐 AuthContext: Google login error:', error);
       
