@@ -3,109 +3,81 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ── Helper functions ──────────────────────────────────────────────────────
-    function isAuthenticated() {
+    function isAuth() {
       return request.auth != null;
     }
 
-    function isOwner(userId) {
-      return request.auth != null && request.auth.uid == userId;
-    }
-
-    // Guard with exists() first so a missing user doc never throws
     function isStaff() {
-      return isAuthenticated() &&
+      return isAuth() &&
         exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.userType in ['admin', 'instructor'];
     }
 
-    // ── Users ─────────────────────────────────────────────────────────────────
+    function isOwner(uid) {
+      return isAuth() && request.auth.uid == uid;
+    }
+
+    // Users
     match /users/{userId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update: if isAuthenticated();
+      allow read: if isAuth();
+      allow create: if isAuth();
+      allow update: if isAuth();
       allow delete: if isStaff();
     }
 
-    // ── Attendance ────────────────────────────────────────────────────────────
+    // Main attendance records
     match /attendance/{attendanceId} {
-      allow read, write: if isStaff();
-
-      allow create: if isAuthenticated()
-        && request.resource.data.studentId == request.auth.uid;
-
-      allow read: if isAuthenticated()
-        && resource.data.studentId == request.auth.uid;
-
-      allow update: if isAuthenticated()
-        && resource.data.studentId == request.auth.uid
-        && request.resource.data.checkInTime == resource.data.checkInTime
-        && request.resource.data.studentId == resource.data.studentId
-        && request.resource.data.checkOutTime != null
-        && resource.data.checkOutTime == null;
+      allow read: if isAuth();
+      allow write: if isStaff();
+      allow create: if isAuth() && request.resource.data.studentId == request.auth.uid;
+      allow update: if isAuth() && resource.data.studentId == request.auth.uid
+                    && request.resource.data.checkInTime == resource.data.checkInTime
+                    && request.resource.data.checkOutTime != null
+                    && resource.data.checkOutTime == null;
     }
 
-    // ── Daily Attendance (was completely missing — caused silent failures) ─────
+    // Daily attendance summary (used by DailyAttendanceService)
     match /dailyAttendance/{recordId} {
-      allow read: if isAuthenticated();
+      allow read: if isAuth();
       allow write: if isStaff();
-      allow create: if isAuthenticated()
-        && request.resource.data.studentId == request.auth.uid;
-      allow update: if isAuthenticated()
-        && resource.data.studentId == request.auth.uid;
+      allow create: if isAuth() && request.resource.data.studentId == request.auth.uid;
+      allow update: if isAuth() && resource.data.studentId == request.auth.uid;
     }
 
-    // ── System Config (QR codes live here — was completely missing) ───────────
-    // Students need READ to validate the daily QR code during check-in.
-    // Only staff can WRITE (generate new codes).
+    // QR codes and system config — students need READ to validate codes
     match /system_config/{docId} {
-      allow read: if isAuthenticated();
+      allow read: if isAuth();
       allow write: if isStaff();
     }
 
-    // ── Admin Actions audit log ────────────────────────────────────────────────
+    // Admin audit log
     match /admin_actions/{docId} {
       allow read, write: if isStaff();
     }
 
-    // ── Events ────────────────────────────────────────────────────────────────
+    // Events
     match /events/{eventId} {
-      allow read: if isAuthenticated();
-      allow create, update, delete: if isStaff();
+      allow read: if isAuth();
+      allow write: if isStaff();
     }
 
-    // ── Supporting collections ─────────────────────────────────────────────────
-    match /ticketTypes/{ticketTypeId} {
-      allow read, write: if isAuthenticated();
-    }
+    match /ticketTypes/{id} { allow read, write: if isAuth(); }
+    match /registrations/{id} { allow read, write: if isAuth(); }
+    match /eventResources/{id} { allow read, write: if isAuth(); }
+    match /feedback/{id} { allow read, write: if isAuth(); }
+    match /students/{id} { allow read, write: if isAuth(); }
 
-    match /registrations/{registrationId} {
-      allow read, write: if isAuthenticated();
-    }
-
-    match /eventResources/{resourceId} {
-      allow read, write: if isAuthenticated();
-    }
-
-    match /feedback/{feedbackId} {
-      allow read, write: if isAuthenticated();
-    }
-
-    match /students/{studentId} {
-      allow read, write: if isAuthenticated();
-    }
-
-    // ── Conversations & Messages ───────────────────────────────────────────────
+    // Conversations
     match /conversations/{conversationId} {
       function isParticipant() {
-        return request.auth.uid == conversationId.split('_')[0]
-            || request.auth.uid == conversationId.split('_')[1];
+        return isAuth() && (
+          request.auth.uid == conversationId.split('_')[0] ||
+          request.auth.uid == conversationId.split('_')[1]
+        );
       }
-
-      allow read, write: if isAuthenticated() && isParticipant();
-
+      allow read, write: if isParticipant();
       match /messages/{messageId} {
-        allow read, write: if isAuthenticated() && isParticipant();
+        allow read, write: if isParticipant();
       }
     }
   }

@@ -1,68 +1,177 @@
-import { InternetTimeService } from './internetTimeService';
-
+/**
+ * TimeService — single source of truth for all time/date operations.
+ *
+ * Design decisions:
+ * - NEVER blocks check-in because of a failed internet sync.
+ * - Uses system clock + Africa/Harare Intl formatting for correctness.
+ * - Attempts internet sync in the background; if it fails we silently use system time.
+ * - Late threshold: 9:00 AM (9:00:00 exact = LATE).
+ * - Check-in window: 7:00 AM – 9:05 AM.
+ * - Admin/skipTimeCheck override bypasses the window entirely.
+ */
 export class TimeService {
   private static instance: TimeService;
-  private internetTimeService: InternetTimeService;
 
-  public static getInstance(): TimeService {
+  // Internet time offset in ms (0 until first successful sync)
+  private timeOffset = 0;
+  private lastSyncTime = 0;
+  private readonly SYNC_INTERVAL = 5 * 60 * 1000; // 5 min
+
+  private constructor() {
+    this._syncInBackground();
+  }
+
+  static getInstance(): TimeService {
     if (!TimeService.instance) {
       TimeService.instance = new TimeService();
     }
     return TimeService.instance;
   }
 
-  constructor() {
-    this.internetTimeService = InternetTimeService.getInstance();
-  }
+  // ── Core clock ──────────────────────────────────────────────────────────────
 
-  // Get current time in Harare/Pretoria timezone (CAT - Central Africa Time)
+  /** Returns the current moment as a JS Date (internet-corrected when available). */
   getCurrentTime(): Date {
-    return this.internetTimeService.getCurrentTimeHarare();
+    const now = Date.now() + this.timeOffset;
+    return new Date(now);
   }
 
-  // Format time for display
-  formatTime(date: Date): string {
-    return this.internetTimeService.formatTime(date);
-  }
-
-  // Format date for display
-  formatDate(date: Date): string {
-    return this.internetTimeService.formatDate(date);
-  }
-
-  // Get current date string in Harare timezone
+  /** Returns YYYY-MM-DD string in Africa/Harare timezone. */
   getCurrentDateString(): string {
-    return this.internetTimeService.getCurrentDateString();
+    return this._toHarareDateString(this.getCurrentTime());
   }
 
-  // Check if it's after 9:05 AM Harare time (late check-in)
+  // ── Attendance rules ────────────────────────────────────────────────────────
+
+  /**
+   * isLate — true if check-in time is 9:00:00 AM or later (Harare).
+   * 08:59:59 → on time.  09:00:00 → late.
+   */
   isLate(checkInTime: Date): boolean {
-    return this.internetTimeService.isLate(checkInTime);
+    const { h, m } = this._harareHM(checkInTime);
+    return h > 9 || (h === 9 && m >= 0);
   }
-  
-  // Check if check-in is still allowed (before 9:05 AM)
-  canCheckIn(checkInTime: Date): boolean {
-    return this.internetTimeService.canCheckIn(checkInTime);
+
+  /**
+   * canCheckIn — true if the current Harare time is within the check-in window.
+   * Window: 07:00 – 09:05.
+   *
+   * IMPORTANT: returns TRUE when time sync hasn't completed yet (lastSyncTime===0)
+   * so that slow devices / bad connections never get locked out.
+   */
+  canCheckIn(now: Date): boolean {
+    // If we have never synced, allow check-in and let Firestore rules be the gate.
+    if (this.lastSyncTime === 0) return true;
+
+    const { h, m } = this._harareHM(now);
+    const total = h * 60 + m;
+    return total >= 7 * 60 && total <= 9 * 60 + 5; // 420 – 545 minutes
   }
-  
-  // Check if student should be marked as absent (after 9:05 AM)
+
   shouldMarkAbsent(): boolean {
-    return this.internetTimeService.shouldMarkAbsent();
+    return !this.canCheckIn(this.getCurrentTime());
   }
 
-  // Get time zone info
+  // ── Formatting ──────────────────────────────────────────────────────────────
+
+  formatTime(date: Date): string {
+    return date.toLocaleString('en-US', {
+      timeZone: 'Africa/Harare',
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+    });
+  }
+
+  formatDate(date: Date): string {
+    return date.toLocaleDateString('en-US', {
+      timeZone: 'Africa/Harare',
+      year: 'numeric', month: 'long', day: 'numeric',
+    });
+  }
+
   getTimeZoneInfo(): string {
-    return this.internetTimeService.getTimeZoneInfo();
+    return this.getCurrentTime().toLocaleString('en-US', {
+      timeZone: 'Africa/Harare', timeZoneName: 'short',
+    });
   }
 
-  // Get synchronization status
   getSyncStatus() {
-    return this.internetTimeService.getSyncStatus();
+    const now = Date.now();
+    const recentSync = this.lastSyncTime > 0 && (now - this.lastSyncTime) < this.SYNC_INTERVAL;
+    return {
+      isOnline: navigator.onLine,
+      lastSyncTime: this.lastSyncTime,
+      timeOffset: this.timeOffset,
+      usingInternetTime: recentSync,
+    };
   }
 
-  // Force manual sync
   async forceSync(): Promise<boolean> {
-    return await this.internetTimeService.forceSync();
+    await this._syncInBackground();
+    return this.lastSyncTime > 0;
+  }
+
+  // ── Internals ───────────────────────────────────────────────────────────────
+
+  /** Returns { h, m } for a Date in Africa/Harare timezone. */
+  private _harareHM(date: Date): { h: number; m: number } {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Africa/Harare',
+      hour: '2-digit', minute: '2-digit', hour12: false,
+    }).formatToParts(date);
+
+    const h = Number(parts.find(p => p.type === 'hour')?.value ?? NaN);
+    const m = Number(parts.find(p => p.type === 'minute')?.value ?? NaN);
+
+    if (!Number.isFinite(h) || !Number.isFinite(m)) {
+      // Fallback: use raw UTC+2 offset for Africa/Harare (CAT, no DST)
+      const cat = new Date(date.getTime() + 2 * 3600 * 1000);
+      return { h: cat.getUTCHours(), m: cat.getUTCMinutes() };
+    }
+    return { h, m };
+  }
+
+  private _toHarareDateString(date: Date): string {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Africa/Harare',
+      year: 'numeric', month: '2-digit', day: '2-digit',
+    }).formatToParts(date);
+
+    const y = parts.find(p => p.type === 'year')?.value;
+    const mo = parts.find(p => p.type === 'month')?.value;
+    const d = parts.find(p => p.type === 'day')?.value;
+
+    if (y && mo && d) return `${y}-${mo}-${d}`;
+    // Ultimate fallback
+    return new Date(date.getTime() + 2 * 3600 * 1000).toISOString().split('T')[0];
+  }
+
+  private async _syncInBackground(): Promise<void> {
+    if (!navigator.onLine) return;
+    const sources = [
+      () => fetch('https://worldtimeapi.org/api/timezone/Africa/Harare', { signal: AbortSignal.timeout(4000) })
+             .then(r => r.json()).then(d => new Date(d.datetime)),
+      () => fetch('https://timeapi.io/api/Time/current/zone?timeZone=Africa/Harare', { signal: AbortSignal.timeout(4000) })
+             .then(r => r.json()).then(d => new Date(d.dateTime)),
+      () => fetch('https://www.google.com', { method: 'HEAD', signal: AbortSignal.timeout(4000) })
+             .then(r => { const d = r.headers.get('date'); if (!d) throw new Error('no date'); return new Date(d); }),
+    ];
+
+    const t0 = Date.now();
+    for (const source of sources) {
+      try {
+        const internetTime = await source();
+        if (!isNaN(internetTime.getTime())) {
+          const rtt = Date.now() - t0;
+          this.timeOffset = internetTime.getTime() + rtt / 2 - Date.now();
+          this.lastSyncTime = Date.now();
+          console.log(`✅ Time synced. Offset: ${this.timeOffset.toFixed(0)}ms`);
+          return;
+        }
+      } catch (_) { /* try next */ }
+    }
+    // All sources failed — keep existing offset, no blocking
+    console.warn('⚠️ Time sync failed — using system clock');
   }
 }
 

@@ -19,376 +19,156 @@ import DataService from '../services/DataService';
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
+  return ctx;
 };
 
-interface AuthProviderProps {
-  children: React.ReactNode;
-}
-
-export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [user, setUser]       = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    console.log('🔐 AuthContext: Setting up auth state listener...');
-    
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      console.log('🔐 AuthContext: Auth state changed:', firebaseUser ? 'User logged in' : 'User logged out');
-      
-      if (firebaseUser) {
+    const unsub = onAuthStateChanged(auth, async (fbUser) => {
+      if (fbUser) {
         try {
-          console.log('🔐 AuthContext: Fetching user data from Firestore...');
-          // Get user data from Firestore with retry logic for new users
-          let userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-          let retries = 0;
-          const maxRetries = 3;
-          
-          // Retry if user document not found (might be a race condition for new users)
-          while (!userDoc.exists() && retries < maxRetries) {
-            retries++;
-            console.log(`🔐 AuthContext: User document not found, retrying... (${retries}/${maxRetries})`);
-            await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
-            userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-          }
-          
-          if (userDoc.exists()) {
-            const userData = userDoc.data();
-            console.log('🔐 AuthContext: User data loaded:', userData.displayName, userData.userType);
-            
-            // SECURITY: Always ensure the specific admin email has the admin role
-            const isAdminEmail = firebaseUser.email === 'quintonndlovu161@gmail.com';
-            const userType = isAdminEmail ? 'admin' : (userData.userType || 'attendee');
+          let snap = await getDoc(doc(db, 'users', fbUser.uid));
 
-            // Use displayName from Firestore document, or from Firebase auth, or fall back
-            const displayName = userData.displayName || firebaseUser.displayName || 'Student';
-            
+          // Retry up to 3× for new accounts (race between Auth and Firestore write)
+          for (let i = 0; i < 3 && !snap.exists(); i++) {
+            await new Promise(r => setTimeout(r, 1000));
+            snap = await getDoc(doc(db, 'users', fbUser.uid));
+          }
+
+          const isAdmin    = fbUser.email === 'quintonndlovu161@gmail.com';
+          const isStaff    = fbUser.email?.endsWith('@uncommon.org');
+
+          if (snap.exists()) {
+            const d = snap.data();
             setUser({
-              uid: firebaseUser.uid,
-              email: firebaseUser.email!,
-              displayName: displayName,
-              photoUrl: firebaseUser.photoURL || userData.photoUrl,
-              userType: userType,
-              bio: userData.bio,
-              createdAt: userData.createdAt?.toDate() || new Date(),
+              uid:         fbUser.uid,
+              email:       fbUser.email!,
+              displayName: d.displayName || fbUser.displayName || 'User',
+              photoUrl:    fbUser.photoURL || d.photoUrl,
+              userType:    isAdmin ? 'admin' : (d.userType || 'attendee'),
+              bio:         d.bio,
+              createdAt:   d.createdAt?.toDate() || new Date(),
             });
-            
-            // Initialize call and presence services for logged-in user
           } else {
-            console.warn('🔐 AuthContext: User document not found in Firestore after retries');
-            
-            const isAdminEmail = firebaseUser.email === 'quintonndlovu161@gmail.com';
-            const isStaffEmail = firebaseUser.email?.endsWith('@uncommon.org'); 
-            
-            console.log('🔐 AuthContext: Creating fallback user document...');
-            const fallbackUserData: {
-              uid: string;
-              email: string;
-              displayName: string;
-              userType: 'instructor' | 'attendee' | 'admin';
-              createdAt: Date;
-              photoUrl: string | null;
-              bio: string;
-            } = {
-              uid: firebaseUser.uid,
-              email: firebaseUser.email!,
-              displayName: firebaseUser.displayName || 'New User',
-              userType: isAdminEmail ? 'admin' : (isStaffEmail ? 'instructor' : 'attendee'),
-              createdAt: new Date(),
-              photoUrl: firebaseUser.photoURL || null,
-              bio: '',
+            // Create fallback document for users who arrive via Google sign-in
+            const fallback = {
+              uid:         fbUser.uid,
+              email:       fbUser.email!,
+              displayName: fbUser.displayName || 'New User',
+              userType:    isAdmin ? 'admin' : isStaff ? 'instructor' : 'attendee' as any,
+              createdAt:   new Date(),
+              photoUrl:    fbUser.photoURL || null,
+              bio:         '',
             };
-            
-            await setDoc(doc(db, 'users', firebaseUser.uid), fallbackUserData);
-            console.log('🔐 AuthContext: Fallback user document created');
-            
-            setUser({
-              uid: firebaseUser.uid,
-              email: firebaseUser.email!,
-              displayName: firebaseUser.displayName || 'New User',
-              photoUrl: firebaseUser.photoURL ?? undefined,
-              userType: fallbackUserData.userType,
-              bio: '',
-              createdAt: new Date(),
-            });
+            await setDoc(doc(db, 'users', fbUser.uid), fallback);
+            setUser({ ...fallback, photoUrl: fallback.photoUrl ?? undefined });
           }
-        } catch (error) {
-          console.error('🔐 AuthContext: Error fetching user data:', error);
-          if (firebaseUser) {
-            console.log('🔐 AuthContext: Using basic Firebase user data as fallback');
-            const isAdminEmail = firebaseUser.email === 'quintonndlovu161@gmail.com';
-            const isStaffEmail = firebaseUser.email?.endsWith('@uncommon.org');
-            setUser({
-              uid: firebaseUser.uid,
-              email: firebaseUser.email!,
-              displayName: firebaseUser.displayName || 'User',
-              photoUrl: firebaseUser.photoURL ?? undefined,
-              userType: isAdminEmail ? 'admin' : (isStaffEmail ? 'instructor' : 'attendee'),
-              bio: '',
-              createdAt: new Date(),
-            });
-          } else {
-            setUser(null);
-          }
+        } catch {
+          // Network error — use minimal user from Firebase Auth
+          const isAdmin = fbUser.email === 'quintonndlovu161@gmail.com';
+          const isStaff = fbUser.email?.endsWith('@uncommon.org');
+          setUser({
+            uid:         fbUser.uid,
+            email:       fbUser.email!,
+            displayName: fbUser.displayName || 'User',
+            photoUrl:    fbUser.photoURL ?? undefined,
+            userType:    isAdmin ? 'admin' : isStaff ? 'instructor' : 'attendee',
+            bio:         '',
+            createdAt:   new Date(),
+          });
         }
       } else {
         setUser(null);
       }
       setLoading(false);
-      console.log('🔐 AuthContext: Auth initialization complete');
     });
-
-    return unsubscribe;
+    return unsub;
   }, []);
 
-  const register = async (
-    email: string,
-    password: string,
-    displayName: string,
-    userType: 'instructor' | 'attendee' | 'admin'
-  ) => {
-    console.log('🔐 AuthContext: Starting registration for:', email, userType);
-    try {
-      console.log('🔐 AuthContext: Creating Firebase user...');
-      const { user: firebaseUser } = await createUserWithEmailAndPassword(
-        auth,
-        email,
-        password
-      );
-      console.log('🔐 AuthContext: Firebase user created:', firebaseUser.uid);
-
-      // Update Firebase Auth profile
-      console.log('🔐 AuthContext: Updating Firebase profile...');
-      await updateProfile(firebaseUser, { displayName });
-
-      // Create user document in Firestore
-      console.log('🔐 AuthContext: Creating Firestore user document...');
-      const userData = {
-        uid: firebaseUser.uid,
-        email: firebaseUser.email!,
-        displayName,
-        userType,
-        createdAt: new Date(),
-        photoUrl: null,
-        bio: '',
-      };
-
-      await setDoc(doc(db, 'users', firebaseUser.uid), userData);
-      console.log('🔐 AuthContext: Firestore user document created successfully!');
-      
-      // Wait a moment for the auth state to update
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      console.log('🔐 AuthContext: Registration complete!');
-      uniqueToast.success('Account created successfully! Welcome!', { autoClose: 4000 });
-      // Note: Auth state change will automatically trigger navigation to the correct dashboard
-      // No need for window.location.href redirect - the onAuthStateChanged listener handles this
-    } catch (error: any) {
-      console.error('🔐 AuthContext: Registration error:', error);
-      uniqueToast.error('Failed to create account. Please try again.', { autoClose: 4000 });
-      throw error;
-    }
+  // ── register ─────────────────────────────────────────────────────────────────
+  const register = async (email: string, password: string, displayName: string, userType: User['userType']) => {
+    const { user: fbUser } = await createUserWithEmailAndPassword(auth, email, password);
+    await updateProfile(fbUser, { displayName });
+    await setDoc(doc(db, 'users', fbUser.uid), {
+      uid: fbUser.uid, email: fbUser.email!, displayName, userType,
+      createdAt: new Date(), photoUrl: null, bio: '',
+    });
+    uniqueToast.success('Account created! Welcome!', { autoClose: 3000 });
+    // NO window.location.href — onAuthStateChanged handles navigation automatically
   };
 
+  // ── login ─────────────────────────────────────────────────────────────────────
   const login = async (email: string, password: string) => {
-    console.log('🔐 AuthContext: Starting login for:', email);
     try {
-      console.log('🔐 AuthContext: Attempting Firebase sign in...');
       await signInWithEmailAndPassword(auth, email, password);
-      console.log('🔐 AuthContext: Login successful!');
-      uniqueToast.success('Welcome back! Successfully logged in.', { autoClose: 3000 });
-    } catch (error: any) {
-      console.error('Login error:', error);
-      
-      // Provide specific error messages based on Firebase error codes
-      let errorMessage = 'Login failed. Please try again.';
-      
-      switch (error.code) {
-        case 'auth/invalid-credential':
-          errorMessage = 'Invalid email or password. Please check your credentials and try again.';
-          break;
-        case 'auth/user-not-found':
-          errorMessage = 'No account found with this email address.';
-          break;
-        case 'auth/wrong-password':
-          errorMessage = 'Incorrect password. Please try again.';
-          break;
-        case 'auth/invalid-email':
-          errorMessage = 'Please enter a valid email address.';
-          break;
-        case 'auth/user-disabled':
-          errorMessage = 'This account has been disabled. Please contact support.';
-          break;
-        case 'auth/too-many-requests':
-          errorMessage = 'Too many failed attempts. Please try again later.';
-          break;
-        case 'auth/network-request-failed':
-          errorMessage = 'Network error. Please check your connection and try again.';
-          break;
-        default:
-          errorMessage = error.message || 'Login failed. Please try again.';
-      }
-      
-      uniqueToast.error(errorMessage, { autoClose: 5000 });
-      throw error;
+      uniqueToast.success('Welcome back!', { autoClose: 3000 });
+    } catch (err: any) {
+      const msgs: Record<string, string> = {
+        'auth/invalid-credential':    'Invalid email or password.',
+        'auth/user-not-found':        'No account with this email.',
+        'auth/wrong-password':        'Incorrect password.',
+        'auth/too-many-requests':     'Too many attempts. Try again later.',
+        'auth/network-request-failed':'Network error. Check your connection.',
+      };
+      uniqueToast.error(msgs[err.code] || err.message || 'Login failed.', { autoClose: 5000 });
+      throw err;
     }
   };
 
+  // ── Google login ──────────────────────────────────────────────────────────────
   const loginWithGoogle = async () => {
-    console.log('🔐 AuthContext: Starting Google login...');
     const provider = new GoogleAuthProvider();
-    
-    // Add common scopes
     provider.addScope('profile');
     provider.addScope('email');
-    
     try {
       const result = await signInWithPopup(auth, provider);
-      const firebaseUser = result.user;
-      console.log('🔐 AuthContext: Google login successful for:', firebaseUser.email);
-      
-      uniqueToast.success(`Welcome, ${firebaseUser.displayName}!`, { autoClose: 3000 });
-      // Note: Auth state change will automatically trigger navigation - no redirect needed
-    } catch (error: any) {
-      console.error('🔐 AuthContext: Google login error:', error);
-      
-      // Don't show toast or throw error if user just closed the popup
-      if (error.code === 'auth/popup-closed-by-user') {
-        console.log('🔐 AuthContext: Google login popup closed by user');
-        return;
-      }
-      
-      let errorMessage = 'Google login failed. Please try again.';
-      
-      // Provide specific error messages based on Firebase error codes
-      switch (error.code) {
-        case 'auth/cancelled-popup-request':
-          errorMessage = 'Only one popup allowed at a time. Please close any other popups.';
-          break;
-        case 'auth/operation-not-allowed':
-          errorMessage = 'Google sign-in is not enabled. Please contact the administrator.';
-          break;
-        case 'auth/unauthorized-domain':
-          errorMessage = 'This domain is not authorized for Google sign-in. Please contact the administrator.';
-          break;
-        case 'auth/network-request-failed':
-          errorMessage = 'Network error. Please check your connection and try again.';
-          break;
-        case 'auth/popup-blocked':
-          errorMessage = 'Sign-in popup was blocked by your browser. Please allow popups for this site.';
-          break;
-        default:
-          errorMessage = error.message || 'Google login failed. Please try again.';
-      }
-      
-      uniqueToast.error(errorMessage, { autoClose: 5000 });
-      throw error;
+      uniqueToast.success(`Welcome, ${result.user.displayName}!`, { autoClose: 3000 });
+      // NO window.location.href — onAuthStateChanged handles navigation automatically
+    } catch (err: any) {
+      if (err.code === 'auth/popup-closed-by-user') return;
+      uniqueToast.error(err.message || 'Google login failed.', { autoClose: 5000 });
+      throw err;
     }
   };
 
+  // ── logout ────────────────────────────────────────────────────────────────────
   const logout = async () => {
-    try {
-      await signOut(auth);
-      uniqueToast.info('Successfully logged out. See you next time!', { autoClose: 3000 });
-    } catch (error) {
-      console.error('Logout error:', error);
-      uniqueToast.error('Failed to logout. Please try again.', { autoClose: 3000 });
-      throw error;
-    }
+    await signOut(auth);
+    uniqueToast.info('Logged out. See you next time!', { autoClose: 3000 });
   };
 
+  // ── updateProfile ─────────────────────────────────────────────────────────────
   const updateUserProfile = async (data: Partial<User>) => {
-    if (!user) throw new Error('No user logged in');
-
-    try {
-      // Only update Firebase Auth profile for displayName (not photoURL for base64)
-      // PhotoURL for base64 images is stored in Firestore only
-      if (data.displayName) {
-        await updateProfile(auth.currentUser!, {
-          displayName: data.displayName,
-        });
-      }
-
-      // Update Firestore document (this includes base64 photoUrl)
-      await updateDoc(doc(db, 'users', user.uid), data);
-
-      // Update local state
-      setUser({ ...user, ...data });
-    } catch (error) {
-      console.error('Profile update error:', error);
-      throw error;
+    if (!user) throw new Error('Not logged in');
+    if (data.displayName) {
+      await updateProfile(auth.currentUser!, { displayName: data.displayName });
     }
+    await updateDoc(doc(db, 'users', user.uid), data as any);
+    setUser({ ...user, ...data });
   };
 
+  // ── resetPassword ─────────────────────────────────────────────────────────────
   const resetPassword = async (email: string) => {
-    try {
-      await sendPasswordResetEmail(auth, email);
-      uniqueToast.success('Password reset email sent! Check your inbox.', { autoClose: 5000 });
-    } catch (error: any) {
-      console.error('Password reset error:', error);
-      
-      let errorMessage = 'Failed to send password reset email.';
-      
-      switch (error.code) {
-        case 'auth/user-not-found':
-          errorMessage = 'No account found with this email address.';
-          break;
-        case 'auth/invalid-email':
-          errorMessage = 'Please enter a valid email address.';
-          break;
-        case 'auth/too-many-requests':
-          errorMessage = 'Too many requests. Please try again later.';
-          break;
-        default:
-          errorMessage = error.message || 'Failed to send password reset email.';
-      }
-      
-      uniqueToast.error(errorMessage, { autoClose: 5000 });
-      throw error;
-    }
+    await sendPasswordResetEmail(auth, email);
+    uniqueToast.success('Password reset email sent!', { autoClose: 5000 });
   };
 
+  // ── deleteAccount ─────────────────────────────────────────────────────────────
   const deleteAccount = async () => {
-    if (!auth.currentUser || !user) throw new Error('No user logged in');
-
-    try {
-      const firebaseUser = auth.currentUser;
-      const userId = user.uid;
-
-      // 1. Delete user document from Firestore
-      await DataService.getInstance().deleteUser(userId);
-
-      // 2. Delete user from Firebase Auth
-      await deleteUser(firebaseUser);
-
-      console.log('🔐 AuthContext: Account deleted successfully');
-      uniqueToast.success('Your account has been deleted successfully.');
-    } catch (error: any) {
-      console.error('🔐 AuthContext: Delete account error:', error);
-      
-      if (error.code === 'auth/requires-recent-login') {
-        uniqueToast.error('For security reasons, please log out and log back in before deleting your account.');
-      } else {
-        uniqueToast.error('Failed to delete account. Please try again.');
-      }
-      throw error;
-    }
+    if (!auth.currentUser || !user) throw new Error('Not logged in');
+    await DataService.getInstance().deleteUser(user.uid);
+    await deleteUser(auth.currentUser);
   };
 
   const value: AuthContextType = {
-    user,
-    loading,
-    login,
-    register,
-    logout,
-    updateProfile: updateUserProfile,
-    resetPassword,
-    deleteAccount,
-    loginWithGoogle,
+    user, loading, login, register, logout,
+    updateProfile: updateUserProfile, resetPassword,
+    deleteAccount, loginWithGoogle,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
