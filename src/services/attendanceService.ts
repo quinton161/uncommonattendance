@@ -160,7 +160,7 @@ export class AttendanceService {
   async getCurrentAttendanceState(studentId: string) {
     const r      = await this.getTodayAttendance(studentId);
     const now    = this.timeService.getCurrentTime();
-    const late   = !this.timeService.canCheckIn(now);
+    const tooLate = this.timeService.isTooLateToCheckIn(now);
     const checkedIn  = !!(r?.checkInTime && !r?.checkOutTime);
     const checkedOut = !!r?.checkOutTime;
     const hasIn      = !!r?.checkInTime;
@@ -168,15 +168,15 @@ export class AttendanceService {
     let status: 'not_checked_in'|'checked_in'|'checked_out'|'absent'|'late' = 'not_checked_in';
     if (checkedOut)          status = 'checked_out';
     else if (checkedIn)      status = r?.status === 'late' ? 'late' : 'checked_in';
-    else if (late && !hasIn) status = 'absent';
+    else if (tooLate && !hasIn) status = 'absent';
 
     return {
       isCheckedIn:        checkedIn,
       checkInTime:        r?.checkInTime ?? null,
-      canCheckIn:         !hasIn && !late,
+      canCheckIn:         !hasIn && !tooLate,
       canCheckOut:        checkedIn && !checkedOut,
       status,
-      isTooLateToCheckIn: late,
+      isTooLateToCheckIn: tooLate,
     };
   }
 
@@ -192,13 +192,13 @@ export class AttendanceService {
     const isNewDay = await this.checkForNewDay(studentId);
     if (isNewDay) {
       const now  = this.timeService.getCurrentTime();
-      const late = !this.timeService.canCheckIn(now);
+      const tooLate = this.timeService.isTooLateToCheckIn(now);
       return {
         isCheckedIn: false, checkInTime: null,
-        canCheckIn: !late, canCheckOut: false,
+        canCheckIn: !tooLate, canCheckOut: false,
         isNewDay: true,
-        status: late ? 'absent' as const : 'not_checked_in' as const,
-        isTooLateToCheckIn: late,
+        status: tooLate ? 'absent' as const : 'not_checked_in' as const,
+        isTooLateToCheckIn: tooLate,
       };
     }
     return { ...(await this.getCurrentAttendanceState(studentId)), isNewDay: false };

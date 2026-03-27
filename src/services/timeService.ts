@@ -53,9 +53,12 @@ export class TimeService {
   }
 
   /**
-   * canCheckIn — true if the current Harare time is within the check-in window.
+   * canCheckIn — true if the current Harare time is within the check-in window OR before it.
+   * We allow the button to be enabled BEFORE the window opens so students can check in early.
+   * They will be marked as "present" (not late) if they check in before 9:00 AM.
+   * 
    * Window: 07:00 – 09:05.
-   *
+   * 
    * IMPORTANT: returns TRUE when time sync hasn't completed yet (lastSyncTime===0)
    * so that slow devices / bad connections never get locked out.
    */
@@ -65,11 +68,25 @@ export class TimeService {
 
     const { h, m } = this._harareHM(now);
     const total = h * 60 + m;
-    return total >= 7 * 60 && total <= 9 * 60 + 5; // 420 – 545 minutes
+    // Allow check-in from midnight until 9:05 AM (0 - 545 minutes)
+    // After 9:05 AM, return false (check-in closed)
+    return total <= 9 * 60 + 5; // 0 - 545 minutes
+  }
+
+  /**
+   * isTooLateToCheckIn — true if check-in window has closed (after 9:05 AM).
+   */
+  isTooLateToCheckIn(now: Date): boolean {
+    // If we have never synced, allow check-in (fail open)
+    if (this.lastSyncTime === 0) return false;
+    
+    const { h, m } = this._harareHM(now);
+    const total = h * 60 + m;
+    return total > 9 * 60 + 5; // After 9:05 AM = too late
   }
 
   shouldMarkAbsent(): boolean {
-    return !this.canCheckIn(this.getCurrentTime());
+    return this.isTooLateToCheckIn(this.getCurrentTime());
   }
 
   // ── Formatting ──────────────────────────────────────────────────────────────
