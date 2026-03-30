@@ -470,8 +470,8 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode }) => {
           <HelpText>
             <h4>Need help logging in?</h4>
             <ul>
-              <li>Try common test credentials: test@test.com / test123</li>
-              <li>Use the "Forgot your password?" link below</li>
+              <li>Double-check your email and password</li>
+              <li>Use the &quot;Forgot your password?&quot; link below</li>
               <li>Or create a new account using the Sign up tab</li>
             </ul>
           </HelpText>

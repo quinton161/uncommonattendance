@@ -7,6 +7,9 @@ export interface User {
   createdAt: Date;
   photoUrl?: string;
   bio?: string;
+  /** Program / cohort label (student-editable in profile) */
+  course?: string;
+  profession?: string;
   userType: 'instructor' | 'attendee' | 'admin';
 }
 

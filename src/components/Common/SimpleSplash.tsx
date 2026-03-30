@@ -34,7 +34,7 @@ const spin = keyframes`
 `;
 
 // Styled components
-const SplashContainer = styled.div<{ isExiting?: boolean }>`
+const SplashContainer = styled.div<{ $isExiting?: boolean }>`
   position: fixed;
   top: 0;
   left: 0;
@@ -48,7 +48,7 @@ const SplashContainer = styled.div<{ isExiting?: boolean }>`
   z-index: 9999;
   animation: ${css`${fadeIn} 0.3s ease-out`};
   
-  ${props => props.isExiting && css`
+  ${props => props.$isExiting && css`
     animation: ${fadeIn} 0.3s ease-out reverse;
   `}
 `;
@@ -108,7 +108,7 @@ export const SimpleSplash: React.FC<SimpleSplashProps> = ({
 
   return (
     <SplashContainer 
-      isExiting={isExiting}
+      $isExiting={isExiting}
       role="dialog"
       aria-label="Loading application"
       aria-live="polite"

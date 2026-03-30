@@ -48,6 +48,20 @@ const ProfileContainer = styled.div`
   }
 `;
 
+const ProfileIntroSection = styled.div`
+  h2 {
+    margin: 0 0 ${theme.spacing.xs} 0;
+    font-size: ${theme.fontSizes.xl};
+    font-weight: ${theme.fontWeights.semibold};
+    color: ${theme.colors.textPrimary};
+  }
+  p {
+    margin: 0;
+    font-size: ${theme.fontSizes.sm};
+    color: ${theme.colors.textSecondary};
+  }
+`;
+
 const HeroSection = styled(motion.div)`
   background: white;
   border-radius: ${theme.borderRadius['2xl']};
@@ -372,8 +386,8 @@ const ScoreCircle = styled.div`
 `;
 
 export const StudentProfile: React.FC = () => {
-  const { user } = useAuth();
-  const [showPhotoUpload, setShowPhotoPhotoUpload] = useState(false);
+  const { user, updateProfile } = useAuth();
+  const [showPhotoUpload, setShowPhotoUpload] = useState(false);
   const [stats, setStats] = useState({
     attendanceRate: 0,
     currentStreak: 0,
@@ -396,13 +410,12 @@ export const StudentProfile: React.FC = () => {
   const [sessions, setSessions] = useState<any[]>([]);
 
   useEffect(() => {
-    const userAsAny = user as any;
     if (user) {
       const initialValues = {
         displayName: user.displayName || '',
-        course: userAsAny?.course || 'Full Stack Web Development',
-        profession: userAsAny?.profession || '',
-        bio: userAsAny?.bio || ''
+        course: user.course || 'Full Stack Web Development',
+        profession: user.profession || '',
+        bio: user.bio || ''
       };
       setStats(prev => ({ ...prev, ...initialValues }));
       setEditValues(initialValues);
@@ -411,10 +424,25 @@ export const StudentProfile: React.FC = () => {
 
   const handleUpdateProfile = async () => {
     if (!user) return;
+    const name = editValues.displayName.trim();
+    if (!name) {
+      uniqueToast.error('Please enter your name');
+      return;
+    }
     try {
-      const dataService = DataService.getInstance();
-      await dataService.updateUser(user.uid, editValues);
-      setStats(prev => ({ ...prev, ...editValues }));
+      await updateProfile({
+        displayName: name,
+        bio: editValues.bio,
+        course: editValues.course,
+        profession: editValues.profession,
+      });
+      setStats(prev => ({
+        ...prev,
+        displayName: name,
+        bio: editValues.bio,
+        course: editValues.course,
+        profession: editValues.profession,
+      }));
       setIsEditing(false);
       uniqueToast.success('Profile updated successfully!');
     } catch (error) {
@@ -429,52 +457,55 @@ export const StudentProfile: React.FC = () => {
     const fetchStudentData = async () => {
       if (!user?.uid) return;
 
-      const studentStats = await ds.getStudentStats(user.uid);
-      const attendance = await ds.getAttendance(user.uid);
-      
-      // Calculate trend data (last 7 days)
-      const last7Days = eachDayOfInterval({
-        start: subDays(new Date(), 6),
-        end: new Date(),
-      });
+      try {
+        const studentStats = await ds.getStudentStats(user.uid);
+        const attendance = await ds.getAttendance(user.uid);
 
-      const chartData = last7Days.map(date => {
-        const dateStr = format(date, 'yyyy-MM-dd');
-        const present = attendance.some(a => {
-          const aDate = a.date || (a.checkInTime ? format(new Date(a.checkInTime), 'yyyy-MM-dd') : '');
-          return aDate === dateStr;
+        const last7Days = eachDayOfInterval({
+          start: subDays(new Date(), 6),
+          end: new Date(),
         });
-        return {
-          name: format(date, 'EEE'),
-          rate: present ? 100 : 0
-        };
-      });
 
-      setTrendData(chartData);
+        const chartData = last7Days.map((date) => {
+          const dateStr = format(date, 'yyyy-MM-dd');
+          const present = attendance.some((a) => {
+            const aDate = a.date || (a.checkInTime ? format(new Date(a.checkInTime), 'yyyy-MM-dd') : '');
+            return aDate === dateStr;
+          });
+          return {
+            name: format(date, 'EEE'),
+            rate: present ? 100 : 0,
+          };
+        });
 
-      // Pie chart data
-      setPieData([
-        { name: 'Present', value: studentStats.attendanceRate, color: theme.colors.primary },
-        { name: 'Absent', value: 100 - studentStats.attendanceRate, color: theme.colors.gray200 },
-      ]);
+        setTrendData(chartData);
 
-      // Recent sessions
-      setSessions(studentStats.recentActivity.map((a: any) => ({
-        date: a.checkInTime,
-        session: 'General Session', // Placeholder
-        status: a.status || 'present'
-      })));
+        const rate = Number(studentStats?.attendanceRate) || 0;
+        setPieData([
+          { name: 'Present', value: rate, color: theme.colors.primary },
+          { name: 'Absent', value: Math.max(0, 100 - rate), color: theme.colors.gray200 },
+        ]);
 
-      setStats({
-        attendanceRate: studentStats.attendanceRate,
-        currentStreak: studentStats.currentStreak,
-        engagementScore: Math.round((studentStats.attendanceRate * 0.7) + (85 * 0.3)), // Real attendance + placeholder participation
-        status: studentStats.attendanceRate >= 80 ? 'on-track' : studentStats.attendanceRate >= 60 ? 'warning' : 'at-risk',
-        course: 'Full Stack Web Development',
-        profession: '',
-        displayName: '',
-        bio: '',
-      });
+        const recent = Array.isArray(studentStats?.recentActivity) ? studentStats.recentActivity : [];
+        setSessions(
+          recent.map((a: any) => ({
+            date: a.checkInTime,
+            session: 'General Session',
+            status: a.status || 'present',
+          }))
+        );
+
+        setStats((prev) => ({
+          ...prev,
+          attendanceRate: rate,
+          currentStreak: studentStats?.currentStreak ?? 0,
+          engagementScore: Math.round(rate * 0.7 + 85 * 0.3),
+          status: rate >= 80 ? 'on-track' : rate >= 60 ? 'warning' : 'at-risk',
+        }));
+      } catch (e) {
+        console.error('Student profile data load:', e);
+        uniqueToast.error('Could not load attendance for your profile. Charts may be empty; you can still edit your details.');
+      }
     };
 
     fetchStudentData();
@@ -485,6 +516,10 @@ export const StudentProfile: React.FC = () => {
 
   return (
     <ProfileContainer>
+      <ProfileIntroSection>
+        <h2>Your profile</h2>
+        <p>Your attendance, charts, and editable details</p>
+      </ProfileIntroSection>
       <AnimatePresence>
         {showPhotoUpload && (
           <motion.div
@@ -504,7 +539,7 @@ export const StudentProfile: React.FC = () => {
               justifyContent: 'center',
               padding: theme.spacing.md
             }}
-            onClick={() => setShowPhotoPhotoUpload(false)}
+            onClick={() => setShowPhotoUpload(false)}
           >
             <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: '500px' }}>
               <ProfileUpload />
@@ -566,7 +601,7 @@ export const StudentProfile: React.FC = () => {
               justifyContent: 'center',
               boxShadow: theme.shadows.md
             }}
-            onClick={() => setShowPhotoPhotoUpload(true)}
+            onClick={() => setShowPhotoUpload(true)}
           >
             <FiCamera size={18} />
           </Button>
@@ -636,8 +671,11 @@ export const StudentProfile: React.FC = () => {
             )}
           </div>
 
-          {isEditing && (
+          {isEditing ? (
             <div style={{ marginBottom: theme.spacing.md }}>
+              <div style={{ fontSize: theme.fontSizes.xs, fontWeight: theme.fontWeights.semibold, color: theme.colors.textSecondary, marginBottom: theme.spacing.xs }}>
+                About you
+              </div>
               <textarea
                 value={editValues.bio}
                 onChange={(e) => setEditValues({ ...editValues, bio: e.target.value })}
@@ -653,6 +691,17 @@ export const StudentProfile: React.FC = () => {
                 }}
               />
             </div>
+          ) : (
+            stats.bio && (
+              <div style={{ marginBottom: theme.spacing.md, maxWidth: '100%' }}>
+                <div style={{ fontSize: theme.fontSizes.xs, fontWeight: theme.fontWeights.semibold, color: theme.colors.textSecondary, marginBottom: theme.spacing.xs }}>
+                  About
+                </div>
+                <p style={{ margin: 0, fontSize: theme.fontSizes.sm, color: theme.colors.textPrimary, lineHeight: 1.5 }}>
+                  {stats.bio}
+                </p>
+              </div>
+            )
           )}
 
           <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing.md, color: theme.colors.textSecondary, fontSize: theme.fontSizes.sm, marginBottom: theme.spacing.md }}>
@@ -666,19 +715,39 @@ export const StudentProfile: React.FC = () => {
           <div style={{ display: 'flex', gap: theme.spacing.sm, marginBottom: theme.spacing.lg }}>
             {isEditing ? (
               <>
-                <Button variant="primary" size="sm" onClick={handleUpdateProfile}>Save Changes</Button>
-                <Button variant="outline" size="sm" onClick={() => setIsEditing(false)}>Cancel</Button>
+                <Button variant="primary" size="sm" onClick={handleUpdateProfile}>Save changes</Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setEditValues({
+                      displayName: stats.displayName,
+                      course: stats.course,
+                      profession: stats.profession,
+                      bio: stats.bio,
+                    });
+                    setIsEditing(false);
+                  }}
+                >
+                  Cancel
+                </Button>
               </>
             ) : (
-              <Button variant="outline" size="sm" onClick={() => {
-                setEditValues({
-                  displayName: stats.displayName,
-                  course: stats.course,
-                  profession: stats.profession,
-                  bio: stats.bio
-                });
-                setIsEditing(true);
-              }}>Edit Profile</Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setEditValues({
+                    displayName: stats.displayName,
+                    course: stats.course,
+                    profession: stats.profession,
+                    bio: stats.bio,
+                  });
+                  setIsEditing(true);
+                }}
+              >
+                Edit profile
+              </Button>
             )}
           </div>
 
@@ -745,8 +814,8 @@ export const StudentProfile: React.FC = () => {
             <FiTrendingUp />
             Attendance Trend
           </ChartTitle>
-          <div style={{ width: '100%', height: 300 }}>
-            <ResponsiveContainer>
+          <div style={{ width: '100%', minWidth: 0, height: 300, minHeight: 240 }}>
+            <ResponsiveContainer width="100%" height="100%" minHeight={240}>
               <LineChart data={trendData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={theme.colors.gray100} />
                 <XAxis 
@@ -788,8 +857,8 @@ export const StudentProfile: React.FC = () => {
             <FiAward />
             Overall Status
           </ChartTitle>
-          <div style={{ width: '100%', height: 300 }}>
-            <ResponsiveContainer>
+          <div style={{ width: '100%', minWidth: 0, height: 300, minHeight: 240 }}>
+            <ResponsiveContainer width="100%" height="100%" minHeight={240}>
               <PieChart>
                 <Pie
                   data={pieData}

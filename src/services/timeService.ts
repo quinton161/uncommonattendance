@@ -165,11 +165,12 @@ export class TimeService {
 
   private async _syncInBackground(): Promise<void> {
     if (!navigator.onLine) return;
+    // Prefer timeapi.io first (worldtimeapi often blocked or reset on some networks).
     const sources = [
-      () => fetch('https://worldtimeapi.org/api/timezone/Africa/Harare', { signal: AbortSignal.timeout(4000) })
-             .then(r => r.json()).then(d => new Date(d.datetime)),
       () => fetch('https://timeapi.io/api/Time/current/zone?timeZone=Africa/Harare', { signal: AbortSignal.timeout(4000) })
              .then(r => r.json()).then(d => new Date(d.dateTime)),
+      () => fetch('https://worldtimeapi.org/api/timezone/Africa/Harare', { signal: AbortSignal.timeout(4000) })
+             .then(r => r.json()).then(d => new Date(d.datetime)),
       () => fetch('https://www.google.com', { method: 'HEAD', signal: AbortSignal.timeout(4000) })
              .then(r => { const d = r.headers.get('date'); if (!d) throw new Error('no date'); return new Date(d); }),
     ];
@@ -182,13 +183,16 @@ export class TimeService {
           const rtt = Date.now() - t0;
           this.timeOffset = internetTime.getTime() + rtt / 2 - Date.now();
           this.lastSyncTime = Date.now();
-          console.log(`✅ Time synced. Offset: ${this.timeOffset.toFixed(0)}ms`);
+          if (process.env.NODE_ENV === 'development') {
+            console.debug(`[TimeService] Synced, offset ${this.timeOffset.toFixed(0)}ms`);
+          }
           return;
         }
       } catch (_) { /* try next */ }
     }
-    // All sources failed — keep existing offset, no blocking
-    console.warn('⚠️ Time sync failed — using system clock');
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('[TimeService] Sync failed — using system clock');
+    }
   }
 }
 

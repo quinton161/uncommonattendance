@@ -74,14 +74,14 @@ const HeaderTitle = styled.div`
 
 
 
-const StatusDot = styled.span<{ isActive: boolean }>`
+const StatusDot = styled.span<{ $isActive: boolean }>`
   width: 8px;
   height: 8px;
   border-radius: 50%;
   display: inline-block;
   margin-right: ${theme.spacing.xs};
-  background: ${props => props.isActive ? '#16a34a' : '#9ca3af'};
-  box-shadow: ${props => props.isActive ? '0 0 6px rgba(34, 197, 94, 0.4)' : 'none'};
+  background: ${props => props.$isActive ? '#16a34a' : '#9ca3af'};
+  box-shadow: ${props => props.$isActive ? '0 0 6px rgba(34, 197, 94, 0.4)' : 'none'};
 `;
 
 const LastActivity = styled.div`
@@ -137,7 +137,7 @@ const TableRow = styled.div`
   }
 `;
 
-const UserAvatar = styled.div<{ isActive?: boolean }>`
+const UserAvatar = styled.div<{ $isActive?: boolean }>`
   width: 44px;
   height: 44px;
   border-radius: ${theme.borderRadius.full};
@@ -148,8 +148,8 @@ const UserAvatar = styled.div<{ isActive?: boolean }>`
   color: ${theme.colors.white};
   font-weight: ${theme.fontWeights.semibold};
   font-size: ${theme.fontSizes.sm};
-  border: 2px solid ${props => props.isActive ? '#16a34a' : 'transparent'};
-  box-shadow: ${props => props.isActive ? '0 0 0 2px #dcfce7' : 'none'};
+  border: 2px solid ${props => props.$isActive ? '#16a34a' : 'transparent'};
+  box-shadow: ${props => props.$isActive ? '0 0 0 2px #dcfce7' : 'none'};
   transition: all 0.3s ease;
   position: relative;
   flex-shrink: 0;
@@ -412,7 +412,7 @@ const UserTypeTag = styled.span<{ type: string }>`
   }}
 `;
 
-const StatusBadge = styled.span<{ isActive: boolean }>`
+const StatusBadge = styled.span<{ $isActive: boolean }>`
   display: inline-block;
   padding: ${theme.spacing.xs} ${theme.spacing.sm};
   border-radius: ${theme.borderRadius.full};
@@ -421,7 +421,7 @@ const StatusBadge = styled.span<{ isActive: boolean }>`
   text-transform: uppercase;
   letter-spacing: 0.5px;
   
-  ${props => props.isActive ? `
+  ${props => props.$isActive ? `
     background: rgba(34, 197, 94, 0.1);
     color: #16a34a;
   ` : `
@@ -498,6 +498,14 @@ const StatLabel = styled.div`
   @media (max-width: ${theme.breakpoints.mobile}) {
     font-size: ${theme.fontSizes.xs};
   }
+`;
+
+const StatsCaption = styled.p`
+  font-size: ${theme.fontSizes.xs};
+  color: ${theme.colors.textSecondary};
+  margin: 0 0 ${theme.spacing.md} 0;
+  line-height: 1.45;
+  max-width: 52rem;
 `;
 
 interface UsersPageProps {
@@ -650,6 +658,14 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
     }
   };
 
+  const attendees = users.filter(u => u.userType === 'attendee');
+  const presentNowCount = attendees.filter(u => {
+    const t = getTodayAttendance(u.id);
+    return !!(t?.checkInTime && !t?.checkOutTime);
+  }).length;
+  const checkedInTodayCount = attendees.filter(u => !!getTodayAttendance(u.id)?.checkInTime).length;
+  const instructorCount = users.filter(u => u.userType === 'instructor').length;
+
   return (
     <PageContainer>
       <Header>
@@ -663,7 +679,7 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
             <UncommonLogo size="lg" showSubtitle={false} />
             <span>Users Management</span>
           </h1>
-          <p>Manage all users and track their attendance</p>
+          <p>Manage students below; admins are hidden. Summary cards count students only (instructors have their own card).</p>
         </HeaderTitle>
         <div style={{ display: 'flex', gap: theme.spacing.md, alignItems: 'center' }}>
           <Button 
@@ -691,28 +707,31 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
         </div>
       </Header>
 
+      <StatsCaption>
+        Student totals match the list (attendees only). “Checked in today” includes anyone who checked in at least once today, even if they have since checked out. “Currently present” means checked in and not checked out yet.
+      </StatsCaption>
       <StatsGrid>
         <StatCard>
           <StatIcon><PersonIcon size={32} /></StatIcon>
-          <StatValue>{users.filter(u => u.userType !== 'admin').length}</StatValue>
-          <StatLabel>Manageable Users</StatLabel>
+          <StatValue>{attendees.length}</StatValue>
+          <StatLabel>Students</StatLabel>
         </StatCard>
         
         <StatCard>
           <StatIcon><CheckCircleIcon size={32} /></StatIcon>
-          <StatValue>{users.filter(u => u.userType !== 'admin' && getTodayAttendance(u.id)?.checkInTime && !getTodayAttendance(u.id)?.checkOutTime).length}</StatValue>
+          <StatValue>{presentNowCount}</StatValue>
           <StatLabel>Currently Present</StatLabel>
         </StatCard>
         
         <StatCard>
           <StatIcon><TodayIcon size={32} /></StatIcon>
-          <StatValue>{users.filter(u => u.userType !== 'admin' && getTodayAttendance(u.id)?.checkInTime).length}</StatValue>
+          <StatValue>{checkedInTodayCount}</StatValue>
           <StatLabel>Checked In Today</StatLabel>
         </StatCard>
         
         <StatCard>
           <StatIcon><PersonIcon size={32} /></StatIcon>
-          <StatValue>{users.filter(u => u.userType === 'instructor').length}</StatValue>
+          <StatValue>{instructorCount}</StatValue>
           <StatLabel>Instructors</StatLabel>
         </StatCard>
       </StatsGrid>
@@ -748,7 +767,7 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
             return (
               <TableRow key={userData.id}>
                 <UserInfo>
-                  <UserAvatar isActive={!!isCheckedIn}>
+                  <UserAvatar $isActive={!!isCheckedIn}>
                     {userData.photoUrl ? (
                       <img src={userData.photoUrl} alt={userData.displayName} />
                     ) : (
@@ -775,8 +794,8 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
                 </div>
                 
                 <div>
-                  <StatusBadge isActive={!!isCheckedIn}>
-                    <StatusDot isActive={!!isCheckedIn} />
+                  <StatusBadge $isActive={!!isCheckedIn}>
+                    <StatusDot $isActive={!!isCheckedIn} />
                     {isCheckedIn ? 'Checked In' : 'Not Present'}
                   </StatusBadge>
                 </div>
@@ -810,7 +829,7 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
               return (
                 <MobileUserCard key={`mobile-${userData.id}`}>
                   <MobileUserHeader>
-                    <UserAvatar isActive={!!isCheckedIn}>
+                    <UserAvatar $isActive={!!isCheckedIn}>
                       {userData.photoUrl ? (
                         <img 
                           src={userData.photoUrl} 
@@ -843,8 +862,8 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
                     </div>
                     <div>
                       <strong style={{ color: theme.colors.textSecondary, fontSize: '10px', textTransform: 'uppercase' }}>Status</strong><br />
-                      <StatusBadge isActive={isCheckedIn} style={{ marginTop: '4px' }}>
-                        <StatusDot isActive={isCheckedIn} />
+                      <StatusBadge $isActive={isCheckedIn} style={{ marginTop: '4px' }}>
+                        <StatusDot $isActive={isCheckedIn} />
                         {isCheckedIn ? 'Checked In' : 'Not Present'}
                       </StatusBadge>
                     </div>

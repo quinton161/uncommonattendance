@@ -6,8 +6,8 @@ import { EventProvider } from './contexts/EventContext';
 import { AuthPage } from './components/Auth/AuthPage';
 import { StudentDashboard } from './components/Dashboard/StudentDashboard';
 import AdminDashboard from './components/Dashboard/AdminDashboard';
-import { ProfilePage } from './components/Student/ProfilePage';
 import { SimpleSplash } from './components/Common/SimpleSplash';
+import { ErrorBoundary } from './components/Common/ErrorBoundary';
 import { DirectAuthTest } from './components/Auth/DirectAuthTest';
 import { GlobalStyles } from './styles/GlobalStyles';
 import { theme } from './styles/theme';
@@ -19,7 +19,6 @@ import 'react-toastify/dist/ReactToastify.css';
 
 const AppRoutes: React.FC = () => {
   const { user, loading } = useAuth();
-  const [currentPage, setCurrentPage] = useState<'dashboard' | 'profile'>('dashboard');
 
   if (loading) {
     return (
@@ -40,23 +39,11 @@ const AppRoutes: React.FC = () => {
     return <AuthPage />;
   }
 
-  // Handle navigation based on user type
   if (user.userType === 'attendee') {
-    if (currentPage === 'profile') {
-      return (
-        <ProfilePage onBack={() => setCurrentPage('dashboard')} />
-      );
-    }
-    return <StudentDashboard onNavigateToProfile={() => setCurrentPage('profile')} />;
+    return <StudentDashboard />;
   }
 
-  // Instructor and Admin dashboard
   if (user.userType === 'instructor' || user.userType === 'admin') {
-    if (currentPage === 'profile') {
-      return (
-        <ProfilePage onBack={() => setCurrentPage('dashboard')} />
-      );
-    }
     return <AdminDashboard />;
   }
 
@@ -107,8 +94,6 @@ function App() {
     
     // Test Firebase connection on app startup (delayed to ensure Firebase is initialized)
     const initializeBackend = async () => {
-      console.log('App initialized with Firebase configuration');
-      
       try {
         // Add a small delay to ensure Firebase is fully initialized
         await new Promise(resolve => setTimeout(resolve, 1000));
@@ -117,24 +102,17 @@ function App() {
         const isConnected = await dataService.testConnection();
         
         if (isConnected) {
-          console.log('✅ Backend connection successful');
-          
-          // Auto-generate daily QR code if not exists
           const existingCode = await qrCodeService.getDailyCode();
           if (!existingCode) {
-            console.log('📱 Auto-generating daily QR code...');
             await qrCodeService.generateDailyCode();
-            console.log('✅ Daily QR code auto-generated');
-          } else {
-            console.log('📱 Daily QR code already exists:', existingCode.code);
           }
-        } else {
-          console.warn('⚠️ Backend connection failed, using offline mode');
+        } else if (process.env.NODE_ENV === 'development') {
+          console.warn('[App] Backend connection failed, offline mode');
         }
       } catch (error) {
-        console.error('❌ Backend initialization error:', error);
-        // Don't show error toast immediately as it might interfere with auth
-        console.warn('Backend connection will be retried when needed');
+        if (process.env.NODE_ENV === 'development') {
+          console.error('[App] Backend initialization:', error);
+        }
       }
     };
     
@@ -163,9 +141,11 @@ function App() {
       {showSplash ? (
         <SimpleSplash onFinish={handleSplashFinish} duration={2000} />
       ) : (
-        <AuthProvider>
-          <AppWithProviders />
-        </AuthProvider>
+        <ErrorBoundary>
+          <AuthProvider>
+            <AppWithProviders />
+          </AuthProvider>
+        </ErrorBoundary>
       )}
       {showAuthTest && <DirectAuthTest />}
       <ToastContainer

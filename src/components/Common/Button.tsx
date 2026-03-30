@@ -121,7 +121,13 @@ const getSizeStyles = (size: string) => {
   }
 };
 
-const StyledButton = styled.button<ButtonProps>`
+type StyledButtonProps = {
+  $variant: NonNullable<ButtonProps['variant']>;
+  $size: NonNullable<ButtonProps['size']>;
+  $fullWidth?: boolean;
+};
+
+const StyledButton = styled.button<StyledButtonProps>`
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -135,11 +141,11 @@ const StyledButton = styled.button<ButtonProps>`
   ${buttonHover}
   ${respectMotionPreference}
   
-  ${({ variant = 'primary' }) => getVariantStyles(variant)}
-  ${({ size = 'md' }) => getSizeStyles(size)}
+  ${({ $variant = 'primary' }) => getVariantStyles($variant)}
+  ${({ $size = 'md' }) => getSizeStyles($size)}
   
-  ${({ fullWidth }) =>
-    fullWidth &&
+  ${({ $fullWidth }) =>
+    $fullWidth &&
     css`
       width: 100%;
     `}
@@ -174,13 +180,19 @@ export const Button: React.FC<ButtonProps> = ({
   loading = false,
   disabled = false,
   type = 'button',
-  ...props
+  variant = 'primary',
+  size = 'md',
+  fullWidth,
+  ...rest
 }) => {
   return (
     <StyledButton
       type={type}
       disabled={disabled || loading}
-      {...props}
+      $variant={variant}
+      $size={size}
+      $fullWidth={fullWidth}
+      {...rest}
     >
       {loading && <LoadingSpinner />}
       {children}

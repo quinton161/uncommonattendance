@@ -154,9 +154,9 @@ const MobileBottomNav = styled.nav`
   @media (max-width: ${theme.breakpoints.tablet}) {
     display: flex;
     position: fixed;
-    bottom: 20px;
-    left: 20px;
-    right: 20px;
+    bottom: max(20px, env(safe-area-inset-bottom, 0px));
+    left: max(20px, env(safe-area-inset-left, 0px));
+    right: max(20px, env(safe-area-inset-right, 0px));
     height: 64px;
     background-color: ${theme.colors.primary};
     border-radius: 20px;

@@ -139,6 +139,25 @@ export class AttendanceService {
 
   // ── Queries ─────────────────────────────────────────────────────────────────
 
+  private safeFirestoreDate(v: unknown): Date | undefined {
+    if (v == null) return undefined;
+    if (v instanceof Date && !Number.isNaN(v.getTime())) return v;
+    if (typeof (v as { toDate?: () => Date }).toDate === 'function') {
+      try {
+        const d = (v as { toDate: () => Date }).toDate();
+        return Number.isNaN(d.getTime()) ? undefined : d;
+      } catch {
+        return undefined;
+      }
+    }
+    try {
+      const d = new Date(v as string | number);
+      return Number.isNaN(d.getTime()) ? undefined : d;
+    } catch {
+      return undefined;
+    }
+  }
+
   async getTodayAttendance(studentId?: string): Promise<AttendanceRecord | null> {
     if (!studentId) return null;
     const today = this.timeService.getCurrentDateString();
@@ -147,8 +166,8 @@ export class AttendanceService {
     const d = snap.data();
     return {
       ...d,
-      checkInTime:  d.checkInTime?.toDate(),
-      checkOutTime: d.checkOutTime?.toDate(),
+      checkInTime:  this.safeFirestoreDate(d.checkInTime),
+      checkOutTime: this.safeFirestoreDate(d.checkOutTime),
     } as AttendanceRecord;
   }
 
@@ -183,8 +202,15 @@ export class AttendanceService {
   async checkForNewDay(studentId: string): Promise<boolean> {
     const r = await this.getTodayAttendance(studentId);
     if (!r) return true;
-    const today    = this.timeService.getCurrentDateString();
-    const recDate  = r.date ?? new Date(r.checkInTime).toISOString().split('T')[0];
+    const today = this.timeService.getCurrentDateString();
+    let recDate: string | undefined;
+    if (typeof r.date === 'string' && r.date.trim()) {
+      recDate = r.date.trim();
+    } else if (r.checkInTime) {
+      const d = r.checkInTime instanceof Date ? r.checkInTime : new Date(r.checkInTime as any);
+      if (!Number.isNaN(d.getTime())) recDate = d.toISOString().split('T')[0];
+    }
+    if (!recDate) return true;
     return recDate !== today;
   }
 
@@ -215,13 +241,22 @@ export class AttendanceService {
   }
 
   async getAttendanceHistory(studentId: string, limitCount = 30): Promise<AttendanceRecord[]> {
-    const q = query(collection(db,'attendance'), where('studentId','==',studentId), orderBy('date','desc'));
-    const docs = (await getDocs(q)).docs.slice(0, limitCount);
-    return docs.map(d => ({
+    const q = query(collection(db, 'attendance'), where('studentId', '==', studentId));
+    const rows = (await getDocs(q)).docs.map((d) => ({
       ...d.data(),
-      checkInTime:  d.data().checkInTime?.toDate(),
+      checkInTime: d.data().checkInTime?.toDate(),
       checkOutTime: d.data().checkOutTime?.toDate(),
     })) as AttendanceRecord[];
+    rows.sort((a, b) => {
+      const da = (a as any).date || '';
+      const db = (b as any).date || '';
+      const cmp = db.localeCompare(da);
+      if (cmp !== 0) return cmp;
+      const ta = a.checkInTime instanceof Date ? a.checkInTime.getTime() : 0;
+      const tb = b.checkInTime instanceof Date ? b.checkInTime.getTime() : 0;
+      return tb - ta;
+    });
+    return rows.slice(0, limitCount);
   }
 
   async getAttendanceByDateRange(startDate: string, endDate: string, studentId?: string): Promise<AttendanceRecord[]> {
@@ -260,10 +295,10 @@ export class AttendanceService {
     return docs.length;
   }
 
-  async masterResetAttendance(): Promise<{ deletedCount: number }> {
+  async masterResetAttendance(): Promise<{ deletedCount: number; deletedDaily: number }> {
     const [a, b] = await Promise.all([getDocs(collection(db,'attendance')), getDocs(collection(db,'dailyAttendance'))]);
     await Promise.all([...a.docs, ...b.docs].map(d => deleteDoc(d.ref)));
-    return { deletedCount: a.docs.length };
+    return { deletedCount: a.docs.length, deletedDaily: b.docs.length };
   }
 
   async fixExistingLocationRecords(): Promise<{ updated: number; errors: number }> {

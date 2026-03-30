@@ -15,7 +15,6 @@ import {
 import DataService from '../../services/DataService';
 import { TimeService } from '../../services/timeService';
 import { AttendanceService } from '../../services/attendanceService';
-import { AttendanceAnalyticsService } from '../../services/attendanceAnalyticsService';
 import { uniqueToast } from '../../utils/toastUtils';
 import { saveAs } from 'file-saver';
 
@@ -42,6 +41,8 @@ import {
   FiRefreshCw
 } from 'react-icons/fi';
 import { QRCodeSVG } from 'qrcode.react';
+import { format, parseISO, subDays } from 'date-fns';
+import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
 
 const DashboardContainer = styled.div`
   display: flex;
@@ -53,7 +54,7 @@ const DashboardContainer = styled.div`
   overflow: hidden;
   @media (max-width: ${theme.breakpoints.tablet}) {
     flex-direction: column;
-    padding-top: 60px; /* Space for MobileHeader */
+    padding-top: calc(60px + env(safe-area-inset-top, 0px));
   }
 `;
 
@@ -113,13 +114,16 @@ const NavList = styled.div`
   gap: ${theme.spacing.sm};
 `;
 
-const NavItem = styled.div<{ $active?: boolean }>`
+const NavItem = styled.div<{ $active?: boolean; $danger?: boolean }>`
   display: flex;
   align-items: center;
   gap: ${theme.spacing.md};
   padding: ${theme.spacing.md};
   border-radius: ${theme.borderRadius.lg};
-  color: ${props => props.$active ? theme.colors.white : theme.colors.gray300};
+  color: ${props => {
+    if (props.$danger) return '#ff8a8a';
+    return props.$active ? theme.colors.white : theme.colors.gray300;
+  }};
   background: ${props => props.$active ? 'rgba(255, 255, 255, 0.1)' : 'transparent'};
   cursor: pointer;
   transition: all 0.2s ease;
@@ -129,7 +133,7 @@ const NavItem = styled.div<{ $active?: boolean }>`
   
   &:hover {
     background: rgba(255, 255, 255, 0.1);
-    color: ${theme.colors.white};
+    color: ${props => (props.$danger ? '#ff8a8a' : theme.colors.white)};
   }
 `;
 
@@ -149,11 +153,12 @@ const MainContent = styled.div`
   ${containerAnimation}
   ${respectMotionPreference}
   @media (max-width: ${theme.breakpoints.tablet}) {
+    flex: 1;
+    min-height: 0;
     padding: 0;
-    padding-top: 70px;
+    padding-top: ${theme.spacing.md};
+    padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px) + ${theme.spacing.lg});
     margin-left: 0;
-    height: calc(100vh - 60px);
-    height: calc(100svh - 60px);
     gap: 0;
   }
 `;
@@ -317,7 +322,12 @@ const MobileHeader = styled.div`
     display: flex;
     justify-content: space-between;
     align-items: center;
+    box-sizing: border-box;
+    height: calc(60px + env(safe-area-inset-top, 0px));
     padding: ${theme.spacing.md};
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-left: max(${theme.spacing.md}, env(safe-area-inset-left, 0px));
+    padding-right: max(${theme.spacing.md}, env(safe-area-inset-right, 0px));
     background: ${theme.colors.white};
     box-shadow: ${theme.shadows.sm};
     position: fixed;
@@ -325,7 +335,6 @@ const MobileHeader = styled.div`
     left: 0;
     right: 0;
     z-index: 1000;
-    height: 60px;
   }
 `;
 
@@ -424,15 +433,12 @@ const UserAvatar = styled.div`
   font-size: ${theme.fontSizes.sm};
 `;
 
-interface AdminDashboardProps {
-  onNavigateToProfile?: () => void;
-}
-
-const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) => {
+const AdminDashboard: React.FC = () => {
 
   const { user } = useAuth();
   const [activeNav, setActiveNav] = useState('dashboard');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  useBodyScrollLock(mobileMenuOpen);
   const [stats, setStats] = useState({
     totalAttendees: 0,
     totalInstructors: 0,
@@ -444,11 +450,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
   const [weeklyData, setWeeklyData] = useState<any[]>([]);
   const [todayAttendanceList, setTodayAttendanceList] = useState<any[]>([]);
   const [atRiskStudents, setAtRiskStudents] = useState<any[]>([]);
+  const [atRiskLoaded, setAtRiskLoaded] = useState(false);
   const [dailyQR, setDailyQR] = useState<DailyQRCode | null>(null);
   const [showQRModal, setShowQRModal] = useState(false);
   const dataService = DataService.getInstance();
   const attendanceService = AttendanceService.getInstance();
-  const analyticsService = AttendanceAnalyticsService.getInstance();
   const [markingStudentId, setMarkingStudentId] = useState<string | null>(null);
   const [markAllLoading, setMarkAllLoading] = useState(false);
   const [showMasterResetModal, setShowMasterResetModal] = useState(false);
@@ -476,7 +482,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
       const rows = todayAttendance.map((a: any) => {
         const userRecord = users.find((u: any) => u.id === a.studentId || u.uid === a.studentId);
         const checkInTime = a.checkInTime ? new Date(a.checkInTime) : null;
-        const isLate = checkInTime && checkInTime.getHours() >= 9 && checkInTime.getMinutes() > 0;
+        const isLate = !!(checkInTime && timeService.isLate(checkInTime));
         return [
           userRecord?.displayName || a.studentName || 'Unknown',
           a.date || '',
@@ -547,61 +553,58 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
 
   const loadDashboardData = async () => {
     try {
-      uniqueToast.info('Loading dashboard data...', { autoClose: 2000 });
-      // Test connection and load stats
       await dataService.testConnection();
-      
+
       const dashboardStats = await dataService.getDashboardStats();
-      
+
       setStats({
         totalAttendees: dashboardStats.totalAttendees,
         totalInstructors: dashboardStats.totalInstructors,
-        // FIX: Let real-time listener handle these fields to avoid flicker
+        // Real-time listener fills today / late / absent / rate
         todayAttendance: 0,
         lateCount: 0,
         absentCount: 0,
         attendanceRate: 0
       });
-      
-      // Load weekly data
-      const attendance = await dataService.getAttendance();
-      const last7Days = [...Array(7)].map((_, i) => {
-        const d = new Date();
-        d.setDate(d.getDate() - i);
-        return d.toISOString().split('T')[0];
-      }).reverse();
 
-      const weeklyTrends = last7Days.map(date => {
+      const attendance = await dataService.getAttendance();
+      const ts = TimeService.getInstance();
+      const endStr = ts.getCurrentDateString();
+      const last7Days = [6, 5, 4, 3, 2, 1, 0].map((off) => format(subDays(parseISO(endStr), off), 'yyyy-MM-dd'));
+
+      const weeklyTrends = last7Days.map((date) => {
         const dayAttendance = attendance.filter((a: any) => a.date === date);
         return {
-          name: new Date(date).toLocaleDateString('en-US', { weekday: 'short' }),
+          name: format(parseISO(date), 'EEE'),
           present: dayAttendance.length,
           late: dayAttendance.filter((a: any) => {
             const checkIn = a.checkInTime ? new Date(a.checkInTime) : null;
-            return checkIn && (checkIn.getHours() > 9 || (checkIn.getHours() === 9 && checkIn.getMinutes() > 0));
+            return !!(checkIn && ts.isLate(checkIn));
           }).length
         };
       });
       setWeeklyData(weeklyTrends);
 
-      // At-risk students (low attendance) for the dashboard side panel.
+      setAtRiskLoaded(false);
       try {
-        const range = analyticsService.getDefaultRange('admin');
-        const analytics = await analyticsService.getAdminAnalytics(range);
-        const atRisk = analytics.mostAbsent
-          .filter((r: any) => r.attendanceRate < 85 || r.absent >= 3)
-          .slice(0, 5);
+        const atRisk = await dataService.getAtRiskStudents({
+          windowDays: 30,
+          maxRate: 85,
+          minMissedSchoolDays: 3,
+          limit: 8,
+        });
         setAtRiskStudents(atRisk);
       } catch (e) {
         console.error('Failed to load at-risk students:', e);
+        setAtRiskStudents([]);
+      } finally {
+        setAtRiskLoaded(true);
       }
-
-      uniqueToast.success('Dashboard data loaded successfully!', { autoClose: 2000 });
     } catch (error) {
       console.error('Error loading dashboard data:', error);
-      uniqueToast.error('Failed to load some data, using fallback');
-      
-      // Fallback data (shown when database is empty or loading fails)
+      uniqueToast.error('Failed to load dashboard data. Check your connection.');
+      setAtRiskLoaded(true);
+      setAtRiskStudents([]);
       setStats({
         totalAttendees: 0,
         totalInstructors: 0,
@@ -614,11 +617,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
   };
 
   useEffect(() => {
-    // Subscribe to today's attendance in real-time
-    console.log('📊 AdminDashboard: Subscribing to real-time attendance...');
     const unsubscribeAttendance = dataService.subscribeToTodayAttendance((summary) => {
-      console.log('🔄 AdminDashboard: Received real-time attendance update:', summary);
-      
       setStats(prev => ({
         ...prev,
         todayAttendance: summary.presentCount,
@@ -694,8 +693,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
   return (
     <DashboardContainer>
       <MobileHeader>
-        <MobileMenuButton onClick={toggleMobileMenu}>
-          {mobileMenuOpen ? <FiX size={24} /> : <FiMenu size={24} />}
+        <MobileMenuButton
+          type="button"
+          onClick={toggleMobileMenu}
+          aria-expanded={mobileMenuOpen}
+          aria-controls="admin-mobile-nav"
+          aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
+        >
+          {mobileMenuOpen ? <FiX size={24} aria-hidden /> : <FiMenu size={24} aria-hidden />}
         </MobileMenuButton>
         <UncommonLogo size="sm" showSubtitle={false} />
         <div style={{ width: 40 }} /> {/* Spacer for alignment */}
@@ -704,7 +709,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
       <MobileOverlay $isOpen={mobileMenuOpen} onClick={() => setMobileMenuOpen(false)} />
       
       {mobileMenuOpen && (
-        <MobileSidebar $isOpen={mobileMenuOpen}>
+        <MobileSidebar id="admin-mobile-nav" $isOpen={mobileMenuOpen}>
           <div style={{ padding: theme.spacing.lg }}>
             <Logo>Menu</Logo>
             <NavList>
@@ -722,6 +727,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
                   {item.label}
                 </NavItem>
               ))}
+              {user?.userType === 'admin' && (
+                <NavItem
+                  $danger
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    setShowMasterResetModal(true);
+                  }}
+                >
+                  Master Reset
+                </NavItem>
+              )}
             </NavList>
           </div>
         </MobileSidebar>
@@ -844,39 +860,40 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
 
             <StatsGrid>
               <StatCard variant="accent">
-                <StatValue>{stats.todayAttendance}</StatValue>
-                <StatLabel>Present Today</StatLabel>
-              </StatCard>
-              <StatCard style={{ background: stats.absentCount > 0 ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)' : theme.colors.white, color: stats.absentCount > 0 ? 'white' : theme.colors.textPrimary }}>
-                <StatValue>{stats.absentCount}</StatValue>
-                <StatLabel>Absent Today</StatLabel>
+                <StatValue>{Math.max(0, stats.todayAttendance - stats.lateCount)}</StatValue>
+                <StatLabel>On time today</StatLabel>
               </StatCard>
               <StatCard style={{ background: stats.lateCount > 0 ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' : theme.colors.white, color: stats.lateCount > 0 ? 'white' : theme.colors.textPrimary }}>
                 <StatValue>{stats.lateCount}</StatValue>
-                <StatLabel>Late Arrivals</StatLabel>
+                <StatLabel>Late today</StatLabel>
+              </StatCard>
+              <StatCard style={{ background: stats.absentCount > 0 ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)' : theme.colors.white, color: stats.absentCount > 0 ? 'white' : theme.colors.textPrimary }}>
+                <StatValue>{stats.absentCount}</StatValue>
+                <StatLabel>Absent today</StatLabel>
+              </StatCard>
+              <StatCard>
+                <StatValue>{stats.todayAttendance}</StatValue>
+                <StatLabel>Checked in (total)</StatLabel>
               </StatCard>
               <StatCard variant="primary">
-                <StatValue>{(stats.todayAttendance || 0) + (stats.lateCount || 0)}</StatValue>
-                <StatLabel>Active Students</StatLabel>
+                <StatValue>{stats.totalAttendees}</StatValue>
+                <StatLabel>Registered students</StatLabel>
               </StatCard>
               <StatCard variant="secondary">
                 <StatValue>{stats.attendanceRate}%</StatValue>
-                <StatLabel>Attendance Rate</StatLabel>
+                <StatLabel>Attendance rate (today)</StatLabel>
               </StatCard>
             </StatsGrid>
 
             <ContentGrid>
               <Card>
-                <CardTitle>Attendance Trend (This Week)</CardTitle>
-                <div style={{ width: '100%', height: 300 }}>
-                  <ResponsiveContainer>
+                <CardTitle>Attendance trend (last 7 days, Harare)</CardTitle>
+                <div style={{ width: '100%', height: 300, minHeight: 240, minWidth: 0 }}>
+                  <ResponsiveContainer width="100%" height="100%" minHeight={240}>
                     <BarChart
                       data={weeklyData.map((d: any) => ({
                         ...d,
-                        absent: Math.max(
-                          0,
-                          (stats.totalAttendees || 0) - ((d.present || 0) + (d.late || 0))
-                        )
+                        absent: Math.max(0, (stats.totalAttendees || 0) - (d.present || 0))
                       }))}
                     >
                       <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -887,15 +904,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
                         cursor={{ fill: 'rgba(0,0,0,0.05)' }}
                       />
                       <Legend iconType="circle" verticalAlign="top" align="right" height={36} />
-                      <Bar dataKey="present" name="Present" fill={theme.colors.primary} radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="absent" name="Absent" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="present" name="Checked in" fill={theme.colors.primary} radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="absent" name="Not checked in" fill="#ef4444" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
               </Card>
 
               <Card>
-                <CardTitle>At Risk Students</CardTitle>
+                <CardTitle>At risk (rolling 30 weekdays)</CardTitle>
                 <AttendanceList>
                   {atRiskStudents.length > 0 ? (
                     atRiskStudents.map((s: any) => (
@@ -914,7 +931,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
                     ))
                   ) : (
                     <p style={{ color: theme.colors.textSecondary, textAlign: 'center', padding: theme.spacing.lg }}>
-                      Loading at-risk data...
+                      {atRiskLoaded
+                        ? 'No students match the at-risk criteria (rate ≥85% and fewer than 3 missed weekdays).'
+                        : 'Loading…'}
                     </p>
                   )}
                 </AttendanceList>
@@ -1003,16 +1022,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigateToProfile }) 
                       <div style={{ color: theme.colors.textSecondary, fontSize: theme.fontSizes.xs }}>Engagement</div>
                       <div style={{ fontWeight: theme.fontWeights.semibold, color: theme.colors.textPrimary, fontSize: theme.fontSizes.xs }}>
                         {stats.totalAttendees > 0
-                          ? Math.round(((stats.todayAttendance + stats.lateCount) / stats.totalAttendees) * 100)
+                          ? Math.round((stats.todayAttendance / stats.totalAttendees) * 100)
                           : 0}
-                        % active
+                        % checked in
                       </div>
                     </div>
                     <div style={{ height: 8, background: theme.colors.gray200, borderRadius: 999, overflow: 'hidden' }}>
                       <div
                         style={{ 
                           width: stats.totalAttendees > 0
-                            ? `${Math.round(((stats.todayAttendance + stats.lateCount) / stats.totalAttendees) * 100)}%`
+                            ? `${Math.round((stats.todayAttendance / stats.totalAttendees) * 100)}%`
                             : '0%',
                           height: '100%',
                           background: theme.colors.primary,

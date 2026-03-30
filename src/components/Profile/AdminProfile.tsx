@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   FiActivity, 
   FiUsers, 
@@ -12,7 +12,9 @@ import {
   FiUser,
   FiCheckCircle,
   FiClock,
-  FiRefreshCw
+  FiRefreshCw,
+  FiCamera,
+  FiMail
 } from 'react-icons/fi';
 import { 
   XAxis, 
@@ -23,13 +25,15 @@ import {
   LineChart,
   Line
 } from 'recharts';
-import { eachDayOfInterval, subDays, format } from 'date-fns';
+import { eachDayOfInterval, subDays, format, parseISO } from 'date-fns';
 import { theme } from '../../styles/theme';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../Common/Button';
 import DataService from '../../services/DataService';
 import { attendanceAnalyticsService } from '../../services/attendanceAnalyticsService';
 import { AttendanceService } from '../../services/attendanceService';
+import { TimeService } from '../../services/timeService';
+import { ProfileUpload } from './ProfileUpload';
 
 const ProfileContainer = styled.div`
   padding: ${theme.spacing.xl};
@@ -325,6 +329,8 @@ const AttendanceRate = styled.div<{ $rate: number }>`
 `;
 
 const MiniChart = styled.div`
+  width: 100%;
+  min-width: 0;
   height: 60px;
   margin-top: ${theme.spacing.sm};
 `;
@@ -335,6 +341,68 @@ const RecentActivity = styled.div`
   gap: ${theme.spacing.xs};
   max-height: 150px;
   overflow-y: auto;
+`;
+
+const MyAccountCard = styled(motion.div)`
+  background: white;
+  padding: ${theme.spacing.xl};
+  border-radius: ${theme.borderRadius.xl};
+  box-shadow: ${theme.shadows.md};
+  border: 1px solid ${theme.colors.gray200};
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: ${theme.spacing.xl};
+
+  @media (max-width: ${theme.breakpoints.mobile}) {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+`;
+
+const AccountAvatarWrap = styled.div`
+  position: relative;
+  flex-shrink: 0;
+`;
+
+const AccountAvatarImg = styled.img`
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid ${theme.colors.gray100};
+`;
+
+const AccountAvatarPlaceholder = styled.div`
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: ${theme.colors.gray100};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: ${theme.colors.primary};
+  border: 3px solid ${theme.colors.gray100};
+`;
+
+const AccountDetails = styled.div`
+  flex: 1;
+  min-width: 200px;
+`;
+
+const AccountSectionTitle = styled.h3`
+  margin: 0 0 ${theme.spacing.sm} 0;
+  font-size: ${theme.fontSizes.lg};
+  color: ${theme.colors.textPrimary};
+`;
+
+const AccountMeta = styled.p`
+  display: flex;
+  align-items: center;
+  gap: ${theme.spacing.sm};
+  margin: ${theme.spacing.xs} 0;
+  font-size: ${theme.fontSizes.sm};
+  color: ${theme.colors.textSecondary};
 `;
 
 const ActivityItem = styled.div`
@@ -353,6 +421,7 @@ const ActivityItem = styled.div`
 
 export const AdminProfile: React.FC = () => {
   const { user } = useAuth();
+  const [showPhotoUpload, setShowPhotoUpload] = useState(false);
   const [stats, setStats] = useState({
     totalEvents: 0,
     totalAttendees: 0,
@@ -473,10 +542,13 @@ export const AdminProfile: React.FC = () => {
     });
 
     // Subscribe to real-time analytics for the charts (Weekly Volume)
+    const ts = TimeService.getInstance();
+    const endDateStr = ts.getCurrentDateString();
+    const startDateStr = format(subDays(parseISO(endDateStr), 6), 'yyyy-MM-dd');
     const currentRange = {
       preset: { label: 'This Week', value: 'week' } as import('../../services/attendanceAnalyticsService').DateRangePreset,
-      startDate: format(subDays(new Date(), 6), 'yyyy-MM-dd'),
-      endDate: format(new Date(), 'yyyy-MM-dd')
+      startDate: startDateStr,
+      endDate: endDateStr,
     };
     
     const unsubscribeAnalytics = attendanceAnalyticsService.subscribeToAdminAnalytics(
@@ -498,12 +570,44 @@ export const AdminProfile: React.FC = () => {
 
   return (
     <ProfileContainer>
+      <AnimatePresence>
+        {showPhotoUpload && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(0,0,0,0.5)',
+              zIndex: 1000,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: theme.spacing.md
+            }}
+            onClick={() => setShowPhotoUpload(false)}
+          >
+            <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: '500px' }}>
+              <ProfileUpload />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <AdminHero
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
       >
-        <div style={{ width: 120, height: 120, background: 'rgba(255,255,255,0.2)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <FiShield size={64} />
+        <div style={{ width: 120, height: 120, background: 'rgba(255,255,255,0.2)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
+          {user?.photoUrl ? (
+            <img src={user.photoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          ) : (
+            <FiShield size={64} />
+          )}
         </div>
         <AdminInfo>
           <RoleBadge>{user?.userType || 'Administrator'}</RoleBadge>
@@ -511,6 +615,53 @@ export const AdminProfile: React.FC = () => {
           <p style={{ opacity: 0.8 }}>Managing {stats.totalEvents} Active Classes • {stats.totalAttendees} Total Students</p>
         </AdminInfo>
       </AdminHero>
+
+      <MyAccountCard
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35 }}
+      >
+        <AccountAvatarWrap>
+          {user?.photoUrl ? (
+            <AccountAvatarImg src={user.photoUrl} alt="" />
+          ) : (
+            <AccountAvatarPlaceholder>
+              <FiUser size={40} />
+            </AccountAvatarPlaceholder>
+          )}
+          <Button
+            variant="primary"
+            style={{
+              position: 'absolute',
+              bottom: 0,
+              right: 0,
+              borderRadius: '50%',
+              width: '36px',
+              height: '36px',
+              padding: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: theme.shadows.md
+            }}
+            onClick={() => setShowPhotoUpload(true)}
+            aria-label="Change profile photo"
+          >
+            <FiCamera size={16} />
+          </Button>
+        </AccountAvatarWrap>
+        <AccountDetails>
+          <AccountSectionTitle>My account</AccountSectionTitle>
+          <AccountMeta>
+            <FiUser size={14} aria-hidden />
+            <span>{user?.displayName || '—'}</span>
+          </AccountMeta>
+          <AccountMeta>
+            <FiMail size={14} aria-hidden />
+            <span>{user?.email || '—'}</span>
+          </AccountMeta>
+        </AccountDetails>
+      </MyAccountCard>
 
       <StatsGrid>
         <StatCard whileHover={{ y: -5 }}>
@@ -566,8 +717,8 @@ export const AdminProfile: React.FC = () => {
             <FiActivity color={theme.colors.primary} />
             Weekly Volume
           </h3>
-          <div style={{ height: 300 }}>
-            <ResponsiveContainer>
+          <div style={{ height: 300, minHeight: 200, minWidth: 0, width: '100%' }}>
+            <ResponsiveContainer width="100%" height="100%" minHeight={200}>
               <LineChart data={activityData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="name" />
@@ -615,7 +766,7 @@ export const AdminProfile: React.FC = () => {
               </div>
 
               <MiniChart>
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" minHeight={60}>
                   <LineChart data={student.trendData}>
                     <XAxis dataKey="name" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
                     <YAxis hide domain={[0, 100]} />
@@ -681,7 +832,9 @@ export const AdminProfile: React.FC = () => {
             try {
               const as = AttendanceService.getInstance();
               const result = await as.masterResetAttendance();
-              alert(`✅ Success: ${result.deletedCount} records deleted. All statistics have been reset to zero.`);
+              alert(
+                `✅ Success: ${result.deletedCount} attendance + ${result.deletedDaily} daily summary records deleted. All statistics start at zero.`
+              );
               window.location.reload();
             } catch (error) {
               alert('❌ Error: Failed to reset data.');

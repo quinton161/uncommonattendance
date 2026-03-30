@@ -30,8 +30,17 @@ export const GlobalStyles = createGlobalStyle`
     position: relative;
     z-index: 1;
     min-height: 100vh;
+    min-height: 100svh;
     display: flex;
     flex-direction: column;
+  }
+
+  @media (max-width: 768px) {
+    .Toastify__toast-container--top-right {
+      top: max(8px, env(safe-area-inset-top, 0px));
+      right: max(8px, env(safe-area-inset-right, 0px));
+      width: min(100vw - 16px, 420px);
+    }
   }
 
   h1, h2, h3, h4, h5, h6 {

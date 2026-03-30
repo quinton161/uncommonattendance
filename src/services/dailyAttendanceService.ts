@@ -6,8 +6,6 @@ import {
   getDocs,
   query,
   where,
-  orderBy,
-  limit,
   Timestamp,
 } from 'firebase/firestore';
 import { db } from './firebase';
@@ -127,27 +125,22 @@ export class DailyAttendanceService {
 
       console.log('📅 Date range:', startDateStr, 'to', endDateStr);
 
-      const q = query(
-        collection(db, 'dailyAttendance'),
-        where('studentId', '==', studentId),
-        where('date', '>=', startDateStr),
-        where('date', '<=', endDateStr),
-        orderBy('date', 'desc')
-      );
-
+      const q = query(collection(db, 'dailyAttendance'), where('studentId', '==', studentId));
       const querySnapshot = await getDocs(q);
       const records: any[] = [];
 
-      console.log('📋 Found', querySnapshot.size, 'attendance records');
-
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
+      querySnapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        if (data.date < startDateStr || data.date > endDateStr) return;
         records.push({
           date: data.date,
           isPresent: data.isPresent,
           markedAt: data.markedAt?.toDate(),
         });
       });
+      records.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
+      console.log('📋 Found', records.length, 'attendance records in range');
 
       // Calculate stats
       const presentDays = records.filter(r => r.isPresent).length;
@@ -194,19 +187,13 @@ export class DailyAttendanceService {
     const startDateStr = startDate.toISOString().split('T')[0];
     const endDateStr = endDate.toISOString().split('T')[0];
 
-    const q = query(
-      collection(db, 'dailyAttendance'),
-      where('studentId', '==', studentId),
-      where('date', '>=', startDateStr),
-      where('date', '<=', endDateStr),
-      orderBy('date', 'asc')
-    );
-
+    const q = query(collection(db, 'dailyAttendance'), where('studentId', '==', studentId));
     const querySnapshot = await getDocs(q);
     const attendanceMap = new Map();
 
-    querySnapshot.forEach((doc) => {
-      const data = doc.data();
+    querySnapshot.forEach((docSnap) => {
+      const data = docSnap.data();
+      if (data.date < startDateStr || data.date > endDateStr) return;
       attendanceMap.set(data.date, {
         isPresent: data.isPresent,
         markedAt: data.markedAt?.toDate(),
@@ -247,18 +234,12 @@ export class DailyAttendanceService {
    * Get recent attendance activity
    */
   async getRecentActivity(studentId: string, limitCount: number = 10): Promise<any[]> {
-    const q = query(
-      collection(db, 'dailyAttendance'),
-      where('studentId', '==', studentId),
-      orderBy('date', 'desc'),
-      limit(limitCount)
-    );
-
+    const q = query(collection(db, 'dailyAttendance'), where('studentId', '==', studentId));
     const querySnapshot = await getDocs(q);
     const activities: any[] = [];
 
-    querySnapshot.forEach((doc) => {
-      const data = doc.data();
+    querySnapshot.forEach((docSnap) => {
+      const data = docSnap.data();
       activities.push({
         date: data.date,
         isPresent: data.isPresent,
@@ -267,8 +248,8 @@ export class DailyAttendanceService {
         description: data.isPresent ? 'Marked Present' : 'Marked Absent',
       });
     });
-
-    return activities;
+    activities.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    return activities.slice(0, limitCount);
   }
 
   /**
@@ -337,26 +318,21 @@ export class DailyAttendanceService {
     const startDateStr = startDate.toISOString().split('T')[0];
     const endDateStr = endDate.toISOString().split('T')[0];
 
-    const q = query(
-      collection(db, 'attendance'),
-      where('studentId', '==', studentId),
-      where('date', '>=', startDateStr),
-      where('date', '<=', endDateStr),
-      orderBy('date', 'asc')
-    );
-
+    const q = query(collection(db, 'attendance'), where('studentId', '==', studentId));
     const querySnapshot = await getDocs(q);
     const records: AttendanceRecord[] = [];
 
-    querySnapshot.forEach((doc) => {
-      const data = doc.data();
+    querySnapshot.forEach((docSnap) => {
+      const data = docSnap.data();
+      const d = (data as any).date;
+      if (!d || d < startDateStr || d > endDateStr) return;
       records.push({
         ...data,
         checkInTime: data.checkInTime?.toDate(),
         checkOutTime: data.checkOutTime?.toDate(),
       } as AttendanceRecord);
     });
-
+    records.sort((a, b) => ((a as any).date || '').localeCompare((b as any).date || ''));
     return records;
   }
 

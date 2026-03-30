@@ -3,6 +3,7 @@ import {
   query, where, orderBy, limit, addDoc,
   Timestamp, deleteDoc, onSnapshot, serverTimestamp,
 } from 'firebase/firestore';
+import { eachDayOfInterval, format, parseISO, subDays } from 'date-fns';
 import { ref, deleteObject } from 'firebase/storage';
 import { db, storage } from './firebase';
 import { uniqueToast } from '../utils/toastUtils';
@@ -88,15 +89,29 @@ class DataService {
 
   async getAttendance(userId?: string): Promise<any[]> {
     try {
-      const q = userId
-        ? query(collection(db,'attendance'), where('studentId','==',userId), orderBy('checkInTime','desc'))
-        : query(collection(db,'attendance'), orderBy('checkInTime','desc'));
-      return (await getDocs(q)).docs.map(d => ({
-        id: d.id, ...d.data(),
-        checkInTime:  d.data().checkInTime?.toDate(),
+      const mapDoc = (d: { id: string; data: () => any }) => ({
+        id: d.id,
+        ...d.data(),
+        checkInTime: d.data().checkInTime?.toDate(),
         checkOutTime: d.data().checkOutTime?.toDate(),
-      }));
-    } catch (e) { console.error('getAttendance error', e); return []; }
+      });
+      if (userId) {
+        // Single-field equality avoids composite index (studentId + checkInTime).
+        const q = query(collection(db, 'attendance'), where('studentId', '==', userId));
+        const rows = (await getDocs(q)).docs.map(mapDoc);
+        rows.sort((a: any, b: any) => {
+          const ta = a.checkInTime instanceof Date ? a.checkInTime.getTime() : 0;
+          const tb = b.checkInTime instanceof Date ? b.checkInTime.getTime() : 0;
+          return tb - ta;
+        });
+        return rows;
+      }
+      const q = query(collection(db, 'attendance'), orderBy('checkInTime', 'desc'));
+      return (await getDocs(q)).docs.map(mapDoc);
+    } catch (e) {
+      console.error('getAttendance error', e);
+      return [];
+    }
   }
 
   async recordAttendance(data: any): Promise<void> {
@@ -297,6 +312,73 @@ class DataService {
     const [users, all] = await Promise.all([this.getUsers(), this.getAttendance()]);
     const forDay = all.filter(r => this.dateStr(r)===tgt);
     return this._buildSummary(tgt, users, forDay);
+  }
+
+  /**
+   * Students to flag on the admin home screen: low attendance over a recent window.
+   * Uses one attendance fetch + in-memory aggregation (same data model as analytics).
+   */
+  async getAtRiskStudents(opts?: {
+    windowDays?: number;
+    maxRate?: number;
+    minMissedSchoolDays?: number;
+    limit?: number;
+  }): Promise<Array<{
+    studentId: string;
+    studentName: string;
+    attendanceRate: number;
+    absent: number;
+  }>> {
+    const windowDays = opts?.windowDays ?? 30;
+    const maxRate = opts?.maxRate ?? 85;
+    const minMissed = opts?.minMissedSchoolDays ?? 3;
+    const limitN = opts?.limit ?? 10;
+
+    const ts = TimeService.getInstance();
+    const endDate = ts.getCurrentDateString();
+    const startDate = format(subDays(parseISO(endDate), windowDays), 'yyyy-MM-dd');
+
+    const [users, allAttendance] = await Promise.all([this.getUsers(), this.getAttendance()]);
+    const students = users.filter(u => this.isStudent(u));
+
+    const inRange = allAttendance.filter((r: any) => {
+      const d = r.date || this.dateStr(r);
+      return d && d >= startDate && d <= endDate;
+    });
+
+    const schoolDays = eachDayOfInterval({
+      start: parseISO(startDate),
+      end: parseISO(endDate),
+    }).filter((d) => {
+      const wd = d.getDay();
+      return wd !== 0 && wd !== 6;
+    }).length;
+
+    const daysPresentByStudent = new Map<string, Set<string>>();
+    inRange.forEach((r: any) => {
+      const sid = r.studentId;
+      const day = r.date || this.dateStr(r);
+      if (!sid || !day) return;
+      if (!daysPresentByStudent.has(sid)) daysPresentByStudent.set(sid, new Set());
+      daysPresentByStudent.get(sid)!.add(day);
+    });
+
+    return students
+      .map((u) => {
+        const uid = u.uid || u.id;
+        const presentDays = daysPresentByStudent.get(uid)?.size ?? 0;
+        const missed = Math.max(0, schoolDays - presentDays);
+        const rate = schoolDays > 0 ? Math.round((presentDays / schoolDays) * 100) : 100;
+        return {
+          studentId: uid,
+          studentName: (u.displayName || u.email || 'Unknown') as string,
+          attendanceRate: rate,
+          absent: missed,
+        };
+      })
+      .filter((r) => r.attendanceRate < maxRate || r.absent >= minMissed)
+      .sort((a, b) => a.attendanceRate - b.attendanceRate || b.absent - a.absent)
+      .slice(0, limitN);
   }
 
   // ── Admin audit log ─────────────────────────────────────────────────────────

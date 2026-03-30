@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { theme } from '../../styles/theme';
 import { attendanceAnalyticsService, DateRange, StudentAnalytics } from '../../services/attendanceAnalyticsService';
 import { DateRangeFilter } from './DateRangeFilter';
+import { format, parseISO } from 'date-fns';
 import {
   ResponsiveContainer,
   LineChart,
@@ -100,11 +101,11 @@ const Page = styled.div`
 
 const Grid = styled.div`
   display: grid;
-  grid-template-columns: 2fr 1fr;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
   gap: ${theme.spacing.lg};
 
   @media (max-width: ${theme.breakpoints.desktop}) {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   @media (max-width: ${theme.breakpoints.tablet}) {
@@ -185,9 +186,9 @@ const Badge = styled.div<{ $kind: 'good' | 'warn' }>`
 
 const ChartContainer = styled.div`
   width: 100%;
-  height: clamp(220px, 34vh, 360px);
   min-width: 0;
-  min-height: 0;
+  min-height: 280px;
+  height: clamp(280px, 36vh, 400px);
 `;
 
 const EmptyState = styled.div`
@@ -200,8 +201,11 @@ const EmptyState = styled.div`
 `;
 
 function fmtShort(dateIso: string) {
-  const d = new Date(dateIso);
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  try {
+    return format(parseISO(dateIso), 'MMM d');
+  } catch {
+    return dateIso;
+  }
 }
 
 export function StudentAttendanceAnalytics(props: { studentId: string }): React.ReactElement {
@@ -250,23 +254,15 @@ export function StudentAttendanceAnalytics(props: { studentId: string }): React.
     };
   }, [props.studentId, range.startDate, range.endDate]);
 
-  const dailyData = (analytics?.daily || []).map(d => ({
+  const dailyData = (analytics?.daily || []).map((d) => ({
     ...d,
     name: fmtShort(d.date),
+    present: d.status === 'present' ? 1 : 0,
+    late: d.status === 'late' ? 1 : 0,
     rate: d.status === 'present' || d.status === 'late' ? 100 : 0,
   }));
   const pieData = analytics?.distribution || [];
   const weekly = analytics?.weekly || [];
-
-  // Debug logging for chart data issues
-  console.log('[StudentAnalytics] Debug - Analytics data:', {
-    hasData: !!analytics,
-    dailyCount: analytics?.daily?.length || 0,
-    pieData,
-    distribution: analytics?.distribution,
-    totals: analytics?.totals,
-    weeklyCount: weekly.length,
-  });
 
   const below = analytics?.warning.isBelowThreshold;
 
@@ -283,7 +279,9 @@ export function StudentAttendanceAnalytics(props: { studentId: string }): React.
       <Card {...cardAnim}>
         <Title>
           <h3>Your highlights</h3>
-          <span>{analytics?.range.startDate} → {analytics?.range.endDate}</span>
+          <span>
+            {analytics?.range.startDate} → {analytics?.range.endDate} · weekdays (Harare)
+          </span>
         </Title>
         <StatRow>
           <Stat $warn={below}><div className="v">{Math.round(analytics?.totals.attendanceRate || 0)}%</div><div className="l">Attendance</div></Stat>
@@ -297,20 +295,20 @@ export function StudentAttendanceAnalytics(props: { studentId: string }): React.
         <Card {...cardAnim}>
           <Title>
             <h3>Personal trend</h3>
-            <span>Present vs late over time</span>
+            <span>Each weekday: on time vs late (Harare)</span>
           </Title>
           <ChartContainer>
             {dailyData.length === 0 ? (
               <EmptyState>No attendance data for this period</EmptyState>
             ) : (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minHeight={280}>
                 <LineChart data={dailyData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={theme.colors.gray200} />
                   <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fill: theme.colors.textSecondary, fontSize: 12 }} />
                   <YAxis tickLine={false} axisLine={false} tick={{ fill: theme.colors.textSecondary, fontSize: 12 }} />
                   <Tooltip content={<CustomTooltip />} />
                   <Legend wrapperStyle={{ paddingTop: 10 }} />
-                  <Line type="monotone" dataKey="present" name="Present" stroke={COLORS.present} strokeWidth={3} dot={{ fill: COLORS.present, strokeWidth: 2, r: 4 }} activeDot={{ r: 6 }} />
+                  <Line type="monotone" dataKey="present" name="On time" stroke={COLORS.present} strokeWidth={3} dot={{ fill: COLORS.present, strokeWidth: 2, r: 4 }} activeDot={{ r: 6 }} />
                   <Line type="monotone" dataKey="late" name="Late" stroke={COLORS.late} strokeWidth={3} dot={{ fill: COLORS.late, strokeWidth: 2, r: 4 }} activeDot={{ r: 6 }} />
                 </LineChart>
               </ResponsiveContainer>
@@ -327,7 +325,7 @@ export function StudentAttendanceAnalytics(props: { studentId: string }): React.
             {pieData.every(d => d.value === 0) ? (
               <EmptyState>No attendance data for this period</EmptyState>
             ) : (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minHeight={280}>
                 <PieChart>
                   <Tooltip content={<CustomTooltip />} />
                   <Pie 
@@ -360,13 +358,13 @@ export function StudentAttendanceAnalytics(props: { studentId: string }): React.
       <Card {...cardAnim}>
         <Title>
           <h3>Weekly view</h3>
-          <span>Last 7 business days</span>
+          <span>Range split into 7-day blocks (weekdays only in totals)</span>
         </Title>
           <ChartContainer>
           {weekly.length === 0 ? (
             <EmptyState>No attendance data for this period</EmptyState>
           ) : (
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minHeight={280}>
               <BarChart data={weekly} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={theme.colors.gray200} />
                 <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fill: theme.colors.textSecondary, fontSize: 12 }} />
@@ -391,7 +389,7 @@ export function StudentAttendanceAnalytics(props: { studentId: string }): React.
           {dailyData.length === 0 ? (
             <EmptyState>No attendance data for this period</EmptyState>
           ) : (
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minHeight={280}>
               <LineChart data={dailyData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={theme.colors.gray200} />
                 <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fill: theme.colors.textSecondary, fontSize: 12 }} />

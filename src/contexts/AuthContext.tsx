@@ -9,11 +9,13 @@ import {
   deleteUser,
   GoogleAuthProvider,
   signInWithPopup,
+  type User as FirebaseAuthUser,
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../services/firebase';
 import { User, AuthContextType } from '../types';
 import { uniqueToast } from '../utils/toastUtils';
+import { getFirebaseAuthErrorMessage } from '../utils/firebaseAuthErrors';
 import DataService from '../services/DataService';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -52,6 +54,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               photoUrl:    fbUser.photoURL || d.photoUrl,
               userType:    isAdmin ? 'admin' : (d.userType || 'attendee'),
               bio:         d.bio,
+              course:      d.course,
+              profession:  d.profession,
               createdAt:   d.createdAt?.toDate() || new Date(),
             });
           } else {
@@ -61,12 +65,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               email:       fbUser.email!,
               displayName: fbUser.displayName || 'New User',
               userType:    isAdmin ? 'admin' : isStaff ? 'instructor' : 'attendee' as any,
-              createdAt:   new Date(),
+              createdAt:   serverTimestamp(),
               photoUrl:    fbUser.photoURL || null,
               bio:         '',
             };
             await setDoc(doc(db, 'users', fbUser.uid), fallback);
-            setUser({ ...fallback, photoUrl: fallback.photoUrl ?? undefined });
+            setUser({
+              uid: fallback.uid,
+              email: fallback.email,
+              displayName: fallback.displayName,
+              userType: fallback.userType,
+              createdAt: new Date(),
+              photoUrl: fallback.photoUrl ?? undefined,
+              bio: fallback.bio,
+            });
           }
         } catch {
           // Network error — use minimal user from Firebase Auth
@@ -92,32 +104,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // ── register ─────────────────────────────────────────────────────────────────
   const register = async (email: string, password: string, displayName: string, userType: User['userType']) => {
-    const { user: fbUser } = await createUserWithEmailAndPassword(auth, email, password);
-    await updateProfile(fbUser, { displayName });
-    await setDoc(doc(db, 'users', fbUser.uid), {
-      uid: fbUser.uid, email: fbUser.email!, displayName, userType,
-      createdAt: new Date(), photoUrl: null, bio: '',
-    });
-    uniqueToast.success('Account created! Welcome!', { autoClose: 3000 });
-    // NO window.location.href — onAuthStateChanged handles navigation automatically
+    let fbUser: FirebaseAuthUser | null = null;
+    try {
+      const cred = await createUserWithEmailAndPassword(auth, email, password);
+      fbUser = cred.user;
+      await updateProfile(fbUser, { displayName });
+      await setDoc(doc(db, 'users', fbUser.uid), {
+        uid: fbUser.uid,
+        email: fbUser.email!,
+        displayName,
+        userType,
+        createdAt: serverTimestamp(),
+        photoUrl: null,
+        bio: '',
+      });
+      uniqueToast.success('Account created! Welcome!', { autoClose: 3000 });
+    } catch (err: any) {
+      if (fbUser) {
+        try {
+          await deleteUser(fbUser);
+        } catch {
+          /* ignore cleanup failure */
+        }
+      }
+      throw err;
+    }
   };
 
   // ── login ─────────────────────────────────────────────────────────────────────
   const login = async (email: string, password: string) => {
-    try {
-      await signInWithEmailAndPassword(auth, email, password);
-      uniqueToast.success('Welcome back!', { autoClose: 3000 });
-    } catch (err: any) {
-      const msgs: Record<string, string> = {
-        'auth/invalid-credential':    'Invalid email or password.',
-        'auth/user-not-found':        'No account with this email.',
-        'auth/wrong-password':        'Incorrect password.',
-        'auth/too-many-requests':     'Too many attempts. Try again later.',
-        'auth/network-request-failed':'Network error. Check your connection.',
-      };
-      uniqueToast.error(msgs[err.code] || err.message || 'Login failed.', { autoClose: 5000 });
-      throw err;
-    }
+    await signInWithEmailAndPassword(auth, email, password);
+    uniqueToast.success('Welcome back!', { autoClose: 3000 });
   };
 
   // ── Google login ──────────────────────────────────────────────────────────────
@@ -130,8 +147,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       uniqueToast.success(`Welcome, ${result.user.displayName}!`, { autoClose: 3000 });
       // NO window.location.href — onAuthStateChanged handles navigation automatically
     } catch (err: any) {
-      if (err.code === 'auth/popup-closed-by-user') return;
-      uniqueToast.error(err.message || 'Google login failed.', { autoClose: 5000 });
+      if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') return;
+      uniqueToast.error(getFirebaseAuthErrorMessage(err.code, 'Google sign-in failed.'), { autoClose: 5000 });
       throw err;
     }
   };
@@ -155,7 +172,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // ── resetPassword ─────────────────────────────────────────────────────────────
   const resetPassword = async (email: string) => {
     await sendPasswordResetEmail(auth, email);
-    uniqueToast.success('Password reset email sent!', { autoClose: 5000 });
   };
 
   // ── deleteAccount ─────────────────────────────────────────────────────────────

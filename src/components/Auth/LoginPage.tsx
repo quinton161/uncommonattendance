@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import styled, { keyframes } from 'styled-components';
 import { useAuth } from '../../contexts/AuthContext';
+import { getFirebaseAuthErrorMessage } from '../../utils/firebaseAuthErrors';
 import { Button } from '../Common/Button';
 import { Input } from '../Common/Input';
 import { Card } from '../Common/Card';
@@ -356,15 +357,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onToggleMode }) => {
       await login(formData.email, formData.password);
     } catch (err: any) {
       console.error('Login error:', err);
-      let errorMessage = 'Failed to sign in';
-      if (err.code === 'auth/invalid-credential') {
-        errorMessage = 'Invalid email or password';
-      } else if (err.code === 'auth/user-not-found') {
-        errorMessage = 'No account found with this email';
-      } else if (err.code === 'auth/wrong-password') {
-        errorMessage = 'Incorrect password';
-      }
-      setError(errorMessage);
+      setError(getFirebaseAuthErrorMessage(err?.code, 'Failed to sign in.'));
+    } finally {
       setLoading(false);
     }
   };
@@ -381,9 +375,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onToggleMode }) => {
 
     try {
       await resetPassword(formData.email);
-      setSuccess('Password reset email sent! Check your inbox.');
+      setSuccess('If an account exists for this email, we sent reset instructions. Check your inbox.');
     } catch (err: any) {
-      setError(err.message || 'Failed to send reset email');
+      setError(getFirebaseAuthErrorMessage(err?.code, 'Failed to send reset email.'));
     } finally {
       setLoading(false);
     }
@@ -488,7 +482,18 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onToggleMode }) => {
           <GoogleButton
             variant="outline"
             fullWidth
-            onClick={loginWithGoogle}
+            onClick={async () => {
+              setError('');
+              setSuccess('');
+              setLoading(true);
+              try {
+                await loginWithGoogle();
+              } catch {
+                /* errors surfaced via toast in AuthContext */
+              } finally {
+                setLoading(false);
+              }
+            }}
             disabled={loading}
           >
             <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" />

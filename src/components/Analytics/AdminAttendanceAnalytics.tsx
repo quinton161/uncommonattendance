@@ -24,6 +24,12 @@ import type { DateRange } from '../../services/attendanceAnalyticsService';
 import { theme } from '../../styles/theme';
 import { DateRangeFilter } from './DateRangeFilter';
 import { AttendanceHeatmap } from './AttendanceHeatmap';
+import { format, parseISO } from 'date-fns';
+import { useAuth } from '../../contexts/AuthContext';
+import { AttendanceService } from '../../services/attendanceService';
+import { uniqueToast } from '../../utils/toastUtils';
+import { Button } from '../Common/Button';
+import { FiAlertTriangle } from 'react-icons/fi';
 
 const Page = styled.div`
   display: flex;
@@ -109,11 +115,11 @@ const Stat = styled.div<{ $grad: string }>`
 
 const TwoCol = styled.div`
   display: grid;
-  grid-template-columns: 2fr 1fr;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
   gap: ${theme.spacing.lg};
 
   @media (max-width: ${theme.breakpoints.desktop}) {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 `;
 
@@ -152,30 +158,82 @@ const BarFill = styled.div<{ $p: number; $kind: 'good' | 'bad' }>`
   transition: width 0.5s ease;
 `;
 
+const DangerCard = styled(Card)`
+  border-color: rgba(220, 38, 38, 0.35);
+  background: linear-gradient(180deg, rgba(254, 242, 242, 0.6) 0%, ${theme.colors.white} 100%);
+`;
+
+const ResetModalOverlay = styled.div`
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 3000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: ${theme.spacing.lg};
+`;
+
+const ResetModalBox = styled.div`
+  background: ${theme.colors.white};
+  border-radius: ${theme.borderRadius.xl};
+  padding: ${theme.spacing.xl};
+  max-width: 440px;
+  width: 100%;
+  box-shadow: ${theme.shadows.xl};
+`;
+
+const ResetInput = styled.input`
+  width: 100%;
+  padding: ${theme.spacing.md};
+  border: 2px solid ${theme.colors.gray300};
+  border-radius: ${theme.borderRadius.md};
+  font-size: ${theme.fontSizes.sm};
+  margin-top: ${theme.spacing.sm};
+  box-sizing: border-box;
+`;
+
 const ChartContainer = styled.div`
   width: 100%;
-  height: clamp(220px, 34vh, 360px);
   min-width: 0;
-  min-height: 0;
+  min-height: 280px;
+  height: clamp(280px, 36vh, 400px);
 `;
 
 function fmtShort(dateIso: string) {
-  const d = new Date(dateIso);
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  try {
+    return format(parseISO(dateIso), 'MMM d');
+  } catch {
+    return dateIso;
+  }
 }
 
 export function AdminAttendanceAnalytics(): React.ReactElement {
+  const { user } = useAuth();
   const dataService = DataService.getInstance();
+  const canClearAttendance = user?.userType === 'admin';
 
-  const [range, setRange] = useState<DateRange>(attendanceAnalyticsService.getDefaultRange('admin' as any) as any);
+  const [range, setRange] = useState<DateRange>(() => attendanceAnalyticsService.getDefaultRange('admin'));
   const [students, setStudents] = useState<any[]>([]);
   const [selectedStudentId, setSelectedStudentId] = useState<string>('all');
   const [analytics, setAnalytics] = useState<AdminAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [resetConfirm, setResetConfirm] = useState('');
+  const [resetLoading, setResetLoading] = useState(false);
 
   const cardAnim = useMemo(
     () => ({ initial: { opacity: 0, y: 8 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.25 } }),
     []
+  );
+
+  const roster = useMemo(
+    () =>
+      students.map((s: any) => ({
+        studentId: s.uid || s.id,
+        studentName: s.displayName || s.email || 'Student',
+      })),
+    [students]
   );
 
   useEffect(() => {
@@ -187,9 +245,9 @@ export function AdminAttendanceAnalytics(): React.ReactElement {
     })();
   }, [dataService]);
 
-  // If a preset was selected, normalize to concrete dates.
+  // If a preset was selected (not Custom), normalize to concrete Harare-aligned dates.
   useEffect(() => {
-    if (range.preset && range.preset.value) {
+    if (range.preset?.value && range.preset.value !== 'custom') {
       setRange(attendanceAnalyticsService.presetToRange(range.preset));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -199,7 +257,12 @@ export function AdminAttendanceAnalytics(): React.ReactElement {
     let mounted = true;
     setLoading(true);
     attendanceAnalyticsService
-      .getAdminAnalytics(range)
+      .getAdminAnalytics(
+        range,
+        selectedStudentId !== 'all'
+          ? { studentId: selectedStudentId }
+          : { totalStudents: students.length, roster }
+      )
       .then((res: AdminAnalytics) => {
         if (!mounted) return;
         setAnalytics(res);
@@ -213,7 +276,7 @@ export function AdminAttendanceAnalytics(): React.ReactElement {
     return () => {
       mounted = false;
     };
-  }, [range.startDate, range.endDate, selectedStudentId]);
+  }, [range.startDate, range.endDate, selectedStudentId, students.length, roster]);
 
   const dailyData =
     (analytics?.daily || []).map((d: { date: string; present: number; late: number; absent: number }) => ({
@@ -234,6 +297,18 @@ export function AdminAttendanceAnalytics(): React.ReactElement {
 
   const totals = analytics?.totals;
   const attendanceRate = analytics && 'attendanceRate' in analytics ? (analytics as any).attendanceRate : 0;
+  const totalDays = totals?.totalDays ?? 0;
+  const tp = totals?.present ?? 0;
+  const tl = totals?.late ?? 0;
+  const ta = totals?.absent ?? 0;
+  const enrolled = students.length;
+  /** All-student view: backend totals are student-days (sum over weekdays). Show averages so they match ~enrollment. */
+  const overviewAll = selectedStudentId === 'all' && totalDays > 0 && enrolled > 0;
+  const avgOnTime = overviewAll ? tp / totalDays : 0;
+  const avgLate = overviewAll ? tl / totalDays : 0;
+  const avgAbsent = overviewAll ? ta / totalDays : 0;
+  const studentDaysTotal = tp + tl + ta;
+  const expectedStudentDays = overviewAll ? enrolled * totalDays : 0;
 
   const COLORS = {
     present: '#22c55e',
@@ -244,7 +319,16 @@ export function AdminAttendanceAnalytics(): React.ReactElement {
   return (
     <Page>
       <FilterRow>
-        <DateRangeFilter value={range} onChange={setRange} presets={[{ label: 'Month', value: 'month' }]} />
+        <DateRangeFilter
+          value={range}
+          onChange={setRange}
+          presets={[
+            { label: 'Week', value: 'week' },
+            { label: 'Month', value: 'month' },
+            { label: 'Quarter', value: 'quarter' },
+            { label: 'Custom', value: 'custom' },
+          ]}
+        />
         <div style={{ display: 'flex', flexDirection: 'column', gap: theme.spacing.xs }}>
           <label style={{ fontSize: theme.fontSizes.xs, color: theme.colors.textSecondary, fontWeight: theme.fontWeights.medium }}>
             Student
@@ -266,34 +350,74 @@ export function AdminAttendanceAnalytics(): React.ReactElement {
       <Card {...cardAnim}>
         <Title>
           <h3>Overview</h3>
-          <span>{loading ? 'Updating…' : `${range.startDate} → ${range.endDate}`}</span>
+          <span>
+            {loading
+              ? 'Updating…'
+              : `${range.startDate} → ${range.endDate}${
+                  selectedStudentId === 'all' && enrolled > 0 ? ` · ${enrolled} students enrolled` : ''
+                }`}
+          </span>
         </Title>
         <StatRow>
           <Stat
             $grad={`linear-gradient(135deg, ${theme.colors.primary}10 0%, ${theme.colors.primaryLight}18 100%)`}
           >
             <div className="v">{attendanceRate}%</div>
-            <div className="l">Attendance rate</div>
+            <div className="l">
+              {selectedStudentId === 'all'
+                ? 'Avg. daily attendance (checked in ÷ enrolled, by day)'
+                : 'Attendance rate (weekdays)'}
+            </div>
           </Stat>
           <Stat
             $grad={`linear-gradient(135deg, rgba(34,197,94,0.10) 0%, rgba(34,197,94,0.18) 100%)`}
           >
-            <div className="v">{totals?.present ?? 0}</div>
-            <div className="l">Present</div>
+            <div className="v">
+              {overviewAll ? avgOnTime.toFixed(1) : tp}
+            </div>
+            <div className="l">
+              {overviewAll ? 'On time / weekday (avg.)' : 'Weekdays on time'}
+            </div>
           </Stat>
           <Stat
             $grad={`linear-gradient(135deg, rgba(245,158,11,0.10) 0%, rgba(245,158,11,0.18) 100%)`}
           >
-            <div className="v">{totals?.late ?? 0}</div>
-            <div className="l">Late</div>
+            <div className="v">
+              {overviewAll ? avgLate.toFixed(1) : tl}
+            </div>
+            <div className="l">
+              {overviewAll ? 'Late / weekday (avg.)' : 'Weekdays late'}
+            </div>
           </Stat>
           <Stat
             $grad={`linear-gradient(135deg, rgba(239,68,68,0.10) 0%, rgba(239,68,68,0.18) 100%)`}
           >
-            <div className="v">{totals?.absent ?? 0}</div>
-            <div className="l">Absent</div>
+            <div className="v">
+              {overviewAll ? avgAbsent.toFixed(1) : ta}
+            </div>
+            <div className="l">
+              {overviewAll ? 'Absent / weekday (avg.)' : 'Weekdays absent'}
+            </div>
           </Stat>
         </StatRow>
+        {overviewAll && (
+          <p
+            style={{
+              margin: `${theme.spacing.md} 0 0 0`,
+              fontSize: theme.fontSizes.xs,
+              color: theme.colors.textSecondary,
+              lineHeight: 1.5,
+            }}
+          >
+            {totalDays} weekdays · {enrolled} enrolled. Cards show <strong>average students per weekday</strong>; three
+            averages should sum to ~{enrolled} (here {(avgOnTime + avgLate + avgAbsent).toFixed(1)}). Raw student-days in
+            range: {tp} on-time + {tl} late + {ta} absent = {studentDaysTotal}
+            {expectedStudentDays > 0 ? ` (expected ${enrolled}×${totalDays}=${expectedStudentDays})` : ''}.
+            {expectedStudentDays > 0 && studentDaysTotal !== expectedStudentDays && (
+              <span style={{ color: theme.colors.warning }}> If this doesn’t match, check for duplicate attendance rows.</span>
+            )}
+          </p>
+        )}
       </Card>
 
       <TwoCol>
@@ -303,7 +427,7 @@ export function AdminAttendanceAnalytics(): React.ReactElement {
             <span>Hover for exact values</span>
           </Title>
           <ChartContainer>
-            <ResponsiveContainer>
+            <ResponsiveContainer width="100%" height="100%" minHeight={280}>
               <LineChart data={dailyData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="name" tickLine={false} axisLine={false} />
@@ -321,10 +445,14 @@ export function AdminAttendanceAnalytics(): React.ReactElement {
         <Card {...cardAnim}>
           <Title>
             <h3>Distribution</h3>
-            <span>Present vs late vs absent</span>
+            <span>
+              {selectedStudentId === 'all'
+                ? 'Share of all student-days (on time vs late vs absent)'
+                : 'Present vs late vs absent'}
+            </span>
           </Title>
           <ChartContainer>
-            <ResponsiveContainer>
+            <ResponsiveContainer width="100%" height="100%" minHeight={280}>
               <PieChart>
                 <Tooltip />
                 <Pie data={pieData} dataKey="value" nameKey="name" innerRadius={70} outerRadius={110} paddingAngle={2}>
@@ -349,7 +477,7 @@ export function AdminAttendanceAnalytics(): React.ReactElement {
           <span>Present / late / absent per day</span>
         </Title>
         <ChartContainer>
-          <ResponsiveContainer>
+          <ResponsiveContainer width="100%" height="100%" minHeight={280}>
             <BarChart data={dailyData}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
               <XAxis dataKey="name" tickLine={false} axisLine={false} />
@@ -370,7 +498,7 @@ export function AdminAttendanceAnalytics(): React.ReactElement {
         <Card {...cardAnim}>
           <Title>
             <h3>Top attendance</h3>
-            <span>Leaderboard (top 10)</span>
+            <span>Best weekday attendance % in this range (top 10)</span>
           </Title>
           <Table>
             {leaderboard.map((r: { studentId: string; studentName: string; attendanceRate: number; present: number; late: number; totalDays: number }) => (
@@ -399,7 +527,15 @@ export function AdminAttendanceAnalytics(): React.ReactElement {
                 </div>
               </Row>
             ))}
-            {leaderboard.length === 0 && <div style={{ color: theme.colors.textSecondary }}>No data.</div>}
+            {leaderboard.length === 0 && (
+              <div style={{ color: theme.colors.textSecondary, fontSize: theme.fontSizes.sm }}>
+                {selectedStudentId !== 'all'
+                  ? 'Switch to “All students” to see the cohort leaderboard.'
+                  : students.length === 0
+                    ? 'Loading students…'
+                    : 'No weekdays in this range, or not enough data yet.'}
+              </div>
+            )}
           </Table>
         </Card>
       </TwoCol>
@@ -407,7 +543,7 @@ export function AdminAttendanceAnalytics(): React.ReactElement {
       <Card {...cardAnim}>
         <Title>
           <h3>Most absent</h3>
-          <span>Quick identification (top 10)</span>
+          <span>Most missed weekdays in this range (top 10)</span>
         </Title>
         <Table>
           {mostAbsent.map((r: { userId: string; userName: string; absent: number; attendanceRate: number }) => (
@@ -434,9 +570,89 @@ export function AdminAttendanceAnalytics(): React.ReactElement {
               <div style={{ textAlign: 'right', fontWeight: theme.fontWeights.bold }}>{r.absent}</div>
             </Row>
           ))}
-          {mostAbsent.length === 0 && <div style={{ color: theme.colors.textSecondary }}>No data.</div>}
+          {mostAbsent.length === 0 && (
+            <div style={{ color: theme.colors.textSecondary, fontSize: theme.fontSizes.sm }}>
+              {selectedStudentId !== 'all'
+                ? 'Switch to “All students” to see absentee rankings.'
+                : students.length === 0
+                  ? 'Loading students…'
+                  : 'No weekdays in this range, or not enough data yet.'}
+            </div>
+          )}
         </Table>
       </Card>
+
+      {canClearAttendance && (
+        <DangerCard {...cardAnim}>
+          <Title>
+            <h3 style={{ color: '#b91c1c' }}>Reset attendance data</h3>
+            <span>Start fresh — analytics will show zeros</span>
+          </Title>
+          <p style={{ margin: `0 0 ${theme.spacing.md} 0`, fontSize: theme.fontSizes.sm, color: theme.colors.textSecondary, lineHeight: 1.5 }}>
+            Deletes <strong>every</strong> document in the <code style={{ fontSize: theme.fontSizes.xs }}>attendance</code> and{' '}
+            <code style={{ fontSize: theme.fontSizes.xs }}>dailyAttendance</code> collections. Student accounts are not removed. Charts and
+            dashboards will show no check-ins until people record attendance again. This cannot be undone.
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              setResetConfirm('');
+              setShowResetModal(true);
+            }}
+            style={{ borderColor: '#dc2626', color: '#dc2626' }}
+          >
+            <FiAlertTriangle size={16} style={{ marginRight: 8 }} />
+            Clear all attendance records…
+          </Button>
+        </DangerCard>
+      )}
+
+      {showResetModal && (
+        <ResetModalOverlay>
+          <ResetModalBox>
+            <h3 style={{ margin: `0 0 ${theme.spacing.sm} 0`, color: theme.colors.textPrimary }}>Confirm full attendance reset</h3>
+            <p style={{ fontSize: theme.fontSizes.sm, color: theme.colors.textSecondary, marginBottom: theme.spacing.md }}>
+              Type <strong>RESET</strong> to permanently delete all attendance and daily summary records.
+            </p>
+            <ResetInput
+              autoComplete="off"
+              placeholder="RESET"
+              value={resetConfirm}
+              onChange={(e) => setResetConfirm(e.target.value)}
+            />
+            <div style={{ display: 'flex', gap: theme.spacing.sm, justifyContent: 'flex-end', marginTop: theme.spacing.lg }}>
+              <Button variant="outline" type="button" disabled={resetLoading} onClick={() => setShowResetModal(false)}>
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                disabled={resetConfirm !== 'RESET' || resetLoading}
+                onClick={async () => {
+                  setResetLoading(true);
+                  try {
+                    const attendanceService = AttendanceService.getInstance();
+                    const result = await attendanceService.masterResetAttendance();
+                    uniqueToast.success(
+                      `Removed ${result.deletedCount} attendance + ${result.deletedDaily} daily records. Reloading…`,
+                      { autoClose: 3500 }
+                    );
+                    setShowResetModal(false);
+                    window.setTimeout(() => window.location.reload(), 600);
+                  } catch (e) {
+                    console.error(e);
+                    uniqueToast.error('Could not reset attendance. Check Firestore rules and your connection.');
+                    setResetLoading(false);
+                  }
+                }}
+                style={{ background: '#dc2626', color: '#fff', borderColor: '#dc2626' }}
+              >
+                {resetLoading ? 'Deleting…' : 'Delete all attendance'}
+              </Button>
+            </div>
+          </ResetModalBox>
+        </ResetModalOverlay>
+      )}
     </Page>
   );
 }
