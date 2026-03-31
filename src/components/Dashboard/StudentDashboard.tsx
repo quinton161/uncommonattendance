@@ -542,7 +542,6 @@ export const StudentDashboard = (): React.ReactElement => {
   useBodyScrollLock(mobileMenuOpen);
   const [attendanceLoading, setAttendanceLoading] = useState(false);
   const [canCheckIn, setCanCheckIn] = useState(true);
-  const [canCheckOut, setCanCheckOut] = useState(false);
   const [stats, setStats] = useState({
     totalCheckIns: 0,
     currentStreak: 0,
@@ -610,7 +609,6 @@ export const StudentDashboard = (): React.ReactElement => {
       setCheckedIn(attendanceState.isCheckedIn);
       setCheckInTime(attendanceState.checkInTime);
       setCanCheckIn(attendanceState.canCheckIn);
-      setCanCheckOut(attendanceState.canCheckOut);
       
       if (attendanceState.isNewDay && !attendanceState.isCheckedIn) {
         setStats(prev => ({
@@ -721,7 +719,6 @@ export const StudentDashboard = (): React.ReactElement => {
       setCheckedIn(true);
       setCheckInTime(currentTime);
       setCanCheckIn(false);
-      setCanCheckOut(true);
       
       setStats(prev => ({
         ...prev,
@@ -811,7 +808,7 @@ export const StudentDashboard = (): React.ReactElement => {
   };
 
   const handleCheckOut = async () => {
-    if (!user || !canCheckOut) return;
+    if (!user) return;
     setAttendanceLoading(true);
     try {
       uniqueToast.info('Recording check-out...', { autoClose: 2000, position: 'top-center' });
@@ -831,7 +828,6 @@ export const StudentDashboard = (): React.ReactElement => {
       setCheckedIn(false);
       setCheckInTime(null);
       setCanCheckIn(false);
-      setCanCheckOut(false);
       setStats(prev => ({ ...prev, todayStatus: 'Completed for Today' }));
       uniqueToast.success('Checked out successfully! See you tomorrow.', { autoClose: 3000, position: 'top-center' });
       void loadStudentStats();
@@ -848,6 +844,11 @@ export const StudentDashboard = (): React.ReactElement => {
       } else if (errorMessage === 'No check-in record found for today') {
           uniqueToast.warning('You need to check in first!', { autoClose: 4000, position: 'top-center' });
           checkTodayAttendance();
+      } else if (errorCode === 'permission-denied') {
+        uniqueToast.error(
+          'Check-out was blocked. Try again in a moment. If it keeps happening, refresh the page.',
+          { autoClose: 5000, position: 'top-center' }
+        );
       } else {
         uniqueToast.error(`Failed to check out: ${errorCode ? `${errorCode} - ` : ''}${errorMessage}`, { autoClose: 4000, position: 'top-center' });
       }
@@ -1159,7 +1160,7 @@ export const StudentDashboard = (): React.ReactElement => {
                   <p style={{ margin: `0 0 ${theme.spacing.md}`, fontSize: theme.fontSizes.sm, color: theme.colors.textSecondary }}>
                     When you&apos;re done for the day, check out so your attendance reflects a full session.
                   </p>
-                  <Button variant="outline" onClick={handleCheckOut} disabled={attendanceLoading || !canCheckOut}>
+                  <Button variant="outline" onClick={handleCheckOut} disabled={attendanceLoading}>
                     <FiLogOut size={16} style={{ marginRight: theme.spacing.xs }} />
                     {attendanceLoading ? 'Checking out…' : 'Check out'}
                   </Button>

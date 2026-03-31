@@ -38,7 +38,8 @@ import {
   FiMenu,
   FiX,
   FiMaximize,
-  FiRefreshCw
+  FiRefreshCw,
+  FiLogOut
 } from 'react-icons/fi';
 import { QRCodeSVG } from 'qrcode.react';
 import { format, parseISO } from 'date-fns';
@@ -467,6 +468,7 @@ const AdminDashboard: React.FC = () => {
   const attendanceService = AttendanceService.getInstance();
   const [markingStudentId, setMarkingStudentId] = useState<string | null>(null);
   const [markAllLoading, setMarkAllLoading] = useState(false);
+  const [checkoutAllLoading, setCheckoutAllLoading] = useState(false);
   const [showMasterResetModal, setShowMasterResetModal] = useState(false);
   const [masterResetStats, setMasterResetStats] = useState({ deletedUsers: 0, deletedAttendance: 0, preservedUsers: 0 });
 
@@ -557,6 +559,38 @@ const AdminDashboard: React.FC = () => {
       uniqueToast.error('Failed to mark all present.');
     } finally {
       setMarkAllLoading(false);
+    }
+  };
+
+  const handleCheckOutAllOpen = async () => {
+    if (checkoutAllLoading || markAllLoading) return;
+    const open = (todayAttendanceList || []).filter(
+      (s: any) => s.checkInTime && !s.checkOutTime && s.status !== 'absent'
+    );
+    if (open.length === 0) {
+      uniqueToast.info('No students are still checked in without a check-out today.');
+      return;
+    }
+    if (
+      !window.confirm(
+        `Check out ${open.length} student(s) who are still checked in (set check-out time to now, Harare)?`
+      )
+    ) {
+      return;
+    }
+    setCheckoutAllLoading(true);
+    try {
+      const { checkedOut } = await attendanceService.checkOutAllOpenToday();
+      uniqueToast.success(
+        checkedOut === 0
+          ? 'No open sessions to close.'
+          : `Checked out ${checkedOut} student(s).`
+      );
+    } catch (e) {
+      console.error('Failed to check out all:', e);
+      uniqueToast.error('Failed to check out everyone. Try again or check your connection.');
+    } finally {
+      setCheckoutAllLoading(false);
     }
   };
 
@@ -1109,10 +1143,25 @@ const AdminDashboard: React.FC = () => {
                     <Button
                       variant="outline"
                       onClick={handleMarkAllPresent}
-                      disabled={markAllLoading}
+                      disabled={markAllLoading || checkoutAllLoading}
                       style={{ flex: 1, minWidth: 160 }}
                     >
                       {markAllLoading ? 'Marking...' : 'Mark All Present'}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={handleCheckOutAllOpen}
+                      disabled={markAllLoading || checkoutAllLoading}
+                      style={{ flex: 1, minWidth: 160, borderColor: theme.colors.gray400 }}
+                    >
+                      {checkoutAllLoading ? (
+                        'Checking out…'
+                      ) : (
+                        <>
+                          <FiLogOut size={14} style={{ marginRight: 6, verticalAlign: 'middle' }} />
+                          Check out everyone
+                        </>
+                      )}
                     </Button>
                     <Button variant="secondary" onClick={handleDownloadAttendanceCSV} style={{ flex: 1, minWidth: 160 }}>
                       Export

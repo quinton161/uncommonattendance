@@ -14,6 +14,7 @@ import {
   TodayIcon,
   SearchIcon
 } from '../Common/Icons';
+import { FiLogOut } from 'react-icons/fi';
 const PageContainer = styled.div`
   padding: ${theme.spacing.xl};
   width: 100%;
@@ -580,6 +581,7 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
   const [users, setUsers] = useState<any[]>([]);
   const [attendance, setAttendance] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [checkoutAllLoading, setCheckoutAllLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const dataService = DataService.getInstance();
 
@@ -747,6 +749,30 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
     }
   };
 
+  const handleCheckOutAllOpen = async () => {
+    if (checkoutAllLoading || loading) return;
+    if (
+      !window.confirm(
+        'Check out everyone who is still checked in today (sets check-out time to now, Harare)?'
+      )
+    ) {
+      return;
+    }
+    setCheckoutAllLoading(true);
+    try {
+      const { checkedOut } = await AttendanceService.getInstance().checkOutAllOpenToday();
+      uniqueToast.success(
+        checkedOut === 0 ? 'No open sessions to close.' : `Checked out ${checkedOut} student(s).`
+      );
+      await loadData();
+    } catch (error) {
+      console.error('Failed to check out all:', error);
+      uniqueToast.error('Failed to check out everyone.');
+    } finally {
+      setCheckoutAllLoading(false);
+    }
+  };
+
   const presentNowCount = attendees.filter(u => {
     const uid = u.id || u.uid;
     const t = getTodayAttendance(uid);
@@ -769,10 +795,18 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
           <Button
             variant="primary"
             onClick={handleMarkAllPresent}
-            disabled={loading}
+            disabled={loading || checkoutAllLoading}
             style={{ backgroundColor: theme.colors.success, borderColor: theme.colors.success }}
           >
             <CheckCircleIcon size={18} /> Mark All Present
+          </Button>
+          <Button
+            variant="outline"
+            onClick={handleCheckOutAllOpen}
+            disabled={loading || checkoutAllLoading}
+          >
+            <FiLogOut size={18} style={{ marginRight: 8, verticalAlign: 'middle' }} />
+            {checkoutAllLoading ? 'Checking out…' : 'Check out everyone'}
           </Button>
           <SearchWrap>
             <SearchIcon

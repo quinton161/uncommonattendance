@@ -137,6 +137,48 @@ export class AttendanceService {
     } as AttendanceRecord;
   }
 
+  /**
+   * Staff only (Firestore `isStaff` write): close every open session for Harare today.
+   * Merges `date == today` with check-in time in today’s Harare window so legacy rows still match.
+   */
+  async checkOutAllOpenToday(): Promise<{ checkedOut: number }> {
+    const today = this.timeService.getCurrentDateString();
+    const { start, end } = this.timeService.getHarareDayUtcBounds(today);
+    const [snapDate, snapRange] = await Promise.all([
+      getDocs(query(collection(db, 'attendance'), where('date', '==', today))),
+      getDocs(
+        query(
+          collection(db, 'attendance'),
+          where('checkInTime', '>=', Timestamp.fromDate(start)),
+          where('checkInTime', '<=', Timestamp.fromDate(end))
+        )
+      ),
+    ]);
+    const byId = new Map<string, (typeof snapDate.docs)[0]>();
+    [...snapDate.docs, ...snapRange.docs].forEach((d) => {
+      if (!byId.has(d.id)) byId.set(d.id, d);
+    });
+    const now = this.timeService.getCurrentTime();
+    const tOut = Timestamp.fromDate(now);
+    const toClose = Array.from(byId.values()).filter((d) => {
+      const x = d.data();
+      return !!(x.checkInTime && !x.checkOutTime);
+    });
+    for (let i = 0; i < toClose.length; i += 10) {
+      const chunk = toClose.slice(i, i + 10);
+      await Promise.all(
+        chunk.map((d) =>
+          updateDoc(d.ref, {
+            checkOutTime: tOut,
+            status: 'completed',
+            updatedAt: serverTimestamp(),
+          })
+        )
+      );
+    }
+    return { checkedOut: toClose.length };
+  }
+
   // ── Queries ─────────────────────────────────────────────────────────────────
 
   private safeFirestoreDate(v: unknown): Date | undefined {
@@ -199,19 +241,15 @@ export class AttendanceService {
     };
   }
 
+  /**
+   * True when there is no attendance doc for *today* (Harare) yet.
+   * Uses the same doc id as check-in (`{yyyy-mm-dd}_{studentId}`) — do not compare
+   * `date` fields or UTC midnights; mismatches blocked checkout and showed wrong state.
+   */
   async checkForNewDay(studentId: string): Promise<boolean> {
-    const r = await this.getTodayAttendance(studentId);
-    if (!r) return true;
     const today = this.timeService.getCurrentDateString();
-    let recDate: string | undefined;
-    if (typeof r.date === 'string' && r.date.trim()) {
-      recDate = r.date.trim();
-    } else if (r.checkInTime) {
-      const d = r.checkInTime instanceof Date ? r.checkInTime : new Date(r.checkInTime as any);
-      if (!Number.isNaN(d.getTime())) recDate = d.toISOString().split('T')[0];
-    }
-    if (!recDate) return true;
-    return recDate !== today;
+    const snap = await getDoc(doc(db, 'attendance', `${today}_${studentId}`));
+    return !snap.exists();
   }
 
   async getAttendanceStateWithDayCheck(studentId: string) {
