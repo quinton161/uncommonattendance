@@ -25,13 +25,26 @@ service cloud.firestore {
       allow delete: if isStaff();
     }
 
-    // Main attendance records
+    // Main attendance records (doc id: {date}_{studentId})
     match /attendance/{attendanceId} {
+      function attendancePath() {
+        return /databases/$(database)/documents/attendance/$(attendanceId);
+      }
+
+      // Students may GET a doc that does not exist yet (duplicate check before first check-in).
+      // For missing docs, `resource` is unavailable — the old rule denied those reads.
+      function canReadOwnAttendance() {
+        return isAuth() && (
+          (exists(attendancePath()) && get(attendancePath()).data.studentId == request.auth.uid)
+          || (!exists(attendancePath()) && attendanceId.matches('.*_' + request.auth.uid + '$'))
+        );
+      }
+
       // Staff can read all attendance records
       allow read: if isStaff();
-      
-      // Students can read their own attendance records
-      allow read: if isAuth() && resource.data.studentId == request.auth.uid;
+
+      // Students can read their own records (including "read" of a missing doc for their id)
+      allow read: if canReadOwnAttendance();
       
       // Staff can do anything
       allow write: if isStaff();

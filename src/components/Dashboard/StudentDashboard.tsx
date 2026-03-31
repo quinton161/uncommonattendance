@@ -754,6 +754,11 @@ export const StudentDashboard = (): React.ReactElement => {
             position: 'top-center',
           });
           checkTodayAttendance();
+      } else if (errorCode === 'permission-denied') {
+        uniqueToast.error(
+          'Could not complete check-in (permission denied). Try refreshing the page. If it persists, contact support.',
+          { autoClose: 5000, position: 'top-center' }
+        );
       } else {
         uniqueToast.error(`Failed to check in: ${errorCode ? `${errorCode} - ` : ''}${errorMessage}`, {
           autoClose: 4000,
