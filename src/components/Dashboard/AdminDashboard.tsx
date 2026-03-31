@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import styled from 'styled-components';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from '../../contexts/AuthContext';
@@ -41,8 +41,18 @@ import {
   FiRefreshCw
 } from 'react-icons/fi';
 import { QRCodeSVG } from 'qrcode.react';
-import { format, parseISO, subDays } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
+
+/** Match Firestore row to a school calendar day (stored `date` or Harare date from check-in). */
+function attendanceMatchesHarareDay(a: any, dateStr: string): boolean {
+  if (a?.date === dateStr) return true;
+  const ci = a?.checkInTime;
+  if (!ci) return false;
+  const d = ci instanceof Date ? ci : new Date(ci);
+  if (Number.isNaN(d.getTime())) return false;
+  return TimeService.getInstance().toHarareDateString(d) === dateStr;
+}
 
 const DashboardContainer = styled.div`
   display: flex;
@@ -477,8 +487,7 @@ const AdminDashboard: React.FC = () => {
       const attendance = await dataService.getAttendance();
       const timeService = TimeService.getInstance();
       const todayStr = timeService.getCurrentDateString();
-      // Only today's attendance
-      const todayAttendance = attendance.filter((a: any) => a.date === todayStr);
+      const todayAttendance = attendance.filter((a: any) => attendanceMatchesHarareDay(a, todayStr));
       const rows = todayAttendance.map((a: any) => {
         const userRecord = users.find((u: any) => u.id === a.studentId || u.uid === a.studentId);
         const checkInTime = a.checkInTime ? new Date(a.checkInTime) : null;
@@ -557,25 +566,23 @@ const AdminDashboard: React.FC = () => {
 
       const dashboardStats = await dataService.getDashboardStats();
 
-      setStats({
+      // Do not reset today counts here — subscribeToTodayAttendance owns them. A slow
+      // loadDashboardData used to finish after the listener and zero out live stats on refresh.
+      setStats((prev) => ({
+        ...prev,
         totalAttendees: dashboardStats.totalAttendees,
         totalInstructors: dashboardStats.totalInstructors,
-        // Real-time listener fills today / late / absent / rate
-        todayAttendance: 0,
-        lateCount: 0,
-        absentCount: 0,
-        attendanceRate: 0
-      });
+      }));
 
       const attendance = await dataService.getAttendance();
       const ts = TimeService.getInstance();
       const endStr = ts.getCurrentDateString();
-      const last7Days = [6, 5, 4, 3, 2, 1, 0].map((off) => format(subDays(parseISO(endStr), off), 'yyyy-MM-dd'));
+      const lastSchoolDays = ts.lastNHarareWeekdays(5, endStr);
 
-      const weeklyTrends = last7Days.map((date) => {
-        const dayAttendance = attendance.filter((a: any) => a.date === date);
+      const weeklyTrends = lastSchoolDays.map((date) => {
+        const dayAttendance = attendance.filter((a: any) => attendanceMatchesHarareDay(a, date));
         return {
-          name: format(parseISO(date), 'EEE'),
+          name: format(parseISO(`${date}T12:00:00+02:00`), 'EEE'),
           present: dayAttendance.length,
           late: dayAttendance.filter((a: any) => {
             const checkIn = a.checkInTime ? new Date(a.checkInTime) : null;
@@ -605,14 +612,11 @@ const AdminDashboard: React.FC = () => {
       uniqueToast.error('Failed to load dashboard data. Check your connection.');
       setAtRiskLoaded(true);
       setAtRiskStudents([]);
-      setStats({
+      setStats((prev) => ({
+        ...prev,
         totalAttendees: 0,
         totalInstructors: 0,
-        todayAttendance: 0,
-        lateCount: 0,
-        absentCount: 0,
-        attendanceRate: 0
-      });
+      }));
     }
   };
 
@@ -644,6 +648,29 @@ const AdminDashboard: React.FC = () => {
       unsubscribeQR();
     };
   }, []);
+
+  const lateNotifyInitRef = useRef(false);
+  const lateUserIdsSeenRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    const lates = (todayAttendanceList || []).filter((s: any) => s.isLate);
+    const ids = new Set(lates.map((s: any) => s.userId));
+
+    if (!lateNotifyInitRef.current) {
+      lateNotifyInitRef.current = true;
+      lateUserIdsSeenRef.current = ids;
+      return;
+    }
+
+    const newlyLate = lates.filter((s: any) => !lateUserIdsSeenRef.current.has(s.userId));
+    if (newlyLate.length > 0) {
+      uniqueToast.info(
+        `Late check-in${newlyLate.length > 1 ? 's' : ''} (Harare): ${newlyLate.map((s: any) => s.userName).join(', ')}`,
+        { autoClose: 7000 }
+      );
+    }
+    lateUserIdsSeenRef.current = ids;
+  }, [todayAttendanceList]);
 
   const handleNavClick = (navItem: string) => {
     setActiveNav(navItem);
@@ -885,9 +912,43 @@ const AdminDashboard: React.FC = () => {
               </StatCard>
             </StatsGrid>
 
+            {stats.lateCount > 0 && (
+              <Card
+                style={{
+                  marginBottom: theme.spacing.lg,
+                  borderLeft: `4px solid #f59e0b`,
+                  background: 'linear-gradient(90deg, rgba(245, 158, 11, 0.08) 0%, transparent 40%)',
+                }}
+              >
+                <CardTitle>Late arrivals today (Harare · 9:00 AM or later)</CardTitle>
+                <p style={{ margin: `0 0 ${theme.spacing.md} 0`, fontSize: theme.fontSizes.sm, color: theme.colors.textSecondary }}>
+                  These students checked in after the on-time window. You will get a toast when someone new is marked late.
+                </p>
+                <AttendanceList>
+                  {(todayAttendanceList || [])
+                    .filter((s: any) => s.isLate)
+                    .map((s: any) => (
+                      <AttendanceItem key={`late-${s.userId}`}>
+                        <UserAvatar style={{ background: '#f59e0b' }}>{getInitials(s.userName || 'Student')}</UserAvatar>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: theme.fontWeights.semibold, color: theme.colors.textPrimary, fontSize: theme.fontSizes.sm }}>
+                            {s.userName}
+                          </div>
+                          <div style={{ color: theme.colors.textSecondary, fontSize: theme.fontSizes.xs }}>
+                            {s.checkInTime
+                              ? TimeService.getInstance().formatClockTime(new Date(s.checkInTime))
+                              : '—'}
+                          </div>
+                        </div>
+                      </AttendanceItem>
+                    ))}
+                </AttendanceList>
+              </Card>
+            )}
+
             <ContentGrid>
               <Card>
-                <CardTitle>Attendance trend (last 7 days, Harare)</CardTitle>
+                <CardTitle>Attendance trend (last 5 school days, Harare)</CardTitle>
                 <div style={{ width: '100%', height: 300, minHeight: 240, minWidth: 0 }}>
                   <ResponsiveContainer width="100%" height="100%" minHeight={240}>
                     <BarChart

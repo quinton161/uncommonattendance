@@ -1,4 +1,4 @@
-import { eachDayOfInterval, format, parseISO, subDays } from 'date-fns';
+import { format, parseISO, subDays } from 'date-fns';
 import { AttendanceRecord, AttendanceStatus } from '../types';
 import { db } from './firebase';
 import { collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
@@ -129,11 +129,20 @@ function normalizeStatus(record: AttendanceRecord): AttendanceStatus {
   return isLateRecord(record) ? 'late' : 'present';
 }
 
+/** School calendar day in Harare from stored `date` or from check-in instant (real data). */
+function recordSchoolDateHarare(r: any): string | undefined {
+  if (r.date && typeof r.date === 'string') return r.date;
+  const d = checkInToDate(r as AttendanceRecord);
+  if (!d) return undefined;
+  return TimeService.getInstance().toHarareDateString(d);
+}
+
 function dedupeRecordsByDate(records: any[]): Map<string, any> {
   const m = new Map<string, any>();
+  const ts = TimeService.getInstance();
   records.forEach((r) => {
-    const day = r.date;
-    if (!day) return;
+    const day = recordSchoolDateHarare(r);
+    if (!day || !ts.isHarareWeekday(day)) return;
     const ex = m.get(day);
     if (!ex) {
       m.set(day, r);
@@ -146,17 +155,9 @@ function dedupeRecordsByDate(records: any[]): Map<string, any> {
   return m;
 }
 
+/** Mon–Fri only; uses Harare calendar (not browser local `getDay()`). */
 function eachWeekdayInRange(startDateStr: string, endDateStr: string): string[] {
-  const dates: string[] = [];
-  eachDayOfInterval({
-    start: parseISO(startDateStr),
-    end: parseISO(endDateStr),
-  }).forEach((d) => {
-    const wd = d.getDay();
-    if (wd === 0 || wd === 6) return;
-    dates.push(format(d, 'yyyy-MM-dd'));
-  });
-  return dates;
+  return TimeService.getInstance().eachHarareWeekdayInRange(startDateStr, endDateStr);
 }
 
 /** Roster entries for per-student leaderboard / most-absent (same date range as query). */
@@ -266,11 +267,13 @@ function aggregateAdminRecords(
       }
     });
   } else {
+    const ts = TimeService.getInstance();
     const byDate = new Map<string, Map<string, 'present' | 'late'>>();
     records.forEach((r: any) => {
-      const day = r.date;
+      const day = recordSchoolDateHarare(r);
       const sid = r.studentId;
       if (!day || !sid) return;
+      if (!ts.isHarareWeekday(day)) return;
       if (!byDate.has(day)) byDate.set(day, new Map());
       const st = normalizeStatus(r as AttendanceRecord) === 'late' ? 'late' : 'present';
       byDate.get(day)!.set(sid, st);
@@ -351,8 +354,8 @@ function chunkWeeklySeries(
   daily: Array<{ date: string; status: 'present' | 'late' | 'absent' }>
 ): Array<{ name: string; present: number; late: number; absent: number }> {
   const weekly: Array<{ name: string; present: number; late: number; absent: number }> = [];
-  for (let i = 0; i < daily.length; i += 7) {
-    const chunk = daily.slice(i, i + 7);
+  for (let i = 0; i < daily.length; i += 5) {
+    const chunk = daily.slice(i, i + 5);
     if (chunk.length === 0) continue;
     const a = chunk[0].date;
     const b = chunk[chunk.length - 1].date;
@@ -485,10 +488,15 @@ export class AttendanceAnalyticsService {
       return { preset, startDate: endDate, endDate };
     }
 
+    if (preset.value === 'week') {
+      const wd = ts.lastNHarareWeekdays(5, endDate);
+      const startW = wd[0] ?? endDate;
+      const endW = wd[wd.length - 1] ?? endDate;
+      return { preset, startDate: startW, endDate: endW };
+    }
+
     const days =
-      preset.value === 'week'
-        ? 7
-        : preset.value === 'quarter'
+      preset.value === 'quarter'
           ? 90
           : preset.value === 'month'
             ? 30

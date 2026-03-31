@@ -358,7 +358,7 @@ export function StudentAttendanceAnalytics(props: { studentId: string }): React.
       <Card {...cardAnim}>
         <Title>
           <h3>Weekly view</h3>
-          <span>Range split into 7-day blocks (weekdays only in totals)</span>
+          <span>Range split into 5-day school blocks (Mon–Fri, Harare)</span>
         </Title>
           <ChartContainer>
           {weekly.length === 0 ? (

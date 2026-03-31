@@ -1,3 +1,5 @@
+import { eachDayOfInterval, parseISO, subDays } from 'date-fns';
+
 /**
  * TimeService — single source of truth for all time/date operations.
  *
@@ -44,6 +46,59 @@ export class TimeService {
   /** Calendar date in Harare for any instant (matches stored attendance `date` field). */
   toHarareDateString(date: Date): string {
     return this._toHarareDateString(date);
+  }
+
+  /**
+   * UTC instants for [start, end] of a calendar day in Africa/Harare (CAT, UTC+2).
+   * Used to query Firestore by `checkInTime` so records are found even if `date` is missing/wrong.
+   */
+  getHarareDayUtcBounds(yyyyMmDd: string): { start: Date; end: Date } {
+    const start = new Date(`${yyyyMmDd}T00:00:00.000+02:00`);
+    const end = new Date(`${yyyyMmDd}T23:59:59.999+02:00`);
+    return { start, end };
+  }
+
+  /**
+   * True if `yyyy-mm-dd` is Monday–Friday on the Africa/Harare calendar (school days).
+   * Uses Harare weekday, not the browser’s local timezone.
+   */
+  isHarareWeekday(yyyyMmDd: string): boolean {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(yyyyMmDd)) return false;
+    const d = new Date(`${yyyyMmDd}T12:00:00+02:00`);
+    const wd = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Africa/Harare',
+      weekday: 'short',
+    }).format(d);
+    return ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].includes(wd);
+  }
+
+  /**
+   * All Mon–Fri calendar dates from start through end (inclusive), Harare.
+   */
+  eachHarareWeekdayInRange(startDateStr: string, endDateStr: string): string[] {
+    const dates: string[] = [];
+    eachDayOfInterval({
+      start: parseISO(`${startDateStr}T12:00:00+02:00`),
+      end: parseISO(`${endDateStr}T12:00:00+02:00`),
+    }).forEach((d) => {
+      const ymd = this.toHarareDateString(d);
+      if (this.isHarareWeekday(ymd)) dates.push(ymd);
+    });
+    return dates;
+  }
+
+  /**
+   * Last `n` school days (Mon–Fri) ending on `endDateStr` (Harare), oldest → newest.
+   */
+  lastNHarareWeekdays(n: number, endDateStr: string): string[] {
+    const out: string[] = [];
+    let d = parseISO(`${endDateStr}T12:00:00+02:00`);
+    for (let i = 0; i < 21 && out.length < n; i++) {
+      const ymd = this.toHarareDateString(d);
+      if (this.isHarareWeekday(ymd)) out.unshift(ymd);
+      d = subDays(d, 1);
+    }
+    return out;
   }
 
   // ── Attendance rules ────────────────────────────────────────────────────────

@@ -25,7 +25,7 @@ import {
   LineChart,
   Line
 } from 'recharts';
-import { eachDayOfInterval, subDays, format, parseISO } from 'date-fns';
+import { format, parseISO, subDays } from 'date-fns';
 import { theme } from '../../styles/theme';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../Common/Button';
@@ -463,11 +463,7 @@ export const AdminProfile: React.FC = () => {
 
         const timeSvc = TimeService.getInstance();
         const endStr = timeSvc.getCurrentDateString();
-        const rangeEnd = parseISO(`${endStr}T12:00:00`);
-        const last7DaysInterval = eachDayOfInterval({
-          start: subDays(rangeEnd, 6),
-          end: rangeEnd,
-        });
+        const lastSchoolDays = timeSvc.lastNHarareWeekdays(5, endStr);
 
         const attendanceDateKey = (a: any): string => {
           if (a.date && typeof a.date === 'string') return a.date;
@@ -479,11 +475,11 @@ export const AdminProfile: React.FC = () => {
         };
 
         const attendance = await ds.getAttendance();
-        const chartData = last7DaysInterval.map(date => {
-          const dateStr = format(date, 'yyyy-MM-dd');
-          const dayAttendance = attendance.filter(a => attendanceDateKey(a) === dateStr);
+        const chartData = lastSchoolDays.map((dateStr) => {
+          const dayAttendance = attendance.filter((a) => attendanceDateKey(a) === dateStr);
+          const d = parseISO(`${dateStr}T12:00:00+02:00`);
           return {
-            name: format(date, 'EEE'),
+            name: format(d, 'EEE'),
             sessions: dayAttendance.length
           };
         });
@@ -503,14 +499,14 @@ export const AdminProfile: React.FC = () => {
           const student = students[index];
           const studentId = student.id || student.uid;
           
-          const trend = last7DaysInterval.map(date => {
-            const dateStr = format(date, 'yyyy-MM-dd');
-            const wasPresent = attendance.some(a => {
+          const trend = lastSchoolDays.map((dateStr) => {
+            const wasPresent = attendance.some((a) => {
               const isSameStudent = a.studentId === studentId || a.userId === studentId;
               return isSameStudent && attendanceDateKey(a) === dateStr;
             });
+            const d = parseISO(`${dateStr}T12:00:00+02:00`);
             return {
-              name: format(date, 'EEE'),
+              name: format(d, 'EEE'),
               rate: wasPresent ? 100 : 0
             };
           });

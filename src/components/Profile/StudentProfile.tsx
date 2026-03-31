@@ -27,7 +27,7 @@ import {
   Pie,
   Cell
 } from 'recharts';
-import { format, subDays, eachDayOfInterval, parseISO } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { theme } from '../../styles/theme';
 import { useAuth } from '../../contexts/AuthContext';
 import { uniqueToast } from '../../utils/toastUtils';
@@ -463,11 +463,7 @@ export const StudentProfile: React.FC = () => {
       const attendance = await ds.getAttendance(user.uid);
       const ts = TimeService.getInstance();
       const endStr = ts.getCurrentDateString();
-      const end = parseISO(`${endStr}T12:00:00`);
-      const last7Days = eachDayOfInterval({
-        start: subDays(end, 6),
-        end,
-      });
+      const lastSchoolDays = ts.lastNHarareWeekdays(5, endStr);
 
       const attendanceDateKey = (a: any): string => {
         if (a.date && typeof a.date === 'string') return a.date;
@@ -478,11 +474,11 @@ export const StudentProfile: React.FC = () => {
         return ts.toHarareDateString(d);
       };
 
-      const chartData = last7Days.map((date) => {
-        const dateStr = format(date, 'yyyy-MM-dd');
+      const chartData = lastSchoolDays.map((dateStr) => {
         const present = attendance.some((a) => attendanceDateKey(a) === dateStr);
+        const d = parseISO(`${dateStr}T12:00:00+02:00`);
         return {
-          name: format(date, 'EEE'),
+          name: format(d, 'EEE'),
           rate: present ? 100 : 0,
         };
       });

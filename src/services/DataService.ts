@@ -3,7 +3,7 @@ import {
   query, where, orderBy, limit, addDoc,
   Timestamp, deleteDoc, onSnapshot, serverTimestamp,
 } from 'firebase/firestore';
-import { eachDayOfInterval, format, parseISO, subDays } from 'date-fns';
+import { format, parseISO, subDays } from 'date-fns';
 import { ref, deleteObject } from 'firebase/storage';
 import { db, storage } from './firebase';
 import { uniqueToast } from '../utils/toastUtils';
@@ -38,6 +38,29 @@ class DataService {
   }
 
   /** Is the check-in time late? (>= 9:00 AM Harare) */
+  private mapAttendanceSnapshotDoc(d: { id: string; data: () => any }): any {
+    const raw = d.data();
+    const ci = raw.checkInTime;
+    const co = raw.checkOutTime;
+    return {
+      id: d.id,
+      ...raw,
+      checkInTime:
+        typeof ci?.toDate === 'function' ? ci.toDate() : ci instanceof Date ? ci : ci,
+      checkOutTime:
+        typeof co?.toDate === 'function' ? co.toDate() : co instanceof Date ? co : co,
+    };
+  }
+
+  /** Merge two attendance arrays by document id (dedupe). */
+  private mergeAttendanceByDocId(a: any[], b: any[]): any[] {
+    const m = new Map<string, any>();
+    [...a, ...b].forEach((r) => {
+      if (r?.id) m.set(r.id, r);
+    });
+    return Array.from(m.values());
+  }
+
   private calcIsLate(checkInTime: any): boolean {
     if (!checkInTime) return false;
     try {
@@ -167,21 +190,34 @@ class DataService {
   async getDashboardStats(): Promise<any> {
     const [events, users] = await Promise.all([this.getEvents(), this.getUsers()]);
     const students  = users.filter(u => this.isStudent(u));
-    const today     = TimeService.getInstance().getCurrentDateString();
-    const todaySnap = await getDocs(query(collection(db,'attendance'), where('date','==',today)));
+    const ts        = TimeService.getInstance();
+    const today     = ts.getCurrentDateString();
+    const { start, end } = ts.getHarareDayUtcBounds(today);
+
+    const [byDateSnap, byRangeSnap] = await Promise.all([
+      getDocs(query(collection(db, 'attendance'), where('date', '==', today))),
+      getDocs(
+        query(
+          collection(db, 'attendance'),
+          where('checkInTime', '>=', Timestamp.fromDate(start)),
+          where('checkInTime', '<=', Timestamp.fromDate(end))
+        )
+      ),
+    ]);
+
+    const mergedDocs = this.mergeAttendanceByDocId(
+      byDateSnap.docs.map((d) => this.mapAttendanceSnapshotDoc(d)),
+      byRangeSnap.docs.map((d) => this.mapAttendanceSnapshotDoc(d))
+    );
 
     return {
       totalEvents:       events.length,
       activeEvents:      events.filter(e => e.eventStatus==='published').length,
       totalAttendees:    students.length,
       totalInstructors:  users.filter(u => this.isInstructor(u)).length,
-      todayAttendance:   todaySnap.size,
-      lateCount:         todaySnap.docs.filter(d => this.calcIsLate(d.data().checkInTime)).length,
-      recentAttendance:  todaySnap.docs.slice(0,10).map(d => ({
-        id: d.id, ...d.data(),
-        checkInTime:  d.data().checkInTime?.toDate(),
-        checkOutTime: d.data().checkOutTime?.toDate(),
-      })),
+      todayAttendance:   mergedDocs.length,
+      lateCount:         mergedDocs.filter((d) => this.calcIsLate(d.checkInTime)).length,
+      recentAttendance:  mergedDocs.slice(0, 10),
     };
   }
 
@@ -192,36 +228,64 @@ class DataService {
    * causing the summary to show 0 present every time a user doc changed.
    */
   subscribeToTodayAttendance(callback: (summary: any) => void): () => void {
-    const ts    = TimeService.getInstance();
+    const ts = TimeService.getInstance();
     const today = ts.getCurrentDateString();
+    const { start, end } = ts.getHarareDayUtcBounds(today);
 
-    // Load users once (they don't change mid-session)
     let users: any[] = [];
-    const usersReady = this.getUsers().then(u => { users = u; });
+    const usersReady = this.getUsers().then((u) => {
+      users = u;
+    });
 
-    const q = query(
-      collection(db,'attendance'),
-      where('date','==',today),
-      orderBy('checkInTime','desc'),
+    let batchDate: any[] = [];
+    let batchRange: any[] = [];
+
+    const emit = async () => {
+      await usersReady;
+      const attendance = this.mergeAttendanceByDocId(batchDate, batchRange);
+      callback(this._buildSummary(today, users, attendance));
+    };
+
+    const qDate = query(
+      collection(db, 'attendance'),
+      where('date', '==', today),
+      orderBy('checkInTime', 'desc')
+    );
+    const qRange = query(
+      collection(db, 'attendance'),
+      where('checkInTime', '>=', Timestamp.fromDate(start)),
+      where('checkInTime', '<=', Timestamp.fromDate(end)),
+      orderBy('checkInTime', 'desc')
     );
 
-    const unsub = onSnapshot(q, async snap => {
-      await usersReady;
-      const attendance = snap.docs.map(d => ({
-        id: d.id, ...d.data(),
-        checkInTime:  d.data().checkInTime?.toDate(),
-        checkOutTime: d.data().checkOutTime?.toDate(),
-      }));
-      callback(this._buildSummary(today, users, attendance));
-    }, err => console.error('attendance listener error:', err));
+    const unsubDate = onSnapshot(
+      qDate,
+      async (snap) => {
+        batchDate = snap.docs.map((d) => this.mapAttendanceSnapshotDoc(d));
+        await emit();
+      },
+      (err) => console.error('attendance listener (date):', err)
+    );
 
-    return unsub;
+    const unsubRange = onSnapshot(
+      qRange,
+      async (snap) => {
+        batchRange = snap.docs.map((d) => this.mapAttendanceSnapshotDoc(d));
+        await emit();
+      },
+      (err) => console.error('attendance listener (checkInTime range):', err)
+    );
+
+    return () => {
+      unsubDate();
+      unsubRange();
+    };
   }
 
   private _buildSummary(date: string, users: any[], attendance: any[]) {
     // Deduplicate: keep newest record per student
     const byStudent = new Map<string, any>();
-    attendance.forEach(r => {
+    attendance.forEach((r) => {
       const sid = r.studentId || r.userId;
       if (!sid) return;
       const ex = byStudent.get(sid);
@@ -232,7 +296,10 @@ class DataService {
 
     const list = users.filter(u => this.isStudent(u)).map(u => {
       const uid = u.uid || u.id;
-      const rec = byStudent.get(uid);
+      let rec = byStudent.get(uid);
+      if (!rec && u.uid && u.id && u.uid !== u.id) {
+        rec = byStudent.get(u.uid) || byStudent.get(u.id);
+      }
       let status: 'present'|'late'|'absent'|'completed' = 'absent';
       let checkInTime = null, checkOutTime = null, isLate = false;
 
@@ -343,19 +410,15 @@ class DataService {
       return d && d >= startDate && d <= endDate;
     });
 
-    const schoolDays = eachDayOfInterval({
-      start: parseISO(startDate),
-      end: parseISO(endDate),
-    }).filter((d) => {
-      const wd = d.getDay();
-      return wd !== 0 && wd !== 6;
-    }).length;
+    const schoolDays = TimeService.getInstance().eachHarareWeekdayInRange(startDate, endDate).length;
 
+    const tsAtRisk = TimeService.getInstance();
     const daysPresentByStudent = new Map<string, Set<string>>();
     inRange.forEach((r: any) => {
       const sid = r.studentId;
       const day = r.date || this.dateStr(r);
       if (!sid || !day) return;
+      if (!tsAtRisk.isHarareWeekday(day)) return;
       if (!daysPresentByStudent.has(sid)) daysPresentByStudent.set(sid, new Set());
       daysPresentByStudent.get(sid)!.add(day);
     });
