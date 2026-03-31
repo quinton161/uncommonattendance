@@ -115,18 +115,24 @@ export class AttendanceService {
       throw new Error('Already checked out today');
     }
 
-    const update: any = {
+    // Include studentId so Firestore rules see it on the merged request.resource (partial updates).
+    const base = {
+      studentId: data.studentId ?? studentId,
       checkOutTime: Timestamp.fromDate(now),
-      status:       'completed',
-      updatedAt:    serverTimestamp(),
+      status: 'completed' as const,
+      updatedAt: serverTimestamp(),
     };
-    if (location?.ip && location.ip !== '0.0.0.0') {
-      update.location = {
-        ...data.location,
-        ip: location.ip,
-        checkOutTimestamp: location.timestamp ?? Date.now(),
-      };
-    }
+    const update =
+      location?.ip && location.ip !== '0.0.0.0'
+        ? {
+            ...base,
+            location: {
+              ...data.location,
+              ip: location.ip,
+              checkOutTimestamp: location.timestamp ?? Date.now(),
+            },
+          }
+        : base;
 
     await updateDoc(doc(db, 'attendance', docId), update);
     return {

@@ -54,11 +54,14 @@ service cloud.firestore {
       
       // Students can UPDATE (add check-out) on their own record. Do not use diff().hasOnly —
       // Firestore merge + serverTimestamp can fail that check and deny legitimate check-outs.
+      // Ownership: doc id is `{date}_{uid}` — do not rely only on request.resource.data.studentId
+      // after partial updates (merged snapshot can be finicky vs request.auth.uid checks).
       allow update: if isAuth()
+                    && attendanceId.matches('.*_' + request.auth.uid + '$')
                     && resource.data.studentId == request.auth.uid
-                    && request.auth.uid == request.resource.data.studentId
-                    && resource.data.checkOutTime == null
-                    && request.resource.data.checkOutTime != null;
+                    && (!resource.data.keys().hasAny(['checkOutTime']) || resource.data.checkOutTime == null)
+                    && request.resource.data.checkOutTime != null
+                    && request.resource.data.studentId == resource.data.studentId;
     }
 
     // Daily attendance summary (used by DailyAttendanceService)
