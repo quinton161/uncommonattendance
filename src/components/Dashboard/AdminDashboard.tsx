@@ -670,7 +670,7 @@ const AdminDashboard: React.FC = () => {
         );
       case 'users':
         return (
-          <div style={{ padding: theme.spacing.lg }}>
+          <div style={{ width: '100%', minWidth: 0, minHeight: 0 }}>
             <UsersPage onBack={() => setActiveNav('dashboard')} onChat={handleChatFromUsers} />
           </div>
         );
@@ -743,9 +743,9 @@ const AdminDashboard: React.FC = () => {
         </MobileSidebar>
       )}
       
-      <Sidebar 
-        activeNav={activeNav} 
-        onNavClick={handleNavClick} 
+      <Sidebar
+        activeNav={activeNav}
+        onNavClick={handleNavClick}
         onMasterReset={user?.userType === 'admin' ? () => setShowMasterResetModal(true) : undefined}
       />
 

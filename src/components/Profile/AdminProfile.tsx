@@ -461,19 +461,27 @@ export const AdminProfile: React.FC = () => {
           ? Math.round((avgRate * 0.7) + (85 * 0.3)) 
           : 0;
 
-        // Unified weekly trend (last 7 days)
+        const timeSvc = TimeService.getInstance();
+        const endStr = timeSvc.getCurrentDateString();
+        const rangeEnd = parseISO(`${endStr}T12:00:00`);
         const last7DaysInterval = eachDayOfInterval({
-          start: subDays(new Date(), 6),
-          end: new Date(),
+          start: subDays(rangeEnd, 6),
+          end: rangeEnd,
         });
+
+        const attendanceDateKey = (a: any): string => {
+          if (a.date && typeof a.date === 'string') return a.date;
+          const c = a.checkInTime;
+          if (!c) return '';
+          const d = c.toDate ? c.toDate() : c instanceof Date ? c : new Date(c);
+          if (Number.isNaN(d.getTime())) return '';
+          return timeSvc.toHarareDateString(d);
+        };
 
         const attendance = await ds.getAttendance();
         const chartData = last7DaysInterval.map(date => {
           const dateStr = format(date, 'yyyy-MM-dd');
-          const dayAttendance = attendance.filter(a => {
-            const aDate = a.date || (a.checkInTime ? format(new Date(a.checkInTime), 'yyyy-MM-dd') : '');
-            return aDate === dateStr;
-          });
+          const dayAttendance = attendance.filter(a => attendanceDateKey(a) === dateStr);
           return {
             name: format(date, 'EEE'),
             sessions: dayAttendance.length
@@ -499,8 +507,7 @@ export const AdminProfile: React.FC = () => {
             const dateStr = format(date, 'yyyy-MM-dd');
             const wasPresent = attendance.some(a => {
               const isSameStudent = a.studentId === studentId || a.userId === studentId;
-              const aDate = a.date || (a.checkInTime ? format(new Date(a.checkInTime), 'yyyy-MM-dd') : '');
-              return isSameStudent && aDate === dateStr;
+              return isSameStudent && attendanceDateKey(a) === dateStr;
             });
             return {
               name: format(date, 'EEE'),

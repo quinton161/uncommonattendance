@@ -41,6 +41,11 @@ export class TimeService {
     return this._toHarareDateString(this.getCurrentTime());
   }
 
+  /** Calendar date in Harare for any instant (matches stored attendance `date` field). */
+  toHarareDateString(date: Date): string {
+    return this._toHarareDateString(date);
+  }
+
   // ── Attendance rules ────────────────────────────────────────────────────────
 
   /**
@@ -96,6 +101,16 @@ export class TimeService {
       timeZone: 'Africa/Harare',
       year: 'numeric', month: '2-digit', day: '2-digit',
       hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+    });
+  }
+
+  /** Short clock time in Africa/Harare (12-hour) for dashboards and lists. */
+  formatClockTime(date: Date): string {
+    return date.toLocaleTimeString('en-US', {
+      timeZone: 'Africa/Harare',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
     });
   }
 

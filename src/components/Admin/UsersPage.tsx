@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import styled from 'styled-components';
 import { useAuth } from '../../contexts/AuthContext';
 import { theme } from '../../styles/theme';
@@ -8,27 +8,27 @@ import { TimeService } from '../../services/timeService';
 import { AttendanceService } from '../../services/attendanceService';
 import { DeleteUserModal } from './DeleteUserModal';
 import { uniqueToast } from '../../utils/toastUtils';
-import { UncommonLogo } from '../Common/UncommonLogo';
 import {
   PersonIcon,
   CheckCircleIcon,
   TodayIcon,
   SearchIcon
 } from '../Common/Icons';
-import { FiClock } from 'react-icons/fi';
-
 const PageContainer = styled.div`
   padding: ${theme.spacing.xl};
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   min-height: 100vh;
   background: ${theme.colors.backgroundSecondary};
   
   @media (max-width: ${theme.breakpoints.tablet}) {
-    padding: ${theme.spacing.lg};
+    padding: ${theme.spacing.md};
   }
   
   @media (max-width: ${theme.breakpoints.mobile}) {
-    padding: ${theme.spacing.md};
+    padding: ${theme.spacing.sm};
   }
 `;
 
@@ -36,6 +36,7 @@ const Header = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
+  flex-wrap: wrap;
   margin-bottom: ${theme.spacing.xl};
   padding-bottom: ${theme.spacing.lg};
   border-bottom: 2px solid ${theme.colors.primary};
@@ -44,12 +45,46 @@ const Header = styled.div`
   @media (max-width: ${theme.breakpoints.tablet}) {
     flex-direction: column;
     align-items: stretch;
-    gap: ${theme.spacing.lg};
+    gap: ${theme.spacing.md};
   }
   
   @media (max-width: ${theme.breakpoints.mobile}) {
     margin-bottom: ${theme.spacing.lg};
     padding-bottom: ${theme.spacing.md};
+  }
+`;
+
+/** Search is redundant with hamburger + fewer pixels on phones/tablets in portrait. */
+const SearchWrap = styled.div`
+  position: relative;
+  flex: 1;
+  min-width: 200px;
+  max-width: 320px;
+
+  @media (max-width: ${theme.breakpoints.tablet}) {
+    display: none;
+  }
+`;
+
+const HeaderActions = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: ${theme.spacing.md};
+  align-items: center;
+  justify-content: flex-end;
+  flex: 1;
+  min-width: 0;
+
+  @media (max-width: ${theme.breakpoints.mobile}) {
+    flex-direction: column;
+    align-items: stretch;
+  }
+`;
+
+const DesktopOnly = styled.div`
+  display: inline-flex;
+  @media (max-width: ${theme.breakpoints.tablet}) {
+    display: none;
   }
 `;
 
@@ -84,40 +119,30 @@ const StatusDot = styled.span<{ $isActive: boolean }>`
   box-shadow: ${props => props.$isActive ? '0 0 6px rgba(34, 197, 94, 0.4)' : 'none'};
 `;
 
-const LastActivity = styled.div`
-  font-size: ${theme.fontSizes.xs};
-  color: ${theme.colors.textSecondary};
-  margin-top: ${theme.spacing.xs};
-  display: flex;
-  align-items: center;
-  gap: 4px;
-`;
-
-const MiniBadge = styled.span`
-  background: ${theme.colors.primary}10;
-  color: ${theme.colors.primary};
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 10px;
-  font-weight: ${theme.fontWeights.semibold};
-  text-transform: uppercase;
-`;
-
 const CardSection = styled.div`
   padding-top: ${theme.spacing.md};
   border-top: 1px solid ${theme.colors.gray100};
   margin-top: ${theme.spacing.md};
 `;
 
+const TimeCell = styled.span`
+  font-weight: ${theme.fontWeights.medium};
+  color: ${theme.colors.textPrimary};
+  font-variant-numeric: tabular-nums;
+  font-size: ${theme.fontSizes.sm};
+`;
+
 const TableRow = styled.div`
   display: grid;
-  grid-template-columns: 2fr 150px 150px 200px;
-  gap: ${theme.spacing.xl};
-  padding: ${theme.spacing.lg} ${theme.spacing.xl};
+  grid-template-columns: minmax(200px, 2fr) 100px minmax(100px, 120px) minmax(88px, 1fr) minmax(88px, 1fr) minmax(160px,auto);
+  gap: ${theme.spacing.md};
+  padding: ${theme.spacing.md} ${theme.spacing.lg};
   border-bottom: 1px solid ${theme.colors.gray100};
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   align-items: center;
-  min-width: 800px;
+  min-width: 0;
+  box-sizing: border-box;
+  min-height: 72px;
   border-left: 4px solid transparent;
   
   &:hover {
@@ -213,9 +238,9 @@ const TableWrapper = styled.div`
 
 const TableHeader = styled.div`
   display: grid;
-  grid-template-columns: 2fr 150px 150px 200px;
-  gap: ${theme.spacing.xl};
-  padding: ${theme.spacing.xl};
+  grid-template-columns: minmax(200px, 2fr) 100px minmax(100px, 120px) minmax(88px, 1fr) minmax(88px, 1fr) minmax(160px,auto);
+  gap: ${theme.spacing.md};
+  padding: ${theme.spacing.md} ${theme.spacing.lg};
   background: ${theme.colors.gray50};
   border-bottom: 1px solid ${theme.colors.gray200};
   font-weight: ${theme.fontWeights.bold};
@@ -223,7 +248,8 @@ const TableHeader = styled.div`
   font-size: ${theme.fontSizes.xs};
   text-transform: uppercase;
   letter-spacing: 1px;
-  min-width: 800px;
+  min-width: 0;
+  align-items: center;
 `;
 
 const LoadingState = styled.div`
@@ -263,7 +289,8 @@ const SearchInput = styled.input`
   border-radius: ${theme.borderRadius.lg};
   border: 1px solid ${theme.colors.gray300};
   font-size: ${theme.fontSizes.sm};
-  width: 300px;
+  width: 100%;
+  box-sizing: border-box;
   background: ${theme.colors.white};
   transition: all 0.2s ease;
 
@@ -271,10 +298,6 @@ const SearchInput = styled.input`
     outline: none;
     border-color: ${theme.colors.primary};
     box-shadow: 0 0 0 3px ${theme.colors.primary}20;
-  }
-
-  @media (max-width: ${theme.breakpoints.tablet}) {
-    width: 100%;
   }
 `;
 
@@ -372,6 +395,32 @@ const MobileUserDetails = styled.div`
     grid-template-columns: 1fr;
     gap: ${theme.spacing.xs};
     font-size: ${theme.fontSizes.xs};
+  }
+`;
+
+const MobileTimesRow = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: ${theme.spacing.sm};
+  margin-bottom: ${theme.spacing.md};
+  padding: ${theme.spacing.sm} 0;
+  border-top: 1px solid ${theme.colors.gray100};
+  font-size: ${theme.fontSizes.sm};
+
+  @media (max-width: ${theme.breakpoints.mobile}) {
+    grid-template-columns: 1fr;
+    font-size: ${theme.fontSizes.xs};
+  }
+`;
+
+const MobileTimeBlock = styled.div`
+  strong {
+    display: block;
+    color: ${theme.colors.textSecondary};
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 4px;
   }
 `;
 
@@ -508,6 +557,17 @@ const StatsCaption = styled.p`
   max-width: 52rem;
 `;
 
+function toDateSafe(value: any): Date | null {
+  if (!value) return null;
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+  if (typeof value?.toDate === 'function') {
+    const d = value.toDate();
+    return d instanceof Date && !Number.isNaN(d.getTime()) ? d : null;
+  }
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
 interface UsersPageProps {
   onBack?: () => void;
   onChat?: (studentId: string, studentName: string, studentPhotoUrl?: string) => void;
@@ -549,19 +609,29 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
     }
   };
 
+  const ts = TimeService.getInstance();
+  const formatAttTime = (value: any): string | null => {
+    const d = toDateSafe(value);
+    return d ? ts.formatClockTime(d) : null;
+  };
+
   const getTodayAttendance = (userId: string) => {
-    const timeService = TimeService.getInstance();
-    const today = timeService.getCurrentDateString();
-    return attendance.find(a => {
-      if (a.studentId !== userId) return false;
+    const today = ts.getCurrentDateString();
+    const matchesToday = (a: any) => {
+      const sid = a.studentId || a.userId;
+      if (sid !== userId) return false;
       if (a.date) return a.date === today;
-      // Fallback for records without a date field
-      if (a.checkInTime) {
-        const checkInDate = a.checkInTime.toDate ? a.checkInTime.toDate() : new Date(a.checkInTime);
-        return checkInDate.toISOString().split('T')[0] === today;
-      }
-      return false;
-    });
+      const ci = toDateSafe(a.checkInTime);
+      if (!ci) return false;
+      return ts.toHarareDateString(ci) === today;
+    };
+    const todays = attendance.filter(matchesToday);
+    if (todays.length === 0) return undefined;
+    return todays.sort((a, b) => {
+      const ta = toDateSafe(a.checkInTime)?.getTime() ?? 0;
+      const tb = toDateSafe(b.checkInTime)?.getTime() ?? 0;
+      return tb - ta;
+    })[0];
   };
 
   // getUserStats and formatTime were previously defined but unused helpers.
@@ -569,6 +639,17 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
   const getInitials = (name: string) => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase();
   };
+
+  const attendees = useMemo(() => users.filter((u) => u.userType === 'attendee'), [users]);
+  const filteredAttendees = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    if (!q) return attendees;
+    return attendees.filter((u) => {
+      const name = (u.displayName || '').toLowerCase();
+      const email = (u.email || '').toLowerCase();
+      return name.includes(q) || email.includes(q);
+    });
+  }, [attendees, searchTerm]);
 
   if (user?.userType !== 'admin' && user?.userType !== 'instructor') {
     return (
@@ -626,7 +707,8 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
   const handleMarkAllPresent = async () => {
     const absentStudents = users.filter(userData => {
       if (userData.userType === 'admin' || userData.userType === 'instructor') return false;
-      const todayAttendance = getTodayAttendance(userData.id);
+      const uid = userData.id || userData.uid;
+      const todayAttendance = getTodayAttendance(uid);
       const isPresent = todayAttendance && todayAttendance.checkInTime && !todayAttendance.checkOutTime;
       return !isPresent;
     });
@@ -644,8 +726,15 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
     try {
       // Use AttendanceService with skipTimeCheck=true to allow marking after deadline
       const attendanceService = AttendanceService.getInstance();
-      const promises = absentStudents.map(student => 
-        attendanceService.checkIn(student.id, student.displayName || 'Unknown User', undefined, undefined, true, 'admin')
+      const promises = absentStudents.map(student =>
+        attendanceService.checkIn(
+          student.id || student.uid,
+          student.displayName || 'Unknown User',
+          undefined,
+          undefined,
+          true,
+          'admin'
+        )
       );
       await Promise.all(promises);
       uniqueToast.success(`Marked ${absentStudents.length} students as present!`);
@@ -658,53 +747,60 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
     }
   };
 
-  const attendees = users.filter(u => u.userType === 'attendee');
   const presentNowCount = attendees.filter(u => {
-    const t = getTodayAttendance(u.id);
+    const uid = u.id || u.uid;
+    const t = getTodayAttendance(uid);
     return !!(t?.checkInTime && !t?.checkOutTime);
   }).length;
-  const checkedInTodayCount = attendees.filter(u => !!getTodayAttendance(u.id)?.checkInTime).length;
+  const checkedInTodayCount = attendees.filter(u => {
+    const uid = u.id || u.uid;
+    return !!getTodayAttendance(uid)?.checkInTime;
+  }).length;
   const instructorCount = users.filter(u => u.userType === 'instructor').length;
 
   return (
     <PageContainer>
       <Header>
         <HeaderTitle>
-          <h1 style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: theme.spacing.lg,
-            margin: 0 
-          }}>
-            <UncommonLogo size="lg" showSubtitle={false} />
-            <span>Users Management</span>
-          </h1>
-          <p>Manage students below; admins are hidden. Summary cards count students only (instructors have their own card).</p>
+          <h1 style={{ margin: 0, lineHeight: 1.2 }}>Users</h1>
+          <p>Manage students below; admins are hidden. Summary cards count students only (instructors have their own card). Check-in and check-out times use Africa/Harare (school time).</p>
         </HeaderTitle>
-        <div style={{ display: 'flex', gap: theme.spacing.md, alignItems: 'center' }}>
-          <Button 
-            variant="primary" 
-            onClick={handleMarkAllPresent} 
+        <HeaderActions>
+          <Button
+            variant="primary"
+            onClick={handleMarkAllPresent}
             disabled={loading}
             style={{ backgroundColor: theme.colors.success, borderColor: theme.colors.success }}
           >
             <CheckCircleIcon size={18} /> Mark All Present
           </Button>
-          <div style={{ position: 'relative' }}>
-            <SearchIcon size={20} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: theme.colors.textSecondary }} />
+          <SearchWrap>
+            <SearchIcon
+              size={20}
+              style={{
+                position: 'absolute',
+                left: '12px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: theme.colors.textSecondary,
+              }}
+            />
             <SearchInput
               type="text"
               placeholder="Search users..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
+              aria-label="Search users"
             />
-          </div>
+          </SearchWrap>
           {onBack && (
-            <Button variant="outline" onClick={onBack}>
-              Back to Dashboard
-            </Button>
+            <DesktopOnly>
+              <Button variant="outline" onClick={onBack}>
+                Back to Dashboard
+              </Button>
+            </DesktopOnly>
           )}
-        </div>
+        </HeaderActions>
       </Header>
 
       <StatsCaption>
@@ -740,10 +836,15 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
         <LoadingState>
           Loading users...
         </LoadingState>
-      ) : users.filter(u => u.userType !== 'admin' && u.userType !== 'instructor').length === 0 ? (
+      ) : attendees.length === 0 ? (
         <EmptyState>
           <h3>No Manageable Users Found</h3>
           <p>No attendees are registered in the system yet. Admin and instructor accounts are protected and not shown here.</p>
+        </EmptyState>
+      ) : filteredAttendees.length === 0 ? (
+        <EmptyState>
+          <h3>No matches</h3>
+          <p>No students match your search. Clear the search or try another name or email.</p>
         </EmptyState>
       ) : (
         <>
@@ -752,22 +853,27 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
               <TableWrapper>
                 <TableHeader>
                   <div>User Information</div>
-                  <div>User Type</div>
-                  <div>Daily Status</div>
+                  <div>Type</div>
+                  <div>Today</div>
+                  <div>Check-in</div>
+                  <div>Check-out</div>
                   <div style={{ textAlign: 'right' }}>Actions</div>
                 </TableHeader>
           
-          {users.filter(userData => userData.userType === 'attendee').map((userData) => {
-            const todayAttendance = getTodayAttendance(userData.id);
-            const isCheckedIn = todayAttendance && todayAttendance.checkInTime && !todayAttendance.checkOutTime;
-            const checkInTimeString = todayAttendance?.checkInTime 
-              ? (todayAttendance.checkInTime.toDate ? todayAttendance.checkInTime.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : new Date(todayAttendance.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))
-              : null;
-            
+          {filteredAttendees.map((userData) => {
+            const uid = userData.id || userData.uid;
+            const todayAttendance = getTodayAttendance(uid);
+            const hasIn = !!todayAttendance?.checkInTime;
+            const hasOut = !!todayAttendance?.checkOutTime;
+            const isCheckedInNow = hasIn && !hasOut;
+            const statusLabel = !hasIn ? 'Not present' : hasOut ? 'Checked out' : 'Checked in';
+            const checkInDisp = formatAttTime(todayAttendance?.checkInTime) ?? '—';
+            const checkOutDisp = formatAttTime(todayAttendance?.checkOutTime) ?? '—';
+
             return (
               <TableRow key={userData.id}>
                 <UserInfo>
-                  <UserAvatar $isActive={!!isCheckedIn}>
+                  <UserAvatar $isActive={!!isCheckedInNow}>
                     {userData.photoUrl ? (
                       <img src={userData.photoUrl} alt={userData.displayName} />
                     ) : (
@@ -780,28 +886,31 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
                       {userData.displayName || 'Unknown User'}
                     </h4>
                     <p>{userData.email}</p>
-                    <LastActivity>
-                      <FiClock size={12} />
-                      Last check-in: {checkInTimeString || 'No record today'}
-                    </LastActivity>
                   </UserDetails>
                 </UserInfo>
-                
+
                 <div>
                   <UserType type={userData.userType}>
                     {userData.userType}
                   </UserType>
                 </div>
-                
+
                 <div>
-                  <StatusBadge $isActive={!!isCheckedIn}>
-                    <StatusDot $isActive={!!isCheckedIn} />
-                    {isCheckedIn ? 'Checked In' : 'Not Present'}
+                  <StatusBadge $isActive={!!isCheckedInNow}>
+                    <StatusDot $isActive={!!isCheckedInNow} />
+                    {statusLabel}
                   </StatusBadge>
                 </div>
-                
+
+                <div>
+                  <TimeCell>{checkInDisp}</TimeCell>
+                </div>
+                <div>
+                  <TimeCell>{checkOutDisp}</TimeCell>
+                </div>
+
                 <ActionButtons style={{ justifyContent: 'flex-end' }}>
-                  <MarkPresentButton onClick={() => handleMarkPresent(userData.id, userData.displayName || 'Unknown User')}>
+                  <MarkPresentButton onClick={() => handleMarkPresent(uid, userData.displayName || 'Unknown User')}>
                     <CheckCircleIcon size={14} /> <span>Mark Present</span>
                   </MarkPresentButton>
                   {user?.userType === 'admin' && (
@@ -818,18 +927,21 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
           </DesktopTable>
           
           {/* Mobile Card Layout */}
-          <div style={{ display: 'block' }}>
-            {users.filter(userData => userData.userType === 'attendee').map((userData) => {
-              const todayAttendance = getTodayAttendance(userData.id);
-              const isCheckedIn = todayAttendance && todayAttendance.checkInTime && !todayAttendance.checkOutTime;
-              const checkInTimeString = todayAttendance?.checkInTime 
-                ? (todayAttendance.checkInTime.toDate ? todayAttendance.checkInTime.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : new Date(todayAttendance.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))
-                : null;
-              
+          <div style={{ display: 'block', width: '100%', minWidth: 0 }}>
+            {filteredAttendees.map((userData) => {
+              const uid = userData.id || userData.uid;
+              const todayAttendance = getTodayAttendance(uid);
+              const hasIn = !!todayAttendance?.checkInTime;
+              const hasOut = !!todayAttendance?.checkOutTime;
+              const isCheckedInNow = hasIn && !hasOut;
+              const statusLabel = !hasIn ? 'Not present' : hasOut ? 'Checked out' : 'Checked in';
+              const checkInDisp = formatAttTime(todayAttendance?.checkInTime) ?? '—';
+              const checkOutDisp = formatAttTime(todayAttendance?.checkOutTime) ?? '—';
+
               return (
                 <MobileUserCard key={`mobile-${userData.id}`}>
                   <MobileUserHeader>
-                    <UserAvatar $isActive={!!isCheckedIn}>
+                    <UserAvatar $isActive={!!isCheckedInNow}>
                       {userData.photoUrl ? (
                         <img 
                           src={userData.photoUrl} 
@@ -839,13 +951,16 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
                         getInitials(userData.displayName || 'Unknown')
                       )}
                     </UserAvatar>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: theme.spacing.sm }}>
                         <h4 style={{ margin: 0, fontSize: theme.fontSizes.base, fontWeight: theme.fontWeights.bold, display: 'flex', alignItems: 'center', gap: theme.spacing.xs }}>
                           <PersonIcon size={14} style={{ color: theme.colors.primary }} />
                           {userData.displayName || 'Unknown User'}
                         </h4>
-                        <MiniBadge>Active</MiniBadge>
+                        <StatusBadge $isActive={!!isCheckedInNow} style={{ flexShrink: 0 }}>
+                          <StatusDot $isActive={!!isCheckedInNow} />
+                          {statusLabel}
+                        </StatusBadge>
                       </div>
                       <p style={{ margin: '2px 0 0 0', fontSize: theme.fontSizes.xs, color: theme.colors.textSecondary }}>
                         {userData.email}
@@ -853,30 +968,29 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
                     </div>
                   </MobileUserHeader>
                   
-                  <MobileUserDetails>
+                  <MobileUserDetails style={{ marginBottom: theme.spacing.sm, gridTemplateColumns: '1fr' }}>
                     <div>
                       <strong style={{ color: theme.colors.textSecondary, fontSize: '10px', textTransform: 'uppercase' }}>Type</strong><br />
                       <UserTypeTag type={userData.userType} style={{ marginTop: '4px' }}>
                         {userData.userType}
                       </UserTypeTag>
                     </div>
-                    <div>
-                      <strong style={{ color: theme.colors.textSecondary, fontSize: '10px', textTransform: 'uppercase' }}>Status</strong><br />
-                      <StatusBadge $isActive={isCheckedIn} style={{ marginTop: '4px' }}>
-                        <StatusDot $isActive={isCheckedIn} />
-                        {isCheckedIn ? 'Checked In' : 'Not Present'}
-                      </StatusBadge>
-                    </div>
                   </MobileUserDetails>
 
-                  <LastActivity style={{ marginBottom: theme.spacing.md, padding: `${theme.spacing.xs} 0` }}>
-                    <FiClock size={12} />
-                    Last check-in: {checkInTimeString || 'No record today'}
-                  </LastActivity>
+                  <MobileTimesRow>
+                    <MobileTimeBlock>
+                      <strong>Check-in</strong>
+                      {checkInDisp}
+                    </MobileTimeBlock>
+                    <MobileTimeBlock>
+                      <strong>Check-out</strong>
+                      {checkOutDisp}
+                    </MobileTimeBlock>
+                  </MobileTimesRow>
 
                   <CardSection>
                     <ActionButtons>
-                      <MarkPresentButton onClick={() => handleMarkPresent(userData.id, userData.displayName || 'Unknown User')} style={{ flex: 1 }}>
+                      <MarkPresentButton onClick={() => handleMarkPresent(uid, userData.displayName || 'Unknown User')} style={{ flex: 1 }}>
                         <CheckCircleIcon size={14} /> <span>Mark Present</span>
                       </MarkPresentButton>
                       {user?.userType === 'admin' && (

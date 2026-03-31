@@ -8,6 +8,7 @@ import { ref, deleteObject } from 'firebase/storage';
 import { db, storage } from './firebase';
 import { uniqueToast } from '../utils/toastUtils';
 import { TimeService } from './timeService';
+import { attendanceAnalyticsService } from './attendanceAnalyticsService';
 
 class DataService {
   private static instance: DataService;
@@ -21,16 +22,19 @@ class DataService {
   private isStudent(u: any)    { const t = (u?.userType||'').toLowerCase(); return !t || t==='attendee'||t==='student'; }
   private isInstructor(u: any) { return (u?.userType||'').toLowerCase()==='instructor'; }
 
-  /** Extract YYYY-MM-DD from a record that may or may not have a `date` field. */
+  /** Extract YYYY-MM-DD from a record (Harare calendar; matches attendance `date` field). */
   private dateStr(record: any): string|undefined {
-    if (record.date) return record.date;
+    if (record.date && typeof record.date === 'string') return record.date;
     const c = record.checkInTime;
     if (!c) return undefined;
     try {
-      if (c.toDate)      return c.toDate().toISOString().split('T')[0];
-      if (c.toISOString) return c.toISOString().split('T')[0];
-      return new Date(c).toISOString().split('T')[0];
-    } catch { return undefined; }
+      const ts = TimeService.getInstance();
+      const d = c.toDate ? c.toDate() : c instanceof Date ? c : new Date(c);
+      if (Number.isNaN(d.getTime())) return undefined;
+      return ts.toHarareDateString(d);
+    } catch {
+      return undefined;
+    }
   }
 
   /** Is the check-in time late? (>= 9:00 AM Harare) */
@@ -263,44 +267,37 @@ class DataService {
 
   // ── Per-student stats ───────────────────────────────────────────────────────
 
+  /**
+   * Same definitions as the Analytics page: last ~30 Harare calendar days, weekdays only,
+   * rate = (present + late) / weekday count. Streaks use weekday sequence (not raw calendar days).
+   */
   async getStudentStats(userId: string): Promise<any> {
-    const all = await this.getAttendance(userId);
+    const range = attendanceAnalyticsService.getDefaultRange('student');
+    const analytics = await attendanceAnalyticsService.getStudentAnalytics(userId, range);
 
-    // Deduplicate by date
+    const all = await this.getAttendance(userId);
     const byDate = new Map<string, any>();
-    all.forEach(r => {
+    all.forEach((r) => {
       const d = this.dateStr(r);
       if (!d) return;
       const ex = byDate.get(d);
-      if (!ex || r.status==='completed' || (!ex.checkOutTime && r.checkOutTime)) byDate.set(d, r);
+      if (!ex || r.status === 'completed' || (!ex.checkOutTime && r.checkOutTime)) byDate.set(d, r);
     });
     const unique = Array.from(byDate.values()).sort(
-      (a,b) => new Date(b.date||b.checkInTime).getTime() - new Date(a.date||a.checkInTime).getTime()
+      (a, b) =>
+        new Date(b.date || b.checkInTime).getTime() - new Date(a.date || a.checkInTime).getTime()
     );
 
-    let streak = 0;
-    if (unique.length) {
-      const today = new Date(); today.setHours(0,0,0,0);
-      const last  = new Date(unique[0].date||unique[0].checkInTime); last.setHours(0,0,0,0);
-      if (Math.floor((today.getTime()-last.getTime())/86400000) <= 1) {
-        streak = 1;
-        for (let i=1; i<unique.length; i++) {
-          const a = new Date(unique[i-1].date||unique[i-1].checkInTime); a.setHours(0,0,0,0);
-          const b = new Date(unique[i].date||unique[i].checkInTime);     b.setHours(0,0,0,0);
-          if (Math.floor((a.getTime()-b.getTime())/86400000)===1) streak++; else break;
-        }
-      }
-    }
-
-    const rate = Math.min(100, Math.round((unique.length/30)*100));
+    const present = analytics.totals.present + analytics.totals.late;
 
     return {
-      totalCheckIns:     unique.length,
-      currentStreak:     streak,
-      attendanceRate:    rate,
-      averageCheckInTime:'9:00 AM',
-      lateCheckIns:      unique.filter(r=>r.status==='late').length,
-      recentActivity:    unique.slice(0,10).map(r => ({ ...r, type:'checkin' })),
+      totalCheckIns: present,
+      currentStreak: analytics.streak.current,
+      longestStreak: analytics.streak.longest,
+      attendanceRate: analytics.totals.attendanceRate,
+      averageCheckInTime: '9:00 AM',
+      lateCheckIns: analytics.totals.late,
+      recentActivity: unique.slice(0, 10).map((r) => ({ ...r, type: 'checkin' })),
     };
   }
 

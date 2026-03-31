@@ -27,13 +27,14 @@ import {
   Pie,
   Cell
 } from 'recharts';
-import { format, subDays, eachDayOfInterval } from 'date-fns';
+import { format, subDays, eachDayOfInterval, parseISO } from 'date-fns';
 import { theme } from '../../styles/theme';
 import { useAuth } from '../../contexts/AuthContext';
 import { uniqueToast } from '../../utils/toastUtils';
 import { ProfileUpload } from './ProfileUpload';
 import { Button } from '../Common/Button';
 import DataService from '../../services/DataService';
+import { TimeService } from '../../services/timeService';
 
 const ProfileContainer = styled.div`
   padding: ${theme.spacing.xl};
@@ -460,18 +461,26 @@ export const StudentProfile: React.FC = () => {
     try {
       const studentStats = await ds.getStudentStats(user.uid);
       const attendance = await ds.getAttendance(user.uid);
-
+      const ts = TimeService.getInstance();
+      const endStr = ts.getCurrentDateString();
+      const end = parseISO(`${endStr}T12:00:00`);
       const last7Days = eachDayOfInterval({
-        start: subDays(new Date(), 6),
-        end: new Date(),
+        start: subDays(end, 6),
+        end,
       });
+
+      const attendanceDateKey = (a: any): string => {
+        if (a.date && typeof a.date === 'string') return a.date;
+        const c = a.checkInTime;
+        if (!c) return '';
+        const d = c.toDate ? c.toDate() : c instanceof Date ? c : new Date(c);
+        if (Number.isNaN(d.getTime())) return '';
+        return ts.toHarareDateString(d);
+      };
 
       const chartData = last7Days.map((date) => {
         const dateStr = format(date, 'yyyy-MM-dd');
-        const present = attendance.some((a) => {
-          const aDate = a.date || (a.checkInTime ? format(new Date(a.checkInTime), 'yyyy-MM-dd') : '');
-          return aDate === dateStr;
-        });
+        const present = attendance.some((a) => attendanceDateKey(a) === dateStr);
         return {
           name: format(date, 'EEE'),
           rate: present ? 100 : 0,
