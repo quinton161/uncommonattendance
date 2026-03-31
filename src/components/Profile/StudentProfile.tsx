@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { db } from '../../services/firebase';
 import styled from 'styled-components';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -451,65 +453,82 @@ export const StudentProfile: React.FC = () => {
     }
   };
 
-  useEffect(() => {
+  const loadProfileAttendance = useCallback(async () => {
+    if (!user?.uid) return;
     const ds = DataService.getInstance();
-    
-    const fetchStudentData = async () => {
-      if (!user?.uid) return;
 
-      try {
-        const studentStats = await ds.getStudentStats(user.uid);
-        const attendance = await ds.getAttendance(user.uid);
+    try {
+      const studentStats = await ds.getStudentStats(user.uid);
+      const attendance = await ds.getAttendance(user.uid);
 
-        const last7Days = eachDayOfInterval({
-          start: subDays(new Date(), 6),
-          end: new Date(),
+      const last7Days = eachDayOfInterval({
+        start: subDays(new Date(), 6),
+        end: new Date(),
+      });
+
+      const chartData = last7Days.map((date) => {
+        const dateStr = format(date, 'yyyy-MM-dd');
+        const present = attendance.some((a) => {
+          const aDate = a.date || (a.checkInTime ? format(new Date(a.checkInTime), 'yyyy-MM-dd') : '');
+          return aDate === dateStr;
         });
+        return {
+          name: format(date, 'EEE'),
+          rate: present ? 100 : 0,
+        };
+      });
 
-        const chartData = last7Days.map((date) => {
-          const dateStr = format(date, 'yyyy-MM-dd');
-          const present = attendance.some((a) => {
-            const aDate = a.date || (a.checkInTime ? format(new Date(a.checkInTime), 'yyyy-MM-dd') : '');
-            return aDate === dateStr;
-          });
-          return {
-            name: format(date, 'EEE'),
-            rate: present ? 100 : 0,
-          };
-        });
+      setTrendData(chartData);
 
-        setTrendData(chartData);
+      const rate = Number(studentStats?.attendanceRate) || 0;
+      setPieData([
+        { name: 'Present', value: rate, color: theme.colors.primary },
+        { name: 'Absent', value: Math.max(0, 100 - rate), color: theme.colors.gray200 },
+      ]);
 
-        const rate = Number(studentStats?.attendanceRate) || 0;
-        setPieData([
-          { name: 'Present', value: rate, color: theme.colors.primary },
-          { name: 'Absent', value: Math.max(0, 100 - rate), color: theme.colors.gray200 },
-        ]);
+      const recent = Array.isArray(studentStats?.recentActivity) ? studentStats.recentActivity : [];
+      setSessions(
+        recent.map((a: any) => ({
+          date: a.checkInTime,
+          session: 'General Session',
+          status: a.status || 'present',
+        }))
+      );
 
-        const recent = Array.isArray(studentStats?.recentActivity) ? studentStats.recentActivity : [];
-        setSessions(
-          recent.map((a: any) => ({
-            date: a.checkInTime,
-            session: 'General Session',
-            status: a.status || 'present',
-          }))
-        );
+      setStats((prev) => ({
+        ...prev,
+        attendanceRate: rate,
+        currentStreak: studentStats?.currentStreak ?? 0,
+        engagementScore: Math.round(rate * 0.7 + 85 * 0.3),
+        status: rate >= 80 ? 'on-track' : rate >= 60 ? 'warning' : 'at-risk',
+      }));
+    } catch (e) {
+      console.error('Student profile data load:', e);
+    }
+  }, [user?.uid]);
 
-        setStats((prev) => ({
-          ...prev,
-          attendanceRate: rate,
-          currentStreak: studentStats?.currentStreak ?? 0,
-          engagementScore: Math.round(rate * 0.7 + 85 * 0.3),
-          status: rate >= 80 ? 'on-track' : rate >= 60 ? 'warning' : 'at-risk',
-        }));
-      } catch (e) {
-        console.error('Student profile data load:', e);
-        uniqueToast.error('Could not load attendance for your profile. Charts may be empty; you can still edit your details.');
-      }
+  useEffect(() => {
+    if (!user?.uid) return;
+    let cancelled = false;
+    const run = () => {
+      if (!cancelled) void loadProfileAttendance();
     };
+    run();
 
-    fetchStudentData();
-  }, [user]);
+    const q = query(collection(db, 'attendance'), where('studentId', '==', user.uid));
+    const unsub = onSnapshot(
+      q,
+      () => {
+        if (!cancelled) void loadProfileAttendance();
+      },
+      (err) => console.error('Student profile attendance listener:', err)
+    );
+
+    return () => {
+      cancelled = true;
+      unsub();
+    };
+  }, [user?.uid, loadProfileAttendance]);
   
   const circumference = 2 * Math.PI * 85;
   const offset = circumference - (stats.attendanceRate / 100) * circumference;

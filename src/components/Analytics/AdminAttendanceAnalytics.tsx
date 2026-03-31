@@ -253,28 +253,28 @@ export function AdminAttendanceAnalytics(): React.ReactElement {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [range.preset]);
 
+  // Real-time: when any student checks in, aggregates update without refresh.
   useEffect(() => {
     let mounted = true;
     setLoading(true);
-    attendanceAnalyticsService
-      .getAdminAnalytics(
-        range,
-        selectedStudentId !== 'all'
-          ? { studentId: selectedStudentId }
-          : { totalStudents: students.length, roster }
-      )
-      .then((res: AdminAnalytics) => {
+    const opts =
+      selectedStudentId !== 'all'
+        ? { studentId: selectedStudentId }
+        : { totalStudents: students.length, roster };
+
+    const unsubscribe = attendanceAnalyticsService.subscribeToAdminAnalytics(
+      range,
+      (res: AdminAnalytics) => {
         if (!mounted) return;
         setAnalytics(res);
         setLoading(false);
-      })
-      .catch(() => {
-        if (!mounted) return;
-        setAnalytics(null);
-        setLoading(false);
-      });
+      },
+      opts
+    );
+
     return () => {
       mounted = false;
+      unsubscribe();
     };
   }, [range.startDate, range.endDate, selectedStudentId, students.length, roster]);
 
