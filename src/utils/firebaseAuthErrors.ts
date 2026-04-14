@@ -10,7 +10,8 @@ export function getFirebaseAuthErrorMessage(code: string | undefined, fallback =
     'auth/user-disabled': 'This account has been disabled.',
     'auth/too-many-requests': 'Too many attempts. Try again later.',
     'auth/network-request-failed': 'Network error. Check your connection.',
-    'auth/email-already-in-use': 'An account already exists with this email.',
+    'auth/email-already-in-use':
+      'This email is already registered. Use Sign in (not Create account), or Forgot password if needed.',
     'auth/weak-password': 'Password is too weak. Use at least 6 characters.',
     'auth/operation-not-allowed': 'This sign-in method isn’t enabled.',
     'auth/popup-closed-by-user': 'Sign-in was cancelled.',

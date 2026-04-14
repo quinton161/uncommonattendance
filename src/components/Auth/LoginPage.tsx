@@ -377,6 +377,19 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onToggleMode }) => {
     };
   }, []);
 
+  /** After “email already registered” on Create account, we prefill Sign in with the same address. */
+  useEffect(() => {
+    try {
+      const pre = sessionStorage.getItem('authPrefillEmail');
+      if (pre) {
+        setFormData((prev) => ({ ...prev, email: pre }));
+        sessionStorage.removeItem('authPrefillEmail');
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
   const selectedHub = (): HubSelection | undefined => {
     const h = hubs.find((x) => x.id === hubId);
     return h ? { id: h.id, name: h.name } : undefined;

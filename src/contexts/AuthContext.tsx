@@ -29,6 +29,35 @@ function isGoogleSignIn(fbUser: FirebaseAuthUser): boolean {
   return !!fbUser.providerData?.some((p) => p.providerId === 'google.com');
 }
 
+/** Directory email stored in Firestore (`users/{uid}.email`); falls back to Firebase Auth sign-in email. */
+function directoryEmailFromUserDoc(
+  d: Record<string, unknown> | undefined,
+  firebaseEmail: string | null
+): string {
+  const docEmail = d && typeof d.email === 'string' ? d.email.trim() : '';
+  if (docEmail) return docEmail;
+  return (firebaseEmail || '').trim();
+}
+
+function emailLowerFromUserDoc(
+  d: Record<string, unknown> | undefined,
+  directoryEmail: string
+): string | undefined {
+  if (d && typeof d.emailLower === 'string' && d.emailLower.trim()) {
+    return d.emailLower.trim().toLowerCase();
+  }
+  return directoryEmail ? directoryEmail.toLowerCase() : undefined;
+}
+
+/** Same code Firebase uses so the UI can detect “use Sign in, not Sign up” and prefill email. */
+function emailAlreadyRegisteredError(): Error & { code: 'auth/email-already-in-use' } {
+  const e = new Error(
+    'This email is already registered. Use Sign in (not Create account). If you forgot your password, use Forgot password on the sign-in screen. If your app profile was removed but your login still exists, signing in will reconnect you. Ask an admin to delete the user in Firebase Authentication only if you need a completely new login at this address.'
+  ) as Error & { code: 'auth/email-already-in-use' };
+  e.code = 'auth/email-already-in-use';
+  return e;
+}
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const useAuth = () => {
@@ -57,7 +86,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const isStaff    = isUncommonOrgStaffEmail(fbUser.email);
 
           if (snap.exists()) {
-            const d = snap.data();
+            const d = snap.data() as Record<string, unknown>;
+            const dirEmail = directoryEmailFromUserDoc(d, fbUser.email);
             try {
               await updateDoc(doc(db, 'users', fbUser.uid), { lastLoginAt: serverTimestamp() });
             } catch {
@@ -65,16 +95,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
             setUser({
               uid:         fbUser.uid,
-              email:       fbUser.email!,
-              displayName: d.displayName || fbUser.displayName || 'User',
-              photoUrl:    fbUser.photoURL || d.photoUrl,
-              userType:    isAdmin ? 'admin' : (d.userType || 'attendee'),
-              bio:         d.bio,
-              course:      d.course,
-              profession:  d.profession,
-              hubId:       d.hubId,
-              hubName:     d.hubName,
-              createdAt:   d.createdAt?.toDate() || new Date(),
+              email:       dirEmail,
+              emailLower:  emailLowerFromUserDoc(d, dirEmail),
+              displayName: (d.displayName as string) || fbUser.displayName || 'User',
+              photoUrl:    fbUser.photoURL || (d.photoUrl as string | undefined),
+              userType:    isAdmin ? 'admin' : ((d.userType as User['userType']) || 'attendee'),
+              bio:         d.bio as string | undefined,
+              course:      d.course as string | undefined,
+              profession:  d.profession as string | undefined,
+              hubId:       d.hubId as string | undefined,
+              hubName:     d.hubName as string | undefined,
+              createdAt:   (d.createdAt as { toDate?: () => Date } | undefined)?.toDate?.() || new Date(),
             });
           } else if (isAdmin) {
             const fallback = {
@@ -168,11 +199,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         'Uncommon staff emails (@uncommon.org) cannot register as students. Choose Instructor, or use a personal email for a student account.'
       );
     }
+    // Note: With “email enumeration protection” enabled, fetchSignInMethodsForEmail often
+    // returns an empty list even when the address exists — registration then fails at createUser.
     const methods = await fetchSignInMethodsForEmail(auth, emailTrim);
     if (methods.length > 0) {
-      throw new Error(
-        'This email already has a Firebase login. Use Sign in, or reset the password. If an admin removed only the profile, the same email may still be reserved — use Password reset or ask an admin to delete the user in Firebase Authentication so a new account can be created.'
-      );
+      throw emailAlreadyRegisteredError();
     }
     const taken = await DataService.getInstance().isEmailLowerTaken(emailTrim);
     if (taken) {
@@ -209,9 +240,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
       if (err?.code === 'auth/email-already-in-use') {
-        throw new Error(
-          'That email is still registered in Firebase. Sign in with it, use Forgot password, or ask an admin to remove the user from Firebase Authentication if you need a brand-new account at this address.'
-        );
+        throw emailAlreadyRegisteredError();
       }
       throw err;
     }
@@ -382,8 +411,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (data.displayName) {
       await updateProfile(auth.currentUser!, { displayName: data.displayName });
     }
-    await updateDoc(doc(db, 'users', user.uid), data as any);
-    setUser({ ...user, ...data });
+    const payload: Record<string, unknown> = { ...data };
+    if (typeof data.email === 'string') {
+      const trimmed = data.email.trim();
+      payload.email = trimmed;
+      payload.emailLower = trimmed.toLowerCase();
+    }
+    await updateDoc(doc(db, 'users', user.uid), payload as any);
+    setUser({ ...user, ...payload } as User);
   };
 
   const setHub = async (hub: HubSelection) => {

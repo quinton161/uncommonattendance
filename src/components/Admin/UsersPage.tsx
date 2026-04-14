@@ -453,6 +453,68 @@ const DesktopTable = styled.div`
   }
 `;
 
+/** 5-column layout: name, hub, last sign-in, type badge, actions (stacked so buttons never bleed over Type). */
+const InstructorTableHeader = styled(TableHeader)`
+  grid-template-columns:
+    minmax(200px, 2fr)
+    minmax(110px, 1fr)
+    minmax(140px, 1.1fr)
+    minmax(120px, 0.65fr)
+    minmax(200px, 1.25fr);
+`;
+
+const InstructorTableRow = styled(TableRow)`
+  grid-template-columns:
+    minmax(200px, 2fr)
+    minmax(110px, 1fr)
+    minmax(140px, 1.1fr)
+    minmax(120px, 0.65fr)
+    minmax(200px, 1.25fr);
+
+  & > *:nth-child(1),
+  & > *:nth-child(2),
+  & > *:nth-child(3) {
+    min-width: 0;
+  }
+
+  & > *:nth-child(4) {
+    min-width: 120px;
+    position: relative;
+    z-index: 2;
+    background: ${theme.colors.white};
+  }
+
+  & > *:nth-child(5) {
+    min-width: 0;
+    position: relative;
+    z-index: 1;
+    justify-self: end;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  &:hover > *:nth-child(4) {
+    background: ${theme.colors.white};
+  }
+`;
+
+/** Type badge sits in its own column — keeps “INSTRUCTOR” from sitting under action buttons. */
+const InstructorTypeCell = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+`;
+
+const InstructorActionButtons = styled(ActionButtons)`
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: ${theme.spacing.sm};
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+`;
+
 const UserTypeTag = styled.span<{ type: string }>`
   display: inline-block;
   padding: ${theme.spacing.xs} ${theme.spacing.sm};
@@ -1274,23 +1336,18 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
             <DesktopTable>
               <UsersTable>
                 <TableWrapper>
-                  <TableHeader style={{ gridTemplateColumns: 'minmax(180px,2fr) minmax(100px,1fr) minmax(140px,1fr) 90px minmax(200px,1.2fr)' }}>
+                  <InstructorTableHeader>
                     <div>Name / email</div>
                     <div>Hub</div>
                     <div>Last sign-in</div>
                     <div>Type</div>
                     <div style={{ textAlign: 'right' }}>Actions</div>
-                  </TableHeader>
+                  </InstructorTableHeader>
                   {instructorRows.map((row) => {
                     const uid = row.id || row.uid;
                     const isSelf = uid === user?.uid;
                     return (
-                      <TableRow
-                        key={`inst-${uid}`}
-                        style={{
-                          gridTemplateColumns: 'minmax(180px,2fr) minmax(100px,1fr) minmax(140px,1fr) 90px minmax(200px,1.2fr)',
-                        }}
-                      >
+                      <InstructorTableRow key={`inst-${uid}`}>
                         <UserInfo>
                           <UserAvatar $isActive={false}>{getInitials(row.displayName || 'Instructor')}</UserAvatar>
                           <UserDetails>
@@ -1307,27 +1364,27 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
                         <div style={{ fontSize: theme.fontSizes.sm, color: theme.colors.textSecondary }}>
                           {formatInstructorLastLogin(row)}
                         </div>
-                        <div>
+                        <InstructorTypeCell>
                           <UserType type="instructor">instructor</UserType>
-                        </div>
-                        <ActionButtons style={{ justifyContent: 'flex-end' }}>
+                        </InstructorTypeCell>
+                        <InstructorActionButtons>
                           <Button
                             type="button"
                             variant="outline"
                             onClick={() => handleSendPasswordReset(row.email)}
                             disabled={resetSending === row.email || !row.email}
-                            style={{ padding: '8px 12px' }}
+                            style={{ padding: '8px 12px', width: '100%', maxWidth: 220 }}
                           >
                             <FiLock size={14} style={{ marginRight: 6, verticalAlign: 'middle' }} />
                             {resetSending === row.email ? 'Sending…' : 'Password reset email'}
                           </Button>
                           {!isSelf && (
-                            <DeleteButton variant="ghost" onClick={() => handleOpenDelete(row)}>
+                            <DeleteButton variant="ghost" onClick={() => handleOpenDelete(row)} style={{ width: '100%', maxWidth: 220 }}>
                               Remove
                             </DeleteButton>
                           )}
-                        </ActionButtons>
-                      </TableRow>
+                        </InstructorActionButtons>
+                      </InstructorTableRow>
                     );
                   })}
                 </TableWrapper>

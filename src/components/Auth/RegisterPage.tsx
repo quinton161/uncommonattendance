@@ -367,11 +367,20 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onToggleMode }) => {
       );
     } catch (err: any) {
       console.error('Registration error:', err);
-      setError(
-        err?.code
-          ? getFirebaseAuthErrorMessage(err.code, 'Failed to create account.')
-          : err?.message || 'Failed to create account.'
-      );
+      if (err?.code === 'auth/email-already-in-use' && formData.email.trim()) {
+        try {
+          sessionStorage.setItem('authPrefillEmail', formData.email.trim());
+        } catch {
+          /* ignore */
+        }
+      }
+      const msg =
+        typeof err?.message === 'string' && err.message.trim()
+          ? err.message
+          : err?.code
+            ? getFirebaseAuthErrorMessage(err.code, 'Failed to create account.')
+            : 'Failed to create account.';
+      setError(msg);
     } finally {
       setLoading(false);
     }
