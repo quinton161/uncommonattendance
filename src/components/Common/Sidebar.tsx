@@ -27,7 +27,7 @@ const SidebarContainer = styled.aside<{ $isExpanded: boolean }>`
   overflow: hidden;
   box-shadow: ${theme.shadows.lg};
 
-  @media (max-width: ${theme.breakpoints.tablet}) {
+  @media (max-width: ${theme.breakpoints.laptop}) {
     display: none;
   }
 

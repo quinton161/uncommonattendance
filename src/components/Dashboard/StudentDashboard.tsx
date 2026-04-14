@@ -45,7 +45,7 @@ const DashboardContainer = styled.div`
   ${respectMotionPreference}
   width: 100%;
   overflow: hidden;
-  @media (max-width: ${theme.breakpoints.tablet}) {
+  @media (max-width: ${theme.breakpoints.laptop}) {
     flex-direction: column;
     padding-top: calc(60px + env(safe-area-inset-top, 0px));
   }
@@ -71,7 +71,7 @@ const MobileSidebar = styled.aside<{ $isOpen: boolean }>`
   &::-webkit-scrollbar {
     display: none;
   }
-  @media (max-width: ${theme.breakpoints.tablet}) {
+  @media (max-width: ${theme.breakpoints.laptop}) {
     position: fixed;
     top: 0;
     left: ${props => props.$isOpen ? '0' : '-100%'};
@@ -147,7 +147,7 @@ const NavItem = styled.div<{ active?: boolean }>`
 const MobileHeader = styled.div`
   display: none;
   
-  @media (max-width: ${theme.breakpoints.tablet}) {
+  @media (max-width: ${theme.breakpoints.laptop}) {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -184,7 +184,7 @@ const MobileMenuButton = styled.button`
 const MobileOverlay = styled.div<{ $isOpen: boolean }>`
   display: none;
   
-  @media (max-width: ${theme.breakpoints.tablet}) {
+  @media (max-width: ${theme.breakpoints.laptop}) {
     display: ${props => props.$isOpen ? 'block' : 'none'};
     position: fixed;
     top: 0;
@@ -211,7 +211,7 @@ const MainContent = styled.div`
   margin-left: 72px;
   ${containerAnimation}
   ${respectMotionPreference}
-  @media (max-width: ${theme.breakpoints.tablet}) {
+  @media (max-width: ${theme.breakpoints.laptop}) {
     flex: 1;
     min-height: 0;
     padding: 0;
@@ -231,7 +231,7 @@ const Header = styled.div`
   margin-bottom: ${theme.spacing.xl};
   gap: ${theme.spacing.md};
 
-  @media (max-width: ${theme.breakpoints.tablet}) {
+  @media (max-width: ${theme.breakpoints.laptop}) {
     flex-direction: column;
     align-items: stretch;
     gap: ${theme.spacing.lg};

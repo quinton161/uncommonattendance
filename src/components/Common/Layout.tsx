@@ -26,7 +26,7 @@ const Main = styled.main`
   margin-left: 72px;
   transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 
-  @media (max-width: ${theme.breakpoints.tablet}) {
+  @media (max-width: ${theme.breakpoints.laptop}) {
     margin-left: 0;
   }
 `;

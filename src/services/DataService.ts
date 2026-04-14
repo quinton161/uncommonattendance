@@ -13,6 +13,7 @@ import { hubIdMatchesScope, resolvedHubLabel, staffMayAccessHubForWrite } from '
 import { isUncommonOrgStaffEmail } from '../constants/staff';
 import { isAdminEmail } from '../constants/admin';
 import type { User } from '../types';
+import { deleteStudentAuthUserCallable } from './staffAuthCleanup';
 
 class DataService {
   private static instance: DataService;
@@ -41,7 +42,7 @@ class DataService {
     }
   }
 
-  /** Is the check-in time late? (9:01 AM Harare or later — see TimeService.isLate) */
+  /** Is the check-in time late? (9:01 AM Harare or later ΓÇö see TimeService.isLate) */
   private mapAttendanceSnapshotDoc(d: { id: string; data: () => any }): any {
     const raw = d.data();
     const ci = raw.checkInTime;
@@ -96,7 +97,7 @@ class DataService {
     }
   }
 
-  // ── Events ──────────────────────────────────────────────────────────────────
+  // ΓöÇΓöÇ Events ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
   async getEvents(): Promise<any[]> {
     try {
@@ -121,7 +122,7 @@ class DataService {
     return ref.id;
   }
 
-  // ── Attendance ──────────────────────────────────────────────────────────────
+  // ΓöÇΓöÇ Attendance ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
   async getAttendance(userId?: string, hubId?: string): Promise<any[]> {
     try {
@@ -145,7 +146,7 @@ class DataService {
         });
         return rows;
       }
-      // `orderBy('checkInTime')` omits staff-recorded absences (no check-in) — merge them in.
+      // `orderBy('checkInTime')` omits staff-recorded absences (no check-in) ΓÇö merge them in.
       const [snapCheckIns, snapStaffAbsent, snapReasonAbsent] = await Promise.all([
         getDocs(query(collection(db, 'attendance'), orderBy('checkInTime', 'desc'))),
         getDocs(query(collection(db, 'attendance'), where('method', '==', 'staff_absent'))),
@@ -191,7 +192,7 @@ class DataService {
     await updateDoc(doc(db,'attendance',id), payload);
   }
 
-  // ── Users ───────────────────────────────────────────────────────────────────
+  // ΓöÇΓöÇ Users ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
   async getUsers(hubId?: string): Promise<any[]> {
     try {
@@ -199,7 +200,7 @@ class DataService {
         const data = d.data();
         return {
           ...data,
-          /** Document id — must win over optional `id` field stored inside the document */
+          /** Document id ΓÇö must win over optional `id` field stored inside the document */
           id: d.id,
           uid: data.uid ?? d.id,
           createdAt: data.createdAt?.toDate(),
@@ -248,6 +249,23 @@ class DataService {
       if (!targetSnap.exists()) throw new Error('User not found');
       if (!staffMayAccessHubForWrite(opts.actingUser, targetSnap.data()?.hubId)) {
         throw new Error('You can only remove accounts registered in your hub.');
+      }
+    }
+
+    // Remove Firebase Auth so the same email can register again (requires Cloud Function deploy).
+    const acting = opts?.actingUser;
+    if (
+      acting &&
+      (acting.userType === 'admin' || acting.userType === 'instructor') &&
+      uid !== acting.uid
+    ) {
+      try {
+        await deleteStudentAuthUserCallable(uid);
+      } catch (e) {
+        console.warn(
+          'deleteStudentAuthUser: callable failed or not deployed. Email may still be reserved in Firebase Auth.',
+          e
+        );
       }
     }
 
@@ -324,7 +342,7 @@ class DataService {
     return { removed: uids.length, uids };
   }
 
-  // ── Dashboard stats ─────────────────────────────────────────────────────────
+  // ΓöÇΓöÇ Dashboard stats ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
   async getDashboardStats(hubId?: string): Promise<any> {
     const [events, users] = await Promise.all([this.getEvents(), this.getUsers(hubId)]);
@@ -363,9 +381,9 @@ class DataService {
     };
   }
 
-  // ── Real-time summary ───────────────────────────────────────────────────────
+  // ΓöÇΓöÇ Real-time summary ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
   /**
-   * FIXED: Load users ONCE upfront — never subscribe to the users collection.
+   * FIXED: Load users ONCE upfront ΓÇö never subscribe to the users collection.
    * The old version subscribed to users, which fired with an empty array first,
    * causing the summary to show 0 present every time a user doc changed.
    */
@@ -391,7 +409,7 @@ class DataService {
       callback(this._buildSummary(today, users, attendance));
     };
 
-    // Do not `orderBy('checkInTime')` here — staff absences have no check-in and would be excluded.
+    // Do not `orderBy('checkInTime')` here ΓÇö staff absences have no check-in and would be excluded.
     const qDate = query(collection(db, 'attendance'), where('date', '==', today));
     const qRange = query(
       collection(db, 'attendance'),
@@ -510,7 +528,7 @@ class DataService {
     };
   }
 
-  // ── Per-student stats ───────────────────────────────────────────────────────
+  // ΓöÇΓöÇ Per-student stats ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
   /**
    * Same definitions as the Analytics page: last ~30 Harare calendar days, weekdays only,
@@ -546,7 +564,7 @@ class DataService {
     };
   }
 
-  // ── Daily attendance summary (admin, date-filtered) ─────────────────────────
+  // ΓöÇΓöÇ Daily attendance summary (admin, date-filtered) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
   async getDailyAttendanceSummary(date?: string, hubId?: string): Promise<any> {
     const ts  = TimeService.getInstance();
@@ -621,7 +639,7 @@ class DataService {
       .slice(0, limitN);
   }
 
-  // ── Admin audit log ─────────────────────────────────────────────────────────
+  // ΓöÇΓöÇ Admin audit log ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
   async logAdminAction(adminId: string, adminName: string, action: string, targetUserId: string, targetUserName: string, details: any): Promise<void> {
     try {
@@ -634,7 +652,7 @@ class DataService {
     } catch (e) { console.error('logAdminAction failed:', e); }
   }
 
-  // ── Master reset ────────────────────────────────────────────────────────────
+  // ΓöÇΓöÇ Master reset ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
   async masterReset(): Promise<{ deletedUsers: number; deletedAttendance: number; preservedUsers: number }> {
     const ADMIN = 'quintonndlovu161@gmail.com';

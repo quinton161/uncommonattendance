@@ -13,14 +13,15 @@
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js';
         import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js';
         
+        // Paste web app config from Firebase Console (do not commit real keys to git)
         const firebaseConfig = {
-            apiKey: "AIzaSyDlyRXx3aUhmsFx0iON1xDE1qGWorsdztc",
-            authDomain: "uncommonattendance.firebaseapp.com",
-            projectId: "uncommonattendance",
-            storageBucket: "uncommonattendance.firebasestorage.app",
-            messagingSenderId: "28326821265",
-            appId: "1:28326821265:web:5b44ada2b7cba9a83bae30",
-            measurementId: "G-6XGF42V4MH"
+            apiKey: "YOUR_WEB_API_KEY",
+            authDomain: "YOUR_PROJECT.firebaseapp.com",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_PROJECT.appspot.com",
+            messagingSenderId: "YOUR_SENDER_ID",
+            appId: "YOUR_APP_ID",
+            measurementId: "G-XXXXXXXXXX"
         };
         
         try {

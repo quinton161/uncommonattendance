@@ -71,7 +71,7 @@ const DashboardContainer = styled.div`
   ${respectMotionPreference}
   width: 100%;
   overflow: hidden;
-  @media (max-width: ${theme.breakpoints.tablet}) {
+  @media (max-width: ${theme.breakpoints.laptop}) {
     flex-direction: column;
     padding-top: calc(60px + env(safe-area-inset-top, 0px));
   }
@@ -97,7 +97,7 @@ const MobileSidebar = styled.div<{ $isOpen?: boolean }>`
   &::-webkit-scrollbar {
     display: none;
   }
-  @media (max-width: ${theme.breakpoints.tablet}) {
+  @media (max-width: ${theme.breakpoints.laptop}) {
     position: fixed;
     top: 0;
     left: ${props => props.$isOpen ? '0' : '-100%'};
@@ -171,7 +171,7 @@ const MainContent = styled.div`
   margin-left: 72px;
   ${containerAnimation}
   ${respectMotionPreference}
-  @media (max-width: ${theme.breakpoints.tablet}) {
+  @media (max-width: ${theme.breakpoints.laptop}) {
     flex: 1;
     min-height: 0;
     padding: 0;
@@ -191,7 +191,7 @@ const Header = styled.div`
   margin-bottom: ${theme.spacing.xl};
   gap: ${theme.spacing.md};
 
-  @media (max-width: ${theme.breakpoints.tablet}) {
+  @media (max-width: ${theme.breakpoints.laptop}) {
     flex-direction: column;
     align-items: stretch;
     gap: ${theme.spacing.lg};
@@ -219,7 +219,7 @@ const HeaderTitle = styled.div`
     align-items: center;
     gap: ${theme.spacing.lg};
     
-    @media (max-width: ${theme.breakpoints.tablet}) {
+    @media (max-width: ${theme.breakpoints.laptop}) {
       font-size: ${theme.fontSizes['2xl']};
       gap: ${theme.spacing.md};
     }
@@ -242,7 +242,7 @@ const HeaderTitle = styled.div`
     margin: 0;
     font-size: ${theme.fontSizes.lg};
     
-    @media (max-width: ${theme.breakpoints.tablet}) {
+    @media (max-width: ${theme.breakpoints.laptop}) {
       font-size: ${theme.fontSizes.base};
     }
     
@@ -261,7 +261,7 @@ const HeaderActions = styled.div`
   gap: ${theme.spacing.md};
   align-items: center;
   
-  @media (max-width: ${theme.breakpoints.tablet}) {
+  @media (max-width: ${theme.breakpoints.laptop}) {
     flex-direction: column;
     align-items: stretch;
     gap: ${theme.spacing.sm};
@@ -337,7 +337,7 @@ const StatLabel = styled.div`
 const MobileHeader = styled.div`
   display: none;
   
-  @media (max-width: ${theme.breakpoints.tablet}) {
+  @media (max-width: ${theme.breakpoints.laptop}) {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -374,7 +374,7 @@ const MobileMenuButton = styled.button`
 const MobileOverlay = styled.div<{ $isOpen: boolean }>`
   display: none;
   
-  @media (max-width: ${theme.breakpoints.tablet}) {
+  @media (max-width: ${theme.breakpoints.laptop}) {
     display: ${props => props.$isOpen ? 'block' : 'none'};
     position: fixed;
     top: 0;

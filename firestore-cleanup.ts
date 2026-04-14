@@ -22,7 +22,7 @@
  *    5. Create a new database (select a location like us-central1)
  * 
  * OPTION 3: Use built-in Master Reset in the app
- *    1. Log in as admin (quintonndlovu161@gmail.com)
+ *    1. Log in as admin
  *    2. Go to Admin Dashboard
  *    3. Find the Master Reset option (usually in settings/profile)
  *    4. Type "reset" to confirm
@@ -34,15 +34,26 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore, getDocs, collection, deleteDoc, doc } from 'firebase/firestore';
 
-// Firebase configuration for uncommonattendance project
+function env(name: string): string {
+  const v = process.env[name];
+  if (!v || !String(v).trim()) {
+    throw new Error(
+      `Missing ${name}. Set the same REACT_APP_* variables as in your .env before running (PowerShell: $env:REACT_APP_FIREBASE_API_KEY="your_value").`
+    );
+  }
+  return String(v).trim();
+}
+
 const firebaseConfig = {
-  apiKey: "AIzaSyDlyRXx3aUhmsFx0iON1xDE1qGWorsdztc",
-  authDomain: "uncommonattendance.firebaseapp.com",
-  projectId: "uncommonattendance",
-  storageBucket: "uncommonattendance.firebasestorage.app",
-  messagingSenderId: "28326821265",
-  appId: "1:28326821265:web:5b44ada2b7cba9a83bae30",
-  measurementId: "G-6XGF42V4MH"
+  apiKey: env('REACT_APP_FIREBASE_API_KEY'),
+  authDomain: env('REACT_APP_FIREBASE_AUTH_DOMAIN'),
+  projectId: env('REACT_APP_FIREBASE_PROJECT_ID'),
+  storageBucket: env('REACT_APP_FIREBASE_STORAGE_BUCKET'),
+  messagingSenderId: env('REACT_APP_FIREBASE_MESSAGING_SENDER_ID'),
+  appId: env('REACT_APP_FIREBASE_APP_ID'),
+  ...(process.env.REACT_APP_FIREBASE_MEASUREMENT_ID?.trim()
+    ? { measurementId: process.env.REACT_APP_FIREBASE_MEASUREMENT_ID.trim() }
+    : {}),
 };
 
 // Collections to delete (add any custom collections you have)

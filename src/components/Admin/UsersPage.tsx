@@ -1331,7 +1331,7 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
             </h2>
             <StatsCaption style={{ marginBottom: theme.spacing.lg }}>
               Every instructor in the organization. Last sign-in updates when they open the app (Harare time). Password reset uses Firebase email.
-              Removing someone deletes their Firestore profile only — to free the email for a new signup, also delete the user in Firebase Authentication (Console) or they can use Forgot password on the old login.
+              Removing a student also removes their Firebase login when Cloud Functions are deployed; otherwise delete the user in Firebase Authentication (Console) so the email can register again.
             </StatsCaption>
             <DesktopTable>
               <UsersTable>
