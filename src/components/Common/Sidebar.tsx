@@ -148,65 +148,6 @@ const ContactButton = styled.button`
   }
 `;
 
-const MobileBottomNav = styled.nav`
-  display: none;
-  
-  @media (max-width: ${theme.breakpoints.tablet}) {
-    display: flex;
-    position: fixed;
-    bottom: max(20px, env(safe-area-inset-bottom, 0px));
-    left: max(20px, env(safe-area-inset-left, 0px));
-    right: max(20px, env(safe-area-inset-right, 0px));
-    height: 64px;
-    background-color: ${theme.colors.primary};
-    border-radius: 20px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-    z-index: ${theme.zIndex.fixed};
-    align-items: center;
-    justify-content: space-around;
-    padding: 0 10px;
-  }
-`;
-
-const MobileNavItem = styled.div<{ $active?: boolean }>`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  color: ${theme.colors.white};
-  transition: all 0.3s ease;
-  width: 48px;
-  height: 48px;
-
-  ${props => props.$active && `
-    &::before {
-      content: '';
-      position: absolute;
-      top: -12px;
-      width: 20px;
-      height: 3px;
-      background: ${theme.colors.white};
-      border-radius: 0 0 4px 4px;
-      box-shadow: 0 2px 10px rgba(255, 255, 255, 0.5);
-    }
-    
-    &::after {
-      content: '';
-      position: absolute;
-      top: -10px;
-      width: 30px;
-      height: 40px;
-      background: radial-gradient(circle, rgba(255, 255, 255, 0.15) 0%, transparent 70%);
-      pointer-events: none;
-    }
-  `}
-
-  svg {
-    color: ${theme.colors.white} !important;
-  }
-`;
-
 interface SidebarProps {
   activeNav?: string;
   onNavClick?: (navItem: string) => void;
@@ -321,21 +262,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </SidebarFooter>
         )}
       </SidebarContainer>
-
-      <MobileBottomNav>
-        {menuItems.map((item) => (
-          <MobileNavItem 
-            key={item.id} 
-            $active={activeNav === item.id}
-            onClick={() => onNavClick(item.id)}
-          >
-            {item.icon}
-          </MobileNavItem>
-        ))}
-        <MobileNavItem onClick={logout}>
-          <LogoutIcon size={20} />
-        </MobileNavItem>
-      </MobileBottomNav>
     </>
   );
 };

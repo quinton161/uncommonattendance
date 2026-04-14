@@ -216,7 +216,7 @@ const MainContent = styled.div`
     min-height: 0;
     padding: 0;
     padding-top: ${theme.spacing.md};
-    padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px) + ${theme.spacing.lg});
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + ${theme.spacing.lg});
     margin-left: 0;
     gap: 0;
   }
@@ -535,7 +535,7 @@ function formatDailyCodePublishedAt(createdAt: unknown): string | null {
 }
 
 export const StudentDashboard = (): React.ReactElement => {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const studentHubId = useMemo(() => effectiveStudentHubId(user ?? undefined), [user]);
   const [activeNav, setActiveNav] = useState('dashboard');
   const [checkedIn, setCheckedIn] = useState(false);
@@ -930,7 +930,7 @@ export const StudentDashboard = (): React.ReactElement => {
         <MobileSidebar id="student-mobile-nav" $isOpen={mobileMenuOpen}>
           <SidebarContent>
             <Logo>Menu</Logo>
-            <SidebarNav>
+            <SidebarNav style={{ flex: '1 1 auto', minHeight: 0, overflowY: 'auto' }}>
               {[
                 { id: 'dashboard', label: 'Dashboard' },
                 { id: 'analytics', label: 'Analytics' },
@@ -945,6 +945,17 @@ export const StudentDashboard = (): React.ReactElement => {
                 </NavItem>
               ))}
             </SidebarNav>
+            <NavItem
+              active={false}
+              onClick={() => {
+                setMobileMenuOpen(false);
+                void logout();
+              }}
+              style={{ flexShrink: 0, marginTop: theme.spacing.md, color: '#ff8a8a' }}
+            >
+              <FiLogOut size={18} aria-hidden />
+              Logout
+            </NavItem>
           </SidebarContent>
         </MobileSidebar>
       )}

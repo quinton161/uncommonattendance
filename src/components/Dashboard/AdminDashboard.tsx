@@ -176,7 +176,7 @@ const MainContent = styled.div`
     min-height: 0;
     padding: 0;
     padding-top: ${theme.spacing.md};
-    padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px) + ${theme.spacing.lg});
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + ${theme.spacing.lg});
     margin-left: 0;
     gap: 0;
   }
@@ -454,7 +454,7 @@ const UserAvatar = styled.div`
 
 const AdminDashboard: React.FC = () => {
 
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const [adminHubFilter, setAdminHubFilter] = useState('');
   const effectiveHub = useMemo(
     () => effectiveStaffHubScope(user, adminHubFilter),
@@ -858,6 +858,16 @@ const AdminDashboard: React.FC = () => {
                   Master Reset
                 </NavItem>
               )}
+              <NavItem
+                $danger
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  void logout();
+                }}
+              >
+                <FiLogOut size={18} aria-hidden />
+                Logout
+              </NavItem>
             </NavList>
           </div>
         </MobileSidebar>
