@@ -20,8 +20,21 @@ import {
   TodayIcon,
   SearchIcon
 } from '../Common/Icons';
-import { FiLogOut, FiLock } from 'react-icons/fi';
+import { FiLogOut, FiLock, FiAlertTriangle } from 'react-icons/fi';
 import { isAdminEmail } from '../../constants/admin';
+
+function formatInstructorLastLogin(row: any): string {
+  const v = row?.lastLoginAt;
+  if (!v) return '—';
+  try {
+    const d = typeof v?.toDate === 'function' ? v.toDate() : v instanceof Date ? v : null;
+    if (!d || Number.isNaN(d.getTime())) return '—';
+    return d.toLocaleString('en-GB', { timeZone: 'Africa/Harare', dateStyle: 'medium', timeStyle: 'short' });
+  } catch {
+    return '—';
+  }
+}
+
 const PageContainer = styled.div`
   padding: ${theme.spacing.xl};
   width: 100%;
@@ -590,31 +603,43 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
   const effectiveHub = useMemo(() => effectiveStaffHubScope(user, adminHubFilter), [user, adminHubFilter]);
   const hubScopeActive = Boolean(effectiveHub);
   const [users, setUsers] = useState<any[]>([]);
+  /** All instructors (every hub) — only populated for admins. */
+  const [allInstructors, setAllInstructors] = useState<any[]>([]);
   const [attendance, setAttendance] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [checkoutAllLoading, setCheckoutAllLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [invalidUncommonLoading, setInvalidUncommonLoading] = useState(false);
   const dataService = DataService.getInstance();
 
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
       await dataService.testConnection();
-      
-      const [usersData, attendanceData] = await Promise.all([
+
+      const isAdmin = user?.userType === 'admin';
+      const [usersData, attendanceData, instructorsEveryHub] = await Promise.all([
         dataService.getUsers(effectiveHub),
-        dataService.getAttendance(undefined, effectiveHub)
+        dataService.getAttendance(undefined, effectiveHub),
+        isAdmin ? dataService.getInstructors() : Promise.resolve([] as any[]),
       ]);
-      
+
       setUsers(usersData);
       setAttendance(attendanceData);
+      if (isAdmin) {
+        setAllInstructors(
+          instructorsEveryHub.filter((row: any) => row.email && !isAdminEmail(row.email))
+        );
+      } else {
+        setAllInstructors([]);
+      }
     } catch (error) {
       console.error('Error loading data:', error);
       uniqueToast.error('Failed to load user data');
     } finally {
       setLoading(false);
     }
-  }, [dataService, effectiveHub]);
+  }, [dataService, effectiveHub, user?.userType]);
 
   useEffect(() => {
     void loadData();
@@ -663,9 +688,10 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
   }, [attendees, searchTerm]);
 
   const instructorRows = useMemo(() => {
-    const inst = users.filter(
-      (u) => u.userType === 'instructor' && u.email && !isAdminEmail(u.email)
-    );
+    const inst =
+      user?.userType === 'admin'
+        ? allInstructors
+        : users.filter((u) => u.userType === 'instructor' && u.email && !isAdminEmail(u.email));
     const q = searchTerm.trim().toLowerCase();
     if (!q) return inst;
     return inst.filter((u) => {
@@ -673,7 +699,7 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
       const email = (u.email || '').toLowerCase();
       return name.includes(q) || email.includes(q);
     });
-  }, [users, searchTerm]);
+  }, [user?.userType, allInstructors, users, searchTerm]);
 
   const handleSendPasswordReset = async (email: string) => {
     if (!email) return;
@@ -872,7 +898,8 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
     const uid = u.id || u.uid;
     return !!getTodayAttendance(uid)?.checkInTime;
   }).length;
-  const instructorCount = users.filter(u => u.userType === 'instructor').length;
+  const instructorCount =
+    user?.userType === 'admin' ? allInstructors.length : users.filter((u) => u.userType === 'instructor').length;
 
   return (
     <PageContainer>
@@ -966,6 +993,73 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
           <StatLabel>Instructors</StatLabel>
         </StatCard>
       </StatsGrid>
+
+      {user?.userType === 'admin' && (
+        <div
+          style={{
+            marginBottom: theme.spacing.lg,
+            padding: theme.spacing.lg,
+            background: 'rgba(220, 38, 38, 0.06)',
+            border: '1px solid rgba(220, 38, 38, 0.2)',
+            borderRadius: theme.borderRadius.lg,
+            maxWidth: 720,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: theme.spacing.md }}>
+            <FiAlertTriangle size={22} color="#b91c1c" style={{ flexShrink: 0, marginTop: 2 }} aria-hidden />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <h3 style={{ margin: `0 0 ${theme.spacing.xs}`, fontSize: theme.fontSizes.base, color: theme.colors.textPrimary }}>
+                Policy: @uncommon.org cannot be students
+              </h3>
+              <p style={{ margin: `0 0 ${theme.spacing.md}`, fontSize: theme.fontSizes.sm, color: theme.colors.textSecondary, lineHeight: 1.5 }}>
+                New signups are blocked. Use the button below to remove old Firestore profiles that incorrectly have Uncommon emails as attendees. This deletes their app profile and linked attendance rows; Firebase Authentication accounts are unchanged (remove those in the Firebase Console if they should register again).
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={invalidUncommonLoading || loading}
+                onClick={async () => {
+                  setInvalidUncommonLoading(true);
+                  try {
+                    const found = await dataService.listUncommonOrgStudentProfiles();
+                    if (found.length === 0) {
+                      uniqueToast.info('No invalid profiles found. All @uncommon.org accounts are staff or already correct.');
+                      return;
+                    }
+                    const summary = found
+                      .slice(0, 8)
+                      .map((r) => `${r.email} (${r.userType})`)
+                      .join('\n');
+                    const more = found.length > 8 ? `\n… and ${found.length - 8} more` : '';
+                    if (
+                      !window.confirm(
+                        `Remove ${found.length} profile(s) from Firestore?\n\n${summary}${more}\n\nTheir Firebase login will still exist until deleted in Authentication.`
+                      )
+                    ) {
+                      return;
+                    }
+                    const { removed } = await dataService.removeUncommonOrgInvalidStudentProfiles();
+                    uniqueToast.success(
+                      removed > 0
+                        ? `Removed ${removed} invalid profile(s) from the database.`
+                        : 'Nothing was removed (check permissions / console).'
+                    );
+                    await loadData();
+                  } catch (e) {
+                    console.error(e);
+                    uniqueToast.error('Cleanup failed. Check the console and Firestore rules.');
+                  } finally {
+                    setInvalidUncommonLoading(false);
+                  }
+                }}
+                style={{ borderColor: '#dc2626', color: '#b91c1c' }}
+              >
+                {invalidUncommonLoading ? 'Working…' : 'Scan & remove invalid Uncommon student profiles'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <LoadingState>
@@ -1169,17 +1263,19 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
                 color: theme.colors.primary,
               }}
             >
-              Instructor accounts
+              All instructor accounts (every hub)
             </h2>
             <StatsCaption style={{ marginBottom: theme.spacing.lg }}>
-              Send a password-reset email (Firebase link + code). Removing an instructor deletes their Firestore profile only — contact hosting to remove Auth login if needed.
+              Every instructor in the organization. Last sign-in updates when they open the app (Harare time). Password reset uses Firebase email.
+              Removing someone deletes their Firestore profile only — to free the email for a new signup, also delete the user in Firebase Authentication (Console) or they can use Forgot password on the old login.
             </StatsCaption>
             <DesktopTable>
               <UsersTable>
                 <TableWrapper>
-                  <TableHeader style={{ gridTemplateColumns: '2fr 1fr 1fr 1fr' }}>
+                  <TableHeader style={{ gridTemplateColumns: 'minmax(180px,2fr) minmax(100px,1fr) minmax(140px,1fr) 90px minmax(200px,1.2fr)' }}>
                     <div>Name / email</div>
                     <div>Hub</div>
+                    <div>Last sign-in</div>
                     <div>Type</div>
                     <div style={{ textAlign: 'right' }}>Actions</div>
                   </TableHeader>
@@ -1190,7 +1286,7 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
                       <TableRow
                         key={`inst-${uid}`}
                         style={{
-                          gridTemplateColumns: 'minmax(200px,2fr) minmax(120px,1fr) 100px minmax(200px,1.2fr)',
+                          gridTemplateColumns: 'minmax(180px,2fr) minmax(100px,1fr) minmax(140px,1fr) 90px minmax(200px,1.2fr)',
                         }}
                       >
                         <UserInfo>
@@ -1205,6 +1301,9 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
                         </UserInfo>
                         <div style={{ fontSize: theme.fontSizes.sm, color: theme.colors.textSecondary }}>
                           {resolvedHubLabel(row)}
+                        </div>
+                        <div style={{ fontSize: theme.fontSizes.sm, color: theme.colors.textSecondary }}>
+                          {formatInstructorLastLogin(row)}
                         </div>
                         <div>
                           <UserType type="instructor">instructor</UserType>

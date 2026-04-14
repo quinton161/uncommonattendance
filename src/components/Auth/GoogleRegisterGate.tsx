@@ -8,6 +8,7 @@ import { theme } from '../../styles/theme';
 import { fetchHubs, hubLabel, hubTooltip, type Hub, DEFAULT_HUBS } from '../../services/hubService';
 import type { HubSelection } from '../../types';
 import { FiCheckCircle } from 'react-icons/fi';
+import { isUncommonOrgStaffEmail } from '../../constants/staff';
 
 const Wrap = styled.div`
   min-height: 100vh;
@@ -139,7 +140,12 @@ export const GoogleRegisterGate: React.FC = () => {
       setError('Please select your hub.');
       return;
     }
-    if (role === 'instructor' && !user.email?.endsWith('@uncommon.org')) {
+    if (role === 'student' && isUncommonOrgStaffEmail(user.email)) {
+      setError('Uncommon staff (@uncommon.org) cannot register as students. Choose Instructor.');
+      return;
+    }
+
+    if (role === 'instructor' && !isUncommonOrgStaffEmail(user.email)) {
       setError('Instructor accounts must use an @uncommon.org Google account.');
       return;
     }

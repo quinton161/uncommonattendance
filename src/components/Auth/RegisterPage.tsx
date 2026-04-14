@@ -11,6 +11,7 @@ import { FiUser, FiCheckCircle, FiMail, FiLock } from 'react-icons/fi';
 import { Rocket } from 'lucide-react';
 import { fetchHubs, hubLabel, hubTooltip, type Hub, DEFAULT_HUBS } from '../../services/hubService';
 import { isAdminEmail } from '../../constants/admin';
+import { isUncommonOrgStaffEmail } from '../../constants/staff';
 import type { HubSelection } from '../../types';
 
 const fadeIn = keyframes`
@@ -336,7 +337,12 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onToggleMode }) => {
       return;
     }
 
-    if (role === 'instructor' && !formData.email.endsWith('@uncommon.org')) {
+    if (role === 'student' && isUncommonOrgStaffEmail(formData.email)) {
+      setError('Uncommon staff emails (@uncommon.org) cannot register as students. Switch to Instructor, or use a non-Uncommon email for a student account.');
+      return;
+    }
+
+    if (role === 'instructor' && !isUncommonOrgStaffEmail(formData.email)) {
       setError('Instructor accounts must use an @uncommon.org email');
       return;
     }

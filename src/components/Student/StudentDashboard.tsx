@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { useAuth } from '../../contexts/AuthContext';
 import { AttendanceService } from '../../services/attendanceService';
+import { effectiveStudentHubId } from '../../services/hubService';
 import { Layout, Container, AppHeader } from '../Common/Layout';
 import { Button } from '../Common/Button';
 import { Card } from '../Common/Card';
@@ -150,6 +151,7 @@ interface StudentDashboardProps {
 
 export function StudentDashboard({ onNavigateToProfile }: StudentDashboardProps): React.ReactElement {
   const { user, logout } = useAuth();
+  const studentHubId = effectiveStudentHubId(user ?? undefined);
   const [todayAttendance, setTodayAttendance] = useState<AttendanceRecord | null>(null);
   const [attendanceHistory, setAttendanceHistory] = useState<AttendanceRecord[]>([]);
   const [loading, setLoading] = useState(false);
@@ -160,13 +162,13 @@ export function StudentDashboard({ onNavigateToProfile }: StudentDashboardProps)
   useEffect(() => {
     loadTodayAttendance();
     loadAttendanceHistory();
-  }, [user]);
+  }, [user, studentHubId]);
 
   const loadTodayAttendance = async () => {
     if (!user) return;
     
     try {
-      const attendance = await attendanceService.getTodayAttendance(user.uid, user.hubId);
+      const attendance = await attendanceService.getTodayAttendance(user.uid, studentHubId);
       setTodayAttendance(attendance);
     } catch (err) {
       console.error('Failed to load today attendance:', err);
@@ -177,7 +179,7 @@ export function StudentDashboard({ onNavigateToProfile }: StudentDashboardProps)
     if (!user) return;
     
     try {
-      const history = await attendanceService.getAttendanceHistory(user.uid, 10, user.hubId);
+      const history = await attendanceService.getAttendanceHistory(user.uid, 10, studentHubId);
       setAttendanceHistory(history);
     } catch (err) {
       console.error('Failed to load attendance history:', err);
@@ -186,7 +188,14 @@ export function StudentDashboard({ onNavigateToProfile }: StudentDashboardProps)
 
   const handleCheckIn = async () => {
     if (!user) return;
-    
+    if (
+      !window.confirm(
+        'Check in for today? Your attendance will be recorded for your hub.'
+      )
+    ) {
+      return;
+    }
+
     setLoading(true);
     setError('');
 
@@ -214,7 +223,7 @@ export function StudentDashboard({ onNavigateToProfile }: StudentDashboardProps)
         locationData,
         false,
         'qr',
-        user.hubId
+        studentHubId
       );
       setTodayAttendance(attendance);
       await loadAttendanceHistory();
@@ -228,7 +237,14 @@ export function StudentDashboard({ onNavigateToProfile }: StudentDashboardProps)
 
   const handleCheckOut = async () => {
     if (!user) return;
-    
+    if (
+      !window.confirm(
+        'Check out now? This completes today’s session.'
+      )
+    ) {
+      return;
+    }
+
     setLoading(true);
     setError('');
 
@@ -249,7 +265,7 @@ export function StudentDashboard({ onNavigateToProfile }: StudentDashboardProps)
         timestamp: Date.now(),
       };
 
-      const attendance = await attendanceService.checkOut(user.uid, locationData);
+      const attendance = await attendanceService.checkOut(user.uid, locationData, studentHubId);
       setTodayAttendance(attendance);
       await loadAttendanceHistory();
     } catch (err: any) {

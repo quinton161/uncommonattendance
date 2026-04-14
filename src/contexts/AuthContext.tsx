@@ -19,6 +19,7 @@ import { uniqueToast } from '../utils/toastUtils';
 import { getFirebaseAuthErrorMessage } from '../utils/firebaseAuthErrors';
 import DataService from '../services/DataService';
 import { ADMIN_EMAIL } from '../constants/admin';
+import { isUncommonOrgStaffEmail } from '../constants/staff';
 
 function needsHubRole(userType: User['userType']): boolean {
   return userType === 'attendee' || userType === 'instructor';
@@ -53,10 +54,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
 
           const isAdmin    = fbUser.email === ADMIN_EMAIL;
-          const isStaff    = fbUser.email?.endsWith('@uncommon.org');
+          const isStaff    = isUncommonOrgStaffEmail(fbUser.email);
 
           if (snap.exists()) {
             const d = snap.data();
+            try {
+              await updateDoc(doc(db, 'users', fbUser.uid), { lastLoginAt: serverTimestamp() });
+            } catch {
+              /* non-fatal */
+            }
             setUser({
               uid:         fbUser.uid,
               email:       fbUser.email!,
@@ -129,7 +135,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } catch {
           // Network error — use minimal user from Firebase Auth
           const isAdmin = fbUser.email === ADMIN_EMAIL;
-          const isStaff = fbUser.email?.endsWith('@uncommon.org');
+          const isStaff = isUncommonOrgStaffEmail(fbUser.email);
           setUser({
             uid:         fbUser.uid,
             email:       fbUser.email!,
@@ -157,13 +163,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     hub?: HubSelection
   ) => {
     const emailTrim = email.trim();
+    if (userType === 'attendee' && isUncommonOrgStaffEmail(emailTrim)) {
+      throw new Error(
+        'Uncommon staff emails (@uncommon.org) cannot register as students. Choose Instructor, or use a personal email for a student account.'
+      );
+    }
     const methods = await fetchSignInMethodsForEmail(auth, emailTrim);
     if (methods.length > 0) {
-      throw new Error('An account with this email already exists.');
+      throw new Error(
+        'This email already has a Firebase login. Use Sign in, or reset the password. If an admin removed only the profile, the same email may still be reserved — use Password reset or ask an admin to delete the user in Firebase Authentication so a new account can be created.'
+      );
     }
     const taken = await DataService.getInstance().isEmailLowerTaken(emailTrim);
     if (taken) {
-      throw new Error('An account with this email already exists.');
+      throw new Error('An account with this email already exists in our directory.');
     }
 
     let fbUser: FirebaseAuthUser | null = null;
@@ -195,6 +208,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           /* ignore cleanup failure */
         }
       }
+      if (err?.code === 'auth/email-already-in-use') {
+        throw new Error(
+          'That email is still registered in Firebase. Sign in with it, use Forgot password, or ask an admin to remove the user from Firebase Authentication if you need a brand-new account at this address.'
+        );
+      }
       throw err;
     }
   };
@@ -203,9 +221,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (email: string, password: string, hub?: HubSelection) => {
     const cred = await signInWithEmailAndPassword(auth, email, password);
     const isAdmin = cred.user.email === ADMIN_EMAIL;
+
+    const snapLogin = await getDoc(doc(db, 'users', cred.user.uid));
+    if (isUncommonOrgStaffEmail(cred.user.email) && snapLogin.exists()) {
+      const ut = (snapLogin.data().userType || 'attendee') as User['userType'];
+      if (ut === 'attendee') {
+        await signOut(auth);
+        throw new Error(
+          'This @uncommon.org profile is set as a student. Uncommon staff must use an instructor account. Ask an admin to change your role in Firestore, or register as Instructor.'
+        );
+      }
+    }
+
     if (!isAdmin && hub) {
-      const snap = await getDoc(doc(db, 'users', cred.user.uid));
-      const d = snap.exists() ? snap.data() : {};
+      const d = snapLogin.exists() ? snapLogin.data() : {};
       const userType = (d.userType || 'attendee') as User['userType'];
       if (needsHubRole(userType)) {
         await setDoc(
@@ -237,6 +266,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!snap.exists() && !isAdmin) {
         uniqueToast.info('Welcome! Finish setting up your account (role and hub).', { autoClose: 4000 });
         return;
+      }
+
+      if (snap.exists() && isUncommonOrgStaffEmail(fb.email)) {
+        const ut = (snap.data().userType || 'attendee') as User['userType'];
+        if (ut === 'attendee') {
+          await signOut(auth);
+          uniqueToast.error(
+            'This @uncommon.org account is registered as a student. Uncommon staff must use an instructor profile. Ask an admin to update your role.',
+            { autoClose: 6000 }
+          );
+          return;
+        }
       }
 
       // Existing user: non-admins must pick a hub on the login screen before we merge
@@ -278,8 +319,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!cu || !user?.needsProfileCompletion) {
       throw new Error('Not completing Google registration.');
     }
-    if (userType === 'instructor' && !cu.email?.endsWith('@uncommon.org')) {
+    if (userType === 'instructor' && !isUncommonOrgStaffEmail(cu.email)) {
       uniqueToast.error('Instructor accounts must use an @uncommon.org email.', { autoClose: 4000 });
+      return;
+    }
+    if (userType === 'attendee' && isUncommonOrgStaffEmail(cu.email)) {
+      uniqueToast.error('Uncommon staff (@uncommon.org) cannot register as students. Choose Instructor.', { autoClose: 5000 });
       return;
     }
     if (needsHubRole(userType) && !hub) {

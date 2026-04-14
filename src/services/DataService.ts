@@ -10,6 +10,8 @@ import { uniqueToast } from '../utils/toastUtils';
 import { TimeService } from './timeService';
 import { attendanceAnalyticsService } from './attendanceAnalyticsService';
 import { hubIdMatchesScope, resolvedHubLabel } from './hubService';
+import { isUncommonOrgStaffEmail } from '../constants/staff';
+import { isAdminEmail } from '../constants/admin';
 
 class DataService {
   private static instance: DataService;
@@ -227,7 +229,7 @@ class DataService {
     uniqueToast.success('User updated!');
   }
 
-  async deleteUser(userId: string): Promise<void> {
+  async deleteUser(userId: string, opts?: { suppressToast?: boolean }): Promise<void> {
     const uid = userId?.trim();
     if (!uid) {
       throw new Error('Missing user id');
@@ -258,7 +260,52 @@ class DataService {
     }
 
     await deleteDoc(doc(db, 'users', uid));
-    uniqueToast.success('User deleted!');
+    if (!opts?.suppressToast) {
+      uniqueToast.success('User deleted!');
+    }
+  }
+
+  /**
+   * Profiles that break policy: @uncommon.org email but stored as student (attendee / blank / student).
+   * Instructors and admins are excluded.
+   */
+  async listUncommonOrgStudentProfiles(): Promise<
+    Array<{ uid: string; email: string; displayName: string; userType: string }>
+  > {
+    const snap = await getDocs(collection(db, 'users'));
+    const out: Array<{ uid: string; email: string; displayName: string; userType: string }> = [];
+    for (const d of snap.docs) {
+      const data = d.data();
+      const email = String(data.email || '').trim();
+      if (!email || !isUncommonOrgStaffEmail(email)) continue;
+      if (isAdminEmail(email)) continue;
+      const t = String(data.userType || '').toLowerCase();
+      if (t === 'admin' || t === 'instructor') continue;
+      if (t === 'attendee' || t === 'student' || !t) {
+        out.push({
+          uid: d.id,
+          email,
+          displayName: String(data.displayName || 'Unknown'),
+          userType: t || '(blank)',
+        });
+      }
+    }
+    return out;
+  }
+
+  /** Deletes Firestore profile + related rows for each invalid Uncommon-as-student account (does not delete Firebase Auth). */
+  async removeUncommonOrgInvalidStudentProfiles(): Promise<{ removed: number; uids: string[] }> {
+    const list = await this.listUncommonOrgStudentProfiles();
+    const uids: string[] = [];
+    for (const row of list) {
+      try {
+        await this.deleteUser(row.uid, { suppressToast: true });
+        uids.push(row.uid);
+      } catch (e) {
+        console.error('removeUncommonOrgInvalidStudentProfiles failed for', row.uid, e);
+      }
+    }
+    return { removed: uids.length, uids };
   }
 
   // ── Dashboard stats ─────────────────────────────────────────────────────────

@@ -119,7 +119,7 @@ export class AttendanceService {
 
   // ── Check-out ───────────────────────────────────────────────────────────────
 
-  async checkOut(studentId: string, location?: LocationData): Promise<AttendanceRecord> {
+  async checkOut(studentId: string, location?: LocationData, studentHubId?: string): Promise<AttendanceRecord> {
     const now   = this.timeService.getCurrentTime();
     const today = this.timeService.getCurrentDateString();
     const docId = `${today}_${studentId}`;
@@ -131,6 +131,11 @@ export class AttendanceService {
     const data = snap.data();
     if (data.checkOutTime) {
       throw new Error('Already checked out today');
+    }
+    const recHub = (data.hubId && String(data.hubId).trim()) || '';
+    const scope = studentHubId?.trim() || '';
+    if (recHub && scope && recHub !== scope) {
+      throw new Error('This check-in belongs to a different hub than your profile. Contact support if you changed hubs.');
     }
 
     // Include studentId so Firestore rules see it on the merged request.resource (partial updates).

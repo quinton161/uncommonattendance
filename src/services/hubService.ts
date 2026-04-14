@@ -42,6 +42,12 @@ export function effectiveStaffHubScope(user: User | null, adminHubFilter: string
   return user.hubId?.trim() || LEGACY_DEFAULT_HUB_ID;
 }
 
+/** Students / attendees: stable Firestore hub id for attendance (missing profile hub → legacy default). */
+export function effectiveStudentHubId(user: User | null | undefined): string {
+  if (!user) return LEGACY_DEFAULT_HUB_ID;
+  return user.hubId?.trim() || LEGACY_DEFAULT_HUB_ID;
+}
+
 export interface Hub {
   id: string;
   /** Official hub title (e.g. … Innovation Hub). */

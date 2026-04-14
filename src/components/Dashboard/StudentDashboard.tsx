@@ -21,6 +21,7 @@ import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
 import { StudentAttendanceAnalytics } from '../Analytics/StudentAttendanceAnalytics';
 import { StudentProfile } from '../Profile/StudentProfile';
 import DataService from '../../services/DataService';
+import { effectiveStudentHubId } from '../../services/hubService';
 import { 
   FiCamera,
   FiX,
@@ -535,6 +536,7 @@ function formatDailyCodePublishedAt(createdAt: unknown): string | null {
 
 export const StudentDashboard = (): React.ReactElement => {
   const { user } = useAuth();
+  const studentHubId = useMemo(() => effectiveStudentHubId(user ?? undefined), [user]);
   const [activeNav, setActiveNav] = useState('dashboard');
   const [checkedIn, setCheckedIn] = useState(false);
   const [checkInTime, setCheckInTime] = useState<Date | null>(null);
@@ -562,7 +564,7 @@ export const StudentDashboard = (): React.ReactElement => {
   const loadStudentStats = useCallback(async () => {
     if (!user?.uid) return;
     try {
-      const s = await DataService.getInstance().getStudentStats(user.uid, user.hubId);
+      const s = await DataService.getInstance().getStudentStats(user.uid, studentHubId);
       setStats((prev) => ({
         ...prev,
         totalCheckIns: s.totalCheckIns ?? 0,
@@ -571,7 +573,7 @@ export const StudentDashboard = (): React.ReactElement => {
     } catch {
       /* ignore */
     }
-  }, [user]);
+  }, [user, studentHubId]);
 
   useEffect(() => {
     loadStudentStats();
@@ -583,7 +585,6 @@ export const StudentDashboard = (): React.ReactElement => {
     const unsubscribe = qrCodeService.subscribeToDailyCode((qrData: DailyQRCode | null) => {
       if (qrData?.code) {
         setDailyQR(qrData);
-        setQrCodeInput((prev) => (prev.trim() ? prev : qrData.code));
       } else {
         setDailyQR(null);
       }
@@ -605,7 +606,7 @@ export const StudentDashboard = (): React.ReactElement => {
     if (!user) return;
     
     try {
-      const attendanceState = await attendanceService.getAttendanceStateWithDayCheck(user.uid, user.hubId);
+      const attendanceState = await attendanceService.getAttendanceStateWithDayCheck(user.uid, studentHubId);
       const beforeSession = !!(attendanceState as { isBeforeSessionStart?: boolean }).isBeforeSessionStart;
       setIsBeforeSessionStart(beforeSession);
 
@@ -655,9 +656,9 @@ export const StudentDashboard = (): React.ReactElement => {
       console.error('Error checking today attendance:', error);
       // Avoid noisy toasts on refresh (offline / transient Firestore). Defaults already show "not checked in".
     }
-  }, [user, attendanceService]);
+  }, [user, attendanceService, studentHubId]);
 
-  const handleCheckInInternal = async (isAutomatic: boolean = false) => {
+  const handleCheckInInternal = async () => {
     if (!user) {
       uniqueToast.error('You must be logged in to check in.', {
         autoClose: 4000,
@@ -682,13 +683,21 @@ export const StudentDashboard = (): React.ReactElement => {
       return;
     }
 
+    if (!qrCodeInput.trim()) {
+      uniqueToast.error('Please enter the daily check-in code');
+      return;
+    }
+
+    if (
+      !window.confirm(
+        'Check in for today with the code you entered? Your attendance will be recorded for your hub. Make sure it matches what your instructor shared.'
+      )
+    ) {
+      return;
+    }
+
     setAttendanceLoading(true);
     try {
-      if (!qrCodeInput) {
-        uniqueToast.error('Please enter the daily check-in code');
-        return;
-      }
-
       setIsVerifyingQR(true);
       const isValid = await qrCodeService.validateCode(qrCodeInput);
       if (!isValid) {
@@ -723,7 +732,7 @@ export const StudentDashboard = (): React.ReactElement => {
             location,
             false,
             'qr',
-            user.hubId
+            studentHubId
           );
           break; // Success
         } catch (err: any) {
@@ -760,7 +769,7 @@ export const StudentDashboard = (): React.ReactElement => {
           position: 'top-center',
         });
       } else {
-        uniqueToast.success(isAutomatic ? 'Auto check-in successful!' : 'Checked in successfully!', {
+        uniqueToast.success('Checked in successfully!', {
           autoClose: 4000,
           position: 'top-center',
         });
@@ -832,11 +841,18 @@ export const StudentDashboard = (): React.ReactElement => {
   }, [user, checkTodayAttendance]);
 
   const handleCheckIn = async () => {
-    await handleCheckInInternal(false);
+    await handleCheckInInternal();
   };
 
   const handleCheckOut = async () => {
     if (!user) return;
+    if (
+      !window.confirm(
+        'Check out now? This completes today’s session. You can only check in once per day.'
+      )
+    ) {
+      return;
+    }
     setAttendanceLoading(true);
     try {
       uniqueToast.info('Recording check-out...', { autoClose: 2000, position: 'top-center' });
@@ -852,7 +868,7 @@ export const StudentDashboard = (): React.ReactElement => {
         // Ignore IP failures
       }
 
-      await attendanceService.checkOut(user.uid, location);
+      await attendanceService.checkOut(user.uid, location, studentHubId);
       setCheckedIn(false);
       setCheckInTime(null);
       setCanCheckIn(false);
@@ -1157,7 +1173,7 @@ export const StudentDashboard = (): React.ReactElement => {
                     <div>
                       <strong style={{ fontSize: theme.fontSizes.sm, color: theme.colors.textPrimary }}>Enter the daily code</strong>
                       <p style={{ margin: '6px 0 12px', fontSize: theme.fontSizes.xs, color: theme.colors.textSecondary }}>
-                        Same characters as the QR. Letters are not case-sensitive once submitted.
+                        Type or paste the code yourself — it is not filled in automatically. Same characters as the QR; not case-sensitive.
                       </p>
                       <CodeInput
                         type="text"
