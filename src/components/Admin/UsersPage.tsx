@@ -6,8 +6,8 @@ import { Button } from '../Common/Button';
 import DataService from '../../services/DataService';
 import {
   effectiveStaffHubScope,
-  LEGACY_DEFAULT_HUB_ID,
   resolvedHubLabel,
+  staffMayAccessHubForWrite,
 } from '../../services/hubService';
 import { AdminHubScopeSelect } from './AdminHubScopeSelect';
 import { TimeService } from '../../services/timeService';
@@ -739,9 +739,7 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
   const instructorCanDeleteStudent = (target: any): boolean => {
     if (user?.userType !== 'instructor') return false;
     if (target?.userType === 'admin' || target?.userType === 'instructor') return false;
-    const a = (target?.hubId && String(target.hubId).trim()) || LEGACY_DEFAULT_HUB_ID;
-    const b = (user?.hubId && String(user.hubId).trim()) || LEGACY_DEFAULT_HUB_ID;
-    return a === b;
+    return staffMayAccessHubForWrite(user, target?.hubId);
   };
 
   const handleOpenDelete = (target: any) => {
@@ -753,7 +751,11 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
     setShowDeleteModal(true);
   };
 
-  const handleMarkPresent = async (studentId: string, studentName: string) => {
+  const handleMarkPresent = async (studentId: string, studentName: string, targetHubId?: string) => {
+    if (user?.userType === 'instructor' && !staffMayAccessHubForWrite(user, targetHubId)) {
+      uniqueToast.error('You can only record attendance for students in your hub.');
+      return;
+    }
     try {
       // Use AttendanceService with skipTimeCheck=true to allow marking after deadline
       const attendanceService = AttendanceService.getInstance();
@@ -793,7 +795,7 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
       throw new Error('Missing user id');
     }
     try {
-      await dataService.deleteUser(targetId);
+      await dataService.deleteUser(targetId, { actingUser: user ?? undefined });
       await loadData();
     } catch (error: unknown) {
       const code =
@@ -1154,7 +1156,7 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
                 </div>
 
                 <ActionButtons style={{ justifyContent: 'flex-end' }}>
-                  <MarkPresentButton onClick={() => handleMarkPresent(uid, userData.displayName || 'Unknown User')}>
+                  <MarkPresentButton onClick={() => handleMarkPresent(uid, userData.displayName || 'Unknown User', userData.hubId)}>
                     <CheckCircleIcon size={14} /> <span>Mark Present</span>
                   </MarkPresentButton>
                   {(user?.userType === 'admin' || instructorCanDeleteStudent(userData)) && (
@@ -1237,7 +1239,7 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
 
                   <CardSection>
                     <ActionButtons>
-                      <MarkPresentButton onClick={() => handleMarkPresent(uid, userData.displayName || 'Unknown User')} style={{ flex: 1 }}>
+                      <MarkPresentButton onClick={() => handleMarkPresent(uid, userData.displayName || 'Unknown User', userData.hubId)} style={{ flex: 1 }}>
                         <CheckCircleIcon size={14} /> <span>Mark Present</span>
                       </MarkPresentButton>
                       {(user?.userType === 'admin' || instructorCanDeleteStudent(userData)) && (

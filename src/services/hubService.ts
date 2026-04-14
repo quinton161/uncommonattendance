@@ -48,6 +48,26 @@ export function effectiveStudentHubId(user: User | null | undefined): string {
   return user.hubId?.trim() || LEGACY_DEFAULT_HUB_ID;
 }
 
+/** Instructor’s assigned hub id (legacy default when profile has no hub). */
+export function instructorAssignedHubId(user: User | null | undefined): string {
+  if (!user || user.userType !== 'instructor') return LEGACY_DEFAULT_HUB_ID;
+  return user.hubId?.trim() || LEGACY_DEFAULT_HUB_ID;
+}
+
+/**
+ * Whether staff may mutate another user’s record or an attendance row for that hub.
+ * Admins: always true. Instructors: only when the target `recordHubId` matches their hub (same rules as hubIdMatchesScope).
+ */
+export function staffMayAccessHubForWrite(
+  staffUser: User | null | undefined,
+  recordHubId: string | null | undefined
+): boolean {
+  if (!staffUser) return false;
+  if (staffUser.userType === 'admin') return true;
+  if (staffUser.userType !== 'instructor') return false;
+  return hubIdMatchesScope(recordHubId ?? undefined, instructorAssignedHubId(staffUser));
+}
+
 export interface Hub {
   id: string;
   /** Official hub title (e.g. … Innovation Hub). */

@@ -405,7 +405,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // ── deleteAccount ─────────────────────────────────────────────────────────────
   const deleteAccount = async () => {
     if (!auth.currentUser || !user) throw new Error('Not logged in');
-    await DataService.getInstance().deleteUser(user.uid);
+    await DataService.getInstance().deleteUser(user.uid, { actingUser: user });
     await deleteUser(auth.currentUser);
   };
 

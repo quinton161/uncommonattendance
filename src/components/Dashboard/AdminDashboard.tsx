@@ -40,7 +40,7 @@ import {
   Legend
 } from 'recharts';
 import { qrCodeService, DailyQRCode } from '../../services/qrCodeService';
-import { effectiveStaffHubScope } from '../../services/hubService';
+import { effectiveStaffHubScope, staffMayAccessHubForWrite } from '../../services/hubService';
 import { AdminHubScopeSelect } from '../Admin/AdminHubScopeSelect';
 import { 
   FiMenu,
@@ -530,6 +530,10 @@ const AdminDashboard: React.FC = () => {
       uniqueToast.info('Select a single hub above to mark attendance for that hub only.');
       return;
     }
+    if (user?.userType === 'instructor' && !staffMayAccessHubForWrite(user, student?.hubId)) {
+      uniqueToast.error('You can only record attendance for students in your hub.');
+      return;
+    }
     if (!student?.userId || !student?.userName) return;
     if (markingStudentId) return;
 
@@ -564,6 +568,9 @@ const AdminDashboard: React.FC = () => {
     if (markAllLoading) return;
     const targets = (todayAttendanceList || [])
       .filter((s: any) => s.status === 'absent' && s.userId && s.userName)
+      .filter(
+        (s: any) => user?.userType !== 'instructor' || staffMayAccessHubForWrite(user, s.hubId)
+      )
       .slice(0, 50);
 
     if (targets.length === 0) {

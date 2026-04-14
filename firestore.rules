@@ -7,38 +7,100 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function usersPath(uid) {
+      return /databases/$(database)/documents/users/$(uid);
+    }
+
+    function authUserData() {
+      return get(usersPath(request.auth.uid)).data;
+    }
+
+    function isSignedInUserDoc() {
+      return exists(usersPath(request.auth.uid));
+    }
+
     function isStaff() {
-      return isAuth() &&
-        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.userType in ['admin', 'instructor'];
+      return isAuth() && isSignedInUserDoc() &&
+        authUserData().userType in ['admin', 'instructor'];
+    }
+
+    function isAdminUser() {
+      return isAuth() && isSignedInUserDoc() && authUserData().userType == 'admin';
+    }
+
+    function isInstructorUser() {
+      return isAuth() && isSignedInUserDoc() && authUserData().userType == 'instructor';
+    }
+
+    /** Mirrors hubService LEGACY_DEFAULT_HUB_ID + hubIdMatchesScope. */
+    function legacyHubId() {
+      return 'uncommon_victoriafalls';
+    }
+
+    function effectiveHubOnUserDoc(data) {
+      return (!('hubId' in data) || data.hubId == null || data.hubId == '')
+        ? ''
+        : data.hubId;
+    }
+
+    function instructorAssignedHubId() {
+      let h = effectiveHubOnUserDoc(authUserData());
+      return h == '' ? legacyHubId() : h;
+    }
+
+    function hubRecordMatchesInstructorScope(recordHubEffective) {
+      let scope = instructorAssignedHubId();
+      return recordHubEffective == scope || (scope == legacyHubId() && recordHubEffective == '');
+    }
+
+    function userHubMatchesInstructorScope(userData) {
+      let r = effectiveHubOnUserDoc(userData);
+      return hubRecordMatchesInstructorScope(r);
+    }
+
+    /** Attendance row hub field (optional). */
+    function effectiveHubOnAttendance(data) {
+      return (!('hubId' in data) || data.hubId == null || data.hubId == '')
+        ? ''
+        : data.hubId;
+    }
+
+    function attendanceMatchesInstructorScope(attData) {
+      return hubRecordMatchesInstructorScope(effectiveHubOnAttendance(attData));
+    }
+
+    function dailyDocStudentUid(recordId) {
+      return recordId.split('_')[0];
     }
 
     function isOwner(uid) {
       return isAuth() && request.auth.uid == uid;
     }
 
-    // Hub registry (doc id = hub slug, fields: name, order)
+    // Hub registry
     match /hubs/{hubId} {
       allow read: if isAuth();
-      allow write: if isStaff();
+      allow write: if isAdminUser();
     }
 
-    // Users
     match /users/{userId} {
       allow read: if isAuth();
       allow create: if isAuth();
-      allow update: if isAuth();
-      allow delete: if isStaff();
+      allow update: if isOwner(userId)
+        || isAdminUser()
+        || (isInstructorUser()
+            && exists(usersPath(userId))
+            && userHubMatchesInstructorScope(get(usersPath(userId)).data)
+            && userHubMatchesInstructorScope(request.resource.data));
+      allow delete: if isAdminUser()
+        || (isInstructorUser() && userHubMatchesInstructorScope(resource.data));
     }
 
-    // Main attendance records (doc id: {date}_{studentId})
     match /attendance/{attendanceId} {
       function attendancePath() {
         return /databases/$(database)/documents/attendance/$(attendanceId);
       }
 
-      // Students may GET a doc that does not exist yet (duplicate check before first check-in).
-      // For missing docs, `resource` is unavailable — the old rule denied those reads.
       function canReadOwnAttendance() {
         return isAuth() && (
           (exists(attendancePath()) && get(attendancePath()).data.studentId == request.auth.uid)
@@ -46,50 +108,47 @@ service cloud.firestore {
         );
       }
 
-      // Staff can read all attendance records
-      allow read: if isStaff();
+      allow read: if isStaff() || canReadOwnAttendance();
 
-      // Students can read their own records (including "read" of a missing doc for their id)
-      allow read: if canReadOwnAttendance();
-      
-      // Staff can do anything
-      allow write: if isStaff();
-      
-      // Students can CREATE their own check-in record
-      allow create: if isAuth() && request.resource.data.studentId == request.auth.uid;
-      
-      // Students can UPDATE (add check-out) on their own record. Do not use diff().hasOnly —
-      // Firestore merge + serverTimestamp can fail that check and deny legitimate check-outs.
-      // Ownership: doc id is `{date}_{uid}` — do not rely only on request.resource.data.studentId
-      // after partial updates (merged snapshot can be finicky vs request.auth.uid checks).
+      allow create: if isAdminUser()
+        || (isInstructorUser() && attendanceMatchesInstructorScope(request.resource.data))
+        || (isAuth() && request.resource.data.studentId == request.auth.uid);
+
       allow update: if isAuth()
                     && attendanceId.matches('.*_' + request.auth.uid + '$')
                     && resource.data.studentId == request.auth.uid
                     && (!resource.data.keys().hasAny(['checkOutTime']) || resource.data.checkOutTime == null)
                     && request.resource.data.checkOutTime != null
                     && request.resource.data.studentId == resource.data.studentId;
+
+      allow update: if isAdminUser()
+        || (isInstructorUser() && attendanceMatchesInstructorScope(resource.data));
+
+      allow delete: if isAdminUser()
+        || (isInstructorUser() && attendanceMatchesInstructorScope(resource.data));
     }
 
-    // Daily attendance summary (used by DailyAttendanceService)
     match /dailyAttendance/{recordId} {
       allow read: if isAuth();
-      allow write: if isStaff();
+
+      allow write: if isAdminUser()
+        || (isInstructorUser()
+            && exists(usersPath(dailyDocStudentUid(recordId)))
+            && userHubMatchesInstructorScope(get(usersPath(dailyDocStudentUid(recordId))).data));
+
       allow create: if isAuth() && request.resource.data.studentId == request.auth.uid;
       allow update: if isAuth() && resource.data.studentId == request.auth.uid;
     }
 
-    // QR codes and system config — students need READ to validate codes
     match /system_config/{docId} {
       allow read: if isAuth();
       allow write: if isStaff();
     }
 
-    // Admin audit log
     match /admin_actions/{docId} {
       allow read, write: if isStaff();
     }
 
-    // Events
     match /events/{eventId} {
       allow read: if isAuth();
       allow write: if isStaff();
@@ -101,7 +160,6 @@ service cloud.firestore {
     match /feedback/{id} { allow read, write: if isAuth(); }
     match /students/{id} { allow read, write: if isAuth(); }
 
-    // Conversations
     match /conversations/{conversationId} {
       function isParticipant() {
         return isAuth() && (

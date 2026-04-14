@@ -1,5 +1,5 @@
 import {
-  collection, doc, getDocs, setDoc, updateDoc,
+  collection, doc, getDoc, getDocs, setDoc, updateDoc,
   query, where, orderBy, limit, addDoc,
   Timestamp, deleteDoc, onSnapshot, serverTimestamp,
 } from 'firebase/firestore';
@@ -9,9 +9,10 @@ import { db, storage } from './firebase';
 import { uniqueToast } from '../utils/toastUtils';
 import { TimeService } from './timeService';
 import { attendanceAnalyticsService } from './attendanceAnalyticsService';
-import { hubIdMatchesScope, resolvedHubLabel } from './hubService';
+import { hubIdMatchesScope, resolvedHubLabel, staffMayAccessHubForWrite } from './hubService';
 import { isUncommonOrgStaffEmail } from '../constants/staff';
 import { isAdminEmail } from '../constants/admin';
+import type { User } from '../types';
 
 class DataService {
   private static instance: DataService;
@@ -224,15 +225,30 @@ class DataService {
     }
   }
 
-  async updateUser(userId: string, data: any): Promise<void> {
+  async updateUser(userId: string, data: any, actingUser?: User | null): Promise<void> {
+    if (actingUser?.userType === 'instructor') {
+      const snap = await getDoc(doc(db, 'users', userId));
+      if (!snap.exists()) throw new Error('User not found');
+      if (!staffMayAccessHubForWrite(actingUser, snap.data()?.hubId)) {
+        throw new Error('You can only edit accounts in your hub.');
+      }
+    }
     await updateDoc(doc(db,'users',userId), data);
     uniqueToast.success('User updated!');
   }
 
-  async deleteUser(userId: string, opts?: { suppressToast?: boolean }): Promise<void> {
+  async deleteUser(userId: string, opts?: { suppressToast?: boolean; actingUser?: User | null }): Promise<void> {
     const uid = userId?.trim();
     if (!uid) {
       throw new Error('Missing user id');
+    }
+
+    if (opts?.actingUser?.userType === 'instructor') {
+      const targetSnap = await getDoc(doc(db, 'users', uid));
+      if (!targetSnap.exists()) throw new Error('User not found');
+      if (!staffMayAccessHubForWrite(opts.actingUser, targetSnap.data()?.hubId)) {
+        throw new Error('You can only remove accounts registered in your hub.');
+      }
     }
 
     const attendSnap = await getDocs(query(collection(db, 'attendance'), where('studentId', '==', uid)));
