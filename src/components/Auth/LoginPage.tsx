@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import styled, { keyframes } from 'styled-components';
 import { useAuth } from '../../contexts/AuthContext';
 import { getFirebaseAuthErrorMessage } from '../../utils/firebaseAuthErrors';
@@ -8,6 +8,9 @@ import { Card } from '../Common/Card';
 import { theme } from '../../styles/theme';
 import { FiCheckCircle, FiAlertTriangle } from 'react-icons/fi';
 import { Rocket } from 'lucide-react';
+import { fetchHubs, hubLabel, hubTooltip, type Hub, DEFAULT_HUBS } from '../../services/hubService';
+import { isAdminEmail } from '../../constants/admin';
+import type { HubSelection } from '../../types';
 
 const fadeIn = keyframes`
   from { opacity: 0; transform: translateY(10px); }
@@ -303,6 +306,30 @@ const PasswordWrapper = styled.div`
   position: relative;
 `;
 
+const HubSelect = styled.select`
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid ${theme.colors.gray300};
+  font-size: 1rem;
+  margin-bottom: ${theme.spacing.md};
+  background: ${theme.colors.white};
+  color: ${theme.colors.textPrimary};
+  &:focus {
+    outline: none;
+    border-color: ${theme.colors.primary};
+    box-shadow: 0 0 0 3px ${theme.colors.primary}20;
+  }
+`;
+
+const HubLabel = styled.label`
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: ${theme.colors.textPrimary};
+  margin-bottom: ${theme.spacing.xs};
+`;
+
 const PasswordToggle = styled.button`
   position: absolute;
   right: 12px;
@@ -333,10 +360,27 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onToggleMode }) => {
     email: '',
     password: '',
   });
+  const [hubs, setHubs] = useState<Hub[]>(() => [...DEFAULT_HUBS]);
+  const [hubId, setHubId] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchHubs().then((list) => {
+      if (!cancelled) setHubs(list);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const selectedHub = (): HubSelection | undefined => {
+    const h = hubs.find((x) => x.id === hubId);
+    return h ? { id: h.id, name: h.name } : undefined;
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -349,12 +393,18 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onToggleMode }) => {
     e.preventDefault();
     if (loading) return;
 
-    setLoading(true);
     setError('');
     setSuccess('');
+    const adminBypassHub = isAdminEmail(formData.email);
+    if (!adminBypassHub && !hubId) {
+      setError('Please select your hub.');
+      return;
+    }
+
+    setLoading(true);
 
     try {
-      await login(formData.email, formData.password);
+      await login(formData.email, formData.password, adminBypassHub ? undefined : selectedHub());
     } catch (err: any) {
       console.error('Login error:', err);
       setError(getFirebaseAuthErrorMessage(err?.code, 'Failed to sign in.'));
@@ -429,6 +479,26 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onToggleMode }) => {
           )}
 
           <form onSubmit={handleSubmit}>
+            <div>
+              <HubLabel htmlFor="login-hub">Your hub</HubLabel>
+              <HubSelect
+                id="login-hub"
+                value={hubId}
+                onChange={(e) => {
+                  setHubId(e.target.value);
+                  if (error) setError('');
+                }}
+                required
+              >
+                <option value="">Select hub…</option>
+                {hubs.map((h) => (
+                  <option key={h.id} value={h.id} title={hubTooltip(h)}>
+                    {hubLabel(h)}
+                  </option>
+                ))}
+              </HubSelect>
+            </div>
+
             <Input
               label="Email Address"
               name="email"
@@ -469,7 +539,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onToggleMode }) => {
               variant="primary"
               fullWidth
               loading={loading}
-              disabled={loading}
+              disabled={loading || (!isAdminEmail(formData.email) && !hubId)}
             >
               Sign In
             </StyledButton>
@@ -487,7 +557,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onToggleMode }) => {
               setSuccess('');
               setLoading(true);
               try {
-                await loginWithGoogle();
+                await loginWithGoogle(selectedHub());
               } catch {
                 /* errors surfaced via toast in AuthContext */
               } finally {

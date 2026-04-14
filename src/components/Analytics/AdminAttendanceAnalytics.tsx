@@ -26,6 +26,8 @@ import { DateRangeFilter } from './DateRangeFilter';
 import { AttendanceHeatmap } from './AttendanceHeatmap';
 import { format, parseISO } from 'date-fns';
 import { useAuth } from '../../contexts/AuthContext';
+import { effectiveStaffHubScope } from '../../services/hubService';
+import { AdminHubScopeSelect } from '../Admin/AdminHubScopeSelect';
 import { AttendanceService } from '../../services/attendanceService';
 import { uniqueToast } from '../../utils/toastUtils';
 import { Button } from '../Common/Button';
@@ -210,6 +212,11 @@ function fmtShort(dateIso: string) {
 
 export function AdminAttendanceAnalytics(): React.ReactElement {
   const { user } = useAuth();
+  const [adminHubFilter, setAdminHubFilter] = useState('');
+  const effectiveHub = useMemo(
+    () => effectiveStaffHubScope(user, adminHubFilter),
+    [user, adminHubFilter]
+  );
   const dataService = DataService.getInstance();
   const canClearAttendance = user?.userType === 'admin';
 
@@ -239,11 +246,11 @@ export function AdminAttendanceAnalytics(): React.ReactElement {
   useEffect(() => {
     (async () => {
       await dataService.testConnection();
-      const users = await dataService.getUsers();
+      const users = await dataService.getUsers(effectiveHub);
       // Treat missing userType as a student for backward-compat.
       setStudents(users.filter((u: any) => !u.userType || u.userType === 'attendee'));
     })();
-  }, [dataService]);
+  }, [dataService, effectiveHub]);
 
   // If a preset was selected (not Custom), normalize to concrete Harare-aligned dates.
   useEffect(() => {
@@ -259,8 +266,8 @@ export function AdminAttendanceAnalytics(): React.ReactElement {
     setLoading(true);
     const opts =
       selectedStudentId !== 'all'
-        ? { studentId: selectedStudentId }
-        : { totalStudents: students.length, roster };
+        ? { studentId: selectedStudentId, hubId: effectiveHub }
+        : { totalStudents: students.length, roster, hubId: effectiveHub };
 
     const unsubscribe = attendanceAnalyticsService.subscribeToAdminAnalytics(
       range,
@@ -276,7 +283,7 @@ export function AdminAttendanceAnalytics(): React.ReactElement {
       mounted = false;
       unsubscribe();
     };
-  }, [range.startDate, range.endDate, selectedStudentId, students.length, roster]);
+  }, [range.startDate, range.endDate, selectedStudentId, students.length, roster, effectiveHub]);
 
   const dailyData =
     (analytics?.daily || []).map((d: { date: string; present: number; late: number; absent: number }) => ({
@@ -319,6 +326,12 @@ export function AdminAttendanceAnalytics(): React.ReactElement {
   return (
     <Page>
       <FilterRow>
+        <AdminHubScopeSelect
+          user={user}
+          value={adminHubFilter}
+          onChange={setAdminHubFilter}
+          id="analytics-hub-filter"
+        />
         <DateRangeFilter
           value={range}
           onChange={setRange}

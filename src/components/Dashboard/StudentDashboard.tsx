@@ -542,6 +542,7 @@ export const StudentDashboard = (): React.ReactElement => {
   useBodyScrollLock(mobileMenuOpen);
   const [attendanceLoading, setAttendanceLoading] = useState(false);
   const [canCheckIn, setCanCheckIn] = useState(true);
+  const [isBeforeSessionStart, setIsBeforeSessionStart] = useState(false);
   const [stats, setStats] = useState({
     totalCheckIns: 0,
     currentStreak: 0,
@@ -561,7 +562,7 @@ export const StudentDashboard = (): React.ReactElement => {
   const loadStudentStats = useCallback(async () => {
     if (!user?.uid) return;
     try {
-      const s = await DataService.getInstance().getStudentStats(user.uid);
+      const s = await DataService.getInstance().getStudentStats(user.uid, user.hubId);
       setStats((prev) => ({
         ...prev,
         totalCheckIns: s.totalCheckIns ?? 0,
@@ -604,17 +605,23 @@ export const StudentDashboard = (): React.ReactElement => {
     if (!user) return;
     
     try {
-      const attendanceState = await attendanceService.getAttendanceStateWithDayCheck(user.uid);
-      
+      const attendanceState = await attendanceService.getAttendanceStateWithDayCheck(user.uid, user.hubId);
+      const beforeSession = !!(attendanceState as { isBeforeSessionStart?: boolean }).isBeforeSessionStart;
+      setIsBeforeSessionStart(beforeSession);
+
       setCheckedIn(attendanceState.isCheckedIn);
       setCheckInTime(attendanceState.checkInTime);
       setCanCheckIn(attendanceState.canCheckIn);
       
       if (attendanceState.isNewDay && !attendanceState.isCheckedIn) {
+        let todayStatus =
+          attendanceState.status === 'absent' ? 'Absent / Check-in closed' : 'Ready for New Day';
+        if (beforeSession && attendanceState.status !== 'absent') {
+          todayStatus = 'Session opens at 7:00 AM';
+        }
         setStats(prev => ({
           ...prev,
-          todayStatus:
-            attendanceState.status === 'absent' ? 'Absent / Check-in closed' : 'Ready for New Day'
+          todayStatus,
         }));
       } else if (attendanceState.isCheckedIn) {
         const late = attendanceState.status === 'late';
@@ -632,6 +639,11 @@ export const StudentDashboard = (): React.ReactElement => {
         setStats(prev => ({
           ...prev,
           todayStatus: 'Absent / Check-in closed'
+        }));
+      } else if (beforeSession) {
+        setStats(prev => ({
+          ...prev,
+          todayStatus: 'Session opens at 7:00 AM'
         }));
       } else {
         setStats(prev => ({
@@ -655,10 +667,18 @@ export const StudentDashboard = (): React.ReactElement => {
     }
 
     if (!canCheckIn) {
-      uniqueToast.info('You cannot check in right now. Please try again or refresh the page.', {
-        autoClose: 4000,
-        position: 'top-center',
-      });
+      const timeService = TimeService.getInstance();
+      if (timeService.isBeforeSessionStart(timeService.getCurrentTime())) {
+        uniqueToast.info('Session starts at 7:00 AM Harare. You can check in once it opens.', {
+          autoClose: 5000,
+          position: 'top-center',
+        });
+      } else {
+        uniqueToast.info('You cannot check in right now. The window may have closed (after 9:05 AM Harare).', {
+          autoClose: 4000,
+          position: 'top-center',
+        });
+      }
       return;
     }
 
@@ -688,7 +708,7 @@ export const StudentDashboard = (): React.ReactElement => {
         // Ignore IP failures
       }
       
-      // Note: Time validation (9:00 AM + 5 min grace) is handled in attendanceService.checkIn()
+      // Time validation: session 7:00–9:05 Harare; late from 9:01 — see TimeService / attendanceService.checkIn()
       
       let attendanceRecord;
       let retries = 0;
@@ -696,7 +716,15 @@ export const StudentDashboard = (): React.ReactElement => {
       
       while (retries <= maxRetries) {
         try {
-          attendanceRecord = await attendanceService.checkIn(user.uid, user.displayName || 'Student', qrCodeInput, location);
+          attendanceRecord = await attendanceService.checkIn(
+            user.uid,
+            user.displayName || 'Student',
+            qrCodeInput,
+            location,
+            false,
+            'qr',
+            user.hubId
+          );
           break; // Success
         } catch (err: any) {
           if (err.message === 'Already checked in today' || retries === maxRetries) throw err;
@@ -727,7 +755,7 @@ export const StudentDashboard = (): React.ReactElement => {
       }));
 
       if (isLate) {
-        uniqueToast.warning('Checked in (Late). Recorded after 9:00 AM.', {
+        uniqueToast.warning('Checked in (Late). Recorded at 9:01 AM or later (Harare).', {
           autoClose: 6000,
           position: 'top-center',
         });
@@ -1068,8 +1096,8 @@ export const StudentDashboard = (): React.ReactElement => {
                 <WindowNote>
                   <FiInfo size={16} style={{ flexShrink: 0, marginTop: 2 }} aria-hidden />
                   <span>
-                    Check-in is open until <strong>9:05 AM</strong> Harare. Arriving at <strong>9:00 AM</strong> or later counts as{' '}
-                    <strong>late</strong>. The code proves you&apos;re joining today&apos;s session — keep it private until you&apos;ve checked in.
+                    Session opens at <strong>7:00 AM</strong> Harare. Check-in is open until <strong>9:05 AM</strong>. Arriving at{' '}
+                    <strong>9:01 AM</strong> or later counts as <strong>late</strong>. The code proves you&apos;re joining today&apos;s session — keep it private until you&apos;ve checked in.
                   </span>
                 </WindowNote>
               </CheckInTop>
@@ -1176,7 +1204,9 @@ export const StudentDashboard = (): React.ReactElement => {
                         {stats.todayStatus}
                       </p>
                       <p style={{ margin: `${theme.spacing.sm} 0 0`, fontSize: theme.fontSizes.sm, color: theme.colors.textSecondary, lineHeight: 1.5 }}>
-                        The check-in window has closed for today (after 9:05 AM Harare), or attendance was already finalized. If this looks wrong, contact your instructor.
+                        {isBeforeSessionStart
+                          ? 'Today’s session begins at 7:00 AM Harare. You can check in once the window opens (7:00–9:05 AM).'
+                          : 'The check-in window has closed for today (after 9:05 AM Harare), or attendance was already finalized. If this looks wrong, contact your instructor.'}
                       </p>
                     </div>
                   </div>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import styled, { keyframes } from 'styled-components';
 import { useAuth } from '../../contexts/AuthContext';
 import { getFirebaseAuthErrorMessage } from '../../utils/firebaseAuthErrors';
@@ -9,6 +9,9 @@ import { theme } from '../../styles/theme';
 import { FiUser, FiCheckCircle, FiMail, FiLock } from 'react-icons/fi';
 
 import { Rocket } from 'lucide-react';
+import { fetchHubs, hubLabel, hubTooltip, type Hub, DEFAULT_HUBS } from '../../services/hubService';
+import { isAdminEmail } from '../../constants/admin';
+import type { HubSelection } from '../../types';
 
 const fadeIn = keyframes`
   from { opacity: 0; transform: translateY(10px); }
@@ -250,6 +253,30 @@ const FooterText = styled.p`
   font-size: 0.95rem;
 `;
 
+const HubLabel = styled.label`
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: ${theme.colors.textPrimary};
+  margin-bottom: ${theme.spacing.xs};
+`;
+
+const HubSelect = styled.select`
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid ${theme.colors.gray300};
+  font-size: 1rem;
+  margin-bottom: ${theme.spacing.lg};
+  background: ${theme.colors.white};
+  color: ${theme.colors.textPrimary};
+  &:focus {
+    outline: none;
+    border-color: ${theme.colors.primary};
+    box-shadow: 0 0 0 3px ${theme.colors.primary}20;
+  }
+`;
+
 interface RegisterPageProps {
   onToggleMode: () => void;
 }
@@ -262,9 +289,26 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onToggleMode }) => {
     password: '',
     confirmPassword: '',
   });
+  const [hubs, setHubs] = useState<Hub[]>(() => [...DEFAULT_HUBS]);
+  const [hubId, setHubId] = useState('');
   const [role, setRole] = useState<'student' | 'instructor'>('student');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchHubs().then((list) => {
+      if (!cancelled) setHubs(list);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const selectedHub = (): HubSelection | undefined => {
+    const h = hubs.find((x) => x.id === hubId);
+    return h ? { id: h.id, name: h.name } : undefined;
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -297,6 +341,12 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onToggleMode }) => {
       return;
     }
 
+    const adminBypassHub = isAdminEmail(formData.email);
+    if (!adminBypassHub && !hubId) {
+      setError('Please select your hub.');
+      return;
+    }
+
     setLoading(true);
     setError('');
 
@@ -306,7 +356,8 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onToggleMode }) => {
         formData.email,
         formData.password,
         formData.displayName,
-        userType
+        userType,
+        adminBypassHub ? undefined : selectedHub()
       );
     } catch (err: any) {
       console.error('Registration error:', err);
@@ -362,6 +413,26 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onToggleMode }) => {
               Instructor
             </RoleButton>
           </RoleToggle>
+
+          <div>
+            <HubLabel htmlFor="register-hub">Your hub</HubLabel>
+            <HubSelect
+              id="register-hub"
+              value={hubId}
+              onChange={(e) => {
+                setHubId(e.target.value);
+                if (error) setError('');
+              }}
+              required
+            >
+              <option value="">Select hub…</option>
+              {hubs.map((h) => (
+                <option key={h.id} value={h.id} title={hubTooltip(h)}>
+                  {hubLabel(h)}
+                </option>
+              ))}
+            </HubSelect>
+          </div>
 
           {error && <ErrorMessage>{error}</ErrorMessage>}
 
@@ -425,7 +496,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onToggleMode }) => {
               variant="primary"
               fullWidth
               loading={loading}
-              disabled={loading}
+              disabled={loading || (!isAdminEmail(formData.email) && !hubId)}
             >
               Create Account
             </StyledButton>

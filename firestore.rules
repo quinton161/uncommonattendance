@@ -17,6 +17,12 @@ service cloud.firestore {
       return isAuth() && request.auth.uid == uid;
     }
 
+    // Hub registry (doc id = hub slug, fields: name, order)
+    match /hubs/{hubId} {
+      allow read: if isAuth();
+      allow write: if isStaff();
+    }
+
     // Users
     match /users/{userId} {
       allow read: if isAuth();

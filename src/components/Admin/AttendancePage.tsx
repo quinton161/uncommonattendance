@@ -1,16 +1,46 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import styled from 'styled-components';
 import { useAuth } from '../../contexts/AuthContext';
 import { theme } from '../../styles/theme';
 import { Button } from '../Common/Button';
 import DataService from '../../services/DataService';
+import { effectiveStaffHubScope } from '../../services/hubService';
+import { AdminHubScopeSelect } from './AdminHubScopeSelect';
 import { AttendanceService } from '../../services/attendanceService';
 import { TimeService } from '../../services/timeService';
+import { saveAs } from 'file-saver';
+import { uniqueToast } from '../../utils/toastUtils';
+import {
+  ATTENDANCE_CSV_HEADERS,
+  formatCsvDocument,
+  buildAttendanceExportRows,
+} from '../../utils/attendanceCsv';
+import { AbsenceRecordModal } from './AbsenceRecordModal';
 import {
   CheckCircleIcon,
   TodayIcon,
   LocationOnIcon
 } from '../Common/Icons';
+
+function recordMatchesDate(a: any, dateStr: string, ts: TimeService): boolean {
+  if (a.date === dateStr) return true;
+  const ci = a.checkInTime;
+  if (!ci) return false;
+  const d =
+    ci instanceof Date ? ci : typeof (ci as { toDate?: () => Date }).toDate === 'function'
+      ? (ci as { toDate: () => Date }).toDate()
+      : new Date(ci);
+  if (Number.isNaN(d.getTime())) return false;
+  return ts.toHarareDateString(d) === dateStr;
+}
+
+function absenceReasonLabel(r?: string): string {
+  if (!r) return '—';
+  if (r === 'excused') return 'Excused';
+  if (r === 'unexcused') return 'Unexcused';
+  if (r === 'dropout') return 'Dropout';
+  return r;
+}
 
 const PageContainer = styled.div`
   padding: ${theme.spacing.xl};
@@ -277,7 +307,7 @@ const AttendanceTable = styled.div`
 
 const TableHeader = styled.div`
   display: grid;
-  grid-template-columns: 2fr 140px 130px 150px;
+  grid-template-columns: 2fr minmax(100px, 1fr) 100px 110px 100px minmax(100px, 1fr) 130px;
   gap: ${theme.spacing.md};
   padding: ${theme.spacing.lg} ${theme.spacing.xl};
   background: linear-gradient(135deg, ${theme.colors.primary}05 0%, ${theme.colors.primaryLight}10 100%);
@@ -289,7 +319,7 @@ const TableHeader = styled.div`
   letter-spacing: 0.5px;
   
   @media (max-width: ${theme.breakpoints.desktop}) {
-    grid-template-columns: 2fr 120px 110px 120px;
+    grid-template-columns: 2fr minmax(72px, 1fr) 82px 82px 82px minmax(72px, 1fr) 100px;
     gap: ${theme.spacing.sm};
     padding: ${theme.spacing.md} ${theme.spacing.lg};
     font-size: ${theme.fontSizes.xs};
@@ -302,7 +332,7 @@ const TableHeader = styled.div`
 
 const TableRow = styled.div`
   display: grid;
-  grid-template-columns: 2fr 140px 130px 150px;
+  grid-template-columns: 2fr minmax(100px, 1fr) 100px 110px 100px minmax(100px, 1fr) 130px;
   gap: ${theme.spacing.md};
   padding: ${theme.spacing.lg} ${theme.spacing.xl};
   border-bottom: 1px solid ${theme.colors.gray100};
@@ -320,7 +350,7 @@ const TableRow = styled.div`
   }
   
   @media (max-width: ${theme.breakpoints.desktop}) {
-    grid-template-columns: 2fr 120px 110px 120px;
+    grid-template-columns: 2fr minmax(72px, 1fr) 82px 82px 82px minmax(72px, 1fr) 100px;
     gap: ${theme.spacing.sm};
     padding: ${theme.spacing.md} ${theme.spacing.lg};
   }
@@ -562,6 +592,20 @@ const InfoNote = styled.div`
   border-radius: ${theme.borderRadius.md};
 `;
 
+const MetaCell = styled.div`
+  font-size: ${theme.fontSizes.sm};
+  color: ${theme.colors.textPrimary};
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  @media (max-width: ${theme.breakpoints.tablet}) {
+    white-space: normal;
+    word-break: break-word;
+  }
+`;
+
 const ActionButtons = styled.div`
   display: flex;
   gap: ${theme.spacing.sm};
@@ -666,6 +710,8 @@ interface AttendancePageProps {
 
 export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
   const { user } = useAuth();
+  const [adminHubFilter, setAdminHubFilter] = useState('');
+  const effectiveHub = useMemo(() => effectiveStaffHubScope(user, adminHubFilter), [user, adminHubFilter]);
   const [attendanceSummary, setAttendanceSummary] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const timeService = TimeService.getInstance();
@@ -673,6 +719,14 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [fixingLocations, setFixingLocations] = useState(false);
+  const [absenceModal, setAbsenceModal] = useState<{
+    userId: string;
+    userName: string;
+    studentHubId?: string;
+    initialReason?: 'excused' | 'unexcused' | 'dropout';
+    initialNotes?: string;
+  } | null>(null);
+  const [csvLoading, setCsvLoading] = useState(false);
   const dataService = DataService.getInstance();
   const attendanceService = AttendanceService.getInstance();
 
@@ -683,7 +737,7 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
     try {
       setLoading(true);
       await dataService.testConnection();
-      const summary = await dataService.getDailyAttendanceSummary(selectedDate);
+      const summary = await dataService.getDailyAttendanceSummary(selectedDate, effectiveHub);
       setAttendanceSummary(summary);
     } catch (error) {
       console.error('Error loading attendance summary:', error);
@@ -691,7 +745,7 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
     } finally {
       setLoading(false);
     }
-  }, [selectedDate]);
+  }, [selectedDate, effectiveHub]);
 
   useEffect(() => {
     const today = timeService.getCurrentDateString();
@@ -702,13 +756,13 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
       const unsubscribe = dataService.subscribeToTodayAttendance((summary) => {
         setAttendanceSummary(summary);
         setLoading(false);
-      });
+      }, effectiveHub);
       return unsubscribe;
     }
 
     // For non-today dates, do a one-time fetch.
     loadAttendanceSummary();
-  }, [selectedDate, loadAttendanceSummary]);
+  }, [selectedDate, loadAttendanceSummary, effectiveHub]);
 
   const getFilteredAttendance = () => {
     if (!attendanceSummary) return [];
@@ -719,7 +773,7 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim();
       filtered = filtered.filter(record => {
-        const name = (record.name || '').toLowerCase();
+        const name = (record.userName || (record as any).name || '').toLowerCase();
         const studentId = (record.userId || '').toLowerCase();
         return name.includes(query) || studentId.includes(query);
       });
@@ -779,10 +833,38 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
     }
   };
 
-  const handleEditAttendance = (record: any) => {
-    console.log('Edit attendance record:', record);
-    // TODO: Toast removed for CI build. info(`Edit functionality for ${record.userName} - Coming soon!`, { autoClose: 3000 });
-    // TODO: Implement edit modal/form
+  const handleOpenAbsenceModal = (record: any) => {
+    setAbsenceModal({
+      userId: record.userId,
+      userName: record.userName || 'Student',
+      studentHubId: record.hubId,
+      initialReason: record.absenceReason,
+      initialNotes: record.absenceNotes,
+    });
+  };
+
+  const handleDownloadAttendanceCsv = async () => {
+    if (csvLoading) return;
+    setCsvLoading(true);
+    try {
+      await dataService.testConnection();
+      const users = await dataService.getUsers(effectiveHub);
+      const all = await dataService.getAttendance(undefined, effectiveHub);
+      const forDay = all.filter((a: any) => recordMatchesDate(a, selectedDate, timeService));
+      const students = users.filter(
+        (u: any) => !u.userType || u.userType === 'attendee' || u.userType === 'student'
+      );
+      const dataRows = buildAttendanceExportRows(students, forDay, selectedDate);
+      const csv = formatCsvDocument([...ATTENDANCE_CSV_HEADERS], dataRows);
+      const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+      saveAs(blob, `attendance_${selectedDate}.csv`);
+      uniqueToast.success('CSV downloaded.');
+    } catch (e) {
+      console.error(e);
+      uniqueToast.error('Failed to build CSV.');
+    } finally {
+      setCsvLoading(false);
+    }
   };
 
   const handleDeleteAttendance = async (record: any) => {
@@ -869,6 +951,12 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
             <option value="absent">Absent</option>
           </select>
         </FilterGroup>
+        <AdminHubScopeSelect
+          user={user}
+          value={adminHubFilter}
+          onChange={setAdminHubFilter}
+          id="attendance-page-hub-filter"
+        />
         {attendanceSummary && (
           <StatsContainer>
             <StatItem>Total: {attendanceSummary.totalUsers}</StatItem>
@@ -882,6 +970,13 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
       <ActionButtonsContainer>
         <Button variant="outline" onClick={() => { setSelectedDate(''); setStatusFilter('all'); setSearchQuery(''); }}>
           Clear Filters
+        </Button>
+        <Button
+          variant="secondary"
+          onClick={handleDownloadAttendanceCsv}
+          disabled={csvLoading || loading}
+        >
+          {csvLoading ? 'Preparing CSV…' : 'Download CSV (this date)'}
         </Button>
         {user?.userType === 'admin' && (
           <Button 
@@ -908,8 +1003,11 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
         <AttendanceTable>
           <TableHeader>
             <div>Student</div>
+            <div>Hub</div>
             <div>Date</div>
             <div>Status</div>
+            <div>Absence</div>
+            <div>Notes</div>
             <div>Actions</div>
           </TableHeader>
           
@@ -924,6 +1022,10 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
                     <p>{record.userEmail}</p>
                   </StudentDetails>
                 </StudentInfo>
+
+                <MetaCell title={(record as any).hubName || (record as any).hubId || undefined}>
+                  {(record as any).hubName || (record as any).hubId || '—'}
+                </MetaCell>
                 
                 <DateDisplay>
                   <TodayIcon size={14} />
@@ -939,25 +1041,35 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
                     )}
                   </StatusBadge>
                 </div>
+
+                <MetaCell title={record.status === 'absent' ? absenceReasonLabel(record.absenceReason) : undefined}>
+                  {record.status === 'absent' ? absenceReasonLabel(record.absenceReason) : '—'}
+                </MetaCell>
+                <MetaCell title={record.absenceNotes || undefined}>
+                  {record.absenceNotes ? record.absenceNotes : '—'}
+                </MetaCell>
                 
-                {user?.userType === 'admin' && (
-                  <ActionButtons>
-                    <ActionButton 
-                      variant="edit" 
-                      onClick={() => handleEditAttendance(record)}
-                      title="Edit attendance record"
-                    >
-                      Edit
-                    </ActionButton>
-                    <ActionButton 
-                      variant="delete" 
+                <ActionButtons>
+                  {(user?.userType === 'admin' || user?.userType === 'instructor') &&
+                    record.status === 'absent' && (
+                      <ActionButton
+                        variant="edit"
+                        onClick={() => handleOpenAbsenceModal(record)}
+                        title={record.absenceReason ? 'Edit absence reason' : 'Record absence reason'}
+                      >
+                        {record.absenceReason ? 'Edit absence' : 'Record absence'}
+                      </ActionButton>
+                    )}
+                  {user?.userType === 'admin' && (
+                    <ActionButton
+                      variant="delete"
                       onClick={() => handleDeleteAttendance(record)}
                       title="Delete attendance record"
                     >
                       Delete
                     </ActionButton>
-                  </ActionButtons>
-                )}
+                  )}
+                </ActionButtons>
                 
                 {/* Mobile-only organized layout */}
                 <MobileDataGrid>
@@ -978,14 +1090,44 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
                   </MobileDataItem>
                   
                   <MobileDataItem>
-                    <InfoNote>
-                      Check-in/out times available in Daily Tracker
-                    </InfoNote>
+                    {record.status === 'absent' ? (
+                      <>
+                        <MetaCell style={{ fontSize: theme.fontSizes.xs, color: theme.colors.textSecondary }}>
+                          Absence: {absenceReasonLabel(record.absenceReason)}
+                        </MetaCell>
+                        {record.absenceNotes && (
+                          <MetaCell style={{ fontSize: theme.fontSizes.xs, marginTop: theme.spacing.xs }}>
+                            Notes: {record.absenceNotes}
+                          </MetaCell>
+                        )}
+                      </>
+                    ) : (
+                      <InfoNote>
+                        Check-in/out times available in Daily Tracker
+                      </InfoNote>
+                    )}
                   </MobileDataItem>
                 </MobileDataGrid>
               </TableRow>
             ))}
         </AttendanceTable>
+      )}
+      {absenceModal && user && (
+        <AbsenceRecordModal
+          open
+          onClose={() => setAbsenceModal(null)}
+          studentId={absenceModal.userId}
+          studentName={absenceModal.userName}
+          dateStr={selectedDate}
+          hubId={effectiveHub ?? absenceModal.studentHubId}
+          recordedByUid={user.uid}
+          recordedByName={user.displayName || user.email || 'Staff'}
+          initialReason={absenceModal.initialReason}
+          initialNotes={absenceModal.initialNotes}
+          onSaved={() => {
+            void loadAttendanceSummary();
+          }}
+        />
       )}
     </PageContainer>
   );

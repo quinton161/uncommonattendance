@@ -7,7 +7,8 @@ import { eachDayOfInterval, parseISO, subDays } from 'date-fns';
  * - NEVER blocks check-in because of a failed internet sync.
  * - Uses system clock + Africa/Harare Intl formatting for correctness.
  * - Attempts internet sync in the background; if it fails we silently use system time.
- * - Late threshold: 9:00 AM (9:00:00 exact = LATE).
+ * - Session opens: 7:00 AM Harare (check-in not allowed before then).
+ * - Late threshold: 9:01 AM Harare (9:00:00–9:00:59 = on time; 9:01:00+ = late).
  * - Check-in window: 7:00 AM – 9:05 AM.
  * - Admin/skipTimeCheck override bypasses the window entirely.
  */
@@ -104,45 +105,38 @@ export class TimeService {
   // ── Attendance rules ────────────────────────────────────────────────────────
 
   /**
-   * isLate — true if check-in time is 9:00:00 AM or later (Harare).
-   * 08:59:59 → on time.  09:00:00 → late.
+   * isLate — true if check-in time is 9:01:00 AM or later (Harare).
+   * Before 9:01 → on time for attendance (including all of 9:00 AM).
    */
   isLate(checkInTime: Date): boolean {
     const { h, m } = this._harareHM(checkInTime);
-    return h > 9 || (h === 9 && m >= 0);
+    return h > 9 || (h === 9 && m >= 1);
   }
 
   /**
-   * canCheckIn — true if the current Harare time is within the check-in window OR before it.
-   * We allow the button to be enabled BEFORE the window opens so students can check in early.
-   * They will be marked as "present" (not late) if they check in before 9:00 AM.
-   * 
-   * Window: 07:00 – 09:05.
-   * 
-   * IMPORTANT: returns TRUE when time sync hasn't completed yet (lastSyncTime===0)
-   * so that slow devices / bad connections never get locked out.
+   * canCheckIn — true only when Harare time is inside the daily session window.
+   * Session starts at 7:00 AM; check-in is not allowed before then.
+   * Window: 07:00 – 09:05 (inclusive).
    */
   canCheckIn(now: Date): boolean {
-    // If we have never synced, allow check-in and let Firestore rules be the gate.
-    if (this.lastSyncTime === 0) return true;
-
     const { h, m } = this._harareHM(now);
     const total = h * 60 + m;
-    // Allow check-in from midnight until 9:05 AM (0 - 545 minutes)
-    // After 9:05 AM, return false (check-in closed)
-    return total <= 9 * 60 + 5; // 0 - 545 minutes
+    return total >= 7 * 60 && total <= 9 * 60 + 5;
+  }
+
+  /** True before 7:00 AM Harare — session has not started yet. */
+  isBeforeSessionStart(now: Date): boolean {
+    const { h, m } = this._harareHM(now);
+    return h * 60 + m < 7 * 60;
   }
 
   /**
    * isTooLateToCheckIn — true if check-in window has closed (after 9:05 AM).
    */
   isTooLateToCheckIn(now: Date): boolean {
-    // If we have never synced, allow check-in (fail open)
-    if (this.lastSyncTime === 0) return false;
-    
     const { h, m } = this._harareHM(now);
     const total = h * 60 + m;
-    return total > 9 * 60 + 5; // After 9:05 AM = too late
+    return total > 9 * 60 + 5; // After 9:05 AM = window closed
   }
 
   shouldMarkAbsent(): boolean {

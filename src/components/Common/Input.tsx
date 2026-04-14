@@ -20,27 +20,27 @@ interface InputProps {
   icon?: React.ReactNode;
 }
 
-const InputContainer = styled.div<{ fullWidth?: boolean }>`
+const InputContainer = styled.div<{ $fullWidth?: boolean }>`
   display: flex;
   flex-direction: column;
   gap: ${theme.spacing.xs};
-  
-  ${({ fullWidth }) =>
-    fullWidth &&
+
+  ${({ $fullWidth }) =>
+    $fullWidth &&
     css`
       width: 100%;
     `}
 `;
 
-const InputWrapper = styled.div<{ hasError?: boolean }>`
+const InputWrapper = styled.div`
   position: relative;
   display: flex;
   align-items: center;
 `;
 
-const IconContainer = styled.div<{ position: 'left' | 'right' }>`
+const IconContainer = styled.div<{ $position: 'left' | 'right' }>`
   position: absolute;
-  ${({ position }) => position}: ${theme.spacing.sm};
+  ${({ $position }) => $position}: ${theme.spacing.sm};
   display: flex;
   align-items: center;
   justify-content: center;
@@ -54,8 +54,8 @@ const Label = styled.label`
   color: ${theme.colors.textPrimary};
 `;
 
-const getSizeStyles = (size: string) => {
-  switch (size) {
+const getSizeStyles = (inputSize: string) => {
+  switch (inputSize) {
     case 'sm':
       return css`
         padding: ${theme.spacing.xs} ${theme.spacing.sm};
@@ -77,17 +77,17 @@ const getSizeStyles = (size: string) => {
   }
 };
 
-const StyledInput = styled.input<{ hasError?: boolean; size?: string }>`
+const StyledInput = styled.input<{ $hasError?: boolean; $inputSize?: string }>`
   width: 100%;
-  border: 1px solid ${({ hasError }) => 
-    hasError ? theme.colors.danger : theme.colors.gray300};
+  border: 1px solid ${({ $hasError }) =>
+    $hasError ? theme.colors.danger : theme.colors.gray300};
   border-radius: ${theme.borderRadius.md};
   font-family: ${theme.fonts.primary};
   color: ${theme.colors.textPrimary};
   background-color: ${theme.colors.white};
   transition: all 0.2s ease;
-  
-  ${({ size = 'md' }) => getSizeStyles(size)}
+
+  ${({ $inputSize = 'md' }) => getSizeStyles($inputSize)}
 
   &::placeholder {
     color: ${theme.colors.textLight};
@@ -95,10 +95,10 @@ const StyledInput = styled.input<{ hasError?: boolean; size?: string }>`
 
   &:focus {
     outline: none;
-    border-color: ${({ hasError }) => 
-      hasError ? theme.colors.danger : theme.colors.primary};
-    box-shadow: 0 0 0 3px ${({ hasError }) => 
-      hasError ? `${theme.colors.danger}20` : `${theme.colors.primary}20`};
+    border-color: ${({ $hasError }) =>
+      $hasError ? theme.colors.danger : theme.colors.primary};
+    box-shadow: 0 0 0 3px ${({ $hasError }) =>
+      $hasError ? `${theme.colors.danger}20` : `${theme.colors.primary}20`};
   }
 
   &:disabled {
@@ -108,18 +108,21 @@ const StyledInput = styled.input<{ hasError?: boolean; size?: string }>`
   }
 `;
 
-const StyledInputWithIcon = styled(StyledInput)<{ hasIcon: boolean; iconPosition: 'left' | 'right' }>`
-  ${({ hasIcon, iconPosition }) =>
-    hasIcon &&
+const StyledInputWithIcon = styled(StyledInput)<{
+  $hasIcon: boolean;
+  $iconPosition: 'left' | 'right';
+}>`
+  ${({ $hasIcon, $iconPosition }) =>
+    $hasIcon &&
     css`
-      padding-${iconPosition}: 40px;
+      padding-${$iconPosition}: 40px;
     `}
 `;
 
-const HelperText = styled.span<{ isError?: boolean }>`
+const HelperText = styled.span<{ $isError?: boolean }>`
   font-size: ${theme.fontSizes.xs};
-  color: ${({ isError }) => 
-    isError ? theme.colors.danger : theme.colors.textSecondary};
+  color: ${({ $isError }) =>
+    $isError ? theme.colors.danger : theme.colors.textSecondary};
 `;
 
 const RequiredIndicator = styled.span`
@@ -142,30 +145,28 @@ export const Input: React.FC<InputProps> = ({
   const inputId = id || name || `input-${Math.random().toString(36).substr(2, 9)}`;
 
   return (
-    <InputContainer fullWidth={fullWidth}>
+    <InputContainer $fullWidth={fullWidth}>
       {label && (
         <Label htmlFor={inputId}>
           {label}
           {required && <RequiredIndicator>*</RequiredIndicator>}
         </Label>
       )}
-      <InputWrapper hasError={!!error}>
-        {icon && <IconContainer position="left">{icon}</IconContainer>}
+      <InputWrapper>
+        {icon && <IconContainer $position="left">{icon}</IconContainer>}
         <StyledInputWithIcon
           id={inputId}
           name={name}
-          hasError={!!error}
-          size={size}
+          $hasError={!!error}
+          $inputSize={size}
           required={required}
-          hasIcon={!!icon}
-          iconPosition="left"
+          $hasIcon={!!icon}
+          $iconPosition="left"
           {...props}
         />
       </InputWrapper>
       {(error || helperText) && (
-        <HelperText isError={!!error}>
-          {error || helperText}
-        </HelperText>
+        <HelperText $isError={!!error}>{error || helperText}</HelperText>
       )}
     </InputContainer>
   );

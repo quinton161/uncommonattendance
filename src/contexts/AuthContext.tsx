@@ -13,10 +13,19 @@ import {
 } from 'firebase/auth';
 import { doc, setDoc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../services/firebase';
-import { User, AuthContextType } from '../types';
+import { User, AuthContextType, HubSelection } from '../types';
 import { uniqueToast } from '../utils/toastUtils';
 import { getFirebaseAuthErrorMessage } from '../utils/firebaseAuthErrors';
 import DataService from '../services/DataService';
+import { ADMIN_EMAIL } from '../constants/admin';
+
+function needsHubRole(userType: User['userType']): boolean {
+  return userType === 'attendee' || userType === 'instructor';
+}
+
+function isGoogleSignIn(fbUser: FirebaseAuthUser): boolean {
+  return !!fbUser.providerData?.some((p) => p.providerId === 'google.com');
+}
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -42,7 +51,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             snap = await getDoc(doc(db, 'users', fbUser.uid));
           }
 
-          const isAdmin    = fbUser.email === 'quintonndlovu161@gmail.com';
+          const isAdmin    = fbUser.email === ADMIN_EMAIL;
           const isStaff    = fbUser.email?.endsWith('@uncommon.org');
 
           if (snap.exists()) {
@@ -56,15 +65,49 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               bio:         d.bio,
               course:      d.course,
               profession:  d.profession,
+              hubId:       d.hubId,
+              hubName:     d.hubName,
               createdAt:   d.createdAt?.toDate() || new Date(),
             });
+          } else if (isAdmin) {
+            const fallback = {
+              uid:         fbUser.uid,
+              email:       fbUser.email!,
+              displayName: fbUser.displayName || 'Admin',
+              userType:    'admin' as const,
+              createdAt:   serverTimestamp(),
+              photoUrl:    fbUser.photoURL || null,
+              bio:         '',
+            };
+            await setDoc(doc(db, 'users', fbUser.uid), fallback);
+            setUser({
+              uid: fallback.uid,
+              email: fallback.email,
+              displayName: fallback.displayName,
+              userType: 'admin',
+              createdAt: new Date(),
+              photoUrl: fallback.photoUrl ?? undefined,
+              bio: fallback.bio,
+            });
+          } else if (isGoogleSignIn(fbUser)) {
+            // New Google user: require explicit registration (role + hub) — no Firestore row yet
+            setUser({
+              uid: fbUser.uid,
+              email: fbUser.email!,
+              displayName: fbUser.displayName || 'User',
+              photoUrl: fbUser.photoURL ?? undefined,
+              userType: 'attendee',
+              createdAt: new Date(),
+              bio: '',
+              needsProfileCompletion: true,
+            });
           } else {
-            // Create fallback document for users who arrive via Google sign-in
+            // Legacy: email/password or other providers without a doc yet
             const fallback = {
               uid:         fbUser.uid,
               email:       fbUser.email!,
               displayName: fbUser.displayName || 'New User',
-              userType:    isAdmin ? 'admin' : isStaff ? 'instructor' : 'attendee' as any,
+              userType:    isStaff ? 'instructor' : 'attendee' as any,
               createdAt:   serverTimestamp(),
               photoUrl:    fbUser.photoURL || null,
               bio:         '',
@@ -82,7 +125,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         } catch {
           // Network error — use minimal user from Firebase Auth
-          const isAdmin = fbUser.email === 'quintonndlovu161@gmail.com';
+          const isAdmin = fbUser.email === ADMIN_EMAIL;
           const isStaff = fbUser.email?.endsWith('@uncommon.org');
           setUser({
             uid:         fbUser.uid,
@@ -103,12 +146,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   // ── register ─────────────────────────────────────────────────────────────────
-  const register = async (email: string, password: string, displayName: string, userType: User['userType']) => {
+  const register = async (
+    email: string,
+    password: string,
+    displayName: string,
+    userType: User['userType'],
+    hub?: HubSelection
+  ) => {
     let fbUser: FirebaseAuthUser | null = null;
     try {
       const cred = await createUserWithEmailAndPassword(auth, email, password);
       fbUser = cred.user;
       await updateProfile(fbUser, { displayName });
+      const hubFields =
+        hub && needsHubRole(userType)
+          ? { hubId: hub.id, hubName: hub.name }
+          : {};
       await setDoc(doc(db, 'users', fbUser.uid), {
         uid: fbUser.uid,
         email: fbUser.email!,
@@ -117,6 +170,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         createdAt: serverTimestamp(),
         photoUrl: null,
         bio: '',
+        ...hubFields,
       });
       uniqueToast.success('Account created! Welcome!', { autoClose: 3000 });
     } catch (err: any) {
@@ -132,25 +186,109 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // ── login ─────────────────────────────────────────────────────────────────────
-  const login = async (email: string, password: string) => {
-    await signInWithEmailAndPassword(auth, email, password);
+  const login = async (email: string, password: string, hub?: HubSelection) => {
+    const cred = await signInWithEmailAndPassword(auth, email, password);
+    const isAdmin = cred.user.email === ADMIN_EMAIL;
+    if (!isAdmin && hub) {
+      const snap = await getDoc(doc(db, 'users', cred.user.uid));
+      const d = snap.exists() ? snap.data() : {};
+      const userType = (d.userType || 'attendee') as User['userType'];
+      if (needsHubRole(userType)) {
+        await setDoc(
+          doc(db, 'users', cred.user.uid),
+          { hubId: hub.id, hubName: hub.name },
+          { merge: true }
+        );
+      }
+    }
     uniqueToast.success('Welcome back!', { autoClose: 3000 });
   };
 
   // ── Google login ──────────────────────────────────────────────────────────────
-  const loginWithGoogle = async () => {
+  const loginWithGoogle = async (hub?: HubSelection) => {
     const provider = new GoogleAuthProvider();
     provider.addScope('profile');
     provider.addScope('email');
     try {
       const result = await signInWithPopup(auth, provider);
+      const fb = result.user;
+      const isAdmin = fb.email === ADMIN_EMAIL;
+      const snap = await getDoc(doc(db, 'users', fb.uid));
+
+      // Brand-new Google account (no Firestore profile): let them complete registration next
+      if (!snap.exists() && !isAdmin) {
+        uniqueToast.info('Welcome! Finish setting up your account (role and hub).', { autoClose: 4000 });
+        return;
+      }
+
+      // Existing user: non-admins must pick a hub on the login screen before we merge
+      if (!isAdmin && !hub) {
+        await signOut(auth);
+        uniqueToast.error('Please select your hub before signing in with Google.', { autoClose: 5000 });
+        return;
+      }
+
+      if (!isAdmin && hub) {
+        const d = snap.exists() ? snap.data() : {};
+        const userType = (d.userType || 'attendee') as User['userType'];
+        if (needsHubRole(userType)) {
+          await setDoc(doc(db, 'users', fb.uid), { hubId: hub.id, hubName: hub.name }, { merge: true });
+        }
+      }
       uniqueToast.success(`Welcome, ${result.user.displayName}!`, { autoClose: 3000 });
-      // NO window.location.href — onAuthStateChanged handles navigation automatically
     } catch (err: any) {
       if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') return;
       uniqueToast.error(getFirebaseAuthErrorMessage(err.code, 'Google sign-in failed.'), { autoClose: 5000 });
       throw err;
     }
+  };
+
+  const completeGoogleProfile = async (
+    displayName: string,
+    userType: User['userType'],
+    hub?: HubSelection
+  ) => {
+    const cu = auth.currentUser;
+    if (!cu || !user?.needsProfileCompletion) {
+      throw new Error('Not completing Google registration.');
+    }
+    if (userType === 'instructor' && !cu.email?.endsWith('@uncommon.org')) {
+      uniqueToast.error('Instructor accounts must use an @uncommon.org email.', { autoClose: 4000 });
+      return;
+    }
+    if (needsHubRole(userType) && !hub) {
+      uniqueToast.error('Please select your hub.', { autoClose: 4000 });
+      return;
+    }
+    const hubFields =
+      hub && needsHubRole(userType) ? { hubId: hub.id, hubName: hub.name } : {};
+    await setDoc(doc(db, 'users', cu.uid), {
+      uid: cu.uid,
+      email: cu.email!,
+      displayName: displayName.trim(),
+      userType,
+      createdAt: serverTimestamp(),
+      photoUrl: cu.photoURL || null,
+      bio: '',
+      ...hubFields,
+    });
+    await updateProfile(cu, { displayName: displayName.trim() });
+    setUser({
+      uid: cu.uid,
+      email: cu.email!,
+      displayName: displayName.trim(),
+      userType,
+      createdAt: new Date(),
+      photoUrl: cu.photoURL ?? undefined,
+      bio: '',
+      ...hubFields,
+    });
+    uniqueToast.success('Account created! Welcome!', { autoClose: 3000 });
+  };
+
+  const cancelGoogleRegistration = async () => {
+    await signOut(auth);
+    uniqueToast.info('Sign in again when you are ready to register.', { autoClose: 3000 });
   };
 
   // ── logout ────────────────────────────────────────────────────────────────────
@@ -169,6 +307,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser({ ...user, ...data });
   };
 
+  const setHub = async (hub: HubSelection) => {
+    if (!auth.currentUser || !user) throw new Error('Not logged in');
+    if (!needsHubRole(user.userType)) return;
+    await updateDoc(doc(db, 'users', user.uid), { hubId: hub.id, hubName: hub.name });
+    setUser({ ...user, hubId: hub.id, hubName: hub.name });
+  };
+
   // ── resetPassword ─────────────────────────────────────────────────────────────
   const resetPassword = async (email: string) => {
     await sendPasswordResetEmail(auth, email);
@@ -184,7 +329,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const value: AuthContextType = {
     user, loading, login, register, logout,
     updateProfile: updateUserProfile, resetPassword,
-    deleteAccount, loginWithGoogle,
+    deleteAccount, loginWithGoogle, setHub,
+    completeGoogleProfile, cancelGoogleRegistration,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

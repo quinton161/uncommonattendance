@@ -1,9 +1,11 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import styled from 'styled-components';
 import { useAuth } from '../../contexts/AuthContext';
 import { theme } from '../../styles/theme';
 import { Button } from '../Common/Button';
 import DataService from '../../services/DataService';
+import { effectiveStaffHubScope } from '../../services/hubService';
+import { AdminHubScopeSelect } from './AdminHubScopeSelect';
 import { TimeService } from '../../services/timeService';
 import { AttendanceService } from '../../services/attendanceService';
 import { DeleteUserModal } from './DeleteUserModal';
@@ -135,7 +137,7 @@ const TimeCell = styled.span`
 
 const TableRow = styled.div`
   display: grid;
-  grid-template-columns: minmax(200px, 2fr) 100px minmax(100px, 120px) minmax(88px, 1fr) minmax(88px, 1fr) minmax(160px,auto);
+  grid-template-columns: minmax(180px, 2fr) minmax(100px, 1.2fr) 100px minmax(100px, 120px) minmax(88px, 1fr) minmax(88px, 1fr) minmax(160px,auto);
   gap: ${theme.spacing.md};
   padding: ${theme.spacing.md} ${theme.spacing.lg};
   border-bottom: 1px solid ${theme.colors.gray100};
@@ -239,7 +241,7 @@ const TableWrapper = styled.div`
 
 const TableHeader = styled.div`
   display: grid;
-  grid-template-columns: minmax(200px, 2fr) 100px minmax(100px, 120px) minmax(88px, 1fr) minmax(88px, 1fr) minmax(160px,auto);
+  grid-template-columns: minmax(180px, 2fr) minmax(100px, 1.2fr) 100px minmax(100px, 120px) minmax(88px, 1fr) minmax(88px, 1fr) minmax(160px,auto);
   gap: ${theme.spacing.md};
   padding: ${theme.spacing.md} ${theme.spacing.lg};
   background: ${theme.colors.gray50};
@@ -578,6 +580,8 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [userToDelete, setUserToDelete] = useState<any>(null);
   const { user } = useAuth();
+  const [adminHubFilter, setAdminHubFilter] = useState('');
+  const effectiveHub = useMemo(() => effectiveStaffHubScope(user, adminHubFilter), [user, adminHubFilter]);
   const [users, setUsers] = useState<any[]>([]);
   const [attendance, setAttendance] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -585,20 +589,14 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const dataService = DataService.getInstance();
 
-  useEffect(() => {
-    // Intentionally run only once on mount; loadData handles its own dependencies.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    loadData();
-  }, []);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
       await dataService.testConnection();
       
       const [usersData, attendanceData] = await Promise.all([
-        dataService.getUsers(),
-        dataService.getAttendance()
+        dataService.getUsers(effectiveHub),
+        dataService.getAttendance(undefined, effectiveHub)
       ]);
       
       setUsers(usersData);
@@ -609,7 +607,11 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [dataService, effectiveHub]);
+
+  useEffect(() => {
+    void loadData();
+  }, [loadData]);
 
   const ts = TimeService.getInstance();
   const formatAttTime = (value: any): string | null => {
@@ -671,8 +673,18 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
 
   // const stats = getUserStats(); // no longer used
 
-  const handleOpenDelete = (user: any) => {
-    setUserToDelete(user);
+  const instructorCanDeleteStudent = (target: any): boolean => {
+    if (user?.userType !== 'instructor') return false;
+    if (target?.userType === 'admin' || target?.userType === 'instructor') return false;
+    return (target?.hubId || '') === (user?.hubId || '');
+  };
+
+  const handleOpenDelete = (target: any) => {
+    if (user?.userType === 'instructor' && !instructorCanDeleteStudent(target)) {
+      uniqueToast.error('You can only remove students registered in your hub.');
+      return;
+    }
+    setUserToDelete(target);
     setShowDeleteModal(true);
   };
 
@@ -680,7 +692,15 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
     try {
       // Use AttendanceService with skipTimeCheck=true to allow marking after deadline
       const attendanceService = AttendanceService.getInstance();
-      await attendanceService.checkIn(studentId, studentName, undefined, undefined, true, 'admin');
+      await attendanceService.checkIn(
+        studentId,
+        studentName,
+        undefined,
+        undefined,
+        true,
+        user?.userType === 'instructor' ? 'instructor' : 'admin',
+        effectiveHub
+      );
       uniqueToast.success(`${studentName} marked as present!`);
       // Refresh the attendance data
       loadData();
@@ -697,6 +717,11 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
 
   const handleConfirmDelete = async () => {
     if (!userToDelete) return;
+    if (user?.userType === 'instructor' && !instructorCanDeleteStudent(userToDelete)) {
+      uniqueToast.error('You can only remove students in your hub.');
+      setShowDeleteModal(false);
+      return;
+    }
     try {
       await dataService.deleteUser(userToDelete.id);
       uniqueToast.success('User deleted successfully!');
@@ -735,7 +760,8 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
           undefined,
           undefined,
           true,
-          'admin'
+          user?.userType === 'instructor' ? 'instructor' : 'admin',
+          effectiveHub
         )
       );
       await Promise.all(promises);
@@ -760,7 +786,7 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
     }
     setCheckoutAllLoading(true);
     try {
-      const { checkedOut } = await AttendanceService.getInstance().checkOutAllOpenToday();
+      const { checkedOut } = await AttendanceService.getInstance().checkOutAllOpenToday(effectiveHub);
       uniqueToast.success(
         checkedOut === 0 ? 'No open sessions to close.' : `Checked out ${checkedOut} student(s).`
       );
@@ -789,9 +815,20 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
       <Header>
         <HeaderTitle>
           <h1 style={{ margin: 0, lineHeight: 1.2 }}>Users</h1>
-          <p>Manage students below; admins are hidden. Summary cards count students only (instructors have their own card). Check-in and check-out times use Africa/Harare (school time).</p>
+          <p>
+          Manage students below; admins are hidden. Summary cards count students only (instructors have their own card). Check-in and check-out times use Africa/Harare (school time).
+          {user?.userType === 'admin' && ' As an admin, use Hub to view one location or all hubs.'}
+          {user?.userType === 'instructor' &&
+            ' Instructors can remove students only from their own hub (attendees and students).'}
+        </p>
         </HeaderTitle>
         <HeaderActions>
+          <AdminHubScopeSelect
+            user={user}
+            value={adminHubFilter}
+            onChange={setAdminHubFilter}
+            id="users-page-hub-filter"
+          />
           <Button
             variant="primary"
             onClick={handleMarkAllPresent}
@@ -887,6 +924,7 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
               <TableWrapper>
                 <TableHeader>
                   <div>User Information</div>
+                  <div>Hub</div>
                   <div>Type</div>
                   <div>Today</div>
                   <div>Check-in</div>
@@ -923,6 +961,10 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
                   </UserDetails>
                 </UserInfo>
 
+                <div style={{ fontSize: theme.fontSizes.sm, color: theme.colors.textSecondary }}>
+                  {userData.hubName || userData.hubId || '—'}
+                </div>
+
                 <div>
                   <UserType type={userData.userType}>
                     {userData.userType}
@@ -947,7 +989,7 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
                   <MarkPresentButton onClick={() => handleMarkPresent(uid, userData.displayName || 'Unknown User')}>
                     <CheckCircleIcon size={14} /> <span>Mark Present</span>
                   </MarkPresentButton>
-                  {user?.userType === 'admin' && (
+                  {(user?.userType === 'admin' || instructorCanDeleteStudent(userData)) && (
                     <DeleteButton variant="ghost" onClick={() => handleOpenDelete(userData)}>
                       Delete
                     </DeleteButton>
@@ -999,6 +1041,9 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
                       <p style={{ margin: '2px 0 0 0', fontSize: theme.fontSizes.xs, color: theme.colors.textSecondary }}>
                         {userData.email}
                       </p>
+                      <p style={{ margin: '4px 0 0 0', fontSize: theme.fontSizes.xs, color: theme.colors.textSecondary }}>
+                        Hub: {userData.hubName || userData.hubId || '—'}
+                      </p>
                     </div>
                   </MobileUserHeader>
                   
@@ -1027,7 +1072,7 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
                       <MarkPresentButton onClick={() => handleMarkPresent(uid, userData.displayName || 'Unknown User')} style={{ flex: 1 }}>
                         <CheckCircleIcon size={14} /> <span>Mark Present</span>
                       </MarkPresentButton>
-                      {user?.userType === 'admin' && (
+                      {(user?.userType === 'admin' || instructorCanDeleteStudent(userData)) && (
                         <DeleteButton variant="outline" size="sm" onClick={() => handleOpenDelete(userData)}>
                           Delete
                         </DeleteButton>

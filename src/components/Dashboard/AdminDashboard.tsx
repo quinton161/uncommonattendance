@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import styled from 'styled-components';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from '../../contexts/AuthContext';
@@ -21,6 +21,12 @@ import { saveAs } from 'file-saver';
 import { AdminProfile } from '../Profile/AdminProfile';
 import { AdminAttendanceAnalytics } from '../Analytics/AdminAttendanceAnalytics';
 import { MasterResetModal } from '../Admin/MasterResetModal';
+import { AbsenceRecordModal } from '../Admin/AbsenceRecordModal';
+import {
+  ATTENDANCE_CSV_HEADERS,
+  formatCsvDocument,
+  buildAttendanceExportRows,
+} from '../../utils/attendanceCsv';
 import { Sidebar } from '../Common/Sidebar';
 
 import { 
@@ -34,6 +40,8 @@ import {
   Legend
 } from 'recharts';
 import { qrCodeService, DailyQRCode } from '../../services/qrCodeService';
+import { effectiveStaffHubScope } from '../../services/hubService';
+import { AdminHubScopeSelect } from '../Admin/AdminHubScopeSelect';
 import { 
   FiMenu,
   FiX,
@@ -447,6 +455,11 @@ const UserAvatar = styled.div`
 const AdminDashboard: React.FC = () => {
 
   const { user } = useAuth();
+  const [adminHubFilter, setAdminHubFilter] = useState('');
+  const effectiveHub = useMemo(
+    () => effectiveStaffHubScope(user, adminHubFilter),
+    [user, adminHubFilter]
+  );
   const [activeNav, setActiveNav] = useState('dashboard');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   useBodyScrollLock(mobileMenuOpen);
@@ -470,6 +483,12 @@ const AdminDashboard: React.FC = () => {
   const [markAllLoading, setMarkAllLoading] = useState(false);
   const [checkoutAllLoading, setCheckoutAllLoading] = useState(false);
   const [showMasterResetModal, setShowMasterResetModal] = useState(false);
+  const [absenceModal, setAbsenceModal] = useState<{
+    userId: string;
+    userName: string;
+    initialReason?: 'excused' | 'unexcused' | 'dropout';
+    initialNotes?: string;
+  } | null>(null);
   const [masterResetStats, setMasterResetStats] = useState({ deletedUsers: 0, deletedAttendance: 0, preservedUsers: 0 });
 
   const handleGenerateQR = async () => {
@@ -485,26 +504,17 @@ const AdminDashboard: React.FC = () => {
   const handleDownloadAttendanceCSV = async () => {
     try {
       await dataService.testConnection();
-      const users = await dataService.getUsers();
-      const attendance = await dataService.getAttendance();
+      const users = await dataService.getUsers(effectiveHub);
+      const attendance = await dataService.getAttendance(undefined, effectiveHub);
       const timeService = TimeService.getInstance();
       const todayStr = timeService.getCurrentDateString();
       const todayAttendance = attendance.filter((a: any) => attendanceMatchesHarareDay(a, todayStr));
-      const rows = todayAttendance.map((a: any) => {
-        const userRecord = users.find((u: any) => u.id === a.studentId || u.uid === a.studentId);
-        const checkInTime = a.checkInTime ? new Date(a.checkInTime) : null;
-        const isLate = !!(checkInTime && timeService.isLate(checkInTime));
-        return [
-          userRecord?.displayName || a.studentName || 'Unknown',
-          a.date || '',
-          checkInTime ? checkInTime.toLocaleTimeString() : '',
-          a.checkOutTime ? new Date(a.checkOutTime).toLocaleTimeString() : '',
-          isLate ? 'Late' : 'On Time'
-        ];
-      });
-      let csv = 'Name,Date,Check-in Time,Check-out Time,Late\n';
-      csv += rows.map(r => r.map(field => `"${field}"`).join(',')).join('\n');
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const students = users.filter(
+        (u: any) => !u.userType || u.userType === 'attendee' || u.userType === 'student'
+      );
+      const dataRows = buildAttendanceExportRows(students, todayAttendance, todayStr);
+      const csv = formatCsvDocument([...ATTENDANCE_CSV_HEADERS], dataRows);
+      const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
       saveAs(blob, `attendance_${todayStr}.csv`);
       uniqueToast.success('CSV downloaded!', { autoClose: 2000 });
     } catch (error) {
@@ -522,7 +532,15 @@ const AdminDashboard: React.FC = () => {
       // Use attendanceService to create proper attendance record
       // skipTimeCheck=true allows admin to mark students present anytime
       // method='admin' indicates admin-marked attendance
-      await attendanceService.checkIn(student.userId, student.userName, undefined, undefined, true, 'admin');
+      await attendanceService.checkIn(
+        student.userId,
+        student.userName,
+        undefined,
+        undefined,
+        true,
+        user?.userType === 'instructor' ? 'instructor' : 'admin',
+        effectiveHub
+      );
       uniqueToast.success(`Marked ${student.userName} as present.`);
     } catch (e: any) {
       console.error('Failed to mark student present:', e.message);
@@ -551,7 +569,19 @@ const AdminDashboard: React.FC = () => {
       const batchSize = 5;
       for (let i = 0; i < targets.length; i += batchSize) {
         const batch = targets.slice(i, i + batchSize);
-        await Promise.all(batch.map((s: any) => attendanceService.checkIn(s.userId, s.userName, undefined, undefined, true, 'admin')));
+        await Promise.all(
+          batch.map((s: any) =>
+            attendanceService.checkIn(
+              s.userId,
+              s.userName,
+              undefined,
+              undefined,
+              true,
+              user?.userType === 'instructor' ? 'instructor' : 'admin',
+              effectiveHub
+            )
+          )
+        );
       }
       uniqueToast.success('Marked absent students as present.');
     } catch (e) {
@@ -580,7 +610,7 @@ const AdminDashboard: React.FC = () => {
     }
     setCheckoutAllLoading(true);
     try {
-      const { checkedOut } = await attendanceService.checkOutAllOpenToday();
+      const { checkedOut } = await attendanceService.checkOutAllOpenToday(effectiveHub);
       uniqueToast.success(
         checkedOut === 0
           ? 'No open sessions to close.'
@@ -598,7 +628,7 @@ const AdminDashboard: React.FC = () => {
     try {
       await dataService.testConnection();
 
-      const dashboardStats = await dataService.getDashboardStats();
+      const dashboardStats = await dataService.getDashboardStats(effectiveHub);
 
       // Do not reset today counts here — subscribeToTodayAttendance owns them. A slow
       // loadDashboardData used to finish after the listener and zero out live stats on refresh.
@@ -608,7 +638,7 @@ const AdminDashboard: React.FC = () => {
         totalInstructors: dashboardStats.totalInstructors,
       }));
 
-      const attendance = await dataService.getAttendance();
+      const attendance = await dataService.getAttendance(undefined, effectiveHub);
       const ts = TimeService.getInstance();
       const endStr = ts.getCurrentDateString();
       const lastSchoolDays = ts.lastNHarareWeekdays(5, endStr);
@@ -633,6 +663,7 @@ const AdminDashboard: React.FC = () => {
           maxRate: 85,
           minMissedSchoolDays: 3,
           limit: 8,
+          hubId: effectiveHub,
         });
         setAtRiskStudents(atRisk);
       } catch (e) {
@@ -667,7 +698,7 @@ const AdminDashboard: React.FC = () => {
       if (summary.attendanceList) {
         setTodayAttendanceList(summary.attendanceList);
       }
-    });
+    }, effectiveHub);
 
     // Load static dashboard stats on mount
     loadDashboardData();
@@ -681,7 +712,7 @@ const AdminDashboard: React.FC = () => {
       unsubscribeAttendance();
       unsubscribeQR();
     };
-  }, []);
+  }, [effectiveHub]);
 
   const lateNotifyInitRef = useRef(false);
   const lateUserIdsSeenRef = useRef<Set<string>>(new Set());
@@ -845,6 +876,33 @@ const AdminDashboard: React.FC = () => {
               </HeaderActions>
             </Header>
 
+            {user?.userType === 'admin' && (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-end',
+                  gap: theme.spacing.md,
+                  flexWrap: 'wrap',
+                }}
+              >
+                <AdminHubScopeSelect
+                  user={user}
+                  value={adminHubFilter}
+                  onChange={setAdminHubFilter}
+                  id="dashboard-hub-filter"
+                />
+                <span
+                  style={{
+                    fontSize: theme.fontSizes.sm,
+                    color: theme.colors.textSecondary,
+                    paddingBottom: 4,
+                  }}
+                >
+                  Dashboard stats and today&apos;s list follow this hub (or all hubs).
+                </span>
+              </div>
+            )}
+
             {showQRModal && (
               <div style={{
                 position: 'fixed',
@@ -954,7 +1012,7 @@ const AdminDashboard: React.FC = () => {
                   background: 'linear-gradient(90deg, rgba(245, 158, 11, 0.08) 0%, transparent 40%)',
                 }}
               >
-                <CardTitle>Late arrivals today (Harare · 9:00 AM or later)</CardTitle>
+                <CardTitle>Late arrivals today (Harare · 9:01 AM or later)</CardTitle>
                 <p style={{ margin: `0 0 ${theme.spacing.md} 0`, fontSize: theme.fontSizes.sm, color: theme.colors.textSecondary }}>
                   These students checked in after the on-time window. You will get a toast when someone new is marked late.
                 </p>
@@ -1074,14 +1132,33 @@ const AdminDashboard: React.FC = () => {
                           </div>
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: theme.spacing.xs }}>
                             <div style={{ width: 8, height: 8, borderRadius: 999, background: statusColor }} />
-                            <Button
-                              variant={s.status === 'absent' ? 'primary' : 'secondary'}
-                              disabled={s.status !== 'absent' || markingStudentId === s.userId}
-                              onClick={() => handleMarkStudentPresent(s)}
-                              style={{ padding: '6px 10px', borderRadius: theme.borderRadius.md }}
-                            >
-                              {s.status === 'absent' ? (markingStudentId === s.userId ? 'Marking...' : 'Mark Present') : 'Checked'}
-                            </Button>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'flex-end' }}>
+                              {s.status === 'absent' && (
+                                <Button
+                                  variant="outline"
+                                  type="button"
+                                  onClick={() =>
+                                    setAbsenceModal({
+                                      userId: s.userId,
+                                      userName: s.userName,
+                                      initialReason: s.absenceReason,
+                                      initialNotes: s.absenceNotes,
+                                    })
+                                  }
+                                  style={{ padding: '6px 10px', borderRadius: theme.borderRadius.md }}
+                                >
+                                  {s.absenceReason ? 'Edit absence' : 'Record absence'}
+                                </Button>
+                              )}
+                              <Button
+                                variant={s.status === 'absent' ? 'primary' : 'secondary'}
+                                disabled={s.status !== 'absent' || markingStudentId === s.userId}
+                                onClick={() => handleMarkStudentPresent(s)}
+                                style={{ padding: '6px 10px', borderRadius: theme.borderRadius.md }}
+                              >
+                                {s.status === 'absent' ? (markingStudentId === s.userId ? 'Marking...' : 'Mark Present') : 'Checked'}
+                              </Button>
+                            </div>
                           </div>
                         </AttendanceItem>
                       );
@@ -1176,6 +1253,24 @@ const AdminDashboard: React.FC = () => {
         </AnimatePresence>
       </MainContent>
       
+      {absenceModal && user && (
+        <AbsenceRecordModal
+          open
+          onClose={() => setAbsenceModal(null)}
+          studentId={absenceModal.userId}
+          studentName={absenceModal.userName}
+          dateStr={TimeService.getInstance().getCurrentDateString()}
+          hubId={effectiveHub}
+          recordedByUid={user.uid}
+          recordedByName={user.displayName || user.email || 'Staff'}
+          initialReason={absenceModal.initialReason}
+          initialNotes={absenceModal.initialNotes}
+          onSaved={() => {
+            void loadDashboardData();
+          }}
+        />
+      )}
+
       {showMasterResetModal && (
         <MasterResetModal
           onClose={() => setShowMasterResetModal(false)}

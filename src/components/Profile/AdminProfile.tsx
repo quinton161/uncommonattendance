@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import styled from 'styled-components';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -30,6 +30,7 @@ import { theme } from '../../styles/theme';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../Common/Button';
 import DataService from '../../services/DataService';
+import { hubScopeForStaff } from '../../services/hubService';
 import { attendanceAnalyticsService } from '../../services/attendanceAnalyticsService';
 import { AttendanceService } from '../../services/attendanceService';
 import { TimeService } from '../../services/timeService';
@@ -421,6 +422,7 @@ const ActivityItem = styled.div`
 
 export const AdminProfile: React.FC = () => {
   const { user } = useAuth();
+  const hubScope = useMemo(() => hubScopeForStaff(user), [user]);
   const [showPhotoUpload, setShowPhotoUpload] = useState(false);
   const [stats, setStats] = useState({
     totalEvents: 0,
@@ -438,8 +440,8 @@ export const AdminProfile: React.FC = () => {
     
     const fetchAdminData = async () => {
       try {
-        const dashboardStats = await ds.getDashboardStats();
-        const users = await ds.getUsers();
+        const dashboardStats = await ds.getDashboardStats(hubScope);
+        const users = await ds.getUsers(hubScope);
         
         // Use consistent student filtering logic
         const students = users.filter((u: any) => {
@@ -449,7 +451,7 @@ export const AdminProfile: React.FC = () => {
         });
         
         // Calculate cohort metrics using StudentProfile logic
-        const studentStatsPromises = students.map(s => ds.getStudentStats(s.id || s.uid));
+        const studentStatsPromises = students.map(s => ds.getStudentStats(s.id || s.uid, hubScope));
         const allStudentStats = await Promise.all(studentStatsPromises);
         
         const totalRate = allStudentStats.reduce((acc, curr) => acc + (curr.attendanceRate || 0), 0);
@@ -474,7 +476,7 @@ export const AdminProfile: React.FC = () => {
           return timeSvc.toHarareDateString(d);
         };
 
-        const attendance = await ds.getAttendance();
+        const attendance = await ds.getAttendance(undefined, hubScope);
         const chartData = lastSchoolDays.map((dateStr) => {
           const dayAttendance = attendance.filter((a) => attendanceDateKey(a) === dateStr);
           const d = parseISO(`${dateStr}T12:00:00+02:00`);
@@ -542,7 +544,7 @@ export const AdminProfile: React.FC = () => {
       }));
       // Refresh list to show new check-ins immediately
       fetchAdminData();
-    });
+    }, hubScope);
 
     // Subscribe to real-time analytics for the charts (Weekly Volume)
     const ts = TimeService.getInstance();
@@ -569,7 +571,7 @@ export const AdminProfile: React.FC = () => {
       unsubscribeSummary();
       unsubscribeAnalytics();
     };
-  }, []);
+  }, [hubScope]);
 
   return (
     <ProfileContainer>

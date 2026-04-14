@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import styled from 'styled-components';
 import { theme } from '../../styles/theme';
 import { Button } from '../Common/Button';
@@ -7,6 +7,9 @@ import { AttendanceService } from '../../services/attendanceService';
 import DataService from '../../services/DataService';
 import { TimeService } from '../../services/timeService';
 import { uniqueToast } from '../../utils/toastUtils';
+import { useAuth } from '../../contexts/AuthContext';
+import { effectiveStaffHubScope } from '../../services/hubService';
+import { AdminHubScopeSelect } from './AdminHubScopeSelect';
 import { FiChevronLeft, FiCalendar, FiUser, FiCheckCircle, FiClock, FiXCircle, FiTrendingUp, FiLogIn, FiLogOut, FiMapPin } from 'react-icons/fi';
 
 // ── Styled components ─────────────────────────────────────────────────────────
@@ -44,6 +47,12 @@ interface StudentRow {
 interface Props { onBack?:()=>void; isEmbedded?:boolean; }
 
 export const DailyAttendanceTracker: React.FC<Props> = ({ onBack, isEmbedded=true }) => {
+  const { user } = useAuth();
+  const [adminHubFilter, setAdminHubFilter] = useState('');
+  const effectiveHub = useMemo(
+    () => effectiveStaffHubScope(user, adminHubFilter),
+    [user, adminHubFilter]
+  );
   const ts = TimeService.getInstance();
   const [date,    setDate]    = useState(ts.getCurrentTime());
   const [rows,    setRows]    = useState<StudentRow[]>([]);
@@ -53,15 +62,7 @@ export const DailyAttendanceTracker: React.FC<Props> = ({ onBack, isEmbedded=tru
   const attendanceService = AttendanceService.getInstance();
   const dataService       = DataService.getInstance();
 
-  /** FIXED: determine lateness via Harare timezone parsing, not raw getHours() */
-  const calcLate = (t: Date): boolean => {
-    const parts = new Intl.DateTimeFormat('en-US', {
-      timeZone: 'Africa/Harare', hour: '2-digit', minute: '2-digit', hour12: false,
-    }).formatToParts(t);
-    const h = Number(parts.find(p=>p.type==='hour')?.value ?? NaN);
-    const m = Number(parts.find(p=>p.type==='minute')?.value ?? NaN);
-    return Number.isFinite(h) && Number.isFinite(m) && (h > 9 || (h === 9 && m >= 0));
-  };
+  const calcLate = (t: Date): boolean => ts.isLate(t);
 
   const load = async () => {
     try {
@@ -72,8 +73,8 @@ export const DailyAttendanceTracker: React.FC<Props> = ({ onBack, isEmbedded=tru
       if (finalDate !== dateStr) setDate(ts.getCurrentTime());
 
       const [users, records] = await Promise.all([
-        dataService.getUsers(),
-        attendanceService.getAttendanceByDateRange(finalDate, finalDate),
+        dataService.getUsers(effectiveHub),
+        attendanceService.getAttendanceByDateRange(finalDate, finalDate, undefined, effectiveHub),
       ]);
 
       const students = users.filter((u:any) => u.userType === 'attendee');
@@ -103,7 +104,10 @@ export const DailyAttendanceTracker: React.FC<Props> = ({ onBack, isEmbedded=tru
     } finally { setLoading(false); }
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [date]);
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [date, effectiveHub]);
 
   const nav = (dir: 'prev'|'next') => {
     const d = new Date(date);
@@ -132,15 +136,23 @@ export const DailyAttendanceTracker: React.FC<Props> = ({ onBack, isEmbedded=tru
         </Header>
 
         <Controls>
-          <DateNav>
-            <NavBtn onClick={()=>nav('prev')}><FiChevronLeft size={16}/></NavBtn>
-            <DateDisp>
-              <FiCalendar size={20} style={{ marginRight:theme.spacing.xs }}/>
-              {fmt(date)}
-              {wknd(date) && <span style={{ color:theme.colors.warning, fontSize:theme.fontSizes.sm, marginLeft:theme.spacing.xs }}>(Weekend)</span>}
-            </DateDisp>
-            <NavBtn onClick={()=>nav('next')}><FiChevronLeft size={16} style={{ transform:'rotate(180deg)' }}/></NavBtn>
-          </DateNav>
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: theme.spacing.md, flex: '1 1 auto', minWidth: 0 }}>
+            <AdminHubScopeSelect
+              user={user}
+              value={adminHubFilter}
+              onChange={setAdminHubFilter}
+              id="daily-tracker-hub-filter"
+            />
+            <DateNav>
+              <NavBtn onClick={()=>nav('prev')}><FiChevronLeft size={16}/></NavBtn>
+              <DateDisp>
+                <FiCalendar size={20} style={{ marginRight:theme.spacing.xs }}/>
+                {fmt(date)}
+                {wknd(date) && <span style={{ color:theme.colors.warning, fontSize:theme.fontSizes.sm, marginLeft:theme.spacing.xs }}>(Weekend)</span>}
+              </DateDisp>
+              <NavBtn onClick={()=>nav('next')}><FiChevronLeft size={16} style={{ transform:'rotate(180deg)' }}/></NavBtn>
+            </DateNav>
+          </div>
           <Button variant="outline" onClick={()=>setDate(ts.getCurrentTime())}>Go to Today</Button>
           <Button variant="danger" onClick={async()=>{
             if(!window.confirm('Clear ALL attendance records for today?')) return;

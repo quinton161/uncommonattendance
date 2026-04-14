@@ -166,7 +166,7 @@ export function StudentDashboard({ onNavigateToProfile }: StudentDashboardProps)
     if (!user) return;
     
     try {
-      const attendance = await attendanceService.getTodayAttendance(user.uid);
+      const attendance = await attendanceService.getTodayAttendance(user.uid, user.hubId);
       setTodayAttendance(attendance);
     } catch (err) {
       console.error('Failed to load today attendance:', err);
@@ -177,7 +177,7 @@ export function StudentDashboard({ onNavigateToProfile }: StudentDashboardProps)
     if (!user) return;
     
     try {
-      const history = await attendanceService.getAttendanceHistory(user.uid, 10);
+      const history = await attendanceService.getAttendanceHistory(user.uid, 10, user.hubId);
       setAttendanceHistory(history);
     } catch (err) {
       console.error('Failed to load attendance history:', err);
@@ -207,7 +207,15 @@ export function StudentDashboard({ onNavigateToProfile }: StudentDashboardProps)
         timestamp: Date.now(),
       };
 
-      const attendance = await attendanceService.checkIn(user.uid, user.displayName, undefined, locationData);
+      const attendance = await attendanceService.checkIn(
+        user.uid,
+        user.displayName,
+        undefined,
+        locationData,
+        false,
+        'qr',
+        user.hubId
+      );
       setTodayAttendance(attendance);
       await loadAttendanceHistory();
     } catch (err: any) {

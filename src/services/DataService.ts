@@ -37,7 +37,7 @@ class DataService {
     }
   }
 
-  /** Is the check-in time late? (>= 9:00 AM Harare) */
+  /** Is the check-in time late? (9:01 AM Harare or later — see TimeService.isLate) */
   private mapAttendanceSnapshotDoc(d: { id: string; data: () => any }): any {
     const raw = d.data();
     const ci = raw.checkInTime;
@@ -67,13 +67,19 @@ class DataService {
       const d = checkInTime instanceof Date ? checkInTime
               : checkInTime.toDate ? checkInTime.toDate()
               : new Date(checkInTime);
-      const parts = new Intl.DateTimeFormat('en-US', {
-        timeZone: 'Africa/Harare', hour: '2-digit', minute: '2-digit', hour12: false,
-      }).formatToParts(d);
-      const h = Number(parts.find(p=>p.type==='hour')?.value ?? NaN);
-      const m = Number(parts.find(p=>p.type==='minute')?.value ?? NaN);
-      return Number.isFinite(h) && Number.isFinite(m) && (h > 9 || (h === 9 && m >= 0));
+      return TimeService.getInstance().isLate(d);
     } catch { return false; }
+  }
+
+  /** Instructor dashboard: rows without `hubId` are treated as not in this hub. */
+  private attendanceMatchesHub(row: any, hubId?: string): boolean {
+    if (!hubId) return true;
+    return row?.hubId === hubId;
+  }
+
+  private usersForHub(users: any[], hubId?: string): any[] {
+    if (!hubId) return users;
+    return users.filter((u) => u.hubId === hubId);
   }
 
   async testConnection(): Promise<boolean> {
@@ -114,7 +120,7 @@ class DataService {
 
   // ── Attendance ──────────────────────────────────────────────────────────────
 
-  async getAttendance(userId?: string): Promise<any[]> {
+  async getAttendance(userId?: string, hubId?: string): Promise<any[]> {
     try {
       const mapDoc = (d: { id: string; data: () => any }) => ({
         id: d.id,
@@ -125,7 +131,10 @@ class DataService {
       if (userId) {
         // Single-field equality avoids composite index (studentId + checkInTime).
         const q = query(collection(db, 'attendance'), where('studentId', '==', userId));
-        const rows = (await getDocs(q)).docs.map(mapDoc);
+        let rows = (await getDocs(q)).docs.map(mapDoc);
+        if (hubId) {
+          rows = rows.filter((r: any) => !r.hubId || r.hubId === hubId);
+        }
         rows.sort((a: any, b: any) => {
           const ta = a.checkInTime instanceof Date ? a.checkInTime.getTime() : 0;
           const tb = b.checkInTime instanceof Date ? b.checkInTime.getTime() : 0;
@@ -133,8 +142,29 @@ class DataService {
         });
         return rows;
       }
-      const q = query(collection(db, 'attendance'), orderBy('checkInTime', 'desc'));
-      return (await getDocs(q)).docs.map(mapDoc);
+      // `orderBy('checkInTime')` omits staff-recorded absences (no check-in) — merge them in.
+      const [snapCheckIns, snapStaffAbsent, snapReasonAbsent] = await Promise.all([
+        getDocs(query(collection(db, 'attendance'), orderBy('checkInTime', 'desc'))),
+        getDocs(query(collection(db, 'attendance'), where('method', '==', 'staff_absent'))),
+        // Legacy rows may have `absenceReason` without `method` (before it was standardized).
+        getDocs(
+          query(
+            collection(db, 'attendance'),
+            where('absenceReason', 'in', ['excused', 'unexcused', 'dropout'])
+          )
+        ),
+      ]);
+      const byId = new Map<string, any>();
+      snapCheckIns.docs.forEach((d) => byId.set(d.id, mapDoc(d)));
+      snapStaffAbsent.docs.forEach((d) => {
+        if (!byId.has(d.id)) byId.set(d.id, mapDoc(d));
+      });
+      snapReasonAbsent.docs.forEach((d) => {
+        if (!byId.has(d.id)) byId.set(d.id, mapDoc(d));
+      });
+      let rows = Array.from(byId.values());
+      if (hubId) rows = rows.filter((r: any) => this.attendanceMatchesHub(r, hubId));
+      return rows;
     } catch (e) {
       console.error('getAttendance error', e);
       return [];
@@ -160,11 +190,12 @@ class DataService {
 
   // ── Users ───────────────────────────────────────────────────────────────────
 
-  async getUsers(): Promise<any[]> {
+  async getUsers(hubId?: string): Promise<any[]> {
     try {
-      return (await getDocs(collection(db,'users'))).docs.map(d => ({
+      const all = (await getDocs(collection(db,'users'))).docs.map(d => ({
         id: d.id, ...d.data(), createdAt: d.data().createdAt?.toDate(),
       }));
+      return this.usersForHub(all, hubId);
     } catch { return []; }
   }
 
@@ -187,8 +218,8 @@ class DataService {
 
   // ── Dashboard stats ─────────────────────────────────────────────────────────
 
-  async getDashboardStats(): Promise<any> {
-    const [events, users] = await Promise.all([this.getEvents(), this.getUsers()]);
+  async getDashboardStats(hubId?: string): Promise<any> {
+    const [events, users] = await Promise.all([this.getEvents(), this.getUsers(hubId)]);
     const students  = users.filter(u => this.isStudent(u));
     const ts        = TimeService.getInstance();
     const today     = ts.getCurrentDateString();
@@ -205,10 +236,13 @@ class DataService {
       ),
     ]);
 
-    const mergedDocs = this.mergeAttendanceByDocId(
+    let mergedDocs = this.mergeAttendanceByDocId(
       byDateSnap.docs.map((d) => this.mapAttendanceSnapshotDoc(d)),
       byRangeSnap.docs.map((d) => this.mapAttendanceSnapshotDoc(d))
     );
+    if (hubId) {
+      mergedDocs = mergedDocs.filter((d) => this.attendanceMatchesHub(d, hubId));
+    }
 
     return {
       totalEvents:       events.length,
@@ -227,13 +261,13 @@ class DataService {
    * The old version subscribed to users, which fired with an empty array first,
    * causing the summary to show 0 present every time a user doc changed.
    */
-  subscribeToTodayAttendance(callback: (summary: any) => void): () => void {
+  subscribeToTodayAttendance(callback: (summary: any) => void, hubId?: string): () => void {
     const ts = TimeService.getInstance();
     const today = ts.getCurrentDateString();
     const { start, end } = ts.getHarareDayUtcBounds(today);
 
     let users: any[] = [];
-    const usersReady = this.getUsers().then((u) => {
+    const usersReady = this.getUsers(hubId).then((u) => {
       users = u;
     });
 
@@ -242,15 +276,15 @@ class DataService {
 
     const emit = async () => {
       await usersReady;
-      const attendance = this.mergeAttendanceByDocId(batchDate, batchRange);
+      let attendance = this.mergeAttendanceByDocId(batchDate, batchRange);
+      if (hubId) {
+        attendance = attendance.filter((r) => this.attendanceMatchesHub(r, hubId));
+      }
       callback(this._buildSummary(today, users, attendance));
     };
 
-    const qDate = query(
-      collection(db, 'attendance'),
-      where('date', '==', today),
-      orderBy('checkInTime', 'desc')
-    );
+    // Do not `orderBy('checkInTime')` here — staff absences have no check-in and would be excluded.
+    const qDate = query(collection(db, 'attendance'), where('date', '==', today));
     const qRange = query(
       collection(db, 'attendance'),
       where('checkInTime', '>=', Timestamp.fromDate(start)),
@@ -289,9 +323,24 @@ class DataService {
       const sid = r.studentId || r.userId;
       if (!sid) return;
       const ex = byStudent.get(sid);
-      if (!ex || (r.checkInTime && (!ex.checkInTime || r.checkInTime > ex.checkInTime))) {
+      if (!ex) {
         byStudent.set(sid, r);
+        return;
       }
+      const exIn = !!ex.checkInTime;
+      const rIn = !!r.checkInTime;
+      if (rIn && !exIn) {
+        byStudent.set(sid, r);
+        return;
+      }
+      if (exIn && !rIn) return;
+      if (rIn && exIn) {
+        const ta = ex.checkInTime instanceof Date ? ex.checkInTime.getTime() : 0;
+        const tb = r.checkInTime instanceof Date ? r.checkInTime.getTime() : 0;
+        if (tb > ta) byStudent.set(sid, r);
+        return;
+      }
+      byStudent.set(sid, r);
     });
 
     const list = users.filter(u => this.isStudent(u)).map(u => {
@@ -302,13 +351,29 @@ class DataService {
       }
       let status: 'present'|'late'|'absent'|'completed' = 'absent';
       let checkInTime = null, checkOutTime = null, isLate = false;
+      let absenceReason: string | undefined;
+      let absenceNotes: string | undefined;
+      let recordedByName: string | undefined;
 
       if (rec) {
         const s = (rec.status||'').toLowerCase();
-        status = s==='late' ? 'late' : s==='completed' ? 'completed' : 'present';
-        checkInTime  = rec.checkInTime;
-        checkOutTime = rec.checkOutTime;
-        isLate = status==='late' || this.calcIsLate(rec.checkInTime);
+        const explicitAbsent = s === 'absent' || (!!rec.absenceReason && !rec.checkInTime);
+        if (explicitAbsent) {
+          status = 'absent';
+          checkInTime = null;
+          checkOutTime = null;
+          isLate = false;
+          absenceReason = rec.absenceReason;
+          absenceNotes = rec.absenceNotes;
+          recordedByName = rec.recordedByName;
+        } else if (rec.checkInTime) {
+          status = s==='late' ? 'late' : s==='completed' ? 'completed' : 'present';
+          checkInTime  = rec.checkInTime;
+          checkOutTime = rec.checkOutTime;
+          isLate = status==='late' || this.calcIsLate(rec.checkInTime);
+        } else {
+          status = 'absent';
+        }
       }
 
       return {
@@ -316,8 +381,13 @@ class DataService {
         userName:    u.displayName || 'Unknown',
         userEmail:   u.email,
         userType:    u.userType,
+        hubId:       u.hubId,
+        hubName:     u.hubName,
         status, checkInTime, checkOutTime, isLate,
         attendanceId: rec?.id ?? null,
+        absenceReason,
+        absenceNotes,
+        recordedByName,
       };
     });
 
@@ -338,11 +408,11 @@ class DataService {
    * Same definitions as the Analytics page: last ~30 Harare calendar days, weekdays only,
    * rate = (present + late) / weekday count. Streaks use weekday sequence (not raw calendar days).
    */
-  async getStudentStats(userId: string): Promise<any> {
+  async getStudentStats(userId: string, hubId?: string): Promise<any> {
     const range = attendanceAnalyticsService.getDefaultRange('student');
     const analytics = await attendanceAnalyticsService.getStudentAnalytics(userId, range);
 
-    const all = await this.getAttendance(userId);
+    const all = await this.getAttendance(userId, hubId);
     const byDate = new Map<string, any>();
     all.forEach((r) => {
       const d = this.dateStr(r);
@@ -370,10 +440,10 @@ class DataService {
 
   // ── Daily attendance summary (admin, date-filtered) ─────────────────────────
 
-  async getDailyAttendanceSummary(date?: string): Promise<any> {
+  async getDailyAttendanceSummary(date?: string, hubId?: string): Promise<any> {
     const ts  = TimeService.getInstance();
     const tgt = date || ts.getCurrentDateString();
-    const [users, all] = await Promise.all([this.getUsers(), this.getAttendance()]);
+    const [users, all] = await Promise.all([this.getUsers(hubId), this.getAttendance(undefined, hubId)]);
     const forDay = all.filter(r => this.dateStr(r)===tgt);
     return this._buildSummary(tgt, users, forDay);
   }
@@ -387,6 +457,7 @@ class DataService {
     maxRate?: number;
     minMissedSchoolDays?: number;
     limit?: number;
+    hubId?: string;
   }): Promise<Array<{
     studentId: string;
     studentName: string;
@@ -397,12 +468,13 @@ class DataService {
     const maxRate = opts?.maxRate ?? 85;
     const minMissed = opts?.minMissedSchoolDays ?? 3;
     const limitN = opts?.limit ?? 10;
+    const hubId = opts?.hubId;
 
     const ts = TimeService.getInstance();
     const endDate = ts.getCurrentDateString();
     const startDate = format(subDays(parseISO(endDate), windowDays), 'yyyy-MM-dd');
 
-    const [users, allAttendance] = await Promise.all([this.getUsers(), this.getAttendance()]);
+    const [users, allAttendance] = await Promise.all([this.getUsers(hubId), this.getAttendance(undefined, hubId)]);
     const students = users.filter(u => this.isStudent(u));
 
     const inRange = allAttendance.filter((r: any) => {

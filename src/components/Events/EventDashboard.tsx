@@ -366,7 +366,11 @@ export const EventDashboard: React.FC<EventDashboardProps> = ({ onNavigateToProf
 
         if (!attendanceDoc.empty) {
           const record = attendanceDoc.docs[0].data();
-          if (record.checkInTime && !record.checkOutTime) {
+          const hubOk =
+            !user.hubId ||
+            !record.hubId ||
+            record.hubId === user.hubId;
+          if (hubOk && record.checkInTime && !record.checkOutTime) {
             setCheckedIn(true);
             setCheckInTime(record.checkInTime.toDate());
           }

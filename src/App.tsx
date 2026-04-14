@@ -4,6 +4,8 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { EventProvider } from './contexts/EventContext';
 import { AuthPage } from './components/Auth/AuthPage';
+import { HubSelectGate } from './components/Auth/HubSelectGate';
+import { GoogleRegisterGate } from './components/Auth/GoogleRegisterGate';
 import { StudentDashboard } from './components/Dashboard/StudentDashboard';
 import AdminDashboard from './components/Dashboard/AdminDashboard';
 import { SimpleSplash } from './components/Common/SimpleSplash';
@@ -37,6 +39,17 @@ const AppRoutes: React.FC = () => {
 
   if (!user) {
     return <AuthPage />;
+  }
+
+  if (user.needsProfileCompletion) {
+    return <GoogleRegisterGate />;
+  }
+
+  const needsHub =
+    (user.userType === 'attendee' || user.userType === 'instructor') && !user.hubId;
+
+  if (needsHub) {
+    return <HubSelectGate />;
   }
 
   if (user.userType === 'attendee') {

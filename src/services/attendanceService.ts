@@ -4,9 +4,20 @@ import {
   Timestamp, deleteDoc, serverTimestamp,
 } from 'firebase/firestore';
 import { db } from './firebase';
-import { AttendanceRecord, AttendanceStatus, LocationData } from '../types';
+import { AbsenceReason, AttendanceRecord, AttendanceStatus, LocationData } from '../types';
 import { DailyAttendanceService } from './dailyAttendanceService';
 import { TimeService } from './timeService';
+
+export interface StaffAbsentPayload {
+  studentId: string;
+  studentName: string;
+  date: string;
+  hubId?: string;
+  absenceReason: AbsenceReason;
+  absenceNotes?: string;
+  recordedByUid: string;
+  recordedByName: string;
+}
 
 export class AttendanceService {
   private static instance: AttendanceService;
@@ -28,6 +39,7 @@ export class AttendanceService {
     location?: LocationData,
     skipTimeCheck = false,
     method = 'qr',
+    hubId?: string,
   ): Promise<AttendanceRecord> {
     if (!studentId?.trim()) throw new Error('Student ID is required');
     if (!studentName?.trim()) throw new Error('Student name is required');
@@ -81,6 +93,10 @@ export class AttendanceService {
       createdAt:        serverTimestamp(),
       updatedAt:        serverTimestamp(),
     };
+
+    if (hubId) {
+      record.hubId = hubId;
+    }
 
     if (location?.ip && location.ip !== '0.0.0.0') {
       record.location = { ip: location.ip, timestamp: location.timestamp ?? Date.now() };
@@ -147,7 +163,7 @@ export class AttendanceService {
    * Staff only (Firestore `isStaff` write): close every open session for Harare today.
    * Merges `date == today` with check-in time in today’s Harare window so legacy rows still match.
    */
-  async checkOutAllOpenToday(): Promise<{ checkedOut: number }> {
+  async checkOutAllOpenToday(hubId?: string): Promise<{ checkedOut: number }> {
     const today = this.timeService.getCurrentDateString();
     const { start, end } = this.timeService.getHarareDayUtcBounds(today);
     const [snapDate, snapRange] = await Promise.all([
@@ -168,7 +184,10 @@ export class AttendanceService {
     const tOut = Timestamp.fromDate(now);
     const toClose = Array.from(byId.values()).filter((d) => {
       const x = d.data();
-      return !!(x.checkInTime && !x.checkOutTime);
+      if (!(x.checkInTime && !x.checkOutTime)) return false;
+      if (hubId && x.hubId && x.hubId !== hubId) return false;
+      if (hubId && !x.hubId) return false;
+      return true;
     });
     for (let i = 0; i < toClose.length; i += 10) {
       const chunk = toClose.slice(i, i + 10);
@@ -185,7 +204,54 @@ export class AttendanceService {
     return { checkedOut: toClose.length };
   }
 
+  /**
+   * Staff-only: explicit absence for a calendar day (no check-in).
+   * Document id remains `{yyyy-mm-dd}_{studentId}` — mutually exclusive with check-in for that day.
+   */
+  async recordStaffAbsent(p: StaffAbsentPayload): Promise<void> {
+    if (!p.absenceReason) throw new Error('Select an absence reason before saving.');
+    const docId = `${p.date}_${p.studentId}`;
+    const docRef = doc(db, 'attendance', docId);
+    const snap = await getDoc(docRef);
+    if (snap.exists() && snap.data().checkInTime) {
+      throw new Error('This student already checked in for this date.');
+    }
+    const prev = snap.exists() ? snap.data() : {};
+    await setDoc(
+      docRef,
+      {
+        id: docId,
+        studentId: p.studentId,
+        studentName: p.studentName,
+        date: p.date,
+        status: 'absent' as const,
+        isPresent: false,
+        absenceReason: p.absenceReason,
+        absenceNotes: (p.absenceNotes || '').trim(),
+        recordedByUid: p.recordedByUid,
+        recordedByName: p.recordedByName,
+        ...(p.hubId ? { hubId: p.hubId } : {}),
+        method: 'staff_absent',
+        updatedAt: serverTimestamp(),
+        createdAt: prev.createdAt || serverTimestamp(),
+      },
+      { merge: true }
+    );
+  }
+
   // ── Queries ─────────────────────────────────────────────────────────────────
+
+  /** Student history: include legacy rows with no hubId. */
+  private matchesStudentHub(record: any, hubId?: string): boolean {
+    if (!hubId) return true;
+    return !record?.hubId || record.hubId === hubId;
+  }
+
+  /** Staff / instructor lists: only rows tagged for this hub (no cross-hub bleed). */
+  private matchesStaffHub(record: any, hubId?: string): boolean {
+    if (!hubId) return true;
+    return record?.hubId === hubId;
+  }
 
   private safeFirestoreDate(v: unknown): Date | undefined {
     if (v == null) return undefined;
@@ -206,12 +272,13 @@ export class AttendanceService {
     }
   }
 
-  async getTodayAttendance(studentId?: string): Promise<AttendanceRecord | null> {
+  async getTodayAttendance(studentId?: string, hubId?: string): Promise<AttendanceRecord | null> {
     if (!studentId) return null;
     const today = this.timeService.getCurrentDateString();
     const snap  = await getDoc(doc(db, 'attendance', `${today}_${studentId}`));
     if (!snap.exists()) return null;
     const d = snap.data();
+    if (hubId && d.hubId && d.hubId !== hubId) return null;
     return {
       ...d,
       checkInTime:  this.safeFirestoreDate(d.checkInTime),
@@ -219,15 +286,16 @@ export class AttendanceService {
     } as AttendanceRecord;
   }
 
-  async isCurrentlyCheckedIn(studentId: string): Promise<boolean> {
-    const r = await this.getTodayAttendance(studentId);
+  async isCurrentlyCheckedIn(studentId: string, hubId?: string): Promise<boolean> {
+    const r = await this.getTodayAttendance(studentId, hubId);
     return !!(r?.checkInTime && !r.checkOutTime);
   }
 
-  async getCurrentAttendanceState(studentId: string) {
-    const r      = await this.getTodayAttendance(studentId);
+  async getCurrentAttendanceState(studentId: string, hubId?: string) {
+    const r      = await this.getTodayAttendance(studentId, hubId);
     const now    = this.timeService.getCurrentTime();
     const tooLate = this.timeService.isTooLateToCheckIn(now);
+    const inWindow = this.timeService.canCheckIn(now);
     const checkedIn  = !!(r?.checkInTime && !r?.checkOutTime);
     const checkedOut = !!r?.checkOutTime;
     const hasIn      = !!r?.checkInTime;
@@ -240,10 +308,11 @@ export class AttendanceService {
     return {
       isCheckedIn:        checkedIn,
       checkInTime:        r?.checkInTime ?? null,
-      canCheckIn:         !hasIn && !tooLate,
+      canCheckIn:         !hasIn && !tooLate && inWindow,
       canCheckOut:        checkedIn && !checkedOut,
       status,
       isTooLateToCheckIn: tooLate,
+      isBeforeSessionStart: this.timeService.isBeforeSessionStart(now),
     };
   }
 
@@ -252,26 +321,32 @@ export class AttendanceService {
    * Uses the same doc id as check-in (`{yyyy-mm-dd}_{studentId}`) — do not compare
    * `date` fields or UTC midnights; mismatches blocked checkout and showed wrong state.
    */
-  async checkForNewDay(studentId: string): Promise<boolean> {
+  async checkForNewDay(studentId: string, hubId?: string): Promise<boolean> {
     const today = this.timeService.getCurrentDateString();
     const snap = await getDoc(doc(db, 'attendance', `${today}_${studentId}`));
-    return !snap.exists();
+    if (!snap.exists()) return true;
+    if (!hubId) return false;
+    const d = snap.data();
+    if (d.hubId && d.hubId !== hubId) return true;
+    return false;
   }
 
-  async getAttendanceStateWithDayCheck(studentId: string) {
-    const isNewDay = await this.checkForNewDay(studentId);
+  async getAttendanceStateWithDayCheck(studentId: string, hubId?: string) {
+    const isNewDay = await this.checkForNewDay(studentId, hubId);
     if (isNewDay) {
       const now  = this.timeService.getCurrentTime();
       const tooLate = this.timeService.isTooLateToCheckIn(now);
+      const inWindow = this.timeService.canCheckIn(now);
       return {
         isCheckedIn: false, checkInTime: null,
-        canCheckIn: !tooLate, canCheckOut: false,
+        canCheckIn: !tooLate && inWindow, canCheckOut: false,
         isNewDay: true,
         status: tooLate ? 'absent' as const : 'not_checked_in' as const,
         isTooLateToCheckIn: tooLate,
+        isBeforeSessionStart: this.timeService.isBeforeSessionStart(now),
       };
     }
-    return { ...(await this.getCurrentAttendanceState(studentId)), isNewDay: false };
+    return { ...(await this.getCurrentAttendanceState(studentId, hubId)), isNewDay: false };
   }
 
   async getAllTodayAttendance(): Promise<AttendanceRecord[]> {
@@ -284,13 +359,16 @@ export class AttendanceService {
     })) as AttendanceRecord[];
   }
 
-  async getAttendanceHistory(studentId: string, limitCount = 30): Promise<AttendanceRecord[]> {
+  async getAttendanceHistory(studentId: string, limitCount = 30, hubId?: string): Promise<AttendanceRecord[]> {
     const q = query(collection(db, 'attendance'), where('studentId', '==', studentId));
-    const rows = (await getDocs(q)).docs.map((d) => ({
+    let rows = (await getDocs(q)).docs.map((d) => ({
       ...d.data(),
       checkInTime: d.data().checkInTime?.toDate(),
       checkOutTime: d.data().checkOutTime?.toDate(),
     })) as AttendanceRecord[];
+    if (hubId) {
+      rows = rows.filter((r) => this.matchesStudentHub(r, hubId));
+    }
     rows.sort((a, b) => {
       const da = (a as any).date || '';
       const db = (b as any).date || '';
@@ -303,7 +381,7 @@ export class AttendanceService {
     return rows.slice(0, limitCount);
   }
 
-  async getAttendanceByDateRange(startDate: string, endDate: string, studentId?: string): Promise<AttendanceRecord[]> {
+  async getAttendanceByDateRange(startDate: string, endDate: string, studentId?: string, hubId?: string): Promise<AttendanceRecord[]> {
     let q;
     if (startDate === endDate) {
       q = studentId
@@ -319,7 +397,10 @@ export class AttendanceService {
         const dateStr = r.date ?? (r.checkInTime ? new Date(r.checkInTime).toISOString().split('T')[0] : '');
         const matchDate   = dateStr >= startDate && dateStr <= endDate;
         const matchStudent = !studentId || r.studentId === studentId;
-        return matchDate && matchStudent;
+        if (!matchDate || !matchStudent) return false;
+        if (!hubId) return true;
+        if (studentId) return this.matchesStudentHub(r, hubId);
+        return this.matchesStaffHub(r, hubId);
       });
   }
 

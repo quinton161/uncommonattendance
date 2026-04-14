@@ -459,8 +459,8 @@ export const StudentProfile: React.FC = () => {
     const ds = DataService.getInstance();
 
     try {
-      const studentStats = await ds.getStudentStats(user.uid);
-      const attendance = await ds.getAttendance(user.uid);
+      const studentStats = await ds.getStudentStats(user.uid, user.hubId);
+      const attendance = await ds.getAttendance(user.uid, user.hubId);
       const ts = TimeService.getInstance();
       const endStr = ts.getCurrentDateString();
       const lastSchoolDays = ts.lastNHarareWeekdays(5, endStr);
@@ -510,7 +510,7 @@ export const StudentProfile: React.FC = () => {
     } catch (e) {
       console.error('Student profile data load:', e);
     }
-  }, [user?.uid]);
+  }, [user?.uid, user?.hubId]);
 
   useEffect(() => {
     if (!user?.uid) return;

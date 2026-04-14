@@ -10,7 +10,17 @@ export interface User {
   /** Program / cohort label (student-editable in profile) */
   course?: string;
   profession?: string;
+  /** Optional bootcamp roster ID (e.g. UN-2026-195) for exports */
+  bootcampStudentId?: string;
   userType: 'instructor' | 'attendee' | 'admin';
+  /** Firestore `hubs` doc id — students/instructors work in one hub at a time */
+  hubId?: string;
+  hubName?: string;
+  /**
+   * True when Firebase Auth has a Google user but no `users/{uid}` document yet.
+   * User must complete registration (role + hub) before using the app.
+   */
+  needsProfileCompletion?: boolean;
 }
 
 export interface Event {
@@ -81,12 +91,20 @@ export interface Feedback {
 // Legacy types for attendance system (still used by some components)
 export type AttendanceStatus = 'present' | 'late' | 'absent' | 'completed';
 
+/** Staff-recorded absence classification (required when status is explicitly absent). */
+export type AbsenceReason = 'excused' | 'unexcused' | 'dropout';
+
 export interface AttendanceRecord {
   id: string;
   studentId: string;
   studentName: string;
   checkInTime: Date;
   checkOutTime?: Date;
+  /** When staff records an explicit absence (no check-in). */
+  absenceReason?: AbsenceReason;
+  absenceNotes?: string;
+  recordedByUid?: string;
+  recordedByName?: string;
   location?: {
     // IP-based location (primary)
     ip?: string;
@@ -111,16 +129,34 @@ export interface LocationData {
 }
 
 // Context Types
+export type HubSelection = { id: string; name: string };
+
 export interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, displayName: string, userType: User['userType']) => Promise<void>;
+  login: (email: string, password: string, hub?: HubSelection) => Promise<void>;
+  register: (
+    email: string,
+    password: string,
+    displayName: string,
+    userType: User['userType'],
+    hub?: HubSelection
+  ) => Promise<void>;
   logout: () => Promise<void>;
   updateProfile: (data: Partial<User>) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   deleteAccount: () => Promise<void>;
-  loginWithGoogle: () => Promise<void>;
+  loginWithGoogle: (hub?: HubSelection) => Promise<void>;
+  /** Persist hub for students/instructors (e.g. first login or change hub). */
+  setHub: (hub: HubSelection) => Promise<void>;
+  /** Create Firestore profile after first Google sign-in (no existing user doc). */
+  completeGoogleProfile: (
+    displayName: string,
+    userType: User['userType'],
+    hub?: HubSelection
+  ) => Promise<void>;
+  /** Sign out and abandon in-progress Google registration. */
+  cancelGoogleRegistration: () => Promise<void>;
 }
 
 export interface EventContextType {

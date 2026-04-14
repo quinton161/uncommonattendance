@@ -242,7 +242,7 @@ function computeRosterLeaderboards(
 function aggregateAdminRecords(
   records: any[],
   range: DateRange,
-  opts?: { studentId?: string; totalStudents?: number; roster?: AdminAnalyticsRosterEntry[] }
+  opts?: { studentId?: string; totalStudents?: number; roster?: AdminAnalyticsRosterEntry[]; hubId?: string }
 ): AdminAnalytics {
   const startDateStr = range.startDate;
   const endDateStr = range.endDate;
@@ -515,7 +515,7 @@ export class AttendanceAnalyticsService {
   // Get admin analytics (studentId = one learner; totalStudents = enrollment for absent / rate when viewing all)
   async getAdminAnalytics(
     range: DateRange,
-    opts?: { studentId?: string; totalStudents?: number; roster?: AdminAnalyticsRosterEntry[] }
+    opts?: { studentId?: string; totalStudents?: number; roster?: AdminAnalyticsRosterEntry[]; hubId?: string }
   ): Promise<AdminAnalytics> {
     try {
       const startDateStr = range.startDate;
@@ -535,6 +535,9 @@ export class AttendanceAnalyticsService {
       }));
       if (opts?.studentId) {
         records = records.filter((r: any) => r.studentId === opts.studentId);
+      }
+      if (opts?.hubId) {
+        records = records.filter((r: any) => r.hubId === opts.hubId);
       }
 
       return aggregateAdminRecords(records, range, opts);
@@ -592,7 +595,7 @@ export class AttendanceAnalyticsService {
   subscribeToAdminAnalytics(
     range: DateRange,
     callback: (data: AdminAnalytics) => void,
-    opts?: { studentId?: string; totalStudents?: number; roster?: AdminAnalyticsRosterEntry[] }
+    opts?: { studentId?: string; totalStudents?: number; roster?: AdminAnalyticsRosterEntry[]; hubId?: string }
   ): () => void {
     const startDateStr = range.startDate;
     const endDateStr = range.endDate;
@@ -611,6 +614,9 @@ export class AttendanceAnalyticsService {
       }));
       if (opts?.studentId) {
         records = records.filter((r: any) => r.studentId === opts.studentId);
+      }
+      if (opts?.hubId) {
+        records = records.filter((r: any) => r.hubId === opts.hubId);
       }
       callback(aggregateAdminRecords(records, range, opts));
     });
