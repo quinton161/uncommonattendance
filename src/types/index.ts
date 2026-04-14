@@ -4,6 +4,8 @@ export interface User {
   uid: string;
   displayName: string;
   email: string;
+  /** Lowercase copy for duplicate checks in Firestore */
+  emailLower?: string;
   createdAt: Date;
   photoUrl?: string;
   bio?: string;

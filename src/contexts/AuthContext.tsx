@@ -9,6 +9,7 @@ import {
   deleteUser,
   GoogleAuthProvider,
   signInWithPopup,
+  fetchSignInMethodsForEmail,
   type User as FirebaseAuthUser,
 } from 'firebase/auth';
 import { doc, setDoc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
@@ -73,6 +74,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const fallback = {
               uid:         fbUser.uid,
               email:       fbUser.email!,
+              emailLower:  fbUser.email!.trim().toLowerCase(),
               displayName: fbUser.displayName || 'Admin',
               userType:    'admin' as const,
               createdAt:   serverTimestamp(),
@@ -106,6 +108,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const fallback = {
               uid:         fbUser.uid,
               email:       fbUser.email!,
+              emailLower:  fbUser.email!.trim().toLowerCase(),
               displayName: fbUser.displayName || 'New User',
               userType:    isStaff ? 'instructor' : 'attendee' as any,
               createdAt:   serverTimestamp(),
@@ -153,9 +156,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     userType: User['userType'],
     hub?: HubSelection
   ) => {
+    const emailTrim = email.trim();
+    const methods = await fetchSignInMethodsForEmail(auth, emailTrim);
+    if (methods.length > 0) {
+      throw new Error('An account with this email already exists.');
+    }
+    const taken = await DataService.getInstance().isEmailLowerTaken(emailTrim);
+    if (taken) {
+      throw new Error('An account with this email already exists.');
+    }
+
     let fbUser: FirebaseAuthUser | null = null;
     try {
-      const cred = await createUserWithEmailAndPassword(auth, email, password);
+      const cred = await createUserWithEmailAndPassword(auth, emailTrim, password);
       fbUser = cred.user;
       await updateProfile(fbUser, { displayName });
       const hubFields =
@@ -165,6 +178,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await setDoc(doc(db, 'users', fbUser.uid), {
         uid: fbUser.uid,
         email: fbUser.email!,
+        emailLower: fbUser.email!.trim().toLowerCase(),
         displayName,
         userType,
         createdAt: serverTimestamp(),
@@ -196,7 +210,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (needsHubRole(userType)) {
         await setDoc(
           doc(db, 'users', cred.user.uid),
-          { hubId: hub.id, hubName: hub.name },
+          {
+            hubId: hub.id,
+            hubName: hub.name,
+            emailLower: cred.user.email?.trim().toLowerCase() ?? undefined,
+          },
           { merge: true }
         );
       }
@@ -232,7 +250,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const d = snap.exists() ? snap.data() : {};
         const userType = (d.userType || 'attendee') as User['userType'];
         if (needsHubRole(userType)) {
-          await setDoc(doc(db, 'users', fb.uid), { hubId: hub.id, hubName: hub.name }, { merge: true });
+          await setDoc(
+            doc(db, 'users', fb.uid),
+            {
+              hubId: hub.id,
+              hubName: hub.name,
+              emailLower: fb.email?.trim().toLowerCase() ?? undefined,
+            },
+            { merge: true }
+          );
         }
       }
       uniqueToast.success(`Welcome, ${result.user.displayName}!`, { autoClose: 3000 });
@@ -260,11 +286,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       uniqueToast.error('Please select your hub.', { autoClose: 4000 });
       return;
     }
+    const em = cu.email!.trim();
+    const dup = await DataService.getInstance().isEmailLowerTaken(em, cu.uid);
+    if (dup) {
+      uniqueToast.error('This email is already registered to another account.', { autoClose: 4000 });
+      return;
+    }
+
     const hubFields =
       hub && needsHubRole(userType) ? { hubId: hub.id, hubName: hub.name } : {};
     await setDoc(doc(db, 'users', cu.uid), {
       uid: cu.uid,
       email: cu.email!,
+      emailLower: em.toLowerCase(),
       displayName: displayName.trim(),
       userType,
       createdAt: serverTimestamp(),
@@ -316,7 +350,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // ── resetPassword ─────────────────────────────────────────────────────────────
   const resetPassword = async (email: string) => {
-    await sendPasswordResetEmail(auth, email);
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    await sendPasswordResetEmail(auth, email.trim(), {
+      url: `${origin}/reset-password`,
+      handleCodeInApp: true,
+    });
   };
 
   // ── deleteAccount ─────────────────────────────────────────────────────────────

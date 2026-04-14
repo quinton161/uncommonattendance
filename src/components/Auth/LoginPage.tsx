@@ -425,7 +425,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onToggleMode }) => {
 
     try {
       await resetPassword(formData.email);
-      setSuccess('If an account exists for this email, we sent reset instructions. Check your inbox.');
+      setSuccess(
+        'If an account exists for this email, you will receive a reset message. Open the link in the email (or open Password reset from the app) and paste the link or code to set a new password.'
+      );
     } catch (err: any) {
       setError(getFirebaseAuthErrorMessage(err?.code, 'Failed to send reset email.'));
     } finally {

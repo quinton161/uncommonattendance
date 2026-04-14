@@ -199,6 +199,20 @@ class DataService {
     } catch { return []; }
   }
 
+  /** Case-normalized email for uniqueness (pair with Auth `fetchSignInMethodsForEmail`). */
+  async isEmailLowerTaken(normalizedEmail: string, exceptUid?: string): Promise<boolean> {
+    const key = normalizedEmail.trim().toLowerCase();
+    if (!key) return false;
+    try {
+      const snap = await getDocs(query(collection(db, 'users'), where('emailLower', '==', key)));
+      if (snap.empty) return false;
+      if (exceptUid && snap.docs.length === 1 && snap.docs[0].id === exceptUid) return false;
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   async updateUser(userId: string, data: any): Promise<void> {
     await updateDoc(doc(db,'users',userId), data);
     uniqueToast.success('User updated!');

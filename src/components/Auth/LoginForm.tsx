@@ -443,7 +443,9 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode }) => {
 
     try {
       await resetPassword(formData.email);
-      setSuccess('Password reset email sent! Check your inbox.');
+      setSuccess(
+        'If an account exists for this email, you will get reset instructions. Open the link or go to the app’s Password reset page and paste the link / code, then set a new password.'
+      );
     } catch (err: any) {
       setError(err.message || 'Failed to send reset email');
     }

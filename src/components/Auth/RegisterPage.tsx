@@ -361,7 +361,11 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onToggleMode }) => {
       );
     } catch (err: any) {
       console.error('Registration error:', err);
-      setError(getFirebaseAuthErrorMessage(err?.code, 'Failed to create account.'));
+      setError(
+        err?.code
+          ? getFirebaseAuthErrorMessage(err.code, 'Failed to create account.')
+          : err?.message || 'Failed to create account.'
+      );
     } finally {
       setLoading(false);
     }

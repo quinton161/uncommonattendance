@@ -20,7 +20,8 @@ import {
   TodayIcon,
   SearchIcon
 } from '../Common/Icons';
-import { FiLogOut } from 'react-icons/fi';
+import { FiLogOut, FiLock } from 'react-icons/fi';
+import { isAdminEmail } from '../../constants/admin';
 const PageContainer = styled.div`
   padding: ${theme.spacing.xl};
   width: 100%;
@@ -583,7 +584,8 @@ interface UsersPageProps {
 export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [userToDelete, setUserToDelete] = useState<any>(null);
-  const { user } = useAuth();
+  const { user, resetPassword } = useAuth();
+  const [resetSending, setResetSending] = useState<string | null>(null);
   const [adminHubFilter, setAdminHubFilter] = useState('');
   const effectiveHub = useMemo(() => effectiveStaffHubScope(user, adminHubFilter), [user, adminHubFilter]);
   const [users, setUsers] = useState<any[]>([]);
@@ -658,6 +660,36 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
       return name.includes(q) || email.includes(q);
     });
   }, [attendees, searchTerm]);
+
+  const instructorRows = useMemo(() => {
+    const inst = users.filter(
+      (u) => u.userType === 'instructor' && u.email && !isAdminEmail(u.email)
+    );
+    const q = searchTerm.trim().toLowerCase();
+    if (!q) return inst;
+    return inst.filter((u) => {
+      const name = (u.displayName || '').toLowerCase();
+      const email = (u.email || '').toLowerCase();
+      return name.includes(q) || email.includes(q);
+    });
+  }, [users, searchTerm]);
+
+  const handleSendPasswordReset = async (email: string) => {
+    if (!email) return;
+    setResetSending(email);
+    try {
+      await resetPassword(email);
+      uniqueToast.success(`Password reset email sent to ${email}. They can set a new password from the link or paste the code on the reset page.`);
+    } catch (e: unknown) {
+      const msg =
+        e && typeof e === 'object' && 'message' in e
+          ? String((e as { message?: string }).message)
+          : 'Could not send reset email.';
+      uniqueToast.error(msg);
+    } finally {
+      setResetSending(null);
+    }
+  };
 
   if (user?.userType !== 'admin' && user?.userType !== 'instructor') {
     return (
@@ -913,17 +945,27 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
         <LoadingState>
           Loading users...
         </LoadingState>
-      ) : attendees.length === 0 ? (
-        <EmptyState>
-          <h3>No Manageable Users Found</h3>
-          <p>No attendees are registered in the system yet. Admin and instructor accounts are protected and not shown here.</p>
-        </EmptyState>
-      ) : filteredAttendees.length === 0 ? (
+      ) : (
+        <>
+        {attendees.length > 0 && filteredAttendees.length === 0 && (
         <EmptyState>
           <h3>No matches</h3>
           <p>No students match your search. Clear the search or try another name or email.</p>
         </EmptyState>
-      ) : (
+        )}
+        {attendees.length === 0 &&
+          (user?.userType !== 'admin' || instructorRows.length === 0) && (
+        <EmptyState>
+          <h3>No Manageable Users Found</h3>
+          <p>
+            No attendees match this hub yet.{' '}
+            {user?.userType === 'admin'
+              ? 'Use Hub to pick a location or all hubs. Instructor accounts are listed below when present.'
+              : 'Instructor accounts are not shown in the student list.'}
+          </p>
+        </EmptyState>
+        )}
+        {filteredAttendees.length > 0 && (
         <>
           <DesktopTable>
             <UsersTable>
@@ -1089,6 +1131,83 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
               );
             })}
           </div>
+        </>
+        )}
+        {user?.userType === 'admin' && instructorRows.length > 0 && (
+          <section style={{ marginTop: theme.spacing['2xl'] }}>
+            <h2
+              style={{
+                fontFamily: theme.fonts.heading,
+                fontSize: theme.fontSizes.xl,
+                margin: `0 0 ${theme.spacing.md}`,
+                color: theme.colors.primary,
+              }}
+            >
+              Instructor accounts
+            </h2>
+            <StatsCaption style={{ marginBottom: theme.spacing.lg }}>
+              Send a password-reset email (Firebase link + code). Removing an instructor deletes their Firestore profile only — contact hosting to remove Auth login if needed.
+            </StatsCaption>
+            <DesktopTable>
+              <UsersTable>
+                <TableWrapper>
+                  <TableHeader style={{ gridTemplateColumns: '2fr 1fr 1fr 1fr' }}>
+                    <div>Name / email</div>
+                    <div>Hub</div>
+                    <div>Type</div>
+                    <div style={{ textAlign: 'right' }}>Actions</div>
+                  </TableHeader>
+                  {instructorRows.map((row) => {
+                    const uid = row.id || row.uid;
+                    const isSelf = uid === user?.uid;
+                    return (
+                      <TableRow
+                        key={`inst-${uid}`}
+                        style={{
+                          gridTemplateColumns: 'minmax(200px,2fr) minmax(120px,1fr) 100px minmax(200px,1.2fr)',
+                        }}
+                      >
+                        <UserInfo>
+                          <UserAvatar $isActive={false}>{getInitials(row.displayName || 'Instructor')}</UserAvatar>
+                          <UserDetails>
+                            <h4 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: theme.spacing.xs }}>
+                              <PersonIcon size={14} style={{ color: theme.colors.primary }} />
+                              {row.displayName || 'Instructor'}
+                            </h4>
+                            <p style={{ margin: 0 }}>{row.email}</p>
+                          </UserDetails>
+                        </UserInfo>
+                        <div style={{ fontSize: theme.fontSizes.sm, color: theme.colors.textSecondary }}>
+                          {resolvedHubLabel(row)}
+                        </div>
+                        <div>
+                          <UserType type="instructor">instructor</UserType>
+                        </div>
+                        <ActionButtons style={{ justifyContent: 'flex-end' }}>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => handleSendPasswordReset(row.email)}
+                            disabled={resetSending === row.email || !row.email}
+                            style={{ padding: '8px 12px' }}
+                          >
+                            <FiLock size={14} style={{ marginRight: 6, verticalAlign: 'middle' }} />
+                            {resetSending === row.email ? 'Sending…' : 'Password reset email'}
+                          </Button>
+                          {!isSelf && (
+                            <DeleteButton variant="ghost" onClick={() => handleOpenDelete(row)}>
+                              Remove
+                            </DeleteButton>
+                          )}
+                        </ActionButtons>
+                      </TableRow>
+                    );
+                  })}
+                </TableWrapper>
+              </UsersTable>
+            </DesktopTable>
+          </section>
+        )}
         </>
       )}
       {showDeleteModal && userToDelete && (

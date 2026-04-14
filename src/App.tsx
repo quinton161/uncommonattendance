@@ -4,6 +4,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { EventProvider } from './contexts/EventContext';
 import { AuthPage } from './components/Auth/AuthPage';
+import { ResetPasswordPage } from './components/Auth/ResetPasswordPage';
 import { HubSelectGate } from './components/Auth/HubSelectGate';
 import { GoogleRegisterGate } from './components/Auth/GoogleRegisterGate';
 import { StudentDashboard } from './components/Dashboard/StudentDashboard';
@@ -79,15 +80,21 @@ const AppRoutes: React.FC = () => {
 
 const AppWithProviders: React.FC = () => {
   const { user } = useAuth();
-  
+
   return (
-    <EventProvider user={user}>
-      <Router>
-        <Routes>
-          <Route path="/*" element={<AppRoutes />} />
-        </Routes>
-      </Router>
-    </EventProvider>
+    <Router>
+      <Routes>
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route
+          path="/*"
+          element={
+            <EventProvider user={user}>
+              <AppRoutes />
+            </EventProvider>
+          }
+        />
+      </Routes>
+    </Router>
   );
 };
 

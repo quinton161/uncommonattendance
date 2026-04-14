@@ -67,7 +67,7 @@ export function hubTooltip(h: Hub): string {
 }
 
 /**
- * Eight Zimbabwe Innovation Hubs — doc IDs match suggested DB names (`uncommon_*`).
+ * Zimbabwe Innovation Hubs — doc IDs match suggested DB names (`uncommon_*`).
  * Source: Uncommon.org locations / published hubs. Override via Firestore `hubs` when ready.
  */
 const FALLBACK_HUBS: Hub[] = [
@@ -127,10 +127,39 @@ const FALLBACK_HUBS: Hub[] = [
     location: 'Chamabondo Primary School',
     order: 8,
   },
+  {
+    id: 'uncommon_gwayi',
+    name: 'Gwayi Innovation Hub',
+    city: 'Matabeleland North',
+    location: 'Gwayi',
+    order: 9,
+  },
+  {
+    id: 'uncommon_jafuta',
+    name: 'Jafuta Innovation Hub',
+    city: 'Victoria Falls',
+    location: 'Jafuta',
+    order: 10,
+  },
 ];
 
 /** Same list as Firestore fallback — use so login/register never wait on an empty hub dropdown. */
 export const DEFAULT_HUBS: Hub[] = FALLBACK_HUBS;
+
+/**
+ * Firestore `hubs` can be a partial list. Merge so signup / hub pickers always include
+ * every canonical hub (Gwayi, Jafuta, etc.); remote docs override name/city for matching ids.
+ */
+export function mergeHubLists(remote: Hub[], canonical: Hub[]): Hub[] {
+  const byId = new Map<string, Hub>();
+  remote.forEach((h) => byId.set(h.id, { ...h }));
+  canonical.forEach((h) => {
+    if (!byId.has(h.id)) byId.set(h.id, { ...h });
+  });
+  return Array.from(byId.values()).sort(
+    (a, b) => (a.order ?? 999) - (b.order ?? 999) || a.name.localeCompare(b.name)
+  );
+}
 
 /** Label for lists/CSV when profile has no hub name saved. */
 export function resolvedHubLabel(u: { hubId?: string; hubName?: string }): string {
@@ -142,36 +171,28 @@ export function resolvedHubLabel(u: { hubId?: string; hubName?: string }): strin
 }
 
 export async function fetchHubs(): Promise<Hub[]> {
+  const mapDoc = (d: { id: string; data: () => Record<string, unknown> }): Hub => {
+    const data = d.data() as { name?: string; order?: number; city?: string; location?: string };
+    return {
+      id: d.id,
+      name: data.name || d.id,
+      city: data.city,
+      location: data.location,
+      order: data.order,
+    };
+  };
   try {
     const q = query(collection(db, 'hubs'), orderBy('order', 'asc'));
     const snap = await getDocs(q);
     if (snap.empty) return FALLBACK_HUBS;
-    return snap.docs.map((d) => {
-      const data = d.data() as { name?: string; order?: number; city?: string; location?: string };
-      return {
-        id: d.id,
-        name: data.name || d.id,
-        city: data.city,
-        location: data.location,
-        order: data.order,
-      };
-    });
+    const remote = snap.docs.map((d) => mapDoc(d));
+    return mergeHubLists(remote, FALLBACK_HUBS);
   } catch {
     try {
       const snap = await getDocs(collection(db, 'hubs'));
       if (snap.empty) return FALLBACK_HUBS;
-      return snap.docs
-        .map((d) => {
-          const data = d.data() as { name?: string; order?: number; city?: string; location?: string };
-          return {
-            id: d.id,
-            name: data.name || d.id,
-            city: data.city,
-            location: data.location,
-            order: data.order ?? 0,
-          };
-        })
-        .sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name));
+      const remote = snap.docs.map((d) => mapDoc(d));
+      return mergeHubLists(remote, FALLBACK_HUBS);
     } catch {
       return FALLBACK_HUBS;
     }
