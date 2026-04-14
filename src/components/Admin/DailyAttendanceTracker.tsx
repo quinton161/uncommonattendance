@@ -154,13 +154,29 @@ export const DailyAttendanceTracker: React.FC<Props> = ({ onBack, isEmbedded=tru
             </DateNav>
           </div>
           <Button variant="outline" onClick={()=>setDate(ts.getCurrentTime())}>Go to Today</Button>
-          <Button variant="danger" onClick={async()=>{
-            if(!window.confirm('Clear ALL attendance records for today?')) return;
-            setLoading(true);
-            const n = await attendanceService.clearTodayAttendance();
-            uniqueToast.success(`Cleared ${n} records`);
-            load();
-          }}>Clear Today</Button>
+          <Button
+            variant="danger"
+            disabled={!effectiveHub}
+            onClick={async () => {
+              if (!effectiveHub) {
+                uniqueToast.info('Select a single hub first — clear today only removes that hub’s attendance.');
+                return;
+              }
+              if (!window.confirm('Clear today’s attendance records for this hub only?')) return;
+              setLoading(true);
+              try {
+                const n = await attendanceService.clearTodayAttendance(effectiveHub);
+                uniqueToast.success(`Cleared ${n} record(s) for this hub.`);
+                load();
+              } catch (e) {
+                console.error(e);
+                uniqueToast.error('Could not clear today’s attendance.');
+                setLoading(false);
+              }
+            }}
+          >
+            Clear Today
+          </Button>
         </Controls>
 
         <Grid4>

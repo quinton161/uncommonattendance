@@ -4,6 +4,7 @@ import {
   Timestamp, deleteDoc, serverTimestamp,
 } from 'firebase/firestore';
 import { db } from './firebase';
+import DataService from './DataService';
 import { hubIdMatchesScope } from './hubService';
 import { AbsenceReason, AttendanceRecord, AttendanceStatus, LocationData } from '../types';
 import { DailyAttendanceService } from './dailyAttendanceService';
@@ -409,18 +410,52 @@ export class AttendanceService {
       .map(d => ({ ...d.data(), checkInTime: d.data().checkInTime.toDate() })) as AttendanceRecord[];
   }
 
-  async clearTodayAttendance(): Promise<number> {
+  /**
+   * Deletes today’s `attendance` documents for one hub only (including absence rows scoped to that hub).
+   */
+  async clearTodayAttendance(hubId: string): Promise<number> {
+    const hid = hubId?.trim();
+    if (!hid) throw new Error('Select a hub to clear today’s attendance.');
     const today = this.timeService.getCurrentDateString();
-    const q     = query(collection(db,'attendance'), where('date','==',today));
-    const docs  = (await getDocs(q)).docs;
-    await Promise.all(docs.map(d => deleteDoc(d.ref)));
-    return docs.length;
+    const q = query(collection(db, 'attendance'), where('date', '==', today));
+    const docs = (await getDocs(q)).docs;
+    const toDelete = docs.filter((d) => hubIdMatchesScope(d.data().hubId, hid));
+    await Promise.all(toDelete.map((d) => deleteDoc(d.ref)));
+    return toDelete.length;
   }
 
-  async masterResetAttendance(): Promise<{ deletedCount: number; deletedDaily: number }> {
-    const [a, b] = await Promise.all([getDocs(collection(db,'attendance')), getDocs(collection(db,'dailyAttendance'))]);
-    await Promise.all([...a.docs, ...b.docs].map(d => deleteDoc(d.ref)));
-    return { deletedCount: a.docs.length, deletedDaily: b.docs.length };
+  /**
+   * Deletes all historical attendance + daily summary rows for students in this hub only.
+   * Does not remove user accounts.
+   */
+  async masterResetAttendance(hubId: string): Promise<{ deletedCount: number; deletedDaily: number }> {
+    const hid = hubId?.trim();
+    if (!hid) throw new Error('A hub must be selected to reset attendance.');
+
+    const users = await DataService.getInstance().getUsers(hid);
+    const studentIds = new Set(
+      users
+        .filter((u: any) => {
+          const t = (u.userType || '').toLowerCase();
+          return !t || t === 'attendee' || t === 'student';
+        })
+        .map((u: any) => String(u.uid || u.id))
+        .filter(Boolean)
+    );
+
+    const [aSnap, dSnap] = await Promise.all([
+      getDocs(collection(db, 'attendance')),
+      getDocs(collection(db, 'dailyAttendance')),
+    ]);
+
+    const attToDel = aSnap.docs.filter((d) => hubIdMatchesScope(d.data().hubId, hid));
+    const dailyToDel = dSnap.docs.filter((d) => {
+      const sid = d.data().studentId;
+      return sid && studentIds.has(String(sid));
+    });
+
+    await Promise.all([...attToDel, ...dailyToDel].map((d) => deleteDoc(d.ref)));
+    return { deletedCount: attToDel.length, deletedDaily: dailyToDel.length };
   }
 
   async fixExistingLocationRecords(): Promise<{ updated: number; errors: number }> {

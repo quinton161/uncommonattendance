@@ -460,6 +460,8 @@ const AdminDashboard: React.FC = () => {
     () => effectiveStaffHubScope(user, adminHubFilter),
     [user, adminHubFilter]
   );
+  /** Staff actions that must not cross hubs (toasts, bulk mark/checkout, destructive clears). */
+  const hubScopeActive = Boolean(effectiveHub);
   const [activeNav, setActiveNav] = useState('dashboard');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   useBodyScrollLock(mobileMenuOpen);
@@ -524,6 +526,10 @@ const AdminDashboard: React.FC = () => {
   };
 
   const handleMarkStudentPresent = async (student: any) => {
+    if (!hubScopeActive) {
+      uniqueToast.info('Select a single hub above to mark attendance for that hub only.');
+      return;
+    }
     if (!student?.userId || !student?.userName) return;
     if (markingStudentId) return;
 
@@ -551,6 +557,10 @@ const AdminDashboard: React.FC = () => {
   };
 
   const handleMarkAllPresent = async () => {
+    if (!hubScopeActive) {
+      uniqueToast.info('Select a single hub above so bulk actions apply to that hub only.');
+      return;
+    }
     if (markAllLoading) return;
     const targets = (todayAttendanceList || [])
       .filter((s: any) => s.status === 'absent' && s.userId && s.userName)
@@ -593,6 +603,10 @@ const AdminDashboard: React.FC = () => {
   };
 
   const handleCheckOutAllOpen = async () => {
+    if (!hubScopeActive) {
+      uniqueToast.info('Select a single hub above so check-out applies to that hub only.');
+      return;
+    }
     if (checkoutAllLoading || markAllLoading) return;
     const open = (todayAttendanceList || []).filter(
       (s: any) => s.checkInTime && !s.checkOutTime && s.status !== 'absent'
@@ -718,6 +732,13 @@ const AdminDashboard: React.FC = () => {
   const lateUserIdsSeenRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
+    lateNotifyInitRef.current = false;
+    lateUserIdsSeenRef.current = new Set();
+  }, [effectiveHub]);
+
+  useEffect(() => {
+    if (!hubScopeActive) return;
+
     const lates = (todayAttendanceList || []).filter((s: any) => s.isLate);
     const ids = new Set(lates.map((s: any) => s.userId));
 
@@ -735,7 +756,7 @@ const AdminDashboard: React.FC = () => {
       );
     }
     lateUserIdsSeenRef.current = ids;
-  }, [todayAttendanceList]);
+  }, [todayAttendanceList, hubScopeActive]);
 
   const handleNavClick = (navItem: string) => {
     setActiveNav(navItem);
@@ -1014,7 +1035,10 @@ const AdminDashboard: React.FC = () => {
               >
                 <CardTitle>Late arrivals today (Harare · 9:01 AM or later)</CardTitle>
                 <p style={{ margin: `0 0 ${theme.spacing.md} 0`, fontSize: theme.fontSizes.sm, color: theme.colors.textSecondary }}>
-                  These students checked in after the on-time window. You will get a toast when someone new is marked late.
+                  These students checked in after the on-time window.
+                  {hubScopeActive
+                    ? ' You will get a toast when someone new is marked late in this hub.'
+                    : ' Select a single hub above to receive late check-in alerts for that hub only.'}
                 </p>
                 <AttendanceList>
                   {(todayAttendanceList || [])
@@ -1137,6 +1161,7 @@ const AdminDashboard: React.FC = () => {
                                 <Button
                                   variant="outline"
                                   type="button"
+                                  disabled={!hubScopeActive}
                                   onClick={() =>
                                     setAbsenceModal({
                                       userId: s.userId,
@@ -1152,7 +1177,7 @@ const AdminDashboard: React.FC = () => {
                               )}
                               <Button
                                 variant={s.status === 'absent' ? 'primary' : 'secondary'}
-                                disabled={s.status !== 'absent' || markingStudentId === s.userId}
+                                disabled={!hubScopeActive || s.status !== 'absent' || markingStudentId === s.userId}
                                 onClick={() => handleMarkStudentPresent(s)}
                                 style={{ padding: '6px 10px', borderRadius: theme.borderRadius.md }}
                               >
@@ -1220,7 +1245,7 @@ const AdminDashboard: React.FC = () => {
                     <Button
                       variant="outline"
                       onClick={handleMarkAllPresent}
-                      disabled={markAllLoading || checkoutAllLoading}
+                      disabled={!hubScopeActive || markAllLoading || checkoutAllLoading}
                       style={{ flex: 1, minWidth: 160 }}
                     >
                       {markAllLoading ? 'Marking...' : 'Mark All Present'}
@@ -1228,7 +1253,7 @@ const AdminDashboard: React.FC = () => {
                     <Button
                       variant="outline"
                       onClick={handleCheckOutAllOpen}
-                      disabled={markAllLoading || checkoutAllLoading}
+                      disabled={!hubScopeActive || markAllLoading || checkoutAllLoading}
                       style={{ flex: 1, minWidth: 160, borderColor: theme.colors.gray400 }}
                     >
                       {checkoutAllLoading ? (

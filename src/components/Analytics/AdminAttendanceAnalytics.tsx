@@ -602,13 +602,18 @@ export function AdminAttendanceAnalytics(): React.ReactElement {
             <span>Start fresh — analytics will show zeros</span>
           </Title>
           <p style={{ margin: `0 0 ${theme.spacing.md} 0`, fontSize: theme.fontSizes.sm, color: theme.colors.textSecondary, lineHeight: 1.5 }}>
-            Deletes <strong>every</strong> document in the <code style={{ fontSize: theme.fontSizes.xs }}>attendance</code> and{' '}
-            <code style={{ fontSize: theme.fontSizes.xs }}>dailyAttendance</code> collections. Student accounts are not removed. Charts and
-            dashboards will show no check-ins until people record attendance again. This cannot be undone.
+            Deletes attendance and daily summary rows for the <strong>selected hub only</strong> (choose a hub in the filter above). Student accounts
+            are not removed. This cannot be undone.
           </p>
+          {!effectiveHub ? (
+            <p style={{ margin: 0, fontSize: theme.fontSizes.sm, color: theme.colors.warning }}>
+              Select a single hub to enable this action (not &quot;All hubs&quot;).
+            </p>
+          ) : null}
           <Button
             type="button"
             variant="outline"
+            disabled={!effectiveHub}
             onClick={() => {
               setResetConfirm('');
               setShowResetModal(true);
@@ -616,7 +621,7 @@ export function AdminAttendanceAnalytics(): React.ReactElement {
             style={{ borderColor: '#dc2626', color: '#dc2626' }}
           >
             <FiAlertTriangle size={16} style={{ marginRight: 8 }} />
-            Clear all attendance records…
+            Clear this hub’s attendance records…
           </Button>
         </DangerCard>
       )}
@@ -624,9 +629,9 @@ export function AdminAttendanceAnalytics(): React.ReactElement {
       {showResetModal && (
         <ResetModalOverlay>
           <ResetModalBox>
-            <h3 style={{ margin: `0 0 ${theme.spacing.sm} 0`, color: theme.colors.textPrimary }}>Confirm full attendance reset</h3>
+            <h3 style={{ margin: `0 0 ${theme.spacing.sm} 0`, color: theme.colors.textPrimary }}>Confirm hub attendance reset</h3>
             <p style={{ fontSize: theme.fontSizes.sm, color: theme.colors.textSecondary, marginBottom: theme.spacing.md }}>
-              Type <strong>RESET</strong> to permanently delete all attendance and daily summary records.
+              Type <strong>RESET</strong> to permanently delete attendance and daily summaries for this hub only.
             </p>
             <ResetInput
               autoComplete="off"
@@ -642,12 +647,13 @@ export function AdminAttendanceAnalytics(): React.ReactElement {
                 type="button"
                 disabled={resetConfirm !== 'RESET' || resetLoading}
                 onClick={async () => {
+                  if (!effectiveHub) return;
                   setResetLoading(true);
                   try {
                     const attendanceService = AttendanceService.getInstance();
-                    const result = await attendanceService.masterResetAttendance();
+                    const result = await attendanceService.masterResetAttendance(effectiveHub);
                     uniqueToast.success(
-                      `Removed ${result.deletedCount} attendance + ${result.deletedDaily} daily records. Reloading…`,
+                      `Removed ${result.deletedCount} attendance + ${result.deletedDaily} daily records (this hub). Reloading…`,
                       { autoClose: 3500 }
                     );
                     setShowResetModal(false);
@@ -660,7 +666,7 @@ export function AdminAttendanceAnalytics(): React.ReactElement {
                 }}
                 style={{ background: '#dc2626', color: '#fff', borderColor: '#dc2626' }}
               >
-                {resetLoading ? 'Deleting…' : 'Delete all attendance'}
+                {resetLoading ? 'Deleting…' : 'Delete this hub’s attendance'}
               </Button>
             </div>
           </ResetModalBox>

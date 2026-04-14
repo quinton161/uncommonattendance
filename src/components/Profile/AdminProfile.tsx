@@ -564,7 +564,8 @@ export const AdminProfile: React.FC = () => {
           sessions: d.present + d.late
         }));
         setActivityData(chartData);
-      }
+      },
+      hubScope ? { hubId: hubScope } : undefined
     );
 
     return () => {
@@ -832,22 +833,33 @@ export const AdminProfile: React.FC = () => {
           <FiUsers />
           <span>Manage Instructor Team</span>
         </ActionCard>
-        <ActionCard onClick={async () => {
-          if (window.confirm('🚨 WARNING: This will permanently delete ALL attendance records and reset all student statistics to zero. This action cannot be undone. Are you absolutely sure?')) {
-            try {
-              const as = AttendanceService.getInstance();
-              const result = await as.masterResetAttendance();
-              alert(
-                `✅ Success: ${result.deletedCount} attendance + ${result.deletedDaily} daily summary records deleted. All statistics start at zero.`
-              );
-              window.location.reload();
-            } catch (error) {
-              alert('❌ Error: Failed to reset data.');
+        <ActionCard
+          type="button"
+          disabled={!hubScope}
+          onClick={async () => {
+            if (!hubScope) return;
+            if (
+              window.confirm(
+                'This will permanently delete attendance and daily summary records for this hub only. Student accounts stay. This cannot be undone. Continue?'
+              )
+            ) {
+              try {
+                const as = AttendanceService.getInstance();
+                const result = await as.masterResetAttendance(hubScope);
+                alert(
+                  `✅ Success: ${result.deletedCount} attendance + ${result.deletedDaily} daily records removed for this hub.`
+                );
+                window.location.reload();
+              } catch (error) {
+                alert('❌ Error: Failed to reset data.');
+              }
             }
-          }
-        }}>
+          }}
+        >
           <FiRefreshCw style={{ color: theme.colors.error }} />
-          <span style={{ color: theme.colors.error }}>Master Reset</span>
+          <span style={{ color: theme.colors.error }}>
+            Master Reset {!hubScope && user?.userType === 'admin' ? '(select a hub)' : ''}
+          </span>
         </ActionCard>
       </ActionGrid>
     </ProfileContainer>

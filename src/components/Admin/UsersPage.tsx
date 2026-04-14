@@ -588,6 +588,7 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
   const [resetSending, setResetSending] = useState<string | null>(null);
   const [adminHubFilter, setAdminHubFilter] = useState('');
   const effectiveHub = useMemo(() => effectiveStaffHubScope(user, adminHubFilter), [user, adminHubFilter]);
+  const hubScopeActive = Boolean(effectiveHub);
   const [users, setUsers] = useState<any[]>([]);
   const [attendance, setAttendance] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -760,16 +761,37 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
       setShowDeleteModal(false);
       return;
     }
+    const targetId = (userToDelete.uid || userToDelete.id || '').trim();
+    if (!targetId) {
+      uniqueToast.error('Could not resolve this account. Refresh the page and try again.');
+      throw new Error('Missing user id');
+    }
     try {
-      await dataService.deleteUser(userToDelete.id);
-      uniqueToast.success('User deleted successfully!');
+      await dataService.deleteUser(targetId);
       await loadData();
-    } catch (error) {
-      uniqueToast.error('Failed to delete user');
+    } catch (error: unknown) {
+      const code =
+        error && typeof error === 'object' && 'code' in error
+          ? String((error as { code?: string }).code)
+          : '';
+      if (code === 'permission-denied') {
+        uniqueToast.error('You do not have permission to delete this account.');
+        throw error;
+      }
+      const msg =
+        error && typeof error === 'object' && 'message' in error
+          ? String((error as { message?: string }).message)
+          : 'Failed to delete user.';
+      uniqueToast.error(msg.includes('Missing') ? msg : `${msg} Check your connection or permissions.`);
+      throw error;
     }
   };
 
   const handleMarkAllPresent = async () => {
+    if (!hubScopeActive) {
+      uniqueToast.info('Select a single hub so bulk actions apply to that hub only.');
+      return;
+    }
     const absentStudents = users.filter(userData => {
       if (userData.userType === 'admin' || userData.userType === 'instructor') return false;
       const uid = userData.id || userData.uid;
@@ -814,6 +836,10 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
   };
 
   const handleCheckOutAllOpen = async () => {
+    if (!hubScopeActive) {
+      uniqueToast.info('Select a single hub so check-out applies to that hub only.');
+      return;
+    }
     if (checkoutAllLoading || loading) return;
     if (
       !window.confirm(
@@ -870,7 +896,7 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
           <Button
             variant="primary"
             onClick={handleMarkAllPresent}
-            disabled={loading || checkoutAllLoading}
+            disabled={!hubScopeActive || loading || checkoutAllLoading}
             style={{ backgroundColor: theme.colors.success, borderColor: theme.colors.success }}
           >
             <CheckCircleIcon size={18} /> Mark All Present
@@ -878,7 +904,7 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
           <Button
             variant="outline"
             onClick={handleCheckOutAllOpen}
-            disabled={loading || checkoutAllLoading}
+            disabled={!hubScopeActive || loading || checkoutAllLoading}
           >
             <FiLogOut size={18} style={{ marginRight: 8, verticalAlign: 'middle' }} />
             {checkoutAllLoading ? 'Checking out…' : 'Check out everyone'}

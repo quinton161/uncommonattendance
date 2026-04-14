@@ -192,11 +192,20 @@ class DataService {
 
   async getUsers(hubId?: string): Promise<any[]> {
     try {
-      const all = (await getDocs(collection(db,'users'))).docs.map(d => ({
-        id: d.id, ...d.data(), createdAt: d.data().createdAt?.toDate(),
-      }));
+      const all = (await getDocs(collection(db, 'users'))).docs.map((d) => {
+        const data = d.data();
+        return {
+          ...data,
+          /** Document id — must win over optional `id` field stored inside the document */
+          id: d.id,
+          uid: data.uid ?? d.id,
+          createdAt: data.createdAt?.toDate(),
+        };
+      });
       return this.usersForHub(all, hubId);
-    } catch { return []; }
+    } catch {
+      return [];
+    }
   }
 
   /** Case-normalized email for uniqueness (pair with Auth `fetchSignInMethodsForEmail`). */
@@ -219,14 +228,36 @@ class DataService {
   }
 
   async deleteUser(userId: string): Promise<void> {
-    await deleteDoc(doc(db,'users',userId));
-    const attendSnap = await getDocs(query(collection(db,'attendance'), where('studentId','==',userId)));
-    await Promise.all(attendSnap.docs.map(d => deleteDoc(d.ref)));
-    const convoSnap  = await getDocs(query(collection(db,'conversations'), where('studentId','==',userId)));
-    await Promise.all(convoSnap.docs.map(d => deleteDoc(d.ref)));
-    const regSnap    = await getDocs(query(collection(db,'registrations'), where('studentId','==',userId)));
-    await Promise.all(regSnap.docs.map(d => deleteDoc(d.ref)));
-    try { await deleteObject(ref(storage,`profile-photos/${userId}/profile.jpg`)); } catch (_) {}
+    const uid = userId?.trim();
+    if (!uid) {
+      throw new Error('Missing user id');
+    }
+
+    const attendSnap = await getDocs(query(collection(db, 'attendance'), where('studentId', '==', uid)));
+    await Promise.all(attendSnap.docs.map((d) => deleteDoc(d.ref)));
+
+    try {
+      const regSnap = await getDocs(query(collection(db, 'registrations'), where('studentId', '==', uid)));
+      await Promise.all(regSnap.docs.map((d) => deleteDoc(d.ref)));
+    } catch (e) {
+      console.warn('deleteUser: registrations cleanup', e);
+    }
+
+    // Conversation rules only allow participants to delete; staff may get permission-denied.
+    try {
+      const convoSnap = await getDocs(query(collection(db, 'conversations'), where('studentId', '==', uid)));
+      await Promise.all(convoSnap.docs.map((d) => deleteDoc(d.ref)));
+    } catch (e) {
+      console.warn('deleteUser: conversations cleanup skipped or partial', e);
+    }
+
+    try {
+      await deleteObject(ref(storage, `profile-photos/${uid}/profile.jpg`));
+    } catch {
+      /* no photo */
+    }
+
+    await deleteDoc(doc(db, 'users', uid));
     uniqueToast.success('User deleted!');
   }
 
