@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { theme } from '../../styles/theme';
 import { Button } from '../Common/Button';
 import DataService from '../../services/DataService';
-import { effectiveStaffHubScope } from '../../services/hubService';
+import { effectiveStaffHubScope, resolvedHubLabel } from '../../services/hubService';
 import { AdminHubScopeSelect } from './AdminHubScopeSelect';
 import { AttendanceService } from '../../services/attendanceService';
 import { TimeService } from '../../services/timeService';
@@ -1023,8 +1023,16 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
                   </StudentDetails>
                 </StudentInfo>
 
-                <MetaCell title={(record as any).hubName || (record as any).hubId || undefined}>
-                  {(record as any).hubName || (record as any).hubId || '—'}
+                <MetaCell
+                  title={resolvedHubLabel({
+                    hubId: (record as any).hubId,
+                    hubName: (record as any).hubName,
+                  })}
+                >
+                  {resolvedHubLabel({
+                    hubId: (record as any).hubId,
+                    hubName: (record as any).hubName,
+                  })}
                 </MetaCell>
                 
                 <DateDisplay>

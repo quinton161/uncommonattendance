@@ -2,10 +2,31 @@ import { collection, getDocs, orderBy, query } from 'firebase/firestore';
 import { db } from './firebase';
 import type { User } from '../types';
 
-/** Instructors see one hub; admins see all (no scope). */
+/**
+ * Firestore doc id for Vincent Bohlen Innovation Hub (Victoria Falls).
+ * Older deployment data often omits `hubId`; those rows are treated as this hub.
+ */
+export const LEGACY_DEFAULT_HUB_ID = 'uncommon_victoriafalls';
+
+/**
+ * Row/user belongs to a scoped hub if `hubId` matches, or the scope is the legacy
+ * Vincent Bohlen hub and `hubId` is missing (pre–multi-hub data).
+ */
+export function hubIdMatchesScope(
+  recordHubId: string | undefined | null,
+  scopeHubId: string | undefined
+): boolean {
+  if (!scopeHubId) return true;
+  const r = (recordHubId && String(recordHubId).trim()) || '';
+  if (r === scopeHubId) return true;
+  if (scopeHubId === LEGACY_DEFAULT_HUB_ID && !r) return true;
+  return false;
+}
+
+/** Instructors see one hub; admins see all (no scope). Missing hubId → legacy Vincent Bohlen site. */
 export function hubScopeForStaff(user: User | null): string | undefined {
   if (!user || user.userType === 'admin') return undefined;
-  return user.hubId;
+  return user.hubId?.trim() || LEGACY_DEFAULT_HUB_ID;
 }
 
 /**
@@ -18,7 +39,7 @@ export function effectiveStaffHubScope(user: User | null, adminHubFilter: string
     const id = adminHubFilter?.trim();
     return id || undefined;
   }
-  return user.hubId;
+  return user.hubId?.trim() || LEGACY_DEFAULT_HUB_ID;
 }
 
 export interface Hub {
@@ -110,6 +131,15 @@ const FALLBACK_HUBS: Hub[] = [
 
 /** Same list as Firestore fallback — use so login/register never wait on an empty hub dropdown. */
 export const DEFAULT_HUBS: Hub[] = FALLBACK_HUBS;
+
+/** Label for lists/CSV when profile has no hub name saved. */
+export function resolvedHubLabel(u: { hubId?: string; hubName?: string }): string {
+  if (u.hubName?.trim()) return u.hubName.trim();
+  const id = (u.hubId?.trim() as string) || LEGACY_DEFAULT_HUB_ID;
+  const fromList = DEFAULT_HUBS.find((h) => h.id === id);
+  if (fromList) return hubLabel(fromList);
+  return id;
+}
 
 export async function fetchHubs(): Promise<Hub[]> {
   try {

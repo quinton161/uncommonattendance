@@ -4,6 +4,7 @@ import {
   Timestamp, deleteDoc, serverTimestamp,
 } from 'firebase/firestore';
 import { db } from './firebase';
+import { hubIdMatchesScope } from './hubService';
 import { AbsenceReason, AttendanceRecord, AttendanceStatus, LocationData } from '../types';
 import { DailyAttendanceService } from './dailyAttendanceService';
 import { TimeService } from './timeService';
@@ -185,8 +186,7 @@ export class AttendanceService {
     const toClose = Array.from(byId.values()).filter((d) => {
       const x = d.data();
       if (!(x.checkInTime && !x.checkOutTime)) return false;
-      if (hubId && x.hubId && x.hubId !== hubId) return false;
-      if (hubId && !x.hubId) return false;
+      if (hubId && !hubIdMatchesScope(x.hubId, hubId)) return false;
       return true;
     });
     for (let i = 0; i < toClose.length; i += 10) {
@@ -241,16 +241,14 @@ export class AttendanceService {
 
   // ── Queries ─────────────────────────────────────────────────────────────────
 
-  /** Student history: include legacy rows with no hubId. */
+  /** Student history — legacy rows without hubId count toward Vincent Bohlen only. */
   private matchesStudentHub(record: any, hubId?: string): boolean {
-    if (!hubId) return true;
-    return !record?.hubId || record.hubId === hubId;
+    return hubIdMatchesScope(record?.hubId, hubId);
   }
 
-  /** Staff / instructor lists: only rows tagged for this hub (no cross-hub bleed). */
+  /** Staff / instructor lists (same rules as DataService hub scope). */
   private matchesStaffHub(record: any, hubId?: string): boolean {
-    if (!hubId) return true;
-    return record?.hubId === hubId;
+    return hubIdMatchesScope(record?.hubId, hubId);
   }
 
   private safeFirestoreDate(v: unknown): Date | undefined {
@@ -278,7 +276,7 @@ export class AttendanceService {
     const snap  = await getDoc(doc(db, 'attendance', `${today}_${studentId}`));
     if (!snap.exists()) return null;
     const d = snap.data();
-    if (hubId && d.hubId && d.hubId !== hubId) return null;
+    if (hubId && !hubIdMatchesScope(d.hubId, hubId)) return null;
     return {
       ...d,
       checkInTime:  this.safeFirestoreDate(d.checkInTime),
@@ -327,8 +325,7 @@ export class AttendanceService {
     if (!snap.exists()) return true;
     if (!hubId) return false;
     const d = snap.data();
-    if (d.hubId && d.hubId !== hubId) return true;
-    return false;
+    return !hubIdMatchesScope(d.hubId, hubId);
   }
 
   async getAttendanceStateWithDayCheck(studentId: string, hubId?: string) {

@@ -4,7 +4,11 @@ import { useAuth } from '../../contexts/AuthContext';
 import { theme } from '../../styles/theme';
 import { Button } from '../Common/Button';
 import DataService from '../../services/DataService';
-import { effectiveStaffHubScope } from '../../services/hubService';
+import {
+  effectiveStaffHubScope,
+  LEGACY_DEFAULT_HUB_ID,
+  resolvedHubLabel,
+} from '../../services/hubService';
 import { AdminHubScopeSelect } from './AdminHubScopeSelect';
 import { TimeService } from '../../services/timeService';
 import { AttendanceService } from '../../services/attendanceService';
@@ -676,7 +680,9 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
   const instructorCanDeleteStudent = (target: any): boolean => {
     if (user?.userType !== 'instructor') return false;
     if (target?.userType === 'admin' || target?.userType === 'instructor') return false;
-    return (target?.hubId || '') === (user?.hubId || '');
+    const a = (target?.hubId && String(target.hubId).trim()) || LEGACY_DEFAULT_HUB_ID;
+    const b = (user?.hubId && String(user.hubId).trim()) || LEGACY_DEFAULT_HUB_ID;
+    return a === b;
   };
 
   const handleOpenDelete = (target: any) => {
@@ -962,7 +968,7 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
                 </UserInfo>
 
                 <div style={{ fontSize: theme.fontSizes.sm, color: theme.colors.textSecondary }}>
-                  {userData.hubName || userData.hubId || '—'}
+                  {resolvedHubLabel(userData)}
                 </div>
 
                 <div>
@@ -1042,7 +1048,7 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
                         {userData.email}
                       </p>
                       <p style={{ margin: '4px 0 0 0', fontSize: theme.fontSizes.xs, color: theme.colors.textSecondary }}>
-                        Hub: {userData.hubName || userData.hubId || '—'}
+                        Hub: {resolvedHubLabel(userData)}
                       </p>
                     </div>
                   </MobileUserHeader>

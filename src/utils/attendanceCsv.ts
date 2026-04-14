@@ -1,4 +1,5 @@
 import type { AbsenceReason } from '../types';
+import { resolvedHubLabel } from '../services/hubService';
 
 export const ATTENDANCE_CSV_HEADERS = [
   'Student ID',
@@ -116,7 +117,7 @@ export function buildAttendanceExportRows(
       return [
         u.bootcampStudentId || uid,
         u.displayName || rec?.studentName || 'Unknown',
-        u.hubName || '',
+        resolvedHubLabel(u),
         u.course || '',
         dateStr,
         attendanceStatusForExport(hasIn, rec?.status, rec?.absenceReason),

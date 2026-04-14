@@ -9,6 +9,7 @@ import { db, storage } from './firebase';
 import { uniqueToast } from '../utils/toastUtils';
 import { TimeService } from './timeService';
 import { attendanceAnalyticsService } from './attendanceAnalyticsService';
+import { hubIdMatchesScope, resolvedHubLabel } from './hubService';
 
 class DataService {
   private static instance: DataService;
@@ -71,15 +72,14 @@ class DataService {
     } catch { return false; }
   }
 
-  /** Instructor dashboard: rows without `hubId` are treated as not in this hub. */
+  /** Staff-scoped lists: Vincent Bohlen hub includes legacy rows with no `hubId`. */
   private attendanceMatchesHub(row: any, hubId?: string): boolean {
-    if (!hubId) return true;
-    return row?.hubId === hubId;
+    return hubIdMatchesScope(row?.hubId, hubId);
   }
 
   private usersForHub(users: any[], hubId?: string): any[] {
     if (!hubId) return users;
-    return users.filter((u) => u.hubId === hubId);
+    return users.filter((u) => hubIdMatchesScope(u.hubId, hubId));
   }
 
   async testConnection(): Promise<boolean> {
@@ -133,7 +133,7 @@ class DataService {
         const q = query(collection(db, 'attendance'), where('studentId', '==', userId));
         let rows = (await getDocs(q)).docs.map(mapDoc);
         if (hubId) {
-          rows = rows.filter((r: any) => !r.hubId || r.hubId === hubId);
+          rows = rows.filter((r: any) => hubIdMatchesScope(r.hubId, hubId));
         }
         rows.sort((a: any, b: any) => {
           const ta = a.checkInTime instanceof Date ? a.checkInTime.getTime() : 0;
@@ -382,7 +382,7 @@ class DataService {
         userEmail:   u.email,
         userType:    u.userType,
         hubId:       u.hubId,
-        hubName:     u.hubName,
+        hubName:     resolvedHubLabel(u),
         status, checkInTime, checkOutTime, isLate,
         attendanceId: rec?.id ?? null,
         absenceReason,

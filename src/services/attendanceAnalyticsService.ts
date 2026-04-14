@@ -3,6 +3,7 @@ import { AttendanceRecord, AttendanceStatus } from '../types';
 import { db } from './firebase';
 import { collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
 import { TimeService } from './timeService';
+import { hubIdMatchesScope } from './hubService';
 
 // Date range preset type
 export interface DateRangePreset {
@@ -537,7 +538,7 @@ export class AttendanceAnalyticsService {
         records = records.filter((r: any) => r.studentId === opts.studentId);
       }
       if (opts?.hubId) {
-        records = records.filter((r: any) => r.hubId === opts.hubId);
+        records = records.filter((r: any) => hubIdMatchesScope(r.hubId, opts.hubId));
       }
 
       return aggregateAdminRecords(records, range, opts);
@@ -616,7 +617,7 @@ export class AttendanceAnalyticsService {
         records = records.filter((r: any) => r.studentId === opts.studentId);
       }
       if (opts?.hubId) {
-        records = records.filter((r: any) => r.hubId === opts.hubId);
+        records = records.filter((r: any) => hubIdMatchesScope(r.hubId, opts.hubId));
       }
       callback(aggregateAdminRecords(records, range, opts));
     });
