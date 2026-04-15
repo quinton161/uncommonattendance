@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import styled from 'styled-components';
-import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../Common/Button';
 import { theme } from '../../styles/theme';
@@ -966,14 +965,7 @@ export const StudentDashboard = (): React.ReactElement => {
       />
 
       <MainContent style={{ padding: 0 }}>
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={activeNav}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.18 }}
-          >
+        <div key={activeNav}>
             {renderCurrentPage() || (
           <div style={{ padding: 0 }}>
           <DashboardPage>
@@ -1243,8 +1235,7 @@ export const StudentDashboard = (): React.ReactElement => {
           </DashboardPage>
         </div>
             )}
-          </motion.div>
-        </AnimatePresence>
+        </div>
       </MainContent>
     </DashboardContainer>
   );

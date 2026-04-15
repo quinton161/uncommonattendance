@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import styled from 'styled-components';
-import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../Common/Button';
 import { UsersPage } from '../Admin/UsersPage';
@@ -880,14 +879,7 @@ const AdminDashboard: React.FC = () => {
       />
 
       <MainContent style={{ padding: 0 }}>
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={activeNav}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.18 }}
-          >
+        <div key={activeNav}>
             {renderCurrentPage() || (
           <div style={{ padding: theme.spacing.lg, display: 'flex', flexDirection: 'column', gap: theme.spacing.lg }}>
             <Header>
@@ -1291,8 +1283,7 @@ const AdminDashboard: React.FC = () => {
             </div>
           </div>
             )}
-          </motion.div>
-        </AnimatePresence>
+        </div>
       </MainContent>
       
       {absenceModal && user && (
