@@ -64,7 +64,7 @@ const TextArea = styled.textarea`
   font-family: ${theme.fonts.primary};
 `;
 
-/** Admin-only: broadcast a user-facing “what’s new” message to everyone signed in */
+/** Admin-only: publish a broadcast update; all signed-in users get a real-time toast */
 export const AppUpdatePublisher: React.FC = () => {
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
@@ -73,17 +73,17 @@ export const AppUpdatePublisher: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !message.trim()) {
-      uniqueToast.error('Add a short headline and a message for users.');
+      uniqueToast.error('Enter a title and message.');
       return;
     }
     setSaving(true);
     try {
       await publishAppUpdate({ title: title.trim(), message: message.trim() });
-      uniqueToast.success('Sent. Everyone signed in will see this update on screen.');
+      uniqueToast.success('Update published. Users will see the scrollable note the next time they open the app.');
       setTitle('');
       setMessage('');
     } catch (err) {
-      uniqueToast.error(err instanceof Error ? err.message : 'Could not send this update.');
+      uniqueToast.error(err instanceof Error ? err.message : 'Could not publish update.');
     } finally {
       setSaving(false);
     }
@@ -91,37 +91,36 @@ export const AppUpdatePublisher: React.FC = () => {
 
   return (
     <Card>
-      <Title>What&apos;s new for everyone</Title>
+      <Title>Notify all users</Title>
       <Hint>
-        Describe what <strong>students and staff will see or use</strong> in the app—today&apos;s improvements to
-        attendance, check-in, goals, dashboards, or buttons. Write in plain language. Do <strong>not</strong> mention
-        databases, servers, Firebase, APIs, or other technical internals; users only need to know what changed for
-        them on screen.
+        Saves to Firebase. When someone opens the app and hasn&apos;t seen this version yet, they get a full-screen
+        scrollable note (not a small toast) with this title and message until they tap <strong>Got it</strong>. Each
+        publish bumps the version so everyone sees the new note once.
       </Hint>
       <form onSubmit={handleSubmit}>
         <Field>
-          <Label htmlFor="app-update-title">Short headline</Label>
+          <Label htmlFor="app-update-title">Title</Label>
           <Input
             id="app-update-title"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="e.g. Easier hub filter on your dashboard"
+            placeholder="e.g. New attendance report"
             maxLength={120}
             autoComplete="off"
           />
         </Field>
         <Field>
-          <Label htmlFor="app-update-body">What users will notice</Label>
+          <Label htmlFor="app-update-body">Message</Label>
           <TextArea
             id="app-update-body"
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            placeholder="e.g. You can pick your hub from the menu at the top of the dashboard so attendance and goals only show your site. Check-in works the same way as before."
+            placeholder="What changed or what users should know…"
             maxLength={2000}
           />
         </Field>
         <Button type="submit" variant="primary" loading={saving} disabled={saving}>
-          Send update to everyone
+          Publish update
         </Button>
       </form>
     </Card>

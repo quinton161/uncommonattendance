@@ -47,7 +47,7 @@ export function subscribeToAppUpdate(
   );
 }
 
-/** Admin: publish user-visible “what’s new” copy; bumps `seq` so all signed-in clients show the toast */
+/** Admin: publish a new announcement; bumps `seq` so clients show the scrollable note until dismissed */
 export async function publishAppUpdate(input: { title: string; message: string }): Promise<number> {
   const title = input.title.trim();
   const message = input.message.trim();
