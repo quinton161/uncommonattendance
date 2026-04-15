@@ -48,3 +48,4 @@ export const MessageIcon: React.FC<IconProps> = (props) => <IconFromFi iconName=
 export const StarIcon: React.FC<IconProps> = (props) => <IconFromFi iconName="FiStar" {...props} />;
 export const RefreshCwIcon: React.FC<IconProps> = (props) => <IconFromFi iconName="FiRefreshCw" {...props} />;
 export const SearchIcon: React.FC<IconProps> = (props) => <IconFromFi iconName="FiSearch" {...props} />;
+export const GoalsIcon: React.FC<IconProps> = (props) => <IconFromFi iconName="FiTarget" {...props} />;

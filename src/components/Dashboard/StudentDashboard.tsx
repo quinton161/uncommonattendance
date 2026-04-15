@@ -19,6 +19,7 @@ import { uniqueToast } from '../../utils/toastUtils';
 import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
 import { StudentAttendanceAnalytics } from '../Analytics/StudentAttendanceAnalytics';
 import { StudentProfile } from '../Profile/StudentProfile';
+import { StudentGoalsBoard } from '../Goals/StudentGoalsBoard';
 import DataService from '../../services/DataService';
 import { effectiveStudentHubId } from '../../services/hubService';
 import { 
@@ -828,6 +829,12 @@ export const StudentDashboard = (): React.ReactElement => {
             <StudentProfile />
           </div>
         );
+      case 'goals':
+        return (
+          <div style={{ flex: 1, minHeight: 0, overflow: 'auto', width: '100%' }}>
+            <StudentGoalsBoard />
+          </div>
+        );
       default:
         return null; // Will render the main dashboard
     }
@@ -933,6 +940,7 @@ export const StudentDashboard = (): React.ReactElement => {
               {[
                 { id: 'dashboard', label: 'Dashboard' },
                 { id: 'analytics', label: 'Analytics' },
+                { id: 'goals', label: 'Goals' },
                 { id: 'profile', label: 'Profile' },
               ].map((item) => (
                 <NavItem 

@@ -14,6 +14,7 @@ import { ErrorBoundary } from './components/Common/ErrorBoundary';
 import { DirectAuthTest } from './components/Auth/DirectAuthTest';
 import { GlobalStyles } from './styles/GlobalStyles';
 import { theme } from './styles/theme';
+import { AppUpdateNotifier } from './components/Common/AppUpdateNotifier';
 import { ToastContainer } from 'react-toastify';
 import { uniqueToast } from './utils/toastUtils';
 import DataService from './services/DataService';
@@ -163,27 +164,25 @@ function App() {
       ) : (
         <ErrorBoundary>
           <AuthProvider>
+            <AppUpdateNotifier />
             <AppWithProviders />
           </AuthProvider>
         </ErrorBoundary>
       )}
       {showAuthTest && <DirectAuthTest />}
       <ToastContainer
-        position="top-right"
-        autoClose={3000}
+        position="top-center"
+        autoClose={4000}
         hideProgressBar={false}
-        newestOnTop={false}
-        closeOnClick
+        newestOnTop
+        closeOnClick={false}
         rtl={false}
         pauseOnFocusLoss
-        draggable
+        draggable={false}
         pauseOnHover
-        theme="light"
-        toastStyle={{
-          backgroundColor: theme.colors.white,
-          color: theme.colors.textPrimary,
-          border: `1px solid ${theme.colors.primary}`,
-        }}
+        theme="dark"
+        limit={4}
+        style={{ zIndex: 100000 }}
       />
     </ThemeProvider>
   );

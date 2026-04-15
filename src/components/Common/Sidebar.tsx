@@ -8,7 +8,8 @@ import {
   PeopleIcon,
   TrendingUpIcon,
   RefreshCwIcon,
-  StarIcon
+  StarIcon,
+  GoalsIcon
 } from './Icons';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -168,10 +169,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'dashboard', icon: <BarChartIcon size={20} />, label: user?.userType === 'instructor' ? 'Instructor' : 'Admin' },
     { id: 'analytics', icon: <TrendingUpIcon size={20} />, label: 'Analytics' },
     { id: 'users', icon: <PeopleIcon size={20} />, label: 'Users' },
+    { id: 'goals', icon: <GoalsIcon size={20} />, label: 'Goals' },
     { id: 'profile', icon: <PersonIcon size={20} />, label: 'Profile' },
   ] : [
     { id: 'dashboard', icon: <BarChartIcon size={20} />, label: 'Dashboard' },
     { id: 'analytics', icon: <TrendingUpIcon size={20} />, label: 'Analytics' },
+    { id: 'goals', icon: <GoalsIcon size={20} />, label: 'Goals' },
     { id: 'profile', icon: <PersonIcon size={20} />, label: 'Profile' },
   ];
 

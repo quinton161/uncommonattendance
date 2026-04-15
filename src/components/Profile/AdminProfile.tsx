@@ -35,6 +35,7 @@ import { attendanceAnalyticsService } from '../../services/attendanceAnalyticsSe
 import { AttendanceService } from '../../services/attendanceService';
 import { TimeService } from '../../services/timeService';
 import { ProfileUpload } from './ProfileUpload';
+import { AppUpdatePublisher } from '../Admin/AppUpdatePublisher';
 
 const ProfileContainer = styled.div`
   padding: ${theme.spacing.xl};
@@ -668,6 +669,12 @@ export const AdminProfile: React.FC = () => {
           </AccountMeta>
         </AccountDetails>
       </MyAccountCard>
+
+      {user?.userType === 'admin' && (
+        <div style={{ width: '100%' }}>
+          <AppUpdatePublisher />
+        </div>
+      )}
 
       <StatsGrid>
         <StatCard whileHover={{ y: -5 }}>

@@ -77,6 +77,15 @@ service cloud.firestore {
       return isAuth() && request.auth.uid == uid;
     }
 
+    /** Goals under users/{uid}/weeklyGoals — read by owner, any admin, or instructors in same hub as target user */
+    function canReadUserGoals(userId) {
+      return isOwner(userId)
+        || isAdminUser()
+        || (isInstructorUser()
+            && exists(usersPath(userId))
+            && userHubMatchesInstructorScope(get(usersPath(userId)).data));
+    }
+
     // Hub registry
     match /hubs/{hubId} {
       allow read: if isAuth();
@@ -94,6 +103,21 @@ service cloud.firestore {
             && userHubMatchesInstructorScope(request.resource.data));
       allow delete: if isAdminUser()
         || (isInstructorUser() && userHubMatchesInstructorScope(resource.data));
+
+      /** Scrum-style weekly + daily goals (student-owned; instructors read same hub; admins read all) */
+      match /weeklyGoals/{weeklyGoalId} {
+        allow read: if canReadUserGoals(userId);
+        allow create: if isAuth() && isOwner(userId);
+        allow update: if isAuth() && isOwner(userId);
+        allow delete: if isAuth() && (isOwner(userId) || isAdminUser());
+
+        match /dailyGoals/{dailyGoalId} {
+          allow read: if canReadUserGoals(userId);
+          allow create: if isAuth() && isOwner(userId);
+          allow update: if isAuth() && isOwner(userId);
+          allow delete: if isAuth() && (isOwner(userId) || isAdminUser());
+        }
+      }
     }
 
     match /attendance/{attendanceId} {
@@ -142,7 +166,9 @@ service cloud.firestore {
 
     match /system_config/{docId} {
       allow read: if isAuth();
-      allow write: if isStaff();
+      /** Daily QR etc.: staff. App-wide announcements: admins only. */
+      allow write: if (docId == 'app_update' && isAdminUser())
+        || (docId != 'app_update' && isStaff());
     }
 
     match /admin_actions/{docId} {

@@ -27,6 +27,7 @@ import {
   buildAttendanceExportRows,
 } from '../../utils/attendanceCsv';
 import { Sidebar } from '../Common/Sidebar';
+import { StudentGoalsBoard } from '../Goals/StudentGoalsBoard';
 
 import { 
   BarChart, 
@@ -799,6 +800,61 @@ const AdminDashboard: React.FC = () => {
             <AdminProfile />
           </div>
         );
+      case 'goals':
+        return (
+          <div
+            style={{
+              flex: 1,
+              minHeight: 0,
+              overflow: 'auto',
+              width: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+          >
+            {user?.userType === 'admin' && (
+              <div
+                style={{
+                  padding: `${theme.spacing.md} ${theme.spacing.lg} 0`,
+                  flexShrink: 0,
+                  display: 'flex',
+                  alignItems: 'flex-end',
+                  gap: theme.spacing.md,
+                  flexWrap: 'wrap',
+                }}
+              >
+                <AdminHubScopeSelect
+                  user={user}
+                  value={adminHubFilter}
+                  onChange={setAdminHubFilter}
+                  id="goals-hub-filter"
+                  label="Hub"
+                />
+                <span
+                  style={{
+                    fontSize: theme.fontSizes.sm,
+                    color: theme.colors.textSecondary,
+                    paddingBottom: 4,
+                    maxWidth: '28rem',
+                    lineHeight: 1.45,
+                  }}
+                >
+                  All hubs: see every student&apos;s goals. Choose a hub to filter.
+                </span>
+              </div>
+            )}
+            <div style={{ flex: 1, minHeight: 0, overflow: 'auto', width: '100%' }}>
+              <StudentGoalsBoard
+                hubScopeId={
+                  user?.userType === 'admin'
+                    ? adminHubFilter.trim() || null
+                    : effectiveHub ?? null
+                }
+                viewAllHubs={Boolean(user?.userType === 'admin' && !adminHubFilter.trim())}
+              />
+            </div>
+          </div>
+        );
       default:
         return null; // Will render the main dashboard
     }
@@ -836,6 +892,7 @@ const AdminDashboard: React.FC = () => {
                 { id: 'dashboard', label: 'Dashboard' },
                 { id: 'analytics', label: 'Analytics' },
                 { id: 'users', label: 'Users' },
+                { id: 'goals', label: 'Goals' },
                 { id: 'profile', label: 'Profile' },
               ].map((item) => (
                 <NavItem 

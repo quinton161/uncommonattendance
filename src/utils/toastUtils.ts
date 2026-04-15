@@ -1,4 +1,6 @@
+import React from 'react';
 import { toast, ToastOptions, Id } from 'react-toastify';
+import { UncommonToastBody } from '../components/Common/UncommonToast';
 
 // Keep track of active toasts to prevent duplicates
 const activeToasts = new Map<string, { id: Id; timestamp: number }>();
@@ -36,19 +38,39 @@ const createUniqueToast = (
     activeToasts.delete(toastKey);
   }
   
-  // Create the toast with onClose callback to remove from active set
-  const toastId = toast[type](message, {
-    ...toastOptions,
-    toastId: toastKey, // Use the key as toastId to prevent react-toastify duplicates
-    onClose: () => {
-      if (preventDuplicate) {
-        activeToasts.delete(toastKey);
-      }
-      if (toastOptions.onClose) {
-        toastOptions.onClose();
-      }
+  const body = React.createElement(UncommonToastBody, { variant: type, message });
+  const onClose = () => {
+    if (preventDuplicate) {
+      activeToasts.delete(toastKey);
     }
-  });
+    toastOptions.onClose?.();
+  };
+
+  const commonOpts: ToastOptions = {
+    ...toastOptions,
+    toastId: toastKey,
+    icon: false,
+    className: 'uncommon-toast-outer',
+    onClose,
+  };
+
+  let toastId: Id;
+  switch (type) {
+    case 'success':
+      toastId = toast.success(body, commonOpts);
+      break;
+    case 'error':
+      toastId = toast.error(body, commonOpts);
+      break;
+    case 'info':
+      toastId = toast.info(body, commonOpts);
+      break;
+    case 'warning':
+      toastId = toast.warning(body, commonOpts);
+      break;
+    default:
+      toastId = toast.info(body, commonOpts);
+  }
   
   // Add to active toasts with timestamp
   if (preventDuplicate && toastId) {

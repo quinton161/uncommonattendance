@@ -35,12 +35,87 @@ export const GlobalStyles = createGlobalStyle`
     flex-direction: column;
   }
 
+  /* Uncommon dark card toasts (react-toastify) */
+  .Toastify__toast-container {
+    width: min(100vw - 24px, 420px);
+    padding: 12px;
+  }
+
+  .Toastify__toast-container--top-center {
+    top: max(16px, env(safe-area-inset-top, 0px));
+  }
+
   @media (max-width: 768px) {
     .Toastify__toast-container--top-right {
       top: max(8px, env(safe-area-inset-top, 0px));
       right: max(8px, env(safe-area-inset-right, 0px));
       width: min(100vw - 16px, 420px);
     }
+  }
+
+  .Toastify__toast.uncommon-toast-outer {
+    position: relative;
+    padding: 0;
+    min-height: 0;
+    margin-bottom: 12px;
+    border-radius: ${theme.borderRadius['3xl']};
+    background: transparent !important;
+    box-shadow: none !important;
+    border: none !important;
+    font-family: ${theme.fonts.primary};
+  }
+
+  .Toastify__toast--success.uncommon-toast-outer,
+  .Toastify__toast--error.uncommon-toast-outer,
+  .Toastify__toast--info.uncommon-toast-outer,
+  .Toastify__toast--warning.uncommon-toast-outer {
+    background: transparent !important;
+  }
+
+  .Toastify__toast.uncommon-toast-outer .Toastify__toast-body {
+    padding: 0;
+    margin: 0;
+    width: 100%;
+  }
+
+  .Toastify__toast.uncommon-toast-outer .Toastify__close-button {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 3;
+    color: rgba(255, 255, 255, 0.7);
+    opacity: 1;
+  }
+
+  .Toastify__toast.uncommon-toast-outer .Toastify__close-button:hover {
+    color: ${theme.colors.white};
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: ${theme.borderRadius.md};
+  }
+
+  .Toastify__toast.uncommon-toast-outer .Toastify__progress-bar {
+    height: 3px;
+    border-radius: 0 0 ${theme.borderRadius['3xl']} ${theme.borderRadius['3xl']};
+  }
+
+  .Toastify__toast--success.uncommon-toast-outer .Toastify__progress-bar {
+    background: linear-gradient(90deg, ${theme.colors.success}, #4ade80);
+    box-shadow: 0 0 12px rgba(39, 174, 96, 0.5);
+  }
+
+  .Toastify__toast--error.uncommon-toast-outer .Toastify__progress-bar {
+    background: linear-gradient(90deg, ${theme.colors.danger}, #f87171);
+    box-shadow: 0 0 12px rgba(231, 76, 60, 0.45);
+  }
+
+  .Toastify__toast--info.uncommon-toast-outer .Toastify__progress-bar {
+    background: linear-gradient(90deg, ${theme.colors.primary}, #60a5fa);
+    box-shadow: 0 0 12px rgba(0, 82, 204, 0.35);
+  }
+
+  .Toastify__toast--warning.uncommon-toast-outer .Toastify__progress-bar {
+    background: linear-gradient(90deg, ${theme.colors.warning}, #fcd34d);
+    box-shadow: 0 0 12px rgba(243, 156, 18, 0.4);
   }
 
   h1, h2, h3, h4, h5, h6 {
