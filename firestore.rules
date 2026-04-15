@@ -118,6 +118,13 @@ service cloud.firestore {
           allow delete: if isAuth() && (isOwner(userId) || isAdminUser());
         }
       }
+
+      /** Check-out self-reflection on daily / weekly goals (Harare date doc id) */
+      match /checkoutGoalLogs/{logId} {
+        allow read: if canReadUserGoals(userId);
+        allow create, update: if isAuth() && isOwner(userId);
+        allow delete: if isAdminUser();
+      }
     }
 
     match /attendance/{attendanceId} {
@@ -173,6 +180,26 @@ service cloud.firestore {
 
     match /admin_actions/{docId} {
       allow read, write: if isStaff();
+    }
+
+    /** Student late self check-in explanations — staff review (same hub scope as attendance). */
+    match /late_check_in_events/{eventId} {
+      allow create: if isAuth()
+        && request.resource.data.studentId == request.auth.uid
+        && request.resource.data.reason is string
+        && request.resource.data.reason.size() >= 10
+        && request.resource.data.reason.size() <= 2000
+        && request.resource.data.date is string
+        && request.resource.data.attendanceDocId is string
+        && request.resource.data.studentName is string
+        && (!request.resource.data.keys().hasAny(['hubId'])
+            || request.resource.data.hubId is string);
+
+      allow read: if isAdminUser()
+        || (isInstructorUser()
+            && hubRecordMatchesInstructorScope(
+              resource.data.keys().hasAny(['hubId']) ? resource.data.hubId : ''
+            ));
     }
 
     match /events/{eventId} {

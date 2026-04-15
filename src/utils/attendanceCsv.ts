@@ -8,6 +8,7 @@ export const ATTENDANCE_CSV_HEADERS = [
   'Program / Class',
   'Date',
   'Attendance Status',
+  'Late reason (student)',
   'Excuse Status',
   'Dropout Status',
   'Notes',
@@ -114,6 +115,11 @@ export function buildAttendanceExportRows(
       const uid = u.uid || u.id;
       const rec = byStudent.get(uid);
       const hasIn = !!(rec?.checkInTime);
+      const lateReason =
+        hasIn && rec?.lateReason && String(rec.lateReason).trim()
+          ? String(rec.lateReason).trim()
+          : '';
+
       return [
         u.bootcampStudentId || uid,
         u.displayName || rec?.studentName || 'Unknown',
@@ -121,6 +127,7 @@ export function buildAttendanceExportRows(
         u.course || '',
         dateStr,
         attendanceStatusForExport(hasIn, rec?.status, rec?.absenceReason),
+        lateReason,
         excuseStatusForExport(rec?.absenceReason),
         dropoutStatusForExport(rec?.absenceReason),
         (rec?.absenceNotes as string) || '',

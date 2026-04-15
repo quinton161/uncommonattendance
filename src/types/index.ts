@@ -119,6 +119,8 @@ export interface AttendanceRecord {
   date: string; // YYYY-MM-DD format
   isPresent: boolean;
   status?: AttendanceStatus;
+  /** Student self check-in after 9:00 AM Harare (when required). */
+  lateReason?: string;
 }
 
 export interface LocationData {

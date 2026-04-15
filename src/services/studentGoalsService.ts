@@ -4,6 +4,7 @@ import {
   deleteDoc,
   doc,
   getDocs,
+  limit,
   onSnapshot,
   orderBy,
   query,
@@ -44,6 +45,43 @@ function mapDaily(id: string, data: Record<string, unknown>): DailyGoal {
     date: String(data.date ?? ''),
     status: (data.status as GoalStatus) || 'pending',
   };
+}
+
+/** True if the student has created at least one weekly goal (used for check-out reflection). */
+export async function hasAnyWeeklyGoals(userId: string): Promise<boolean> {
+  if (!userId) return false;
+  try {
+    const q = query(weeklyCol(userId), limit(1));
+    const snap = await getDocs(q);
+    return !snap.empty;
+  } catch {
+    return false;
+  }
+}
+
+/** True if there is at least one daily goal under any weekly goal. */
+export async function hasAnyDailyGoal(userId: string): Promise<boolean> {
+  if (!userId) return false;
+  try {
+    const weeksSnap = await getDocs(query(weeklyCol(userId), limit(80)));
+    for (const w of weeksSnap.docs) {
+      const dSnap = await getDocs(query(dailyCol(userId, w.id), limit(1)));
+      if (!dSnap.empty) return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Show check-out goal reflection when the student has any daily goal(s) and/or at least one weekly goal.
+ * Daily subcollections are checked first; then weekly-only (week set without daily tasks yet).
+ */
+export async function hasGoalsForCheckoutReflection(userId: string): Promise<boolean> {
+  if (!userId) return false;
+  if (await hasAnyDailyGoal(userId)) return true;
+  return hasAnyWeeklyGoals(userId);
 }
 
 export function subscribeWeeklyGoals(

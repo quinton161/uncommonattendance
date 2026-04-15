@@ -52,6 +52,9 @@ import {
 import { QRCodeSVG } from 'qrcode.react';
 import { format, parseISO } from 'date-fns';
 import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { db } from '../../services/firebase';
+import { hubIdMatchesScope } from '../../services/hubService';
 
 /** Match Firestore row to a school calendar day (stored `date` or Harare date from check-in). */
 function attendanceMatchesHarareDay(a: any, dateStr: string): boolean {
@@ -735,35 +738,47 @@ const AdminDashboard: React.FC = () => {
     };
   }, [effectiveHub]);
 
-  const lateNotifyInitRef = useRef(false);
-  const lateUserIdsSeenRef = useRef<Set<string>>(new Set());
+  const lateEventSeenIdsRef = useRef<Set<string>>(new Set());
+  const lateEventInitRef = useRef(false);
 
   useEffect(() => {
-    lateNotifyInitRef.current = false;
-    lateUserIdsSeenRef.current = new Set();
+    lateEventSeenIdsRef.current = new Set();
+    lateEventInitRef.current = false;
   }, [effectiveHub]);
 
   useEffect(() => {
-    if (!hubScopeActive) return;
-
-    const lates = (todayAttendanceList || []).filter((s: any) => s.isLate);
-    const ids = new Set(lates.map((s: any) => s.userId));
-
-    if (!lateNotifyInitRef.current) {
-      lateNotifyInitRef.current = true;
-      lateUserIdsSeenRef.current = ids;
-      return;
-    }
-
-    const newlyLate = lates.filter((s: any) => !lateUserIdsSeenRef.current.has(s.userId));
-    if (newlyLate.length > 0) {
-      uniqueToast.info(
-        `Late check-in${newlyLate.length > 1 ? 's' : ''} (Harare): ${newlyLate.map((s: any) => s.userName).join(', ')}`,
-        { autoClose: 7000 }
-      );
-    }
-    lateUserIdsSeenRef.current = ids;
-  }, [todayAttendanceList, hubScopeActive]);
+    if (!hubScopeActive || !effectiveHub) return;
+    const today = TimeService.getInstance().getCurrentDateString();
+    const q = query(collection(db, 'late_check_in_events'), where('date', '==', today));
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        if (!lateEventInitRef.current) {
+          lateEventInitRef.current = true;
+          snap.docs.forEach((d) => lateEventSeenIdsRef.current.add(d.id));
+          return;
+        }
+        snap.docChanges().forEach((change) => {
+          if (change.type !== 'added') return;
+          const id = change.doc.id;
+          if (lateEventSeenIdsRef.current.has(id)) return;
+          lateEventSeenIdsRef.current.add(id);
+          const d = change.doc.data() as {
+            studentName?: string;
+            reason?: string;
+            hubId?: string;
+          };
+          if (!hubIdMatchesScope(d.hubId, effectiveHub)) return;
+          const name = d.studentName || 'Student';
+          const preview =
+            (d.reason && d.reason.length > 120 ? `${d.reason.slice(0, 120)}…` : d.reason) || '';
+          uniqueToast.info(`Late check-in — ${name}: ${preview}`, { autoClose: 10000 });
+        });
+      },
+      (err) => console.error('late_check_in_events listener:', err)
+    );
+    return () => unsub();
+  }, [effectiveHub, hubScopeActive]);
 
   const handleNavClick = (navItem: string) => {
     setActiveNav(navItem);
@@ -1112,7 +1127,7 @@ const AdminDashboard: React.FC = () => {
                     .map((s: any) => (
                       <AttendanceItem key={`late-${s.userId}`}>
                         <UserAvatar style={{ background: '#f59e0b' }}>{getInitials(s.userName || 'Student')}</UserAvatar>
-                        <div style={{ flex: 1 }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontWeight: theme.fontWeights.semibold, color: theme.colors.textPrimary, fontSize: theme.fontSizes.sm }}>
                             {s.userName}
                           </div>
@@ -1121,6 +1136,19 @@ const AdminDashboard: React.FC = () => {
                               ? TimeService.getInstance().formatClockTime(new Date(s.checkInTime))
                               : '—'}
                           </div>
+                          {s.lateReason ? (
+                            <div
+                              style={{
+                                marginTop: theme.spacing.xs,
+                                fontSize: theme.fontSizes.xs,
+                                color: theme.colors.textPrimary,
+                                lineHeight: 1.35,
+                                wordBreak: 'break-word',
+                              }}
+                            >
+                              Reason: {s.lateReason}
+                            </div>
+                          ) : null}
                         </div>
                       </AttendanceItem>
                     ))}
@@ -1219,6 +1247,19 @@ const AdminDashboard: React.FC = () => {
                               {statusLabel}
                               {s.checkInTime ? ` • ${new Date(s.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}
                             </div>
+                            {isLateStudent && s.lateReason ? (
+                              <div
+                                style={{
+                                  marginTop: theme.spacing.xs,
+                                  fontSize: theme.fontSizes.xs,
+                                  color: theme.colors.textPrimary,
+                                  lineHeight: 1.35,
+                                  wordBreak: 'break-word',
+                                }}
+                              >
+                                Late reason: {s.lateReason}
+                              </div>
+                            ) : null}
                           </div>
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: theme.spacing.xs }}>
                             <div style={{ width: 8, height: 8, borderRadius: 999, background: statusColor }} />

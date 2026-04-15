@@ -74,6 +74,19 @@ export class TimeService {
   }
 
   /**
+   * True if `yyyy-mm-dd` is Friday on the Africa/Harare calendar (weekly goal reflection).
+   */
+  isHarareFriday(yyyyMmDd: string): boolean {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(yyyyMmDd)) return false;
+    const d = new Date(`${yyyyMmDd}T12:00:00+02:00`);
+    const wd = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Africa/Harare',
+      weekday: 'short',
+    }).format(d);
+    return wd === 'Fri';
+  }
+
+  /**
    * All Mon–Fri calendar dates from start through end (inclusive), Harare.
    */
   eachHarareWeekdayInRange(startDateStr: string, endDateStr: string): string[] {

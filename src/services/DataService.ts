@@ -480,6 +480,7 @@ class DataService {
       let absenceReason: string | undefined;
       let absenceNotes: string | undefined;
       let recordedByName: string | undefined;
+      let lateReason: string | undefined;
 
       if (rec) {
         const s = (rec.status||'').toLowerCase();
@@ -497,6 +498,7 @@ class DataService {
           checkInTime  = rec.checkInTime;
           checkOutTime = rec.checkOutTime;
           isLate = status==='late' || this.calcIsLate(rec.checkInTime);
+          lateReason = typeof rec.lateReason === 'string' && rec.lateReason.trim() ? rec.lateReason.trim() : undefined;
         } else {
           status = 'absent';
         }
@@ -514,6 +516,7 @@ class DataService {
         absenceReason,
         absenceNotes,
         recordedByName,
+        lateReason,
       };
     });
 

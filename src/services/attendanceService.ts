@@ -2,6 +2,7 @@ import {
   collection, doc, setDoc, getDoc, getDocs,
   query, where, orderBy, updateDoc,
   Timestamp, deleteDoc, serverTimestamp,
+  addDoc,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import DataService from './DataService';
@@ -34,6 +35,9 @@ export class AttendanceService {
 
   // ── Check-in ────────────────────────────────────────────────────────────────
 
+  /** Minimum length for student late self check-in explanation (Harare 9:01+). */
+  static readonly LATE_REASON_MIN_LEN = 10;
+
   async checkIn(
     studentId: string,
     studentName: string,
@@ -42,6 +46,7 @@ export class AttendanceService {
     skipTimeCheck = false,
     method = 'qr',
     hubId?: string,
+    lateReason?: string,
   ): Promise<AttendanceRecord> {
     if (!studentId?.trim()) throw new Error('Student ID is required');
     if (!studentName?.trim()) throw new Error('Student name is required');
@@ -80,6 +85,16 @@ export class AttendanceService {
 
     const isLate: boolean       = this.timeService.isLate(now);
     const status: AttendanceStatus = isLate ? 'late' : 'present';
+    const isStudentQrSelfCheckIn = !skipTimeCheck && method === 'qr';
+
+    if (isLate && isStudentQrSelfCheckIn) {
+      const r = lateReason?.trim() ?? '';
+      if (r.length < AttendanceService.LATE_REASON_MIN_LEN) {
+        throw new Error(
+          `Late check-in requires a short explanation (at least ${AttendanceService.LATE_REASON_MIN_LEN} characters).`
+        );
+      }
+    }
 
     const record: any = {
       id:               docId,
@@ -100,11 +115,31 @@ export class AttendanceService {
       record.hubId = hubId;
     }
 
+    if (isLate && isStudentQrSelfCheckIn && lateReason?.trim()) {
+      record.lateReason = lateReason.trim();
+    }
+
     if (location?.ip && location.ip !== '0.0.0.0') {
       record.location = { ip: location.ip, timestamp: location.timestamp ?? Date.now() };
     }
 
     await setDoc(docRef, record);
+
+    if (isLate && isStudentQrSelfCheckIn && lateReason?.trim()) {
+      try {
+        await addDoc(collection(db, 'late_check_in_events'), {
+          studentId,
+          studentName,
+          hubId: hubId?.trim() ?? '',
+          date: today,
+          reason: lateReason.trim(),
+          attendanceDocId: docId,
+          createdAt: serverTimestamp(),
+        });
+      } catch (e) {
+        console.warn('late_check_in_events write failed (non-fatal):', e);
+      }
+    }
 
     // Mirror to dailyAttendance (best-effort — don't let a failure block check-in)
     try {

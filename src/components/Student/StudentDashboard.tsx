@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { useAuth } from '../../contexts/AuthContext';
 import { AttendanceService } from '../../services/attendanceService';
+import { TimeService } from '../../services/timeService';
 import { effectiveStudentHubId } from '../../services/hubService';
+import { LateCheckInReasonModal } from './LateCheckInReasonModal';
 import { Layout, Container, AppHeader } from '../Common/Layout';
 import { Button } from '../Common/Button';
 import { Card } from '../Common/Card';
@@ -156,6 +158,7 @@ export function StudentDashboard({ onNavigateToProfile }: StudentDashboardProps)
   const [attendanceHistory, setAttendanceHistory] = useState<AttendanceRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [lateReasonModalOpen, setLateReasonModalOpen] = useState(false);
 
   const attendanceService = AttendanceService.getInstance();
 
@@ -186,16 +189,8 @@ export function StudentDashboard({ onNavigateToProfile }: StudentDashboardProps)
     }
   };
 
-  const handleCheckIn = async () => {
+  const runCheckIn = async (lateReason?: string) => {
     if (!user) return;
-    if (
-      !window.confirm(
-        'Check in for today? Your attendance will be recorded for your hub.'
-      )
-    ) {
-      return;
-    }
-
     setLoading(true);
     setError('');
 
@@ -223,15 +218,43 @@ export function StudentDashboard({ onNavigateToProfile }: StudentDashboardProps)
         locationData,
         false,
         'qr',
-        studentHubId
+        studentHubId,
+        lateReason
       );
       setTodayAttendance(attendance);
       await loadAttendanceHistory();
     } catch (err: any) {
       console.error('❌ Check-in failed:', err);
       setError(err.message || 'Failed to check in');
+      throw err;
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCheckIn = async () => {
+    if (!user) return;
+    if (
+      !window.confirm(
+        'Check in for today? Your attendance will be recorded for your hub.'
+      )
+    ) {
+      return;
+    }
+    const ts = TimeService.getInstance();
+    if (ts.isLate(ts.getCurrentTime())) {
+      setLateReasonModalOpen(true);
+      return;
+    }
+    await runCheckIn();
+  };
+
+  const handleLateReasonSubmit = async (reason: string) => {
+    try {
+      await runCheckIn(reason);
+      setLateReasonModalOpen(false);
+    } catch {
+      /* error surfaced via setError in runCheckIn */
     }
   };
 
@@ -311,6 +334,11 @@ export function StudentDashboard({ onNavigateToProfile }: StudentDashboardProps)
 
   return (
     <Layout>
+      <LateCheckInReasonModal
+        open={lateReasonModalOpen}
+        onClose={() => setLateReasonModalOpen(false)}
+        onSubmit={handleLateReasonSubmit}
+      />
       <AppHeader>
         <HeaderButtons>
           {onNavigateToProfile && (

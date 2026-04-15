@@ -20,6 +20,11 @@ import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
 import { StudentAttendanceAnalytics } from '../Analytics/StudentAttendanceAnalytics';
 import { StudentProfile } from '../Profile/StudentProfile';
 import { StudentGoalsBoard } from '../Goals/StudentGoalsBoard';
+import { CheckoutGoalModal } from '../Student/CheckoutGoalModal';
+import { LateCheckInReasonModal } from '../Student/LateCheckInReasonModal';
+import { saveCheckoutGoalReflection } from '../../services/checkoutGoalReflectionService';
+import { hasGoalsForCheckoutReflection } from '../../services/studentGoalsService';
+import type { CheckoutGoalReflectionPayload } from '../../types/checkoutGoalReflection';
 import DataService from '../../services/DataService';
 import { effectiveStudentHubId } from '../../services/hubService';
 import { 
@@ -541,7 +546,11 @@ export const StudentDashboard = (): React.ReactElement => {
   const [checkedIn, setCheckedIn] = useState(false);
   const [checkInTime, setCheckInTime] = useState<Date | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  useBodyScrollLock(mobileMenuOpen);
+  const [checkoutGoalModalOpen, setCheckoutGoalModalOpen] = useState(false);
+  const [checkoutModalIsFriday, setCheckoutModalIsFriday] = useState(false);
+  const [checkoutGoalsLookupLoading, setCheckoutGoalsLookupLoading] = useState(false);
+  const [lateReasonModalOpen, setLateReasonModalOpen] = useState(false);
+  useBodyScrollLock(mobileMenuOpen || checkoutGoalModalOpen || lateReasonModalOpen);
   const [attendanceLoading, setAttendanceLoading] = useState(false);
   const [canCheckIn, setCanCheckIn] = useState(true);
   const [isBeforeSessionStart, setIsBeforeSessionStart] = useState(false);
@@ -658,6 +667,114 @@ export const StudentDashboard = (): React.ReactElement => {
     }
   }, [user, attendanceService, studentHubId]);
 
+  const handleCheckInError = useCallback(
+    (error: unknown) => {
+      console.error('Check-in error:', error);
+
+      const errAny = error as any;
+      const errorMessage =
+        (errAny?.message as string | undefined) ||
+        (error instanceof Error ? error.message : undefined) ||
+        'Unknown error';
+      const errorCode = errAny?.code as string | undefined;
+
+      if (errorMessage === 'Already checked in today') {
+        uniqueToast.info('You have already checked in today.', {
+          autoClose: 4000,
+          position: 'top-center',
+        });
+        void checkTodayAttendance();
+      } else if (errorCode === 'permission-denied') {
+        uniqueToast.error(
+          'Could not complete check-in (permission denied). Try refreshing the page. If it persists, contact support.',
+          { autoClose: 5000, position: 'top-center' }
+        );
+      } else {
+        uniqueToast.error(`Failed to check in: ${errorCode ? `${errorCode} - ` : ''}${errorMessage}`, {
+          autoClose: 4000,
+          position: 'top-center',
+        });
+      }
+    },
+    [checkTodayAttendance]
+  );
+
+  const performCheckIn = useCallback(
+    async (lateReason?: string) => {
+      if (!user) return;
+
+      let location: any = { ip: '0.0.0.0', timestamp: Date.now() };
+      try {
+        const ipResponse = await fetch('https://api.ipify.org?format=json');
+        if (ipResponse.ok) {
+          const ipData = await ipResponse.json();
+          location = { ...location, ip: ipData.ip || location.ip };
+        }
+      } catch (e) {
+        // Ignore IP failures
+      }
+
+      let attendanceRecord;
+      let retries = 0;
+      const maxRetries = 2;
+
+      while (retries <= maxRetries) {
+        try {
+          attendanceRecord = await attendanceService.checkIn(
+            user.uid,
+            user.displayName || 'Student',
+            qrCodeInput,
+            location,
+            false,
+            'qr',
+            studentHubId,
+            lateReason
+          );
+          break;
+        } catch (err: any) {
+          if (err.message === 'Already checked in today' || retries === maxRetries) throw err;
+          retries++;
+          console.warn(`Retry check-in ${retries}/${maxRetries}...`);
+          await new Promise((r) => setTimeout(r, 1000));
+        }
+      }
+
+      if (!attendanceRecord) throw new Error('Check-in failed after retries');
+
+      const currentTime = new Date();
+      const ts = TimeService.getInstance();
+      const checkInAt =
+        attendanceRecord.checkInTime instanceof Date
+          ? attendanceRecord.checkInTime
+          : new Date(attendanceRecord.checkInTime as any);
+      const isLate = ts.isLate(checkInAt);
+
+      setCheckedIn(true);
+      setCheckInTime(currentTime);
+      setCanCheckIn(false);
+
+      setStats((prev) => ({
+        ...prev,
+        todayStatus: isLate ? 'Checked In (Late)' : 'Checked In',
+        lastCheckIn: currentTime,
+      }));
+
+      if (isLate) {
+        uniqueToast.warning('Checked in (Late). Your explanation was recorded for staff.', {
+          autoClose: 6000,
+          position: 'top-center',
+        });
+      } else {
+        uniqueToast.success('Checked in successfully!', {
+          autoClose: 4000,
+          position: 'top-center',
+        });
+      }
+      void loadStudentStats();
+    },
+    [user, qrCodeInput, attendanceService, studentHubId, loadStudentStats]
+  );
+
   const handleCheckInInternal = async () => {
     if (!user) {
       uniqueToast.error('You must be logged in to check in.', {
@@ -668,8 +785,8 @@ export const StudentDashboard = (): React.ReactElement => {
     }
 
     if (!canCheckIn) {
-      const timeService = TimeService.getInstance();
-      if (timeService.isBeforeSessionStart(timeService.getCurrentTime())) {
+      const ts = TimeService.getInstance();
+      if (ts.isBeforeSessionStart(ts.getCurrentTime())) {
         uniqueToast.info('Session starts at 7:00 AM Harare. You can check in once it opens.', {
           autoClose: 5000,
           position: 'top-center',
@@ -702,105 +819,32 @@ export const StudentDashboard = (): React.ReactElement => {
       const isValid = await qrCodeService.validateCode(qrCodeInput);
       if (!isValid) {
         uniqueToast.error('Invalid check-in code. Please ask your instructor for the current code.');
-        setIsVerifyingQR(false);
         return;
       }
 
-      let location: any = { ip: '0.0.0.0', timestamp: Date.now() };
-      try {
-        const ipResponse = await fetch('https://api.ipify.org?format=json');
-        if (ipResponse.ok) {
-          const ipData = await ipResponse.json();
-          location = { ...location, ip: ipData.ip || location.ip };
-        }
-      } catch (e) {
-        // Ignore IP failures
+      const ts = TimeService.getInstance();
+      if (ts.isLate(ts.getCurrentTime())) {
+        setLateReasonModalOpen(true);
+        return;
       }
-      
-      // Time validation: session 7:00–9:05 Harare; late from 9:01 — see TimeService / attendanceService.checkIn()
-      
-      let attendanceRecord;
-      let retries = 0;
-      const maxRetries = 2;
-      
-      while (retries <= maxRetries) {
-        try {
-          attendanceRecord = await attendanceService.checkIn(
-            user.uid,
-            user.displayName || 'Student',
-            qrCodeInput,
-            location,
-            false,
-            'qr',
-            studentHubId
-          );
-          break; // Success
-        } catch (err: any) {
-          if (err.message === 'Already checked in today' || retries === maxRetries) throw err;
-          retries++;
-          console.warn(`Retry check-in ${retries}/${maxRetries}...`);
-          await new Promise(r => setTimeout(r, 1000));
-        }
-      }
-      
-      if (!attendanceRecord) throw new Error('Check-in failed after retries');
-      
-      const currentTime = new Date();
-      const timeService = TimeService.getInstance();
-      const checkInAt =
-        attendanceRecord.checkInTime instanceof Date
-          ? attendanceRecord.checkInTime
-          : new Date(attendanceRecord.checkInTime as any);
-      const isLate = timeService.isLate(checkInAt);
-      
-      setCheckedIn(true);
-      setCheckInTime(currentTime);
-      setCanCheckIn(false);
-      
-      setStats(prev => ({
-        ...prev,
-        todayStatus: isLate ? 'Checked In (Late)' : 'Checked In',
-        lastCheckIn: currentTime,
-      }));
 
-      if (isLate) {
-        uniqueToast.warning('Checked in (Late). Recorded at 9:01 AM or later (Harare).', {
-          autoClose: 6000,
-          position: 'top-center',
-        });
-      } else {
-        uniqueToast.success('Checked in successfully!', {
-          autoClose: 4000,
-          position: 'top-center',
-        });
-      }
-      void loadStudentStats();
+      await performCheckIn(undefined);
     } catch (error) {
-      console.error('Check-in error:', error);
-
-      const errAny = error as any;
-      const errorMessage = (errAny?.message as string | undefined) || (error instanceof Error ? error.message : undefined) || 'Unknown error';
-      const errorCode = errAny?.code as string | undefined;
-
-      if (errorMessage === 'Already checked in today') {
-          uniqueToast.info('You have already checked in today.', {
-            autoClose: 4000,
-            position: 'top-center',
-          });
-          checkTodayAttendance();
-      } else if (errorCode === 'permission-denied') {
-        uniqueToast.error(
-          'Could not complete check-in (permission denied). Try refreshing the page. If it persists, contact support.',
-          { autoClose: 5000, position: 'top-center' }
-        );
-      } else {
-        uniqueToast.error(`Failed to check in: ${errorCode ? `${errorCode} - ` : ''}${errorMessage}`, {
-          autoClose: 4000,
-          position: 'top-center',
-        });
-      }
+      handleCheckInError(error);
     } finally {
       setIsVerifyingQR(false);
+      setAttendanceLoading(false);
+    }
+  };
+
+  const handleLateReasonSubmit = async (reason: string) => {
+    setAttendanceLoading(true);
+    try {
+      await performCheckIn(reason);
+      setLateReasonModalOpen(false);
+    } catch (error) {
+      handleCheckInError(error);
+    } finally {
       setAttendanceLoading(false);
     }
   };
@@ -850,58 +894,121 @@ export const StudentDashboard = (): React.ReactElement => {
     await handleCheckInInternal();
   };
 
-  const handleCheckOut = async () => {
-    if (!user) return;
-    if (
-      !window.confirm(
-        'Check out now? This completes today’s session. You can only check in once per day.'
-      )
-    ) {
-      return;
+  const handleCheckoutModalCancel = () => {
+    setCheckoutGoalModalOpen(false);
+  };
+
+  const handleCheckOutError = (error: unknown) => {
+    const errAny = error as any;
+    const errorMessage =
+      (errAny?.message as string | undefined) ||
+      (error instanceof Error ? error.message : undefined) ||
+      'Unknown error';
+    const errorCode = errAny?.code as string | undefined;
+
+    if (errorMessage === 'Already checked out today') {
+      uniqueToast.info('You have already checked out today!', { autoClose: 4000, position: 'top-center' });
+      checkTodayAttendance();
+    } else if (errorMessage === 'No check-in record found for today') {
+      uniqueToast.warning('You need to check in first!', { autoClose: 4000, position: 'top-center' });
+      checkTodayAttendance();
+    } else if (errorCode === 'permission-denied') {
+      uniqueToast.error(
+        'Check-out was blocked. Try again in a moment. If it keeps happening, refresh the page.',
+        { autoClose: 5000, position: 'top-center' }
+      );
+    } else {
+      uniqueToast.error(`Failed to check out: ${errorCode ? `${errorCode} - ` : ''}${errorMessage}`, {
+        autoClose: 4000,
+        position: 'top-center',
+      });
     }
+  };
+
+  const runCheckOutRequest = async () => {
+    if (!user) throw new Error('Not signed in');
+    uniqueToast.info('Recording check-out...', { autoClose: 2000, position: 'top-center' });
+
+    let location: any = { ip: '0.0.0.0', timestamp: Date.now() };
+    try {
+      const ipResponse = await fetch('https://api.ipify.org?format=json');
+      if (ipResponse.ok) {
+        const ipData = await ipResponse.json();
+        location = { ...location, ip: ipData.ip || location.ip };
+      }
+    } catch (e) {
+      // Ignore IP failures
+    }
+
+    await attendanceService.checkOut(user.uid, location, studentHubId);
+  };
+
+  const applyCheckOutSuccessUi = () => {
+    setCheckoutGoalModalOpen(false);
+    setCheckedIn(false);
+    setCheckInTime(null);
+    setCanCheckIn(false);
+    setStats((prev) => ({ ...prev, todayStatus: 'Completed for Today' }));
+    uniqueToast.success('Checked out successfully! See you tomorrow.', { autoClose: 3000, position: 'top-center' });
+    void loadStudentStats();
+  };
+
+  const openCheckoutModal = async () => {
+    if (!user) return;
+    setCheckoutGoalsLookupLoading(true);
+    try {
+      const hasGoals = await hasGoalsForCheckoutReflection(user.uid);
+      if (hasGoals) {
+        const ts = TimeService.getInstance();
+        const d = ts.getCurrentDateString();
+        setCheckoutModalIsFriday(ts.isHarareFriday(d));
+        setCheckoutGoalModalOpen(true);
+      } else {
+        setAttendanceLoading(true);
+        try {
+          await runCheckOutRequest();
+          applyCheckOutSuccessUi();
+        } catch (error) {
+          console.error('Check-out error:', error);
+          handleCheckOutError(error);
+        } finally {
+          setAttendanceLoading(false);
+        }
+      }
+    } catch (e) {
+      console.error('Goals lookup failed:', e);
+      uniqueToast.error('Could not verify your goals. Check your connection and try again.', {
+        autoClose: 4000,
+        position: 'top-center',
+      });
+    } finally {
+      setCheckoutGoalsLookupLoading(false);
+    }
+  };
+
+  const performCheckOutWithReflection = async (reflection: CheckoutGoalReflectionPayload) => {
+    if (!user) return;
     setAttendanceLoading(true);
     try {
-      uniqueToast.info('Recording check-out...', { autoClose: 2000, position: 'top-center' });
+      await runCheckOutRequest();
 
-      let location: any = { ip: '0.0.0.0', timestamp: Date.now() };
+      const ts = TimeService.getInstance();
+      const dateStr = ts.getCurrentDateString();
+      const isFriday = ts.isHarareFriday(dateStr);
       try {
-        const ipResponse = await fetch('https://api.ipify.org?format=json');
-        if (ipResponse.ok) {
-          const ipData = await ipResponse.json();
-          location = { ...location, ip: ipData.ip || location.ip };
-        }
-      } catch (e) {
-        // Ignore IP failures
+        await saveCheckoutGoalReflection(user.uid, dateStr, reflection, isFriday);
+      } catch (logErr) {
+        console.error('Checkout goal reflection save failed:', logErr);
+        uniqueToast.warning('Checked out, but your goal reflection could not be saved. You can try again tomorrow.', {
+          autoClose: 5000,
+          position: 'top-center',
+        });
       }
 
-      await attendanceService.checkOut(user.uid, location, studentHubId);
-      setCheckedIn(false);
-      setCheckInTime(null);
-      setCanCheckIn(false);
-      setStats(prev => ({ ...prev, todayStatus: 'Completed for Today' }));
-      uniqueToast.success('Checked out successfully! See you tomorrow.', { autoClose: 3000, position: 'top-center' });
-      void loadStudentStats();
+      applyCheckOutSuccessUi();
     } catch (error) {
       console.error('Check-out error:', error);
-
-      const errAny = error as any;
-      const errorMessage = (errAny?.message as string | undefined) || (error instanceof Error ? error.message : undefined) || 'Unknown error';
-      const errorCode = errAny?.code as string | undefined;
-
-      if (errorMessage === 'Already checked out today') {
-          uniqueToast.info('You have already checked out today!', { autoClose: 4000, position: 'top-center' });
-          checkTodayAttendance();
-      } else if (errorMessage === 'No check-in record found for today') {
-          uniqueToast.warning('You need to check in first!', { autoClose: 4000, position: 'top-center' });
-          checkTodayAttendance();
-      } else if (errorCode === 'permission-denied') {
-        uniqueToast.error(
-          'Check-out was blocked. Try again in a moment. If it keeps happening, refresh the page.',
-          { autoClose: 5000, position: 'top-center' }
-        );
-      } else {
-        uniqueToast.error(`Failed to check out: ${errorCode ? `${errorCode} - ` : ''}${errorMessage}`, { autoClose: 4000, position: 'top-center' });
-      }
+      handleCheckOutError(error);
     } finally {
       setAttendanceLoading(false);
     }
@@ -916,6 +1023,18 @@ export const StudentDashboard = (): React.ReactElement => {
 
   return (
     <DashboardContainer>
+      <CheckoutGoalModal
+        open={checkoutGoalModalOpen}
+        isFriday={checkoutModalIsFriday}
+        submitting={attendanceLoading}
+        onCancel={handleCheckoutModalCancel}
+        onConfirm={performCheckOutWithReflection}
+      />
+      <LateCheckInReasonModal
+        open={lateReasonModalOpen}
+        onClose={() => setLateReasonModalOpen(false)}
+        onSubmit={handleLateReasonSubmit}
+      />
       <MobileHeader>
         <MobileMenuButton
           type="button"
@@ -1215,9 +1334,17 @@ export const StudentDashboard = (): React.ReactElement => {
                   <p style={{ margin: `0 0 ${theme.spacing.md}`, fontSize: theme.fontSizes.sm, color: theme.colors.textSecondary }}>
                     When you&apos;re done for the day, check out so your attendance reflects a full session.
                   </p>
-                  <Button variant="outline" onClick={handleCheckOut} disabled={attendanceLoading}>
+                  <Button
+                    variant="outline"
+                    onClick={openCheckoutModal}
+                    disabled={attendanceLoading || checkoutGoalsLookupLoading}
+                  >
                     <FiLogOut size={16} style={{ marginRight: theme.spacing.xs }} />
-                    {attendanceLoading ? 'Checking out…' : 'Check out'}
+                    {checkoutGoalsLookupLoading
+                      ? 'Loading…'
+                      : attendanceLoading
+                        ? 'Checking out…'
+                        : 'Check out'}
                   </Button>
                 </div>
               )}

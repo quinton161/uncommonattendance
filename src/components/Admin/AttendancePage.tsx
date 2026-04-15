@@ -307,7 +307,7 @@ const AttendanceTable = styled.div`
 
 const TableHeader = styled.div`
   display: grid;
-  grid-template-columns: 2fr minmax(100px, 1fr) 100px 110px 100px minmax(100px, 1fr) 130px;
+  grid-template-columns: 2fr minmax(100px, 1fr) 100px 110px 100px minmax(100px, 1fr) minmax(120px, 1.2fr) 130px;
   gap: ${theme.spacing.md};
   padding: ${theme.spacing.lg} ${theme.spacing.xl};
   background: linear-gradient(135deg, ${theme.colors.primary}05 0%, ${theme.colors.primaryLight}10 100%);
@@ -319,7 +319,7 @@ const TableHeader = styled.div`
   letter-spacing: 0.5px;
   
   @media (max-width: ${theme.breakpoints.desktop}) {
-    grid-template-columns: 2fr minmax(72px, 1fr) 82px 82px 82px minmax(72px, 1fr) 100px;
+    grid-template-columns: 2fr minmax(72px, 1fr) 82px 82px 82px minmax(72px, 1fr) minmax(88px, 1fr) 100px;
     gap: ${theme.spacing.sm};
     padding: ${theme.spacing.md} ${theme.spacing.lg};
     font-size: ${theme.fontSizes.xs};
@@ -332,7 +332,7 @@ const TableHeader = styled.div`
 
 const TableRow = styled.div`
   display: grid;
-  grid-template-columns: 2fr minmax(100px, 1fr) 100px 110px 100px minmax(100px, 1fr) 130px;
+  grid-template-columns: 2fr minmax(100px, 1fr) 100px 110px 100px minmax(100px, 1fr) minmax(120px, 1.2fr) 130px;
   gap: ${theme.spacing.md};
   padding: ${theme.spacing.lg} ${theme.spacing.xl};
   border-bottom: 1px solid ${theme.colors.gray100};
@@ -350,7 +350,7 @@ const TableRow = styled.div`
   }
   
   @media (max-width: ${theme.breakpoints.desktop}) {
-    grid-template-columns: 2fr minmax(72px, 1fr) 82px 82px 82px minmax(72px, 1fr) 100px;
+    grid-template-columns: 2fr minmax(72px, 1fr) 82px 82px 82px minmax(72px, 1fr) minmax(88px, 1fr) 100px;
     gap: ${theme.spacing.sm};
     padding: ${theme.spacing.md} ${theme.spacing.lg};
   }
@@ -1008,6 +1008,7 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
             <div>Status</div>
             <div>Absence</div>
             <div>Notes</div>
+            <div>Late reason</div>
             <div>Actions</div>
           </TableHeader>
           
@@ -1055,6 +1056,11 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
                 </MetaCell>
                 <MetaCell title={record.absenceNotes || undefined}>
                   {record.absenceNotes ? record.absenceNotes : '—'}
+                </MetaCell>
+                <MetaCell title={record.lateReason || undefined}>
+                  {record.status !== 'absent' && (record.status === 'late' || record.isLate) && record.lateReason
+                    ? record.lateReason
+                    : '—'}
                 </MetaCell>
                 
                 <ActionButtons>
@@ -1109,6 +1115,13 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
                           </MetaCell>
                         )}
                       </>
+                    ) : record.status === 'late' || record.isLate ? (
+                      <MetaCell
+                        style={{ fontSize: theme.fontSizes.xs, color: theme.colors.textSecondary }}
+                        title={record.lateReason || undefined}
+                      >
+                        {record.lateReason ? <>Late reason: {record.lateReason}</> : '—'}
+                      </MetaCell>
                     ) : (
                       <InfoNote>
                         Check-in/out times available in Daily Tracker

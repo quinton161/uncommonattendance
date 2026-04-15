@@ -11,6 +11,7 @@ import {
   signInWithPopup,
   fetchSignInMethodsForEmail,
   type User as FirebaseAuthUser,
+  type UserCredential,
 } from 'firebase/auth';
 import { doc, setDoc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../services/firebase';
@@ -52,10 +53,57 @@ function emailLowerFromUserDoc(
 /** Same code Firebase uses so the UI can detect “use Sign in, not Sign up” and prefill email. */
 function emailAlreadyRegisteredError(): Error & { code: 'auth/email-already-in-use' } {
   const e = new Error(
-    'This email is already registered. Use Sign in (not Create account). If you forgot your password, use Forgot password on the sign-in screen. If your app profile was removed but your login still exists, signing in will reconnect you. Ask an admin to delete the user in Firebase Authentication only if you need a completely new login at this address.'
+    'This email is already registered. Use Sign in (not Create account). If you forgot your password, use Forgot password on the sign-in screen. If an admin removed your app profile but your login still exists, Sign in will restore your profile automatically.'
   ) as Error & { code: 'auth/email-already-in-use' };
   e.code = 'auth/email-already-in-use';
   return e;
+}
+
+function isDirectoryProfileComplete(d: Record<string, unknown> | undefined): boolean {
+  if (!d) return false;
+  const emailOk = typeof d.email === 'string' && d.email.trim().length > 0;
+  const typeOk = typeof d.userType === 'string' && d.userType.trim().length > 0;
+  return !!(emailOk && typeOk);
+}
+
+/**
+ * After email/password sign-in: (re)create `users/{uid}` when the directory row was deleted
+ * but Firebase Auth still exists (e.g. admin delete without Auth cleanup).
+ */
+async function restoreDirectoryProfileAfterPasswordSignIn(
+  cred: UserCredential,
+  opts: {
+    displayName: string;
+    userType: User['userType'];
+    hub?: HubSelection;
+  }
+): Promise<void> {
+  const u = cred.user;
+  const email = u.email!.trim();
+  const emailLower = email.toLowerCase();
+  const name = opts.displayName.trim() || u.displayName || 'User';
+  const hubFields =
+    opts.hub && needsHubRole(opts.userType) ? { hubId: opts.hub.id, hubName: opts.hub.name } : {};
+
+  await setDoc(
+    doc(db, 'users', u.uid),
+    {
+      uid: u.uid,
+      email,
+      emailLower,
+      displayName: name,
+      userType: opts.userType,
+      createdAt: serverTimestamp(),
+      photoUrl: u.photoURL || null,
+      bio: '',
+      lastLoginAt: serverTimestamp(),
+      ...hubFields,
+    },
+    { merge: true }
+  );
+  if (name && u.displayName !== name) {
+    await updateProfile(u, { displayName: name });
+  }
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -199,13 +247,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         'Uncommon staff emails (@uncommon.org) cannot register as students. Choose Instructor, or use a personal email for a student account.'
       );
     }
+
+    const taken = await DataService.getInstance().isEmailLowerTaken(emailTrim);
     // Note: With “email enumeration protection” enabled, fetchSignInMethodsForEmail often
-    // returns an empty list even when the address exists — registration then fails at createUser.
+    // returns an empty list even when the address exists — createUser may still fail.
     const methods = await fetchSignInMethodsForEmail(auth, emailTrim);
-    if (methods.length > 0) {
+
+    /** Auth user exists but Firestore profile was removed (e.g. deleteUser without Auth cleanup). */
+    const tryRecoverOrSignInExisting = async (): Promise<boolean> => {
+      try {
+        const cred = await signInWithEmailAndPassword(auth, emailTrim, password);
+        const snap = await getDoc(doc(db, 'users', cred.user.uid));
+        if (snap.exists() && isDirectoryProfileComplete(snap.data() as Record<string, unknown>)) {
+          uniqueToast.success('Welcome back! You already have an account.', { autoClose: 3000 });
+          return true;
+        }
+        await restoreDirectoryProfileAfterPasswordSignIn(cred, {
+          displayName,
+          userType,
+          hub,
+        });
+        uniqueToast.success('Your profile was restored. Welcome!', { autoClose: 3000 });
+        return true;
+      } catch (e: any) {
+        if (e?.code === 'auth/wrong-password' || e?.code === 'auth/invalid-credential') {
+          throw new Error(
+            'This email still has a login. Use the correct password to restore your profile, or open Sign in and use Forgot password.'
+          );
+        }
+        throw e;
+      }
+    };
+
+    if (methods.length > 0 && taken) {
       throw emailAlreadyRegisteredError();
     }
-    const taken = await DataService.getInstance().isEmailLowerTaken(emailTrim);
+
+    if (methods.length > 0 && !taken) {
+      await tryRecoverOrSignInExisting();
+      return;
+    }
+
     if (taken) {
       throw new Error('An account with this email already exists in our directory.');
     }
@@ -240,7 +322,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
       if (err?.code === 'auth/email-already-in-use') {
-        throw emailAlreadyRegisteredError();
+        try {
+          await tryRecoverOrSignInExisting();
+          return;
+        } catch (e2: any) {
+          if (e2?.message && String(e2.message).includes('still has a login')) throw e2;
+          throw e2 ?? emailAlreadyRegisteredError();
+        }
       }
       throw err;
     }
@@ -251,7 +339,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const cred = await signInWithEmailAndPassword(auth, email, password);
     const isAdmin = cred.user.email === ADMIN_EMAIL;
 
-    const snapLogin = await getDoc(doc(db, 'users', cred.user.uid));
+    let snapLogin = await getDoc(doc(db, 'users', cred.user.uid));
+    if (!snapLogin.exists() || !isDirectoryProfileComplete(snapLogin.data() as Record<string, unknown>)) {
+      const ut: User['userType'] = isAdmin
+        ? 'admin'
+        : isUncommonOrgStaffEmail(cred.user.email)
+          ? 'instructor'
+          : 'attendee';
+      await restoreDirectoryProfileAfterPasswordSignIn(cred, {
+        displayName: cred.user.displayName || 'User',
+        userType: ut,
+        hub,
+      });
+      snapLogin = await getDoc(doc(db, 'users', cred.user.uid));
+    }
+
     if (isUncommonOrgStaffEmail(cred.user.email) && snapLogin.exists()) {
       const ut = (snapLogin.data().userType || 'attendee') as User['userType'];
       if (ut === 'attendee') {
