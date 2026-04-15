@@ -1,28 +1,16 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
-import { isFirebaseWebConfigPresent } from './config/firebaseEnv';
-import { FirebaseConfigMissing } from './components/Common/FirebaseConfigMissing';
+import App from './App';
+import reportWebVitals from './reportWebVitals';
 
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
 );
+root.render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);
 
-if (!isFirebaseWebConfigPresent()) {
-  root.render(
-    <React.StrictMode>
-      <FirebaseConfigMissing />
-    </React.StrictMode>
-  );
-} else {
-  void import('./App').then(({ default: App }) => {
-    root.render(
-      <React.StrictMode>
-        <App />
-      </React.StrictMode>
-    );
-    void import('./reportWebVitals').then(({ default: reportWebVitals }) => {
-      reportWebVitals();
-    });
-  });
-}
+reportWebVitals();

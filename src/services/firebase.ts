@@ -5,28 +5,40 @@ import { getFirestore } from 'firebase/firestore';
 import { getFunctions } from 'firebase/functions';
 import { getStorage } from 'firebase/storage';
 
-const isTest = process.env.NODE_ENV === 'test';
+/**
+ * Default Uncommon Attendance Firebase web app (Console → Project settings).
+ * Override any value with REACT_APP_* in .env for staging or other projects.
+ */
+const DEFAULT_WEB_CONFIG = {
+  apiKey: 'AIzaSyDlyRXx3aUhmsFx0iON1xDE1qGWorsdztc',
+  authDomain: 'uncommonattendance.firebaseapp.com',
+  projectId: 'uncommonattendance',
+  storageBucket: 'uncommonattendance.firebasestorage.app',
+  messagingSenderId: '28326821265',
+  appId: '1:28326821265:web:5b44ada2b7cba9a83bae30',
+  measurementId: 'G-6XGF42V4MH',
+} as const;
 
-/** Prefer env vars so keys and project IDs are not committed. Jest uses placeholders when unset. */
-function requiredEnv(name: string, testFallback: string): string {
-  const v = process.env[name];
+function envOrDefault(envName: string, fallback: string): string {
+  const v = process.env[envName];
   if (v != null && String(v).trim() !== '') return String(v).trim();
-  if (isTest) return testFallback;
-  throw new Error(
-    `Missing ${name}. Copy .env.example to .env and set your Firebase web app config (Console → Project settings).`
-  );
+  return fallback;
 }
 
 const firebaseConfig = {
-  apiKey: requiredEnv('REACT_APP_FIREBASE_API_KEY', 'AIzaSyTest000000000000000000000000000000'),
-  authDomain: requiredEnv('REACT_APP_FIREBASE_AUTH_DOMAIN', 'test.firebaseapp.com'),
-  projectId: requiredEnv('REACT_APP_FIREBASE_PROJECT_ID', 'test-project'),
-  storageBucket: requiredEnv('REACT_APP_FIREBASE_STORAGE_BUCKET', 'test-project.appspot.com'),
-  messagingSenderId: requiredEnv('REACT_APP_FIREBASE_MESSAGING_SENDER_ID', '000000000000'),
-  appId: requiredEnv('REACT_APP_FIREBASE_APP_ID', '1:000000000000:web:0000000000000000000000'),
-  ...(process.env.REACT_APP_FIREBASE_MEASUREMENT_ID?.trim()
-    ? { measurementId: process.env.REACT_APP_FIREBASE_MEASUREMENT_ID.trim() }
-    : {}),
+  apiKey: envOrDefault('REACT_APP_FIREBASE_API_KEY', DEFAULT_WEB_CONFIG.apiKey),
+  authDomain: envOrDefault('REACT_APP_FIREBASE_AUTH_DOMAIN', DEFAULT_WEB_CONFIG.authDomain),
+  projectId: envOrDefault('REACT_APP_FIREBASE_PROJECT_ID', DEFAULT_WEB_CONFIG.projectId),
+  storageBucket: envOrDefault('REACT_APP_FIREBASE_STORAGE_BUCKET', DEFAULT_WEB_CONFIG.storageBucket),
+  messagingSenderId: envOrDefault(
+    'REACT_APP_FIREBASE_MESSAGING_SENDER_ID',
+    DEFAULT_WEB_CONFIG.messagingSenderId
+  ),
+  appId: envOrDefault('REACT_APP_FIREBASE_APP_ID', DEFAULT_WEB_CONFIG.appId),
+  measurementId: envOrDefault(
+    'REACT_APP_FIREBASE_MEASUREMENT_ID',
+    DEFAULT_WEB_CONFIG.measurementId
+  ),
 };
 
 // Initialize Firebase
