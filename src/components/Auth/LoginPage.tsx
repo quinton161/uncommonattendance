@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import styled, { keyframes } from 'styled-components';
 import { useAuth } from '../../contexts/AuthContext';
-import { getFirebaseAuthErrorMessage } from '../../utils/firebaseAuthErrors';
+import { getFirebaseAuthErrorMessage, getStudentLoginAuthErrorMessage } from '../../utils/firebaseAuthErrors';
 import { Button } from '../Common/Button';
 import { Input } from '../Common/Input';
 import { Card } from '../Common/Card';
@@ -418,9 +418,17 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onToggleMode }) => {
 
     try {
       await login(formData.email, formData.password, adminBypassHub ? undefined : selectedHub());
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Login error:', err);
-      setError(getFirebaseAuthErrorMessage(err?.code, 'Failed to sign in.'));
+      const any = err as { code?: string; message?: string };
+      const code = any.code;
+      if (typeof code === 'string' && code.startsWith('auth/')) {
+        setError(getStudentLoginAuthErrorMessage(code, 'Failed to sign in.'));
+      } else if (typeof any.message === 'string' && any.message.trim()) {
+        setError(any.message.trim());
+      } else {
+        setError('Failed to sign in.');
+      }
     } finally {
       setLoading(false);
     }
@@ -457,7 +465,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onToggleMode }) => {
           </IconWrapper>
           <WelcomeTitle>Welcome Back</WelcomeTitle>
           <WelcomeSubtitle>
-            Sign in to continue tracking your attendance and performance.
+            Students: sign in to check in, set your daily goal, and track attendance.
           </WelcomeSubtitle>
         </BrandingContent>
         <CloudDivider>
@@ -473,13 +481,15 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onToggleMode }) => {
       <MobileHeader>
         <Rocket size={40} color="white" style={{ marginBottom: theme.spacing.sm }} />
         <WelcomeTitle>Uncommon Attendance</WelcomeTitle>
-        <WelcomeSubtitle>Welcome Back</WelcomeSubtitle>
+        <WelcomeSubtitle>Students: attendance and daily goals</WelcomeSubtitle>
       </MobileHeader>
 
       <RightPanel>
         <FormCard>
           <FormTitle>Sign In</FormTitle>
-          <FormSubtitle>Enter your details to access your account</FormSubtitle>
+          <FormSubtitle>
+            Select your hub, then email and password. Instructors: use your @uncommon.org address.
+          </FormSubtitle>
 
           {error && (
             <ErrorMessage>
@@ -495,7 +505,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onToggleMode }) => {
 
           <form onSubmit={handleSubmit}>
             <div>
-              <HubLabel htmlFor="login-hub">Your hub</HubLabel>
+              <HubLabel htmlFor="login-hub">Your hub (where you study)</HubLabel>
               <HubSelect
                 id="login-hub"
                 value={hubId}

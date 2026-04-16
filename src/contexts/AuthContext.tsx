@@ -336,50 +336,60 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // ── login ─────────────────────────────────────────────────────────────────────
   const login = async (email: string, password: string, hub?: HubSelection) => {
-    const cred = await signInWithEmailAndPassword(auth, email, password);
-    const isAdmin = cred.user.email === ADMIN_EMAIL;
+    const emailTrim = email.trim();
+    const cred = await signInWithEmailAndPassword(auth, emailTrim, password);
+    try {
+      const isAdmin = cred.user.email === ADMIN_EMAIL;
 
-    let snapLogin = await getDoc(doc(db, 'users', cred.user.uid));
-    if (!snapLogin.exists() || !isDirectoryProfileComplete(snapLogin.data() as Record<string, unknown>)) {
-      const ut: User['userType'] = isAdmin
-        ? 'admin'
-        : isUncommonOrgStaffEmail(cred.user.email)
-          ? 'instructor'
-          : 'attendee';
-      await restoreDirectoryProfileAfterPasswordSignIn(cred, {
-        displayName: cred.user.displayName || 'User',
-        userType: ut,
-        hub,
-      });
-      snapLogin = await getDoc(doc(db, 'users', cred.user.uid));
-    }
+      let snapLogin = await getDoc(doc(db, 'users', cred.user.uid));
+      if (!snapLogin.exists() || !isDirectoryProfileComplete(snapLogin.data() as Record<string, unknown>)) {
+        const ut: User['userType'] = isAdmin
+          ? 'admin'
+          : isUncommonOrgStaffEmail(cred.user.email)
+            ? 'instructor'
+            : 'attendee';
+        await restoreDirectoryProfileAfterPasswordSignIn(cred, {
+          displayName: cred.user.displayName || 'User',
+          userType: ut,
+          hub,
+        });
+        snapLogin = await getDoc(doc(db, 'users', cred.user.uid));
+      }
 
-    if (isUncommonOrgStaffEmail(cred.user.email) && snapLogin.exists()) {
-      const ut = (snapLogin.data().userType || 'attendee') as User['userType'];
-      if (ut === 'attendee') {
+      if (isUncommonOrgStaffEmail(cred.user.email) && snapLogin.exists()) {
+        const ut = (snapLogin.data().userType || 'attendee') as User['userType'];
+        if (ut === 'attendee') {
+          await signOut(auth);
+          throw new Error(
+            'This @uncommon.org profile is set as a student. Uncommon staff must use an instructor account. Ask an admin to change your role in Firestore, or register as Instructor.'
+          );
+        }
+      }
+
+      if (!isAdmin && hub) {
+        const d = snapLogin.exists() ? snapLogin.data() : {};
+        const userType = (d.userType || 'attendee') as User['userType'];
+        if (needsHubRole(userType)) {
+          await setDoc(
+            doc(db, 'users', cred.user.uid),
+            {
+              hubId: hub.id,
+              hubName: hub.name,
+              emailLower: cred.user.email?.trim().toLowerCase() ?? undefined,
+            },
+            { merge: true }
+          );
+        }
+      }
+      uniqueToast.success('Welcome back!', { autoClose: 3000 });
+    } catch (err) {
+      try {
         await signOut(auth);
-        throw new Error(
-          'This @uncommon.org profile is set as a student. Uncommon staff must use an instructor account. Ask an admin to change your role in Firestore, or register as Instructor.'
-        );
+      } catch {
+        /* ignore */
       }
+      throw err;
     }
-
-    if (!isAdmin && hub) {
-      const d = snapLogin.exists() ? snapLogin.data() : {};
-      const userType = (d.userType || 'attendee') as User['userType'];
-      if (needsHubRole(userType)) {
-        await setDoc(
-          doc(db, 'users', cred.user.uid),
-          {
-            hubId: hub.id,
-            hubName: hub.name,
-            emailLower: cred.user.email?.trim().toLowerCase() ?? undefined,
-          },
-          { merge: true }
-        );
-      }
-    }
-    uniqueToast.success('Welcome back!', { autoClose: 3000 });
   };
 
   // ── Google login ──────────────────────────────────────────────────────────────
