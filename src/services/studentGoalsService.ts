@@ -10,11 +10,13 @@ import {
   query,
   serverTimestamp,
   updateDoc,
+  where,
   writeBatch,
   type DocumentData,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import type { DailyGoal, GoalStatus, WeeklyGoal } from '../types/studentGoals';
+import { TimeService } from './timeService';
 
 function weeklyCol(userId: string) {
   return collection(db, 'users', userId, 'weeklyGoals');
@@ -208,4 +210,66 @@ export function computeWeeklyProgress(weekly: WeeklyGoal, dailies: DailyGoal[]):
 
 export function sortDailiesByDate(dailies: DailyGoal[]): DailyGoal[] {
   return [...dailies].sort((a, b) => a.date.localeCompare(b.date));
+}
+
+const CHECKIN_DAILY_DESC = 'Synced from check-in';
+
+/**
+ * Upserts today’s daily goal under the student’s weekly scaffold: prefers a weekly goal whose
+ * [weekStart, weekEnd] contains `dateStr`; otherwise creates a Mon–Sun week (Harare) for that date.
+ * Called after successful self check-in so the Goals board stays in sync.
+ */
+export async function upsertDailyGoalFromCheckIn(
+  userId: string,
+  goalText: string,
+  dateStr: string
+): Promise<void> {
+  const trimmed = goalText.trim();
+  if (!userId || !trimmed || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return;
+
+  const weeksSnap = await getDocs(query(weeklyCol(userId), orderBy('weekStart', 'desc')));
+  let weeklyGoalId: string | null = null;
+  let bestWeekStart = '';
+  for (const w of weeksSnap.docs) {
+    const data = w.data();
+    const ws = String(data.weekStart || '');
+    const we = String(data.weekEnd || '');
+    if (ws && we && dateStr >= ws && dateStr <= we) {
+      if (!weeklyGoalId || ws > bestWeekStart) {
+        weeklyGoalId = w.id;
+        bestWeekStart = ws;
+      }
+    }
+  }
+
+  if (!weeklyGoalId) {
+    const { weekStart, weekEnd } = TimeService.getInstance().getHarareWeekMondaySundayBounds(dateStr);
+    weeklyGoalId = await addWeeklyGoal(userId, {
+      title: `Week ${weekStart} → ${weekEnd}`,
+      description:
+        'Created automatically from your check-in goal. You can rename this week or add more daily goals anytime.',
+      weekStart,
+      weekEnd,
+      status: 'in_progress',
+    });
+  }
+
+  const dCol = dailyCol(userId, weeklyGoalId);
+  const existingSnap = await getDocs(query(dCol, where('date', '==', dateStr)));
+  if (!existingSnap.empty) {
+    const first = existingSnap.docs[0];
+    await updateDailyGoal(userId, weeklyGoalId, first.id, {
+      title: trimmed,
+      description: CHECKIN_DAILY_DESC,
+      status: 'in_progress',
+    });
+    return;
+  }
+
+  await addDailyGoal(userId, weeklyGoalId, {
+    title: trimmed,
+    description: CHECKIN_DAILY_DESC,
+    date: dateStr,
+    status: 'in_progress',
+  });
 }

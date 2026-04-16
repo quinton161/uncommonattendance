@@ -22,6 +22,7 @@ import { StudentProfile } from '../Profile/StudentProfile';
 import { StudentGoalsBoard } from '../Goals/StudentGoalsBoard';
 import { CheckoutGoalModal } from '../Student/CheckoutGoalModal';
 import { LateCheckInReasonModal } from '../Student/LateCheckInReasonModal';
+import { CheckInDailyGoalModal } from '../Student/CheckInDailyGoalModal';
 import { saveCheckoutGoalReflection } from '../../services/checkoutGoalReflectionService';
 import { hasGoalsForCheckoutReflection } from '../../services/studentGoalsService';
 import type { CheckoutGoalReflectionPayload } from '../../types/checkoutGoalReflection';
@@ -550,7 +551,9 @@ export const StudentDashboard = (): React.ReactElement => {
   const [checkoutModalIsFriday, setCheckoutModalIsFriday] = useState(false);
   const [checkoutGoalsLookupLoading, setCheckoutGoalsLookupLoading] = useState(false);
   const [lateReasonModalOpen, setLateReasonModalOpen] = useState(false);
-  useBodyScrollLock(mobileMenuOpen || checkoutGoalModalOpen || lateReasonModalOpen);
+  const [checkInGoalModalOpen, setCheckInGoalModalOpen] = useState(false);
+  const [lateReasonPendingForGoal, setLateReasonPendingForGoal] = useState<string | null>(null);
+  useBodyScrollLock(mobileMenuOpen || checkoutGoalModalOpen || lateReasonModalOpen || checkInGoalModalOpen);
   const [attendanceLoading, setAttendanceLoading] = useState(false);
   const [canCheckIn, setCanCheckIn] = useState(true);
   const [isBeforeSessionStart, setIsBeforeSessionStart] = useState(false);
@@ -700,7 +703,7 @@ export const StudentDashboard = (): React.ReactElement => {
   );
 
   const performCheckIn = useCallback(
-    async (lateReason?: string) => {
+    async (lateReason?: string, checkInGoal?: string) => {
       if (!user) return;
 
       let location: any = { ip: '0.0.0.0', timestamp: Date.now() };
@@ -728,7 +731,8 @@ export const StudentDashboard = (): React.ReactElement => {
             false,
             'qr',
             studentHubId,
-            lateReason
+            lateReason,
+            checkInGoal
           );
           break;
         } catch (err: any) {
@@ -828,7 +832,8 @@ export const StudentDashboard = (): React.ReactElement => {
         return;
       }
 
-      await performCheckIn(undefined);
+      setLateReasonPendingForGoal(null);
+      setCheckInGoalModalOpen(true);
     } catch (error) {
       handleCheckInError(error);
     } finally {
@@ -838,10 +843,17 @@ export const StudentDashboard = (): React.ReactElement => {
   };
 
   const handleLateReasonSubmit = async (reason: string) => {
+    setLateReasonModalOpen(false);
+    setLateReasonPendingForGoal(reason);
+    setCheckInGoalModalOpen(true);
+  };
+
+  const handleCheckInGoalSubmit = async (goal: string) => {
     setAttendanceLoading(true);
     try {
-      await performCheckIn(reason);
-      setLateReasonModalOpen(false);
+      await performCheckIn(lateReasonPendingForGoal ?? undefined, goal);
+      setCheckInGoalModalOpen(false);
+      setLateReasonPendingForGoal(null);
     } catch (error) {
       handleCheckInError(error);
     } finally {
@@ -1034,6 +1046,14 @@ export const StudentDashboard = (): React.ReactElement => {
         open={lateReasonModalOpen}
         onClose={() => setLateReasonModalOpen(false)}
         onSubmit={handleLateReasonSubmit}
+      />
+      <CheckInDailyGoalModal
+        open={checkInGoalModalOpen}
+        onClose={() => {
+          setCheckInGoalModalOpen(false);
+          setLateReasonPendingForGoal(null);
+        }}
+        onSubmit={handleCheckInGoalSubmit}
       />
       <MobileHeader>
         <MobileMenuButton

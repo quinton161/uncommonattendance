@@ -1149,6 +1149,19 @@ const AdminDashboard: React.FC = () => {
                               Reason: {s.lateReason}
                             </div>
                           ) : null}
+                          {s.checkInGoal ? (
+                            <div
+                              style={{
+                                marginTop: theme.spacing.xs,
+                                fontSize: theme.fontSizes.xs,
+                                color: theme.colors.textSecondary,
+                                lineHeight: 1.35,
+                                wordBreak: 'break-word',
+                              }}
+                            >
+                              Today&apos;s goal: {s.checkInGoal}
+                            </div>
+                          ) : null}
                         </div>
                       </AttendanceItem>
                     ))}
@@ -1258,6 +1271,19 @@ const AdminDashboard: React.FC = () => {
                                 }}
                               >
                                 Late reason: {s.lateReason}
+                              </div>
+                            ) : null}
+                            {s.status !== 'absent' && s.checkInGoal ? (
+                              <div
+                                style={{
+                                  marginTop: theme.spacing.xs,
+                                  fontSize: theme.fontSizes.xs,
+                                  color: theme.colors.textSecondary,
+                                  lineHeight: 1.35,
+                                  wordBreak: 'break-word',
+                                }}
+                              >
+                                Goal: {s.checkInGoal}
                               </div>
                             ) : null}
                           </div>

@@ -38,6 +38,9 @@ export class AttendanceService {
   /** Minimum length for student late self check-in explanation (Harare 9:01+). */
   static readonly LATE_REASON_MIN_LEN = 10;
 
+  /** Required length for student self check-in “goal of the day”. */
+  static readonly CHECK_IN_GOAL_MIN_LEN = 3;
+
   async checkIn(
     studentId: string,
     studentName: string,
@@ -47,6 +50,7 @@ export class AttendanceService {
     method = 'qr',
     hubId?: string,
     lateReason?: string,
+    checkInGoal?: string,
   ): Promise<AttendanceRecord> {
     if (!studentId?.trim()) throw new Error('Student ID is required');
     if (!studentName?.trim()) throw new Error('Student name is required');
@@ -96,6 +100,15 @@ export class AttendanceService {
       }
     }
 
+    if (isStudentQrSelfCheckIn) {
+      const g = checkInGoal?.trim() ?? '';
+      if (g.length < AttendanceService.CHECK_IN_GOAL_MIN_LEN) {
+        throw new Error(
+          `Check-in requires today's goal (at least ${AttendanceService.CHECK_IN_GOAL_MIN_LEN} characters).`
+        );
+      }
+    }
+
     const record: any = {
       id:               docId,
       studentId,
@@ -119,6 +132,10 @@ export class AttendanceService {
       record.lateReason = lateReason.trim();
     }
 
+    if (isStudentQrSelfCheckIn && checkInGoal?.trim()) {
+      record.checkInGoal = checkInGoal.trim();
+    }
+
     if (location?.ip && location.ip !== '0.0.0.0') {
       record.location = { ip: location.ip, timestamp: location.timestamp ?? Date.now() };
     }
@@ -138,6 +155,15 @@ export class AttendanceService {
         });
       } catch (e) {
         console.warn('late_check_in_events write failed (non-fatal):', e);
+      }
+    }
+
+    if (isStudentQrSelfCheckIn && checkInGoal?.trim()) {
+      try {
+        const { upsertDailyGoalFromCheckIn } = await import('./studentGoalsService');
+        await upsertDailyGoalFromCheckIn(studentId, checkInGoal.trim(), today);
+      } catch (e) {
+        console.warn('goals sync from check-in failed (non-fatal):', e);
       }
     }
 

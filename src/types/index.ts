@@ -121,6 +121,8 @@ export interface AttendanceRecord {
   status?: AttendanceStatus;
   /** Student self check-in after 9:00 AM Harare (when required). */
   lateReason?: string;
+  /** Student “goal of the day” captured at self check-in. */
+  checkInGoal?: string;
 }
 
 export interface LocationData {

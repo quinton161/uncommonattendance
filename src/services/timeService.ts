@@ -1,4 +1,4 @@
-import { eachDayOfInterval, parseISO, subDays } from 'date-fns';
+import { addDays, eachDayOfInterval, parseISO, subDays } from 'date-fns';
 
 /**
  * TimeService — single source of truth for all time/date operations.
@@ -113,6 +113,30 @@ export class TimeService {
       d = subDays(d, 1);
     }
     return out;
+  }
+
+  /**
+   * Monday–Sunday calendar bounds (Africa/Harare) for the week containing `dateStr` (YYYY-MM-DD).
+   * Used to attach check-in goals to the weekly goals scaffold.
+   */
+  getHarareWeekMondaySundayBounds(dateStr: string): { weekStart: string; weekEnd: string } {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+      return { weekStart: dateStr, weekEnd: dateStr };
+    }
+    const d = new Date(`${dateStr}T12:00:00+02:00`);
+    const wd = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Africa/Harare',
+      weekday: 'short',
+    }).format(d);
+    const order = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
+    const idx = order.indexOf(wd as (typeof order)[number]);
+    const mondayOffset = idx >= 0 ? idx : 0;
+    const monday = subDays(d, mondayOffset);
+    const sunday = addDays(monday, 6);
+    return {
+      weekStart: this.toHarareDateString(monday),
+      weekEnd: this.toHarareDateString(sunday),
+    };
   }
 
   // ── Attendance rules ────────────────────────────────────────────────────────

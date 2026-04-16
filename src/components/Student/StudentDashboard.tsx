@@ -5,6 +5,8 @@ import { AttendanceService } from '../../services/attendanceService';
 import { TimeService } from '../../services/timeService';
 import { effectiveStudentHubId } from '../../services/hubService';
 import { LateCheckInReasonModal } from './LateCheckInReasonModal';
+import { CheckInDailyGoalModal } from './CheckInDailyGoalModal';
+import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
 import { Layout, Container, AppHeader } from '../Common/Layout';
 import { Button } from '../Common/Button';
 import { Card } from '../Common/Card';
@@ -159,6 +161,9 @@ export function StudentDashboard({ onNavigateToProfile }: StudentDashboardProps)
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [lateReasonModalOpen, setLateReasonModalOpen] = useState(false);
+  const [checkInGoalModalOpen, setCheckInGoalModalOpen] = useState(false);
+  const [lateReasonPendingForGoal, setLateReasonPendingForGoal] = useState<string | null>(null);
+  useBodyScrollLock(lateReasonModalOpen || checkInGoalModalOpen);
 
   const attendanceService = AttendanceService.getInstance();
 
@@ -189,7 +194,7 @@ export function StudentDashboard({ onNavigateToProfile }: StudentDashboardProps)
     }
   };
 
-  const runCheckIn = async (lateReason?: string) => {
+  const runCheckIn = async (lateReason?: string, checkInGoal?: string) => {
     if (!user) return;
     setLoading(true);
     setError('');
@@ -219,7 +224,8 @@ export function StudentDashboard({ onNavigateToProfile }: StudentDashboardProps)
         false,
         'qr',
         studentHubId,
-        lateReason
+        lateReason,
+        checkInGoal
       );
       setTodayAttendance(attendance);
       await loadAttendanceHistory();
@@ -246,13 +252,21 @@ export function StudentDashboard({ onNavigateToProfile }: StudentDashboardProps)
       setLateReasonModalOpen(true);
       return;
     }
-    await runCheckIn();
+    setLateReasonPendingForGoal(null);
+    setCheckInGoalModalOpen(true);
   };
 
   const handleLateReasonSubmit = async (reason: string) => {
+    setLateReasonModalOpen(false);
+    setLateReasonPendingForGoal(reason);
+    setCheckInGoalModalOpen(true);
+  };
+
+  const handleCheckInGoalSubmit = async (goal: string) => {
     try {
-      await runCheckIn(reason);
-      setLateReasonModalOpen(false);
+      await runCheckIn(lateReasonPendingForGoal ?? undefined, goal);
+      setCheckInGoalModalOpen(false);
+      setLateReasonPendingForGoal(null);
     } catch {
       /* error surfaced via setError in runCheckIn */
     }
@@ -338,6 +352,14 @@ export function StudentDashboard({ onNavigateToProfile }: StudentDashboardProps)
         open={lateReasonModalOpen}
         onClose={() => setLateReasonModalOpen(false)}
         onSubmit={handleLateReasonSubmit}
+      />
+      <CheckInDailyGoalModal
+        open={checkInGoalModalOpen}
+        onClose={() => {
+          setCheckInGoalModalOpen(false);
+          setLateReasonPendingForGoal(null);
+        }}
+        onSubmit={handleCheckInGoalSubmit}
       />
       <AppHeader>
         <HeaderButtons>
