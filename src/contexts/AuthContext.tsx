@@ -242,10 +242,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     hub?: HubSelection
   ) => {
     const emailTrim = email.trim();
+    const displayNameTrim = displayName.trim();
+
+    if (!displayNameTrim) {
+      throw new Error('Please enter your full name.');
+    }
     if (userType === 'attendee' && isUncommonOrgStaffEmail(emailTrim)) {
       throw new Error(
         'Uncommon staff emails (@uncommon.org) cannot register as students. Choose Instructor, or use a personal email for a student account.'
       );
+    }
+    if (needsHubRole(userType) && !hub) {
+      throw new Error('Please select your hub.');
     }
 
     const taken = await DataService.getInstance().isEmailLowerTaken(emailTrim);
@@ -263,7 +271,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return true;
         }
         await restoreDirectoryProfileAfterPasswordSignIn(cred, {
-          displayName,
+          displayName: displayNameTrim,
           userType,
           hub,
         });
@@ -296,7 +304,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const cred = await createUserWithEmailAndPassword(auth, emailTrim, password);
       fbUser = cred.user;
-      await updateProfile(fbUser, { displayName });
+      await updateProfile(fbUser, { displayName: displayNameTrim });
       const hubFields =
         hub && needsHubRole(userType)
           ? { hubId: hub.id, hubName: hub.name }
@@ -305,7 +313,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         uid: fbUser.uid,
         email: fbUser.email!,
         emailLower: fbUser.email!.trim().toLowerCase(),
-        displayName,
+        displayName: displayNameTrim,
         userType,
         createdAt: serverTimestamp(),
         photoUrl: null,
@@ -460,6 +468,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!cu || !user?.needsProfileCompletion) {
       throw new Error('Not completing Google registration.');
     }
+    const displayNameTrim = displayName.trim();
+    if (!displayNameTrim) {
+      uniqueToast.error('Please enter your full name.', { autoClose: 4000 });
+      return;
+    }
     if (userType === 'instructor' && !isUncommonOrgStaffEmail(cu.email)) {
       uniqueToast.error('Instructor accounts must use an @uncommon.org email.', { autoClose: 4000 });
       return;
@@ -485,18 +498,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       uid: cu.uid,
       email: cu.email!,
       emailLower: em.toLowerCase(),
-      displayName: displayName.trim(),
+      displayName: displayNameTrim,
       userType,
       createdAt: serverTimestamp(),
       photoUrl: cu.photoURL || null,
       bio: '',
       ...hubFields,
     });
-    await updateProfile(cu, { displayName: displayName.trim() });
+    await updateProfile(cu, { displayName: displayNameTrim });
     setUser({
       uid: cu.uid,
       email: cu.email!,
-      displayName: displayName.trim(),
+      displayName: displayNameTrim,
       userType,
       createdAt: new Date(),
       photoUrl: cu.photoURL ?? undefined,

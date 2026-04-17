@@ -24,8 +24,8 @@ class DataService {
     return DataService.instance;
   }
 
-  private isStudent(u: any)    { const t = (u?.userType||'').toLowerCase(); return !t || t==='attendee'||t==='student'; }
-  private isInstructor(u: any) { return (u?.userType||'').toLowerCase()==='instructor'; }
+  private isStudent(u: any)    { const t = String(u?.userType || '').trim().toLowerCase(); return !t || t==='attendee'||t==='student'; }
+  private isInstructor(u: any) { return String(u?.userType || '').trim().toLowerCase()==='instructor'; }
 
   /** Extract YYYY-MM-DD from a record (Harare calendar; matches attendance `date` field). */
   private dateStr(record: any): string|undefined {
@@ -521,16 +521,69 @@ class DataService {
         recordedByName,
         lateReason,
         checkInGoal,
+        profileMissing: false,
       };
     });
 
+    // Include attendance rows that do not currently map to a student profile.
+    // This prevents real check-ins from disappearing in staff views when a user document
+    // is missing or has malformed student metadata.
+    const listedIds = new Set<string>();
+    list.forEach((row) => {
+      if (row.userId) listedIds.add(String(row.userId).trim());
+    });
+
+    const orphanRows = Array.from(byStudent.entries())
+      .filter(([sid]) => !listedIds.has(String(sid).trim()))
+      .map(([sid, rec]) => {
+        const s = String(rec?.status || '').toLowerCase();
+        const explicitAbsent = s === 'absent' || (!!rec?.absenceReason && !rec?.checkInTime);
+        const hasCheckIn = !!rec?.checkInTime;
+        const status: 'present'|'late'|'absent'|'completed' = explicitAbsent
+          ? 'absent'
+          : hasCheckIn
+            ? (s === 'late' ? 'late' : s === 'completed' ? 'completed' : 'present')
+            : 'absent';
+        const isLate = status === 'late' || this.calcIsLate(rec?.checkInTime);
+        const lateReason =
+          typeof rec?.lateReason === 'string' && rec.lateReason.trim()
+            ? rec.lateReason.trim()
+            : undefined;
+        const checkInGoal =
+          typeof rec?.checkInGoal === 'string' && rec.checkInGoal.trim()
+            ? rec.checkInGoal.trim()
+            : undefined;
+
+        return {
+          userId: String(sid),
+          userName: rec?.studentName || 'Unknown student',
+          userEmail: rec?.studentEmail || '',
+          userType: 'student',
+          hubId: rec?.hubId,
+          hubName: resolvedHubLabel({ hubId: rec?.hubId, hubName: rec?.hubName }),
+          status,
+          checkInTime: hasCheckIn ? rec.checkInTime : null,
+          checkOutTime: rec?.checkOutTime ?? null,
+          isLate,
+          attendanceId: rec?.id ?? null,
+          absenceReason: rec?.absenceReason,
+          absenceNotes: rec?.absenceNotes,
+          recordedByName: rec?.recordedByName,
+          lateReason,
+          checkInGoal,
+          profileMissing: true,
+        };
+      });
+
+    const combinedList = [...list, ...orphanRows];
+
     return {
       date,
-      totalUsers:   list.length,
-      presentCount: list.filter(a => a.status!=='absent').length,
-      absentCount:  list.filter(a => a.status==='absent').length,
-      lateCount:    list.filter(a => a.isLate).length,
-      attendanceList: list,
+      totalUsers:   combinedList.length,
+      presentCount: combinedList.filter(a => a.status!=='absent').length,
+      absentCount:  combinedList.filter(a => a.status==='absent').length,
+      lateCount:    combinedList.filter(a => a.isLate).length,
+      attendanceList: combinedList,
       recentAttendance: Array.from(byStudent.values()).slice(0,10),
     };
   }

@@ -482,6 +482,19 @@ const StudentDetails = styled.div`
   }
 `;
 
+const ProfileIssueTag = styled.span`
+  display: inline-flex;
+  align-items: center;
+  margin-left: ${theme.spacing.xs};
+  padding: 2px 8px;
+  border-radius: ${theme.borderRadius.full};
+  background: rgba(245, 158, 11, 0.15);
+  color: #b45309;
+  font-size: ${theme.fontSizes.xs};
+  font-weight: ${theme.fontWeights.semibold};
+  vertical-align: middle;
+`;
+
 const DateDisplay = styled.div`
   font-size: ${theme.fontSizes.sm};
   color: ${theme.colors.textSecondary};
@@ -797,6 +810,10 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
     return filtered;
   };
 
+  const profileMismatchCount = attendanceSummary
+    ? (attendanceSummary.attendanceList || []).filter((r: any) => r.profileMissing).length
+    : 0;
+
   const getInitials = (name: string) => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase();
   };
@@ -963,6 +980,11 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
             <StatItem>Present: {attendanceSummary.presentCount}</StatItem>
             <StatItem>Absent: {attendanceSummary.absentCount}</StatItem>
             <StatItem>Late: {attendanceSummary.lateCount}</StatItem>
+            {profileMismatchCount > 0 && (
+              <StatItem title="Attendance rows that don't have a clean linked student profile">
+                Profile issues: {profileMismatchCount}
+              </StatItem>
+            )}
           </StatsContainer>
         )}
       </FilterSection>
@@ -1019,7 +1041,14 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
                     {getInitials(record.userName || 'Unknown')}
                   </StudentAvatar>
                   <StudentDetails>
-                    <h4>{record.userName || 'Unknown Student'}</h4>
+                    <h4>
+                      {record.userName || 'Unknown Student'}
+                      {(record as any).profileMissing && (
+                        <ProfileIssueTag title="This attendance row could not be linked to a valid student profile.">
+                          Profile issue
+                        </ProfileIssueTag>
+                      )}
+                    </h4>
                     <p>{record.userEmail}</p>
                   </StudentDetails>
                 </StudentInfo>

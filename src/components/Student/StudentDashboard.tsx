@@ -200,6 +200,11 @@ export function StudentDashboard({ onNavigateToProfile }: StudentDashboardProps)
     setError('');
 
     try {
+      const fallbackName =
+        user.displayName?.trim() ||
+        user.email?.split('@')[0]?.trim() ||
+        'Student';
+
       let userIp = '0.0.0.0';
       try {
         const ipResponse = await fetch('https://api.ipify.org?format=json');
@@ -218,7 +223,7 @@ export function StudentDashboard({ onNavigateToProfile }: StudentDashboardProps)
 
       const attendance = await attendanceService.checkIn(
         user.uid,
-        user.displayName,
+        fallbackName,
         undefined,
         locationData,
         false,

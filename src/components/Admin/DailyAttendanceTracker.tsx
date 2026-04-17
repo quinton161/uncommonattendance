@@ -77,7 +77,10 @@ export const DailyAttendanceTracker: React.FC<Props> = ({ onBack, isEmbedded=tru
         attendanceService.getAttendanceByDateRange(finalDate, finalDate, undefined, effectiveHub),
       ]);
 
-      const students = users.filter((u:any) => u.userType === 'attendee');
+      const students = users.filter((u: any) => {
+        const t = String(u?.userType || '').trim().toLowerCase();
+        return !t || t === 'attendee' || t === 'student';
+      });
       const map      = new Map(records.map((r:any) => [r.studentId || r.id, r]));
 
       const built: StudentRow[] = students.map((s:any) => {
