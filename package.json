@@ -42,7 +42,13 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "maintenance:outdated": "npm outdated || echo Updates available",
+    "maintenance:audit": "npm audit || echo Audit has findings to review",
+    "maintenance:refresh-browsers": "npx update-browserslist-db@latest",
+    "maintenance:verify": "npm test -- --watchAll=false && npm run build",
+    "maintenance:monthly": "npm run maintenance:outdated && npm run maintenance:audit && npm run maintenance:refresh-browsers && npm run maintenance:verify",
+    "seed:hubs": "npx ts-node firestore-seed-hubs.ts"
   },
   "eslintConfig": {
     "extends": [

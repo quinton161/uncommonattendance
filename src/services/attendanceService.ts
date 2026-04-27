@@ -306,6 +306,41 @@ export class AttendanceService {
     );
   }
 
+  /**
+   * Staff correction: remove a mistakenly marked-present record for a date.
+   * Returns true when an attendance row existed and was removed.
+   */
+  async unmarkPresentForDate(studentId: string, date: string, staffHubId?: string): Promise<boolean> {
+    const sid = (studentId || '').trim();
+    const d = (date || '').trim();
+    if (!sid) throw new Error('Missing student id.');
+    if (!d) throw new Error('Missing date.');
+
+    const attendanceDocId = `${d}_${sid}`;
+    const attendanceRef = doc(db, 'attendance', attendanceDocId);
+    const snap = await getDoc(attendanceRef);
+    if (!snap.exists()) return false;
+
+    const row = snap.data();
+    if (staffHubId && !hubIdMatchesScope(row?.hubId, staffHubId)) {
+      throw new Error('You can only update attendance in your hub.');
+    }
+    if (!row?.checkInTime) {
+      throw new Error('This row is not a present check-in record.');
+    }
+
+    await deleteDoc(attendanceRef);
+
+    // Keep dailyAttendance in sync so cards/stats recalculate immediately.
+    try {
+      await deleteDoc(doc(db, 'dailyAttendance', `${sid}_${d}`));
+    } catch {
+      /* best effort */
+    }
+
+    return true;
+  }
+
   // ── Queries ─────────────────────────────────────────────────────────────────
 
   /** Student history — legacy rows without hubId count toward Vincent Bohlen only. */

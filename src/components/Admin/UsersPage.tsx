@@ -839,6 +839,44 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
     }
   };
 
+  const handleUnmarkPresent = async (
+    studentId: string,
+    studentName: string,
+    targetHubId?: string
+  ) => {
+    if (user?.userType === 'instructor' && !staffMayAccessHubForWrite(user, targetHubId)) {
+      uniqueToast.error('You can only update attendance for students in your hub.');
+      return;
+    }
+    if (!window.confirm(`Unmark ${studentName} as present for today?`)) return;
+
+    try {
+      const today = ts.getCurrentDateString();
+      const removed = await AttendanceService.getInstance().unmarkPresentForDate(
+        studentId,
+        today,
+        effectiveHub || targetHubId
+      );
+      if (!removed) {
+        uniqueToast.info(`${studentName} has no present record for today.`);
+        return;
+      }
+
+      setAttendance((prev) =>
+        prev.filter((r: any) => {
+          const sid = r.studentId || r.userId;
+          const date = r.date || '';
+          return !(String(sid) === String(studentId) && String(date) === String(today));
+        })
+      );
+      uniqueToast.success(`${studentName} unmarked successfully.`);
+      void loadData();
+    } catch (error) {
+      console.error('Failed to unmark present:', error);
+      uniqueToast.error(`Failed to unmark ${studentName}.`);
+    }
+  };
+
   const handleCloseDelete = () => {
     setShowDeleteModal(false);
     setUserToDelete(null);
@@ -1221,6 +1259,14 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
                   <MarkPresentButton onClick={() => handleMarkPresent(uid, userData.displayName || 'Unknown User', userData.hubId)}>
                     <CheckCircleIcon size={14} /> <span>Mark Present</span>
                   </MarkPresentButton>
+                  {hasIn && !hasOut && (
+                    <Button
+                      variant="outline"
+                      onClick={() => handleUnmarkPresent(uid, userData.displayName || 'Unknown User', userData.hubId)}
+                    >
+                      Unmark
+                    </Button>
+                  )}
                   {(user?.userType === 'admin' || instructorCanDeleteStudent(userData)) && (
                     <DeleteButton variant="ghost" onClick={() => handleOpenDelete(userData)}>
                       Delete
@@ -1304,6 +1350,14 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
                       <MarkPresentButton onClick={() => handleMarkPresent(uid, userData.displayName || 'Unknown User', userData.hubId)} style={{ flex: 1 }}>
                         <CheckCircleIcon size={14} /> <span>Mark Present</span>
                       </MarkPresentButton>
+                      {hasIn && !hasOut && (
+                        <Button
+                          variant="outline"
+                          onClick={() => handleUnmarkPresent(uid, userData.displayName || 'Unknown User', userData.hubId)}
+                        >
+                          Unmark
+                        </Button>
+                      )}
                       {(user?.userType === 'admin' || instructorCanDeleteStudent(userData)) && (
                         <DeleteButton variant="outline" size="sm" onClick={() => handleOpenDelete(userData)}>
                           Delete

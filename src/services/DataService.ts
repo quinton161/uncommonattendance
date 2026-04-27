@@ -254,44 +254,57 @@ class DataService {
 
     // Remove Firebase Auth so the same email can register again (requires Cloud Function deploy).
     const acting = opts?.actingUser;
-    if (
+    const canTryDeleteAuth =
       acting &&
       (acting.userType === 'admin' || acting.userType === 'instructor') &&
-      uid !== acting.uid
-    ) {
-      try {
-        await deleteStudentAuthUserCallable(uid);
-      } catch (e) {
-        console.warn(
-          'deleteStudentAuthUser: callable failed or not deployed. Email may still be reserved in Firebase Auth.',
-          e
-        );
-      }
-    }
+      uid !== acting.uid;
 
-    const attendSnap = await getDocs(query(collection(db, 'attendance'), where('studentId', '==', uid)));
-    await Promise.all(attendSnap.docs.map((d) => deleteDoc(d.ref)));
+    const authCleanupPromise = canTryDeleteAuth
+      ? deleteStudentAuthUserCallable(uid).catch((e) => {
+          console.warn(
+            'deleteStudentAuthUser: callable failed or not deployed. Email may still be reserved in Firebase Auth.',
+            e
+          );
+        })
+      : Promise.resolve();
 
-    try {
-      const regSnap = await getDocs(query(collection(db, 'registrations'), where('studentId', '==', uid)));
-      await Promise.all(regSnap.docs.map((d) => deleteDoc(d.ref)));
-    } catch (e) {
+    const attendanceQueryPromise = getDocs(
+      query(collection(db, 'attendance'), where('studentId', '==', uid))
+    );
+    const registrationsQueryPromise = getDocs(
+      query(collection(db, 'registrations'), where('studentId', '==', uid))
+    ).catch((e) => {
       console.warn('deleteUser: registrations cleanup', e);
-    }
-
-    // Conversation rules only allow participants to delete; staff may get permission-denied.
-    try {
-      const convoSnap = await getDocs(query(collection(db, 'conversations'), where('studentId', '==', uid)));
-      await Promise.all(convoSnap.docs.map((d) => deleteDoc(d.ref)));
-    } catch (e) {
+      return null;
+    });
+    const conversationsQueryPromise = getDocs(
+      query(collection(db, 'conversations'), where('studentId', '==', uid))
+    ).catch((e) => {
+      // Conversation rules may block staff for rows where they are not participants.
       console.warn('deleteUser: conversations cleanup skipped or partial', e);
+      return null;
+    });
+    const profilePhotoCleanupPromise = deleteObject(ref(storage, `profile-photos/${uid}/profile.jpg`)).catch(
+      () => {
+        /* no photo */
+      }
+    );
+
+    const [attendSnap, regSnap, convoSnap] = await Promise.all([
+      attendanceQueryPromise,
+      registrationsQueryPromise,
+      conversationsQueryPromise,
+    ]);
+
+    const cleanupDeletes: Promise<void>[] = [];
+    cleanupDeletes.push(...attendSnap.docs.map((d) => deleteDoc(d.ref)));
+    if (regSnap) cleanupDeletes.push(...regSnap.docs.map((d) => deleteDoc(d.ref)));
+    if (convoSnap) cleanupDeletes.push(...convoSnap.docs.map((d) => deleteDoc(d.ref)));
+    if (cleanupDeletes.length > 0) {
+      await Promise.all(cleanupDeletes);
     }
 
-    try {
-      await deleteObject(ref(storage, `profile-photos/${uid}/profile.jpg`));
-    } catch {
-      /* no photo */
-    }
+    await Promise.all([authCleanupPromise, profilePhotoCleanupPromise]);
 
     await deleteDoc(doc(db, 'users', uid));
     if (!opts?.suppressToast) {

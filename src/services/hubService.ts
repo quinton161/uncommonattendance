@@ -167,6 +167,27 @@ const FALLBACK_HUBS: Hub[] = [
     location: 'Jafuta',
     order: 10,
   },
+  {
+    id: 'uncommon_gokwe',
+    name: 'Gokwe Innovation Hub',
+    city: 'Gokwe',
+    location: 'Gokwe',
+    order: 11,
+  },
+  {
+    id: 'uncommon_chitungwiza',
+    name: 'Chitungwiza Innovation Hub',
+    city: 'Chitungwiza',
+    location: 'Chitungwiza',
+    order: 12,
+  },
+  {
+    id: 'uncommon_sizinda_byo',
+    name: 'Sizinda Innovation Hub',
+    city: 'Bulawayo',
+    location: 'Sizinda, BYO',
+    order: 13,
+  },
 ];
 
 /** Same list as Firestore fallback — use so login/register never wait on an empty hub dropdown. */
