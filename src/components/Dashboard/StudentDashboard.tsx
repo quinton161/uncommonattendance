@@ -46,13 +46,15 @@ import { QRCodeSVG } from 'qrcode.react';
 const DashboardContainer = styled.div`
   display: flex;
   min-height: 100vh;
+  min-height: 100dvh;
   /* Soft Uncommon blue-to-white gradient */
   background: linear-gradient(135deg, #E8F4FD 0%, #F0F7FF 50%, #FFFFFF 100%);
   background-attachment: fixed;
   ${pageTransition}
   ${respectMotionPreference}
   width: 100%;
-  overflow: hidden;
+  overflow-x: hidden;
+  
   @media (max-width: ${theme.breakpoints.laptop}) {
     flex-direction: column;
     padding-top: calc(60px + env(safe-area-inset-top, 0px));
@@ -211,9 +213,10 @@ const MobileOverlay = styled.div<{ $isOpen: boolean }>`
 const MainContent = styled.div`
   flex: 1;
   padding: 0;
-  height: 100vh;
-  height: 100svh; /* Modern mobile browsers */
+  min-height: 100vh;
+  min-height: 100dvh;
   overflow-y: auto;
+  overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
   box-sizing: border-box;
   padding-top: 20px;
@@ -223,9 +226,10 @@ const MainContent = styled.div`
   margin-left: 72px;
   ${containerAnimation}
   ${respectMotionPreference}
+  
   @media (max-width: ${theme.breakpoints.laptop}) {
     flex: 1;
-    min-height: 0;
+    min-height: auto;
     padding: 0;
     padding-top: ${theme.spacing.md};
     padding-bottom: calc(env(safe-area-inset-bottom, 0px) + ${theme.spacing.lg});
@@ -272,10 +276,21 @@ const HeaderActions = styled.div`
 
 const DashboardPage = styled.div`
   max-width: 1040px;
+  width: 100%;
   margin: 0 auto;
   padding: ${theme.spacing.lg} ${theme.spacing.xl} ${theme.spacing['2xl']};
+  box-sizing: border-box;
+  
+  @media (max-width: ${theme.breakpoints.tablet}) {
+    padding: ${theme.spacing.md} ${theme.spacing.lg};
+  }
+  
   @media (max-width: ${theme.breakpoints.mobile}) {
-    padding: ${theme.spacing.md};
+    padding: ${theme.spacing.sm} ${theme.spacing.md};
+  }
+  
+  @media (max-width: 360px) {
+    padding: ${theme.spacing.xs} ${theme.spacing.sm};
   }
 `;
 
@@ -292,8 +307,14 @@ const HowItWorks = styled.div`
   grid-template-columns: repeat(3, 1fr);
   gap: ${theme.spacing.md};
   margin-bottom: ${theme.spacing.xl};
+  
   @media (max-width: ${theme.breakpoints.tablet}) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  @media (max-width: ${theme.breakpoints.mobile}) {
     grid-template-columns: 1fr;
+    gap: ${theme.spacing.sm};
   }
 `;
 
@@ -306,11 +327,18 @@ const StepCard = styled.div`
   border-radius: ${theme.borderRadius['3xl']};
   padding: ${theme.spacing.lg};
   box-shadow: 0 8px 32px rgba(0, 82, 204, 0.08);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
   
-  &:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 16px 48px rgba(0, 82, 204, 0.12);
+  @media (hover: hover) {
+    &:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 16px 48px rgba(0, 82, 204, 0.12);
+    }
+  }
+  
+  @media (max-width: ${theme.breakpoints.mobile}) {
+    padding: ${theme.spacing.md};
   }
 `;
 
@@ -347,9 +375,18 @@ const StepBody = styled.p`
 
 const MiniStatsRow = styled.div`
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: ${theme.spacing.md};
   margin-bottom: ${theme.spacing.xl};
+  
+  @media (max-width: ${theme.breakpoints.mobile}) {
+    grid-template-columns: repeat(2, 1fr);
+    gap: ${theme.spacing.sm};
+  }
+  
+  @media (max-width: 360px) {
+    grid-template-columns: 1fr;
+  }
 `;
 
 const MiniStat = styled.div`
@@ -364,11 +401,19 @@ const MiniStat = styled.div`
   align-items: center;
   gap: ${theme.spacing.md};
   box-shadow: 0 8px 32px rgba(0, 82, 204, 0.08);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
   
-  &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 12px 40px rgba(0, 82, 204, 0.12);
+  @media (hover: hover) {
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 40px rgba(0, 82, 204, 0.12);
+    }
+  }
+  
+  @media (max-width: ${theme.breakpoints.mobile}) {
+    padding: ${theme.spacing.sm} ${theme.spacing.md};
+    gap: ${theme.spacing.sm};
   }
 `;
 
@@ -388,6 +433,10 @@ const MiniStatValue = styled.span`
   font-weight: ${theme.fontWeights.bold};
   color: ${theme.colors.textPrimary};
   line-height: 1.1;
+  
+  @media (max-width: ${theme.breakpoints.mobile}) {
+    font-size: ${theme.fontSizes.xl};
+  }
 `;
 
 const MiniStatLabel = styled.span`
@@ -406,6 +455,10 @@ const CheckInShell = styled.div`
   border-radius: ${theme.borderRadius['3xl']};
   overflow: hidden;
   box-shadow: 0 12px 40px rgba(0, 82, 204, 0.1);
+  
+  @media (max-width: ${theme.breakpoints.mobile}) {
+    border-radius: ${theme.borderRadius['2xl']};
+  }
 `;
 
 const CheckInTop = styled.div<{ $tone: 'success' | 'action' | 'closed' }>`
