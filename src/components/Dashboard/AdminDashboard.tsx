@@ -68,8 +68,10 @@ function attendanceMatchesHarareDay(a: any, dateStr: string): boolean {
 
 const DashboardContainer = styled.div`
   display: flex;
-  height: 100vh;
-  background: ${theme.colors.backgroundSecondary};
+  min-height: 100vh;
+  /* Soft Uncommon blue-to-white gradient */
+  background: linear-gradient(135deg, #E8F4FD 0%, #F0F7FF 50%, #FFFFFF 100%);
+  background-attachment: fixed;
   ${pageTransition}
   ${respectMotionPreference}
   width: 100%;
@@ -300,28 +302,46 @@ const StatsGrid = styled.div`
 `;
 
 const StatCard = styled.div<{ variant?: 'primary' | 'secondary' | 'accent' }>`
+  /* Glassmorphism stat card */
   background: ${props => {
     switch (props.variant) {
       case 'primary': return `linear-gradient(135deg, ${theme.colors.primary} 0%, ${theme.colors.primaryDark} 100%)`;
       case 'secondary': return `linear-gradient(135deg, ${theme.colors.secondary} 0%, ${theme.colors.gray800} 100%)`;
-      case 'accent': return `linear-gradient(135deg, ${theme.colors.primaryLight} 0%, ${theme.colors.primary} 100%)`;
-      default: return theme.colors.white;
+      case 'accent': return `linear-gradient(135deg, ${theme.colors.accent} 0%, #e67e22 100%)`;
+      default: return 'rgba(255, 255, 255, 0.8)';
     }
   }};
+  ${props => !props.variant && `
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+  `}
   color: ${props => props.variant ? theme.colors.white : theme.colors.textPrimary};
   padding: ${theme.spacing.lg};
-  border-radius: ${theme.borderRadius.xl};
-  box-shadow: ${theme.shadows.md};
-  border: 1px solid ${theme.colors.gray200};
+  border-radius: ${theme.borderRadius['3xl']};
+  box-shadow: 0 8px 32px rgba(0, 82, 204, 0.1);
   position: relative;
   overflow: hidden;
   ${staggeredAnimation(0.1)}
   ${respectMotionPreference}
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: ${props => props.variant 
+      ? 'radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.15) 0%, transparent 50%)' 
+      : 'none'};
+    pointer-events: none;
+  }
+  
   &:hover {
     transform: translateY(-4px) scale(1.02);
-    box-shadow: 0 12px 35px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 16px 48px rgba(0, 82, 204, 0.15);
   }
 `;
 
@@ -350,8 +370,12 @@ const MobileHeader = styled.div`
     padding-top: env(safe-area-inset-top, 0px);
     padding-left: max(${theme.spacing.md}, env(safe-area-inset-left, 0px));
     padding-right: max(${theme.spacing.md}, env(safe-area-inset-right, 0px));
-    background: ${theme.colors.white};
-    box-shadow: ${theme.shadows.sm};
+    /* Glassmorphism header */
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.4);
+    box-shadow: 0 4px 24px rgba(0, 82, 204, 0.06);
     position: fixed;
     top: 0;
     left: 0;
@@ -405,18 +429,21 @@ const ContentGrid = styled.div`
 `;
 
 const Card = styled.div`
-  background: ${theme.colors.white};
-  border-radius: ${theme.borderRadius.xl};
+  /* Glassmorphism card */
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: ${theme.borderRadius['3xl']};
   padding: ${theme.spacing.lg};
-  box-shadow: ${theme.shadows.sm};
-  border: 1px solid ${theme.colors.gray200};
+  box-shadow: 0 8px 32px rgba(0, 82, 204, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.4);
   ${staggeredAnimation(0.2)}
   ${respectMotionPreference}
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   
   &:hover {
     transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12);
+    box-shadow: 0 12px 40px rgba(0, 82, 204, 0.12);
   }
 `;
 
@@ -437,9 +464,17 @@ const AttendanceItem = styled.div`
   display: flex;
   align-items: center;
   gap: ${theme.spacing.md};
-  padding: ${theme.spacing.sm};
-  border-radius: ${theme.borderRadius.md};
-  background: ${theme.colors.backgroundSecondary};
+  padding: ${theme.spacing.sm} ${theme.spacing.md};
+  border-radius: ${theme.borderRadius['2xl']};
+  /* Glassmorphism list item */
+  background: rgba(248, 249, 250, 0.6);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  transition: all 0.2s ease;
+  
+  &:hover {
+    background: rgba(255, 255, 255, 0.7);
+  }
 `;
 
 const UserAvatar = styled.div`

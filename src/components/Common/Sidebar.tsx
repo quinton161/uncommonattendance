@@ -19,14 +19,21 @@ const SidebarContainer = styled.aside<{ $isExpanded: boolean }>`
   top: 0;
   bottom: 0;
   width: ${props => props.$isExpanded ? '240px' : '72px'};
-  background-color: ${theme.colors.primary};
+  /* Glassmorphism sidebar with Uncommon blue gradient */
+  background: linear-gradient(180deg, 
+    rgba(0, 82, 204, 0.95) 0%, 
+    rgba(0, 61, 153, 0.98) 100%
+  );
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   color: ${theme.colors.white};
   transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   z-index: ${theme.zIndex.fixed};
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  box-shadow: ${theme.shadows.lg};
+  box-shadow: 0 8px 32px rgba(0, 82, 204, 0.25);
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
 
   @media (max-width: ${theme.breakpoints.laptop}) {
     display: none;
@@ -74,7 +81,7 @@ const NavItem = styled.div<{ $active?: boolean; $danger?: boolean }>`
   display: flex;
   align-items: center;
   padding: 12px;
-  border-radius: ${theme.borderRadius.md};
+  border-radius: ${theme.borderRadius['2xl']};
   cursor: pointer;
   transition: all 0.2s ease;
   background-color: ${props => props.$active ? 'rgba(255, 255, 255, 0.2)' : 'transparent'};
@@ -82,6 +89,10 @@ const NavItem = styled.div<{ $active?: boolean; $danger?: boolean }>`
     if (props.$danger) return '#ff8a8a';
     return theme.colors.white;
   }};
+  ${props => props.$active && `
+    backdrop-filter: blur(8px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  `}
 
   &:hover {
     background-color: rgba(255, 255, 255, 0.15);
@@ -113,12 +124,15 @@ const SidebarFooter = styled.div`
 `;
 
 const SupportCard = styled.div`
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: ${theme.borderRadius.lg};
+  /* Glassmorphism support card */
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(8px);
+  border-radius: ${theme.borderRadius['2xl']};
   padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
 `;
 
 const SupportTitle = styled.div`

@@ -90,15 +90,20 @@ export const theme = {
     xl: '0.75rem',
     '2xl': '1rem',
     '3xl': '1.5rem',
+    '4xl': '2rem',
+    '5xl': '2.5rem',
     full: '9999px',
   },
   
+  /* Glassmorphism shadows */
   shadows: {
     sm: '0 1px 2px 0 rgb(0 0 0 / 0.05)',
     base: '0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)',
     md: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
     lg: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
     xl: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
+    glass: '0 8px 32px rgba(0, 82, 204, 0.08)',
+    glassHover: '0 12px 40px rgba(0, 82, 204, 0.12)',
   },
   
   breakpoints: {

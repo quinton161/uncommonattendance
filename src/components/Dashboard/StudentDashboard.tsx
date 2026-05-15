@@ -45,8 +45,10 @@ import { QRCodeSVG } from 'qrcode.react';
 
 const DashboardContainer = styled.div`
   display: flex;
-  height: 100vh;
-  background: ${theme.colors.backgroundSecondary};
+  min-height: 100vh;
+  /* Soft Uncommon blue-to-white gradient */
+  background: linear-gradient(135deg, #E8F4FD 0%, #F0F7FF 50%, #FFFFFF 100%);
+  background-attachment: fixed;
   ${pageTransition}
   ${respectMotionPreference}
   width: 100%;
@@ -163,8 +165,12 @@ const MobileHeader = styled.div`
     padding-top: env(safe-area-inset-top, 0px);
     padding-left: max(${theme.spacing.md}, env(safe-area-inset-left, 0px));
     padding-right: max(${theme.spacing.md}, env(safe-area-inset-right, 0px));
-    background: ${theme.colors.white};
-    box-shadow: ${theme.shadows.sm};
+    /* Glassmorphism header */
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.4);
+    box-shadow: 0 4px 24px rgba(0, 82, 204, 0.06);
     position: fixed;
     top: 0;
     left: 0;
@@ -292,11 +298,20 @@ const HowItWorks = styled.div`
 `;
 
 const StepCard = styled.div`
-  background: ${theme.colors.white};
-  border: 1px solid ${theme.colors.gray200};
-  border-radius: ${theme.borderRadius.xl};
+  /* Glassmorphism card */
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: ${theme.borderRadius['3xl']};
   padding: ${theme.spacing.lg};
-  box-shadow: ${theme.shadows.sm};
+  box-shadow: 0 8px 32px rgba(0, 82, 204, 0.08);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 16px 48px rgba(0, 82, 204, 0.12);
+  }
 `;
 
 const StepNum = styled.span`
@@ -338,13 +353,23 @@ const MiniStatsRow = styled.div`
 `;
 
 const MiniStat = styled.div`
-  background: ${theme.colors.white};
-  border: 1px solid ${theme.colors.gray200};
-  border-radius: ${theme.borderRadius.lg};
+  /* Glassmorphism stat card */
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: ${theme.borderRadius['3xl']};
   padding: ${theme.spacing.md} ${theme.spacing.lg};
   display: flex;
   align-items: center;
   gap: ${theme.spacing.md};
+  box-shadow: 0 8px 32px rgba(0, 82, 204, 0.08);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 40px rgba(0, 82, 204, 0.12);
+  }
 `;
 
 const MiniStatIcon = styled.div`
@@ -373,22 +398,25 @@ const MiniStatLabel = styled.span`
 `;
 
 const CheckInShell = styled.div`
-  background: ${theme.colors.white};
-  border: 1px solid ${theme.colors.gray200};
-  border-radius: ${theme.borderRadius['2xl']};
+  /* Glassmorphism check-in card */
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: ${theme.borderRadius['3xl']};
   overflow: hidden;
-  box-shadow: ${theme.shadows.lg};
+  box-shadow: 0 12px 40px rgba(0, 82, 204, 0.1);
 `;
 
 const CheckInTop = styled.div<{ $tone: 'success' | 'action' | 'closed' }>`
   padding: ${theme.spacing.lg} ${theme.spacing.xl};
   background: ${p =>
     p.$tone === 'success'
-      ? 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)'
+      ? 'linear-gradient(135deg, rgba(39, 174, 96, 0.15) 0%, rgba(39, 174, 96, 0.08) 100%)'
       : p.$tone === 'action'
-        ? 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)'
-        : theme.colors.gray50};
-  border-bottom: 1px solid ${theme.colors.gray200};
+        ? 'linear-gradient(135deg, rgba(0, 82, 204, 0.12) 0%, rgba(0, 82, 204, 0.06) 100%)'
+        : 'rgba(248, 249, 250, 0.5)'};
+  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
 `;
 
 const CheckInTopRow = styled.div`
@@ -428,9 +456,11 @@ const QRPanel = styled.div`
   text-align: center;
   gap: ${theme.spacing.md};
   padding: ${theme.spacing.lg};
-  background: ${theme.colors.gray50};
-  border-radius: ${theme.borderRadius.xl};
-  border: 1px dashed ${theme.colors.gray200};
+  /* Glassmorphism inner panel */
+  background: rgba(248, 249, 250, 0.6);
+  backdrop-filter: blur(12px);
+  border-radius: ${theme.borderRadius['2xl']};
+  border: 1px dashed rgba(0, 82, 204, 0.2);
 `;
 
 const QRLabel = styled.div`
@@ -473,9 +503,11 @@ const WindowNote = styled.div`
   align-items: flex-start;
   margin-top: ${theme.spacing.sm};
   padding: ${theme.spacing.sm} ${theme.spacing.md};
-  background: ${theme.colors.white};
-  border-radius: ${theme.borderRadius.md};
-  border: 1px solid ${theme.colors.gray200};
+  /* Glassmorphism note */
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(8px);
+  border-radius: ${theme.borderRadius.xl};
+  border: 1px solid rgba(255, 255, 255, 0.4);
   font-size: ${theme.fontSizes.xs};
   color: ${theme.colors.textSecondary};
   max-width: 100%;
@@ -491,17 +523,22 @@ const FormPanel = styled.div`
 const CodeInput = styled.input`
   width: 100%;
   padding: ${theme.spacing.md};
-  border-radius: ${theme.borderRadius.lg};
-  border: 2px solid ${theme.colors.gray200};
+  border-radius: ${theme.borderRadius['2xl']};
+  /* Glassmorphism input */
+  border: 2px solid rgba(0, 82, 204, 0.15);
+  background: rgba(255, 255, 255, 0.7);
   font-size: ${theme.fontSizes.lg};
   letter-spacing: 0.2em;
   text-align: center;
   text-transform: uppercase;
   font-family: ${theme.fonts.mono};
+  transition: all 0.2s ease;
+  
   &:focus {
     outline: none;
     border-color: ${theme.colors.primary};
-    box-shadow: 0 0 0 3px ${theme.colors.primary}22;
+    background: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 0 0 4px rgba(0, 82, 204, 0.15);
   }
 `;
 
