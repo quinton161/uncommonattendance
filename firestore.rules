@@ -125,14 +125,10 @@ service cloud.firestore {
     }
 
     match /attendance/{attendanceId} {
-      function attendancePath() {
-        return /databases/$(database)/documents/attendance/$(attendanceId);
-      }
-
       function canReadOwnAttendance() {
         return isAuth() && (
-          (exists(attendancePath()) && get(attendancePath()).data.studentId == request.auth.uid)
-          || (!exists(attendancePath()) && attendanceId.matches('.*_' + request.auth.uid + '$'))
+          resource.data.studentId == request.auth.uid
+          || attendanceId.matches('.*_' + request.auth.uid + '$')
         );
       }
 
