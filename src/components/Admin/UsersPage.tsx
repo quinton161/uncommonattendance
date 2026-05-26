@@ -6,6 +6,7 @@ import { Button } from '../Common/Button';
 import DataService from '../../services/DataService';
 import {
   effectiveStaffHubScope,
+  initialStaffHubFilter,
   resolvedHubLabel,
   staffMayAccessHubForWrite,
 } from '../../services/hubService';
@@ -165,6 +166,10 @@ const TableRow = styled.div`
   box-sizing: border-box;
   min-height: 72px;
   border-left: 4px solid transparent;
+
+  & > * {
+    min-width: 0;
+  }
   
   &:hover {
     background: white;
@@ -271,6 +276,10 @@ const TableHeader = styled.div`
   letter-spacing: 1px;
   min-width: 0;
   align-items: center;
+
+  & > * {
+    min-width: 0;
+  }
 `;
 
 const LoadingState = styled.div`
@@ -359,6 +368,8 @@ const UserInfo = styled.div`
   display: flex;
   align-items: center;
   gap: ${theme.spacing.md};
+  min-width: 0;
+  overflow: hidden;
 `;
 
 const AccessDeniedWrapper = styled.div`
@@ -418,6 +429,10 @@ const UserNameHeading = styled.h4`
   align-items: center;
   gap: ${theme.spacing.xs};
   margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 `;
 
 const TableIcon = styled.span`
@@ -428,6 +443,10 @@ const TableIcon = styled.span`
 const ValueTextSmall = styled.div`
   font-size: ${theme.fontSizes.sm};
   color: ${theme.colors.textSecondary};
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 `;
 
 const FullWidthBlock = styled.div`
@@ -476,6 +495,10 @@ const SectionTitle = styled.h2`
 
 const UserEmail = styled.p`
   margin: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 `;
 
 const MobileSubText = styled.p`
@@ -545,6 +568,9 @@ const MobileMarkPresentButton = styled(MarkPresentButton)`
 `;
 
 const UserDetails = styled.div`
+  min-width: 0;
+  overflow: hidden;
+
   h4 {
     margin: 0;
     font-size: ${theme.fontSizes.base};
@@ -558,6 +584,10 @@ const UserDetails = styled.div`
     margin: ${theme.spacing.xs} 0 0;
     font-size: ${theme.fontSizes.sm};
     color: ${theme.colors.textSecondary};
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 `;
 
@@ -808,9 +838,12 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
   const [userToDelete, setUserToDelete] = useState<any>(null);
   const { user, resetPassword } = useAuth();
   const [resetSending, setResetSending] = useState<string | null>(null);
-  const [adminHubFilter, setAdminHubFilter] = useState('');
+  const [adminHubFilter, setAdminHubFilter] = useState(() => initialStaffHubFilter(user));
   const effectiveHub = useMemo(() => effectiveStaffHubScope(user, adminHubFilter), [user, adminHubFilter]);
   const hubScopeActive = Boolean(effectiveHub);
+  const canWriteSelectedHub =
+    user?.userType === 'admin' ||
+    (user?.userType === 'instructor' && Boolean(effectiveHub) && staffMayAccessHubForWrite(user, effectiveHub));
   const [users, setUsers] = useState<any[]>([]);
   /** All instructors (every hub) — only populated for admins. */
   const [allInstructors, setAllInstructors] = useState<any[]>([]);
@@ -826,16 +859,16 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
       setLoading(true);
       await dataService.testConnection();
 
-      const isAdmin = user?.userType === 'admin';
+      const isStaff = user?.userType === 'admin' || user?.userType === 'instructor';
       const [usersData, attendanceData, instructorsEveryHub] = await Promise.all([
         dataService.getUsers(effectiveHub),
         dataService.getAttendance(undefined, effectiveHub),
-        isAdmin ? dataService.getInstructors() : Promise.resolve([] as any[]),
+        isStaff ? dataService.getInstructors() : Promise.resolve([] as any[]),
       ]);
 
       setUsers(usersData);
       setAttendance(attendanceData);
-      if (isAdmin) {
+      if (isStaff) {
         setAllInstructors(
           instructorsEveryHub.filter((row: any) => row.email && !isAdminEmail(row.email))
         );
@@ -975,7 +1008,7 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
         undefined,
         true,
         user?.userType === 'instructor' ? 'instructor' : 'admin',
-        effectiveHub
+        targetHubId || effectiveHub
       );
       uniqueToast.success(`${studentName} marked as present!`);
       // Refresh the attendance data
@@ -1002,7 +1035,7 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
       const removed = await AttendanceService.getInstance().unmarkPresentForDate(
         studentId,
         today,
-        effectiveHub || targetHubId
+        targetHubId || effectiveHub
       );
       if (!removed) {
         uniqueToast.info(`${studentName} has no present record for today.`);
@@ -1063,8 +1096,12 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
   };
 
   const handleMarkAllPresent = async () => {
-    if (!hubScopeActive) {
-      uniqueToast.info('Select a single hub so bulk actions apply to that hub only.');
+    if (!hubScopeActive || !canWriteSelectedHub) {
+      uniqueToast.info(
+        user?.userType === 'instructor'
+          ? 'Select your assigned hub before using bulk actions.'
+          : 'Select a single hub so bulk actions apply to that hub only.'
+      );
       return;
     }
     const absentStudents = users.filter(userData => {
@@ -1111,8 +1148,12 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
   };
 
   const handleCheckOutAllOpen = async () => {
-    if (!hubScopeActive) {
-      uniqueToast.info('Select a single hub so check-out applies to that hub only.');
+    if (!hubScopeActive || !canWriteSelectedHub) {
+      uniqueToast.info(
+        user?.userType === 'instructor'
+          ? 'Select your assigned hub before checking out everyone.'
+          : 'Select a single hub so check-out applies to that hub only.'
+      );
       return;
     }
     if (checkoutAllLoading || loading) return;
@@ -1147,8 +1188,7 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
     const uid = u.id || u.uid;
     return !!getTodayAttendance(uid)?.checkInTime;
   }).length;
-  const instructorCount =
-    user?.userType === 'admin' ? allInstructors.length : users.filter((u) => u.userType === 'instructor').length;
+  const instructorCount = allInstructors.length;
 
   return (
     <PageContainer>
@@ -1157,9 +1197,10 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
           <PageHeading>Users</PageHeading>
           <p>
           Manage students below; admins are hidden. Summary cards count students only (instructors have their own card). Check-in and check-out times use Africa/Harare (school time).
-          {user?.userType === 'admin' && ' As an admin, use Hub to view one location or all hubs.'}
+          {(user?.userType === 'admin' || user?.userType === 'instructor') &&
+            ' Use Hub to view one location or all hubs.'}
           {user?.userType === 'instructor' &&
-            ' Instructors can remove students only from their own hub (attendees and students).'}
+            ' Instructors can edit students only in their own assigned hub.'}
         </p>
         </HeaderTitle>
         <HeaderActions>
@@ -1172,14 +1213,14 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
           <SuccessButton
             variant="primary"
             onClick={handleMarkAllPresent}
-            disabled={!hubScopeActive || loading || checkoutAllLoading}
+            disabled={!hubScopeActive || !canWriteSelectedHub || loading || checkoutAllLoading}
           >
             <CheckCircleIcon size={18} /> Mark All Present
           </SuccessButton>
           <Button
             variant="outline"
             onClick={handleCheckOutAllOpen}
-            disabled={!hubScopeActive || loading || checkoutAllLoading}
+            disabled={!hubScopeActive || !canWriteSelectedHub || loading || checkoutAllLoading}
           >
             <InlineIcon>
               <FiLogOut size={18} />
@@ -1340,6 +1381,8 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
             const statusLabel = !hasIn ? 'Not present' : hasOut ? 'Checked out' : 'Checked in';
             const checkInDisp = formatAttTime(todayAttendance?.checkInTime) ?? '—';
             const checkOutDisp = formatAttTime(todayAttendance?.checkOutTime) ?? '—';
+            const canWriteStudentHub =
+              user?.userType === 'admin' || staffMayAccessHubForWrite(user, userData.hubId);
 
             return (
               <TableRow key={userData.id}>
@@ -1358,7 +1401,7 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
                       </TableIcon>
                       {userData.displayName || 'Unknown User'}
                     </UserNameHeading>
-                    <p>{userData.email}</p>
+                    <UserEmail>{userData.email}</UserEmail>
                   </UserDetails>
                 </UserInfo>
 
@@ -1387,10 +1430,12 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
                 </div>
 
                 <ActionButtonsEnd>
-                  <MarkPresentButton onClick={() => handleMarkPresent(uid, userData.displayName || 'Unknown User', userData.hubId)}>
-                    <CheckCircleIcon size={14} /> <span>Mark Present</span>
-                  </MarkPresentButton>
-                  {hasIn && !hasOut && (
+                  {canWriteStudentHub && (
+                    <MarkPresentButton onClick={() => handleMarkPresent(uid, userData.displayName || 'Unknown User', userData.hubId)}>
+                      <CheckCircleIcon size={14} /> <span>Mark Present</span>
+                    </MarkPresentButton>
+                  )}
+                  {canWriteStudentHub && hasIn && !hasOut && (
                     <Button
                       variant="outline"
                       onClick={() => handleUnmarkPresent(uid, userData.displayName || 'Unknown User', userData.hubId)}
@@ -1398,10 +1443,15 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
                       Unmark
                     </Button>
                   )}
-                  {(user?.userType === 'admin' || instructorCanDeleteStudent(userData)) && (
+                  {canWriteStudentHub && (user?.userType === 'admin' || instructorCanDeleteStudent(userData)) && (
                     <DeleteButton variant="ghost" onClick={() => handleOpenDelete(userData)}>
                       Delete
                     </DeleteButton>
+                  )}
+                  {!canWriteStudentHub && (
+                    <ValueTextSmall title="View only. Instructors can edit only their assigned hub.">
+                      View only
+                    </ValueTextSmall>
                   )}
                 </ActionButtonsEnd>
               </TableRow>
@@ -1422,6 +1472,8 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
               const statusLabel = !hasIn ? 'Not present' : hasOut ? 'Checked out' : 'Checked in';
               const checkInDisp = formatAttTime(todayAttendance?.checkInTime) ?? '—';
               const checkOutDisp = formatAttTime(todayAttendance?.checkOutTime) ?? '—';
+              const canWriteStudentHub =
+                user?.userType === 'admin' || staffMayAccessHubForWrite(user, userData.hubId);
 
               return (
                 <MobileUserCard key={`mobile-${userData.id}`}>
@@ -1476,10 +1528,12 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
 
                   <CardSection>
                     <ActionButtons>
-                      <MobileMarkPresentButton onClick={() => handleMarkPresent(uid, userData.displayName || 'Unknown User', userData.hubId)}>
-                        <CheckCircleIcon size={14} /> <span>Mark Present</span>
-                      </MobileMarkPresentButton>
-                      {hasIn && !hasOut && (
+                      {canWriteStudentHub && (
+                        <MobileMarkPresentButton onClick={() => handleMarkPresent(uid, userData.displayName || 'Unknown User', userData.hubId)}>
+                          <CheckCircleIcon size={14} /> <span>Mark Present</span>
+                        </MobileMarkPresentButton>
+                      )}
+                      {canWriteStudentHub && hasIn && !hasOut && (
                         <Button
                           variant="outline"
                           onClick={() => handleUnmarkPresent(uid, userData.displayName || 'Unknown User', userData.hubId)}
@@ -1487,10 +1541,15 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
                           Unmark
                         </Button>
                       )}
-                      {(user?.userType === 'admin' || instructorCanDeleteStudent(userData)) && (
+                      {canWriteStudentHub && (user?.userType === 'admin' || instructorCanDeleteStudent(userData)) && (
                         <DeleteButton variant="outline" size="sm" onClick={() => handleOpenDelete(userData)}>
                           Delete
                         </DeleteButton>
+                      )}
+                      {!canWriteStudentHub && (
+                        <ValueTextSmall title="View only. Instructors can edit only their assigned hub.">
+                          View only
+                        </ValueTextSmall>
                       )}
                     </ActionButtons>
                   </CardSection>
@@ -1500,14 +1559,16 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
           </FullWidthBlock>
         </>
         )}
-        {user?.userType === 'admin' && instructorRows.length > 0 && (
+        {(user?.userType === 'admin' || user?.userType === 'instructor') && instructorRows.length > 0 && (
           <SectionBreak>
             <SectionTitle>
               All instructor accounts (every hub)
             </SectionTitle>
             <SectionCaption>
-              Every instructor in the organization. Last sign-in updates when they open the app (Harare time). Password reset uses Firebase email.
-              Removing a student also removes their Firebase login when Cloud Functions are deployed; otherwise delete the user in Firebase Authentication (Console) so the email can register again.
+              Every instructor in the organization. Last sign-in updates when they open the app (Harare time).
+              {user?.userType === 'admin'
+                ? ' Password reset uses Firebase email. Removing a student also removes their Firebase login when Cloud Functions are deployed; otherwise delete the user in Firebase Authentication (Console) so the email can register again.'
+                : ' Instructor accounts are view-only for instructors.'}
             </SectionCaption>
             <DesktopTable>
               <UsersTable>
@@ -1546,21 +1607,27 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
                           <UserType type="instructor">instructor</UserType>
                         </InstructorTypeCell>
                         <InstructorActionButtons>
-                          <InstructorActionButton
-                            type="button"
-                            variant="outline"
-                            onClick={() => handleSendPasswordReset(row.email)}
-                            disabled={resetSending === row.email || !row.email}
-                          >
-                            <InlineIcon>
-                              <FiLock size={14} />
-                            </InlineIcon>
-                            {resetSending === row.email ? 'Sending…' : 'Password reset email'}
-                          </InstructorActionButton>
-                          {!isSelf && (
-                            <InstructorDeleteButton variant="ghost" onClick={() => handleOpenDelete(row)}>
-                              Remove
-                            </InstructorDeleteButton>
+                          {user?.userType === 'admin' ? (
+                            <>
+                              <InstructorActionButton
+                                type="button"
+                                variant="outline"
+                                onClick={() => handleSendPasswordReset(row.email)}
+                                disabled={resetSending === row.email || !row.email}
+                              >
+                                <InlineIcon>
+                                  <FiLock size={14} />
+                                </InlineIcon>
+                                {resetSending === row.email ? 'Sending…' : 'Password reset email'}
+                              </InstructorActionButton>
+                              {!isSelf && (
+                                <InstructorDeleteButton variant="ghost" onClick={() => handleOpenDelete(row)}>
+                                  Remove
+                                </InstructorDeleteButton>
+                              )}
+                            </>
+                          ) : (
+                            <ValueTextSmall>View only</ValueTextSmall>
                           )}
                         </InstructorActionButtons>
                       </InstructorTableRow>

@@ -72,7 +72,7 @@ const StyledStatCard = styled.div<{ $variant: string; $delay: number; $accentCol
   overflow: hidden;
   ${({ $delay }) => staggeredAnimation($delay)}
   ${respectMotionPreference}
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: border-color 0.2s ease, background 0.2s ease;
   ${({ $variant }) => getVariantStyles($variant)}
 
   &::before {
@@ -86,8 +86,7 @@ const StyledStatCard = styled.div<{ $variant: string; $delay: number; $accentCol
   }
 
   &:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(0, 82, 204, 0.06);
+    border-color: rgba(0, 82, 204, 0.14);
   }
 
   @media (max-width: ${theme.breakpoints.mobile}) {

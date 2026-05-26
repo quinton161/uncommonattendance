@@ -36,7 +36,7 @@ export interface AdminHubScopeSelectProps {
   label?: string;
 }
 
-/** Shown only for admins — filter users and attendance to one hub, or all hubs when empty. */
+/** Staff hub filter — admins and instructors can view one hub or all hubs when empty. */
 export function AdminHubScopeSelect({
   user,
   value,
@@ -56,7 +56,7 @@ export function AdminHubScopeSelect({
     };
   }, []);
 
-  if (user?.userType !== 'admin') return null;
+  if (user?.userType !== 'admin' && user?.userType !== 'instructor') return null;
 
   return (
     <Wrap>

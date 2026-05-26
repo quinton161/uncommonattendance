@@ -27,7 +27,6 @@ import { ToastContainer } from 'react-toastify';
 import { uniqueToast } from './utils/toastUtils';
 import DataService from './services/DataService';
 import { qrCodeService } from './services/qrCodeService';
-import { hubScopeForStaff } from './services/hubService';
 import 'react-toastify/dist/ReactToastify.css';
 import styled from 'styled-components';
 
@@ -96,8 +95,6 @@ const AppRoutes: React.FC = () => {
   }
 
   if (user.userType === 'instructor' || user.userType === 'admin') {
-    const staffHubScope = user.userType === 'admin' ? undefined : hubScopeForStaff(user);
-
     return (
       <Layout>
         <Routes>
@@ -110,8 +107,8 @@ const AppRoutes: React.FC = () => {
             path="/goals"
             element={
               <StudentGoalsBoard
-                hubScopeId={staffHubScope}
-                viewAllHubs={user.userType === 'admin'}
+                            hubScopeId={undefined}
+                            viewAllHubs={user.userType === 'admin' || user.userType === 'instructor'}
               />
             }
           />

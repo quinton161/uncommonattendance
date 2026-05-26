@@ -8,7 +8,7 @@ import DataService from '../../services/DataService';
 import { TimeService } from '../../services/timeService';
 import { uniqueToast } from '../../utils/toastUtils';
 import { useAuth } from '../../contexts/AuthContext';
-import { effectiveStaffHubScope } from '../../services/hubService';
+import { effectiveStaffHubScope, initialStaffHubFilter, staffMayAccessHubForWrite } from '../../services/hubService';
 import { AdminHubScopeSelect } from './AdminHubScopeSelect';
 import { FiChevronLeft, FiCalendar, FiUser, FiCheckCircle, FiClock, FiXCircle, FiTrendingUp, FiLogIn, FiLogOut, FiMapPin } from 'react-icons/fi';
 
@@ -48,11 +48,14 @@ interface Props { onBack?:()=>void; isEmbedded?:boolean; }
 
 export const DailyAttendanceTracker: React.FC<Props> = ({ onBack, isEmbedded=true }) => {
   const { user } = useAuth();
-  const [adminHubFilter, setAdminHubFilter] = useState('');
+  const [adminHubFilter, setAdminHubFilter] = useState(() => initialStaffHubFilter(user));
   const effectiveHub = useMemo(
     () => effectiveStaffHubScope(user, adminHubFilter),
     [user, adminHubFilter]
   );
+  const canClearSelectedHub =
+    user?.userType === 'admin' ||
+    (user?.userType === 'instructor' && Boolean(effectiveHub) && staffMayAccessHubForWrite(user, effectiveHub));
   const ts = TimeService.getInstance();
   const [date,    setDate]    = useState(ts.getCurrentTime());
   const [rows,    setRows]    = useState<StudentRow[]>([]);
@@ -159,10 +162,14 @@ export const DailyAttendanceTracker: React.FC<Props> = ({ onBack, isEmbedded=tru
           <Button variant="outline" onClick={()=>setDate(ts.getCurrentTime())}>Go to Today</Button>
           <Button
             variant="danger"
-            disabled={!effectiveHub}
+            disabled={!effectiveHub || !canClearSelectedHub}
             onClick={async () => {
-              if (!effectiveHub) {
-                uniqueToast.info('Select a single hub first — clear today only removes that hub’s attendance.');
+              if (!effectiveHub || !canClearSelectedHub) {
+                uniqueToast.info(
+                  user?.userType === 'instructor'
+                    ? 'Select your assigned hub first — instructors can clear attendance only for their hub.'
+                    : 'Select a single hub first — clear today only removes that hub’s attendance.'
+                );
                 return;
               }
               if (!window.confirm('Clear today’s attendance records for this hub only?')) return;

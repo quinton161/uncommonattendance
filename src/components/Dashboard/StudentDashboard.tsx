@@ -189,6 +189,28 @@ export function StudentDashboard(): React.ReactElement {
   };
 
   const status = getAttendanceStatus();
+  const checkedInToday = Boolean(todayAttendance?.checkInTime);
+  const checkedOutToday = Boolean(todayAttendance?.checkOutTime);
+  const todayStatusLabel = checkedOutToday
+    ? 'Day completed'
+    : checkedInToday
+      ? todayAttendance?.status === 'late'
+        ? 'Checked in late'
+        : 'Checked in'
+      : 'Not checked in';
+  const nextActionLabel = status === 'checked-out' ? 'Check In' : 'Check Out';
+  const snapshot = {
+    total: attendanceHistory.length,
+    present: attendanceHistory.filter((record) => record.status === 'present' || record.status === 'completed' || (record.isPresent && record.status !== 'late')).length,
+    late: attendanceHistory.filter((record) => record.status === 'late').length,
+    absent: attendanceHistory.filter((record) => record.status === 'absent' || !record.isPresent).length,
+  };
+  const snapshotItems = [
+    { label: 'Records', value: snapshot.total, detail: 'Recent days', color: 'text-[#0052CC]', bg: 'bg-[#EEF4FF]' },
+    { label: 'On time', value: snapshot.present, detail: 'Present records', color: 'text-emerald-700', bg: 'bg-emerald-50' },
+    { label: 'Late', value: snapshot.late, detail: 'Needs attention', color: 'text-amber-700', bg: 'bg-amber-50' },
+    { label: 'Absent', value: snapshot.absent, detail: 'Missed days', color: 'text-red-700', bg: 'bg-red-50' },
+  ];
 
   return (
     <>
@@ -220,6 +242,18 @@ export function StudentDashboard(): React.ReactElement {
           </p>
         </div>
 
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {snapshotItems.map((item) => (
+            <div key={item.label} className="card-white p-4 transition-colors">
+              <div className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider ${item.bg} ${item.color}`}>
+                {item.label}
+              </div>
+              <div className="mt-3 text-2xl font-bold text-gray-900">{loading ? '—' : item.value}</div>
+              <p className="mt-1 text-xs text-gray-400">{item.detail}</p>
+            </div>
+          ))}
+        </div>
+
         {error && (
           <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-center text-sm font-medium text-red-700">
             {error}
@@ -229,6 +263,11 @@ export function StudentDashboard(): React.ReactElement {
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
           <div className="card-white p-6 lg:col-span-1">
             <div className="flex flex-col items-center text-center">
+              <span className={`mb-3 rounded-full px-3 py-1 text-xs font-bold ${
+                checkedInToday ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'
+              }`}>
+                {todayStatusLabel}
+              </span>
               <div
                 className={`mb-4 flex h-16 w-16 items-center justify-center rounded-2xl text-2xl font-bold text-white ${
                   status === 'checked-in'
@@ -240,17 +279,23 @@ export function StudentDashboard(): React.ReactElement {
               </div>
 
               <h3 className="text-lg font-bold text-gray-900">
-                {status === 'checked-in'
-                  ? `Checked in${todayAttendance?.status === 'late' ? ' late' : ''}`
-                  : 'Not checked in'}
+                {status === 'checked-in' ? 'You are currently checked in' : 'Ready for today'}
               </h3>
 
-              {todayAttendance?.checkInTime && (
-                <p className="mb-4 mt-2 text-sm text-gray-500">
-                  Check-in: {formatTime(todayAttendance.checkInTime)}
-                  {todayAttendance.checkOutTime && <> · Check-out: {formatTime(todayAttendance.checkOutTime)}</>}
-                </p>
-              )}
+              <div className="my-4 w-full rounded-2xl bg-[#F8FAFF] p-3 text-left text-sm text-gray-500">
+                <div className="flex items-center justify-between gap-3">
+                  <span>Check-in</span>
+                  <span className="font-semibold text-gray-800">
+                    {todayAttendance?.checkInTime ? formatTime(todayAttendance.checkInTime) : 'Not yet'}
+                  </span>
+                </div>
+                <div className="mt-2 flex items-center justify-between gap-3">
+                  <span>Check-out</span>
+                  <span className="font-semibold text-gray-800">
+                    {todayAttendance?.checkOutTime ? formatTime(todayAttendance.checkOutTime) : 'Not yet'}
+                  </span>
+                </div>
+              </div>
 
               <Button
                 variant={status === 'checked-out' ? 'primary' : 'secondary'}
@@ -260,7 +305,7 @@ export function StudentDashboard(): React.ReactElement {
                 loading={loading}
                 disabled={loading}
               >
-                {status === 'checked-out' ? 'Check In' : 'Check Out'}
+                {nextActionLabel}
               </Button>
             </div>
           </div>

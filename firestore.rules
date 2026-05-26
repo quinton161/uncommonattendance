@@ -77,13 +77,10 @@ service cloud.firestore {
       return isAuth() && request.auth.uid == uid;
     }
 
-    /** Goals under users/{uid}/weeklyGoals — read by owner, any admin, or instructors in same hub as target user */
+    /** Goals under users/{uid}/weeklyGoals — read by owner or staff; writes remain owner/admin scoped below. */
     function canReadUserGoals(userId) {
       return isOwner(userId)
-        || isAdminUser()
-        || (isInstructorUser()
-            && exists(usersPath(userId))
-            && userHubMatchesInstructorScope(get(usersPath(userId)).data));
+        || isStaff();
     }
 
     // Hub registry

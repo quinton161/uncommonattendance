@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { theme } from '../../styles/theme';
 import { Button } from '../Common/Button';
 import DataService from '../../services/DataService';
-import { effectiveStaffHubScope, resolvedHubLabel } from '../../services/hubService';
+import { effectiveStaffHubScope, initialStaffHubFilter, resolvedHubLabel, staffMayAccessHubForWrite } from '../../services/hubService';
 import { AdminHubScopeSelect } from './AdminHubScopeSelect';
 import { AttendanceService } from '../../services/attendanceService';
 import { TimeService } from '../../services/timeService';
@@ -723,7 +723,7 @@ interface AttendancePageProps {
 
 export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
   const { user } = useAuth();
-  const [adminHubFilter, setAdminHubFilter] = useState('');
+  const [adminHubFilter, setAdminHubFilter] = useState(() => initialStaffHubFilter(user));
   const effectiveHub = useMemo(() => effectiveStaffHubScope(user, adminHubFilter), [user, adminHubFilter]);
   const [attendanceSummary, setAttendanceSummary] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -851,6 +851,10 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
   };
 
   const handleOpenAbsenceModal = (record: any) => {
+    if (user?.userType === 'instructor' && !staffMayAccessHubForWrite(user, record.hubId)) {
+      uniqueToast.error('You can only edit absence records for students in your hub.');
+      return;
+    }
     setAbsenceModal({
       userId: record.userId,
       userName: record.userName || 'Student',
@@ -1093,7 +1097,8 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
                 </MetaCell>
                 
                 <ActionButtons>
-                  {(user?.userType === 'admin' || user?.userType === 'instructor') &&
+                  {(user?.userType === 'admin' ||
+                    (user?.userType === 'instructor' && staffMayAccessHubForWrite(user, record.hubId))) &&
                     record.status === 'absent' && (
                       <ActionButton
                         variant="edit"

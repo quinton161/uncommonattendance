@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { StatCard } from '../Common/StatCard';
 import DataService from '../../services/DataService';
 import { qrCodeService } from '../../services/qrCodeService';
-import { DEFAULT_HUBS, fetchHubs, effectiveStaffHubScope, resolvedHubLabel, type Hub } from '../../services/hubService';
+import { DEFAULT_HUBS, fetchHubs, initialStaffHubFilter, resolvedHubLabel, type Hub } from '../../services/hubService';
 import type { DailyQRCode } from '../../services/qrCodeService';
 import { format } from 'date-fns';
 import { Users, CheckCircle2, Clock, XCircle, QrCode, RefreshCw, Copy, TrendingUp, Zap, MapPin, Building2 } from 'lucide-react';
@@ -18,7 +18,7 @@ export const AdminDashboard: React.FC = () => {
   const { user } = useAuth();
   const isGlobalAdmin = user?.userType === 'admin' || user?.userType === 'instructor';
 
-  const defaultHub = effectiveStaffHubScope(user ?? null, '');
+  const defaultHub = initialStaffHubFilter(user ?? null) || undefined;
   const [selectedHub, setSelectedHub] = useState<string | undefined>(defaultHub);
 
   const [todaySummary, setTodaySummary] = useState<any>(null);
@@ -135,6 +135,7 @@ export const AdminDashboard: React.FC = () => {
   const total = students.length;
   const checkedIn = present + late;
   const rate = total > 0 ? Math.round((checkedIn / total) * 100) : 0;
+  const notCheckedIn = Math.max(0, total - checkedIn);
 
   const chartData = [
     { name: 'Present', value: present, color: '#0052CC' },
@@ -142,6 +143,14 @@ export const AdminDashboard: React.FC = () => {
     { name: 'Absent', value: absent, color: '#f87171' },
     { name: 'No data', value: Math.max(0, total - checkedIn - absent), color: '#e0e7ff' },
   ].filter((d) => d.value > 0);
+
+  const glanceItems = [
+    { label: 'Checked in', value: checkedIn, detail: 'Present or late', color: 'text-emerald-700', bg: 'bg-emerald-50' },
+    { label: 'Not checked in', value: notCheckedIn, detail: 'Still expected', color: 'text-slate-700', bg: 'bg-slate-50' },
+    { label: 'Late arrivals', value: late, detail: 'After 9 AM', color: 'text-amber-700', bg: 'bg-amber-50' },
+    { label: 'Attendance rate', value: `${rate}%`, detail: resolvedHubLabel({ hubId: selectedHub }), color: 'text-[#0052CC]', bg: 'bg-[#EEF4FF]' },
+  ];
+
   const greetHour = new Date().getHours();
   const greet = greetHour < 12 ? 'Good morning' : greetHour < 17 ? 'Good afternoon' : 'Good evening';
 
@@ -179,7 +188,7 @@ export const AdminDashboard: React.FC = () => {
             title="All Hubs"
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold whitespace-nowrap transition-all ${
               selectedHub === undefined
-                ? 'bg-[#0052CC] text-white shadow-lg shadow-blue-200'
+                ? 'bg-[#0052CC] text-white'
                 : 'bg-white border border-gray-200 text-gray-600 hover:border-blue-200'
             }`}
           >
@@ -193,7 +202,7 @@ export const AdminDashboard: React.FC = () => {
               title={h.name}
               className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold whitespace-nowrap transition-all ${
                 selectedHub === h.id
-                  ? 'bg-[#0052CC] text-white shadow-lg shadow-blue-200'
+                  ? 'bg-[#0052CC] text-white'
                   : 'bg-white border border-gray-200 text-gray-600 hover:border-blue-200'
               }`}
             >
@@ -208,6 +217,18 @@ export const AdminDashboard: React.FC = () => {
         <StatCard label="Present" value={loading ? '—' : present} icon={<CheckCircle2 size={19} />} color="green" sub="On time" />
         <StatCard label="Late" value={loading ? '—' : late} icon={<Clock size={19} />} color="orange" sub="After 9 AM" />
         <StatCard label="Absent" value={loading ? '—' : absent} icon={<XCircle size={19} />} color="red" sub="No check-in" />
+      </div>
+
+      <div className="gsap-target grid grid-cols-2 xl:grid-cols-4 gap-3">
+        {glanceItems.map((item) => (
+          <div key={item.label} className="rounded-[16px] bg-white border border-[rgba(0,82,204,0.06)] p-4 transition-colors">
+            <div className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider ${item.bg} ${item.color}`}>
+              {item.label}
+            </div>
+            <div className="mt-3 text-2xl font-bold text-gray-900">{loading ? '—' : item.value}</div>
+            <p className="mt-1 text-xs text-gray-400">{item.detail}</p>
+          </div>
+        ))}
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
@@ -260,7 +281,7 @@ export const AdminDashboard: React.FC = () => {
                 <div className="h-2 bg-[#EEF2FF] rounded-full overflow-hidden">
                     <div
                       className="h-full rounded-full transition-all duration-1000"
-                      style={{ width: `${rate}%` }}
+                      style={{ width: `${rate}%`, background: '#0052CC' }}
                     />
                 </div>
               </div>

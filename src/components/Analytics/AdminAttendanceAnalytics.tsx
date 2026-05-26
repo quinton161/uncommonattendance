@@ -26,7 +26,7 @@ import { DateRangeFilter } from './DateRangeFilter';
 import { AttendanceHeatmap } from './AttendanceHeatmap';
 import { format, parseISO } from 'date-fns';
 import { useAuth } from '../../contexts/AuthContext';
-import { effectiveStaffHubScope } from '../../services/hubService';
+import { effectiveStaffHubScope, initialStaffHubFilter } from '../../services/hubService';
 import { AdminHubScopeSelect } from '../Admin/AdminHubScopeSelect';
 import { AttendanceService } from '../../services/attendanceService';
 import { uniqueToast } from '../../utils/toastUtils';
@@ -312,7 +312,7 @@ function fmtShort(dateIso: string) {
 
 export function AdminAttendanceAnalytics(): React.ReactElement {
   const { user } = useAuth();
-  const [adminHubFilter, setAdminHubFilter] = useState('');
+  const [adminHubFilter, setAdminHubFilter] = useState(() => initialStaffHubFilter(user));
   const effectiveHub = useMemo(
     () => effectiveStaffHubScope(user, adminHubFilter),
     [user, adminHubFilter]

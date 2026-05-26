@@ -5,8 +5,9 @@ import { Button } from '../Common/Button';
 import { theme } from '../../styles/theme';
 import { uniqueToast } from '../../utils/toastUtils';
 import DataService from '../../services/DataService';
-import { resolvedHubLabel } from '../../services/hubService';
+import { effectiveStaffHubScope, initialStaffHubFilter, resolvedHubLabel } from '../../services/hubService';
 import { TimeService } from '../../services/timeService';
+import { AdminHubScopeSelect } from '../Admin/AdminHubScopeSelect';
 import type { DailyGoal, GoalStatus, WeeklyGoal } from '../../types/studentGoals';
 import { GOAL_STATUS_LABEL } from '../../types/studentGoals';
 import {
@@ -658,12 +659,9 @@ const HubChip = styled.span`
 `;
 
 export interface StudentGoalsBoardProps {
-  /** When set, staff sees students in this hub (instructors always use their hub). */
+  /** When set, staff sees students in this hub. */
   hubScopeId?: string | null;
-  /**
-   * Admins only: when true with `hubScopeId` unset, load students from every hub.
-   * Instructors should leave this false; they only ever see their hub.
-   */
+  /** Staff-wide view: when true with `hubScopeId` unset, load students from every hub. */
   viewAllHubs?: boolean;
 }
 
@@ -685,8 +683,10 @@ export const StudentGoalsBoard: React.FC<StudentGoalsBoardProps> = ({ hubScopeId
   const isStaff = user?.userType === 'instructor' || user?.userType === 'admin';
   const isAdmin = user?.userType === 'admin';
   const isStudent = user?.userType === 'attendee';
-  const adminAllHubs = Boolean(isAdmin && viewAllHubs);
-  const staffMode = isStaff && (Boolean(hubScopeId) || adminAllHubs);
+  const [staffHubFilter, setStaffHubFilter] = useState(() => hubScopeId || initialStaffHubFilter(user));
+  const effectiveHubScope = hubScopeId || effectiveStaffHubScope(user ?? null, staffHubFilter);
+  const staffAllHubs = Boolean(isStaff && viewAllHubs && !effectiveHubScope);
+  const staffMode = isStaff && (Boolean(effectiveHubScope) || staffAllHubs);
 
   const [studentIds, setStudentIds] = useState<string[]>([]);
   const [studentNames, setStudentNames] = useState<Record<string, string>>({});
@@ -734,10 +734,10 @@ export const StudentGoalsBoard: React.FC<StudentGoalsBoardProps> = ({ hubScopeId
     (async () => {
       try {
         let users: any[];
-        if (adminAllHubs) {
+        if (staffAllHubs) {
           users = await DataService.getInstance().getUsers(undefined);
-        } else if (hubScopeId) {
-          users = await DataService.getInstance().getUsers(hubScopeId);
+        } else if (effectiveHubScope) {
+          users = await DataService.getInstance().getUsers(effectiveHubScope);
         } else {
           if (!cancelled) {
             setStudentIds([]);
@@ -773,7 +773,7 @@ export const StudentGoalsBoard: React.FC<StudentGoalsBoardProps> = ({ hubScopeId
     return () => {
       cancelled = true;
     };
-  }, [staffMode, hubScopeId, adminAllHubs]);
+  }, [staffMode, effectiveHubScope, staffAllHubs]);
 
   useEffect(() => {
     if (!userId || staffMode) return;
@@ -1150,7 +1150,7 @@ export const StudentGoalsBoard: React.FC<StudentGoalsBoardProps> = ({ hubScopeId
                   · {weeks.length} week{weeks.length === 1 ? '' : 's'}
                 </StaffMeta>
               </span>
-              {adminAllHubs && studentHubLabels[sid] ? <HubChip>{studentHubLabels[sid]}</HubChip> : null}
+              {staffAllHubs && studentHubLabels[sid] ? <HubChip>{studentHubLabels[sid]}</HubChip> : null}
             </StaffNameMeta>
           </StaffNameBlock>
           <StaffProgressPill>~{overall}% avg</StaffProgressPill>
@@ -1220,7 +1220,7 @@ export const StudentGoalsBoard: React.FC<StudentGoalsBoardProps> = ({ hubScopeId
     );
   }
 
-  if (isStaff && !hubScopeId && !adminAllHubs) {
+  if (isStaff && !effectiveHubScope && !staffAllHubs) {
     return (
       <PageShell>
         <Page>
@@ -1230,7 +1230,7 @@ export const StudentGoalsBoard: React.FC<StudentGoalsBoardProps> = ({ hubScopeId
                 <HeroEyebrow>Goals</HeroEyebrow>
                 <H1>Student goals</H1>
                 <Sub>
-                  {isAdmin
+                  {isAdmin || user?.userType === 'instructor'
                     ? 'Choose a hub above, or leave “All hubs” to see goals for every student across the organization.'
                     : 'Your instructor hub could not be determined. Check your profile hub assignment, then try again.'}
                 </Sub>
@@ -1268,7 +1268,7 @@ export const StudentGoalsBoard: React.FC<StudentGoalsBoardProps> = ({ hubScopeId
               <Sub>
                 {staffMode
                   ? isAdmin
-                    ? adminAllHubs
+                    ? staffAllHubs
                       ? 'Monitor weekly goals for every student across all hubs. Pick a hub to filter the list.'
                       : 'Monitor weekly scrum goals and daily breakdowns for students in the selected hub.'
                     : 'Monitor weekly scrum goals and daily breakdowns for students in your hub.'
@@ -1278,6 +1278,14 @@ export const StudentGoalsBoard: React.FC<StudentGoalsBoardProps> = ({ hubScopeId
             <LogoWrap>
               <UncommonLogo size="sm" showSubtitle={false} />
             </LogoWrap>
+            {isStaff && (
+              <AdminHubScopeSelect
+                user={user}
+                value={staffHubFilter}
+                onChange={setStaffHubFilter}
+                id="goals-page-hub-filter"
+              />
+            )}
           </HeroTop>
         </Hero>
 

@@ -23,19 +23,19 @@ export function hubIdMatchesScope(
   return false;
 }
 
-/** Instructors see one hub; admins see all (no scope). Missing hubId → legacy Vincent Bohlen site. */
+/** Staff-wide read scope: admins and instructors can view all hubs when no filter is applied. */
 export function hubScopeForStaff(user: User | null): string | undefined {
-  if (!user || user.userType === 'admin') return undefined;
+  if (!user || user.userType === 'admin' || user.userType === 'instructor') return undefined;
   return user.hubId?.trim() || LEGACY_DEFAULT_HUB_ID;
 }
 
 /**
- * Admins may narrow lists to one hub (pass Firestore hub doc id) or leave empty for all hubs.
- * Instructors are always limited to their own `user.hubId`.
+ * Staff may narrow lists to one hub (pass Firestore hub doc id) or leave empty for all hubs.
+ * Writes are still restricted separately by `staffMayAccessHubForWrite`.
  */
 export function effectiveStaffHubScope(user: User | null, adminHubFilter: string): string | undefined {
   if (!user) return undefined;
-  if (user.userType === 'admin') {
+  if (user.userType === 'admin' || user.userType === 'instructor') {
     const id = adminHubFilter?.trim();
     return id || undefined;
   }
@@ -52,6 +52,11 @@ export function effectiveStudentHubId(user: User | null | undefined): string {
 export function instructorAssignedHubId(user: User | null | undefined): string {
   if (!user || user.userType !== 'instructor') return LEGACY_DEFAULT_HUB_ID;
   return user.hubId?.trim() || LEGACY_DEFAULT_HUB_ID;
+}
+
+/** Initial staff filter: instructors land on their assigned hub first; admins land on all hubs. */
+export function initialStaffHubFilter(user: User | null | undefined): string {
+  return user?.userType === 'instructor' ? instructorAssignedHubId(user) : '';
 }
 
 /**
