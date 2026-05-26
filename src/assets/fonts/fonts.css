@@ -1,0 +1,44 @@
+/* Nano Banana + Chillax font fallback setup */
+@font-face {
+  font-family: 'Nano Banana';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Nano Banana'), local('NanoBanana'), local('Nano Banana Regular');
+}
+
+@font-face {
+  font-family: 'Chillax';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Chillax'), local('Chillax Regular');
+}
+
+/* Utility classes for Nano Banana weights */
+.nano-banana-font {
+  font-family: 'Nano Banana', 'Chillax', sans-serif;
+}
+.nano-banana-light {
+  font-family: 'Nano Banana', 'Chillax', sans-serif;
+  font-weight: 300;
+}
+.nano-banana-regular {
+  font-family: 'Nano Banana', 'Chillax', sans-serif;
+  font-weight: 400;
+}
+.nano-banana-medium {
+  font-family: 'Nano Banana', 'Chillax', sans-serif;
+  font-weight: 500;
+}
+.nano-banana-semibold {
+  font-family: 'Nano Banana', 'Chillax', sans-serif;
+  font-weight: 600;
+}
+.nano-banana-bold {
+  font-family: 'Nano Banana', 'Chillax', sans-serif;
+  font-weight: 700;
+}
+
+/* To use local Nano Banana font files, add them to src/assets/fonts
+   and update the src values above with URL paths to those font files. */

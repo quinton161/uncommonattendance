@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chillax Font Demo - Event Management System</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Chillax:wght@300;400;500;600;700;800&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Chillax', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            padding: 40px 20px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding-bottom: 30px;
+            border-bottom: 2px solid #1e40af;
+        }
+        
+        .logo {
+            font-size: 2.5rem;
+            font-weight: 800;
+            color: #1e40af;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            font-size: 1.2rem;
+            color: #475569;
+            font-weight: 400;
+        }
+        
+        .font-showcase {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+        
+        .weight-demo {
+            background: #f8fafc;
+            padding: 25px;
+            border-radius: 15px;
+            border-left: 4px solid #1e40af;
+        }
+        
+        .weight-title {
+            font-size: 1rem;
+            color: #1e40af;
+            font-weight: 600;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .sample-text {
+            margin-bottom: 10px;
+            color: #000;
+        }
+        
+        .light { font-weight: 300; }
+        .regular { font-weight: 400; }
+        .medium { font-weight: 500; }
+        .semibold { font-weight: 600; }
+        .bold { font-weight: 700; }
+        .extrabold { font-weight: 800; }
+        
+        .size-demo {
+            margin-top: 40px;
+        }
+        
+        .size-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #1e40af;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .size-sample {
+            margin-bottom: 15px;
+            color: #000;
+        }
+        
+        .xl { font-size: 3rem; font-weight: 800; }
+        .lg { font-size: 2rem; font-weight: 700; }
+        .md { font-size: 1.5rem; font-weight: 600; }
+        .sm { font-size: 1.2rem; font-weight: 500; }
+        .xs { font-size: 1rem; font-weight: 400; }
+        
+        .features {
+            background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 15px;
+            margin-top: 40px;
+        }
+        
+        .features h3 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+        
+        .feature-item {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .feature-item h4 {
+            font-weight: 600;
+            margin-bottom: 10px;
+            font-size: 1.1rem;
+        }
+        
+        .feature-item p {
+            font-weight: 400;
+            opacity: 0.9;
+            line-height: 1.5;
+        }
+        
+        .alphabet {
+            margin-top: 30px;
+            text-align: center;
+        }
+        
+        .alphabet-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: #1e40af;
+            margin-bottom: 15px;
+        }
+        
+        .alphabet-text {
+            font-size: 1.5rem;
+            font-weight: 500;
+            color: #000;
+            letter-spacing: 2px;
+            line-height: 1.8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">Event Management System</div>
+            <div class="subtitle">Powered by Chillax Typography</div>
+        </div>
+        
+        <div class="font-showcase">
+            <div class="weight-demo">
+                <div class="weight-title">Light (300)</div>
+                <div class="sample-text light">AaBbCcDdEeFfGgHhŞşIıİi Example</div>
+                <div class="sample-text light">Modern Event Management</div>
+            </div>
+            
+            <div class="weight-demo">
+                <div class="weight-title">Regular (400)</div>
+                <div class="sample-text regular">AaBbCcDdEeFfGgHhŞşIıİi Example</div>
+                <div class="sample-text regular">Student Dashboard</div>
+            </div>
+            
+            <div class="weight-demo">
+                <div class="weight-title">Medium (500)</div>
+                <div class="sample-text medium">AaBbCcDdEeFfGgHhŞşIıİi Example</div>
+                <div class="sample-text medium">Admin Panel</div>
+            </div>
+            
+            <div class="weight-demo">
+                <div class="weight-title">Semibold (600)</div>
+                <div class="sample-text semibold">AaBbCcDdEeFfGgHhŞşIıİi Example</div>
+                <div class="sample-text semibold">Event Creation</div>
+            </div>
+            
+            <div class="weight-demo">
+                <div class="weight-title">Bold (700)</div>
+                <div class="sample-text bold">AaBbCcDdEeFfGgHhŞşIıİi Example</div>
+                <div class="sample-text bold">Attendance Tracking</div>
+            </div>
+            
+            <div class="weight-demo">
+                <div class="weight-title">Extrabold (800)</div>
+                <div class="sample-text extrabold">AaBbCcDdEeFfGgHhŞşIıİi Example</div>
+                <div class="sample-text extrabold">Welcome Dashboard</div>
+            </div>
+        </div>
+        
+        <div class="size-demo">
+            <div class="size-title">Typography Scale</div>
+            <div class="size-sample xl">Event Management</div>
+            <div class="size-sample lg">Student Dashboard</div>
+            <div class="size-sample md">Check-in System</div>
+            <div class="size-sample sm">Profile Settings</div>
+            <div class="size-sample xs">Navigation Menu</div>
+        </div>
+        
+        <div class="alphabet">
+            <div class="alphabet-title">Complete Character Set</div>
+            <div class="alphabet-text">
+                AaBbCcDdEeFfGgHhŞşIıİi<br>
+                JjKkLlMmNnOoPpQqRrSsTt<br>
+                UuVvWwXxYyZz 0123456789<br>
+                !@#$%^&*()_+-=[]{}|;:'"<br>
+                .,<>?/~`
+            </div>
+        </div>
+        
+        <div class="features">
+            <h3>Chillax Font Features</h3>
+            <div class="feature-grid">
+                <div class="feature-item">
+                    <h4>Modern & Clean</h4>
+                    <p>Perfect for contemporary web applications with a professional look</p>
+                </div>
+                <div class="feature-item">
+                    <h4>Multiple Weights</h4>
+                    <p>6 font weights from Light (300) to Extrabold (800) for versatile typography</p>
+                </div>
+                <div class="feature-item">
+                    <h4>Excellent Readability</h4>
+                    <p>Optimized for both headings and body text across all screen sizes</p>
+                </div>
+                <div class="feature-item">
+                    <h4>International Support</h4>
+                    <p>Supports extended Latin characters including Turkish (Şş, Iı, İi)</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

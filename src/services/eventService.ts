@@ -1,0 +1,357 @@
+import { 
+  collection, 
+  doc, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc, 
+  getDoc, 
+  getDocs, 
+  query, 
+  where, 
+  orderBy, 
+  limit,
+  Timestamp 
+} from 'firebase/firestore';
+import { db } from './firebase';
+import { Event, TicketType, Registration, EventResource, Feedback } from '../types';
+
+export class EventService {
+  private static instance: EventService;
+
+  static getInstance(): EventService {
+    if (!EventService.instance) {
+      EventService.instance = new EventService();
+    }
+    return EventService.instance;
+  }
+
+  // Event Management
+  async createEvent(eventData: Omit<Event, 'id' | 'createdAt' | 'instructor'>): Promise<string> {
+    try {
+      const docRef = await addDoc(collection(db, 'events'), {
+        ...eventData,
+        createdAt: Timestamp.now(),
+        startDate: Timestamp.fromDate(eventData.startDate),
+        endDate: Timestamp.fromDate(eventData.endDate),
+      });
+      return docRef.id;
+    } catch (error) {
+      console.error('Error creating event:', error);
+      throw error;
+    }
+  }
+
+  async updateEvent(eventId: string, eventData: Partial<Event>): Promise<void> {
+    try {
+      const eventRef = doc(db, 'events', eventId);
+      const updateData: any = { ...eventData };
+      
+      // Convert dates to Timestamps if they exist
+      if (eventData.startDate) {
+        updateData.startDate = Timestamp.fromDate(eventData.startDate);
+      }
+      if (eventData.endDate) {
+        updateData.endDate = Timestamp.fromDate(eventData.endDate);
+      }
+      
+      await updateDoc(eventRef, updateData);
+    } catch (error) {
+      console.error('Error updating event:', error);
+      throw error;
+    }
+  }
+
+  async deleteEvent(eventId: string): Promise<void> {
+    try {
+      await deleteDoc(doc(db, 'events', eventId));
+    } catch (error) {
+      console.error('Error deleting event:', error);
+      throw error;
+    }
+  }
+
+  async getEvent(eventId: string): Promise<Event | null> {
+    try {
+      const docRef = doc(db, 'events', eventId);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        return {
+          id: docSnap.id,
+          ...data,
+          startDate: data.startDate.toDate(),
+          endDate: data.endDate.toDate(),
+          createdAt: data.createdAt.toDate(),
+        } as Event;
+      }
+      return null;
+    } catch (error) {
+      console.error('Error getting event:', error);
+      throw error;
+    }
+  }
+
+  async getUserEvents(userId: string): Promise<Event[]> {
+    try {
+      const q = query(
+        collection(db, 'events'),
+        where('instructorId', '==', userId),
+        orderBy('createdAt', 'desc')
+      );
+      const querySnapshot = await getDocs(q);
+      
+      return querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        startDate: doc.data().startDate.toDate(),
+        endDate: doc.data().endDate.toDate(),
+        createdAt: doc.data().createdAt.toDate(),
+      })) as Event[];
+    } catch (error) {
+      console.error('Error getting user events:', error);
+      throw error;
+    }
+  }
+
+  async getPublicEvents(): Promise<Event[]> {
+    try {
+      // Try the optimized query first (requires index)
+      const q = query(
+        collection(db, 'events'),
+        where('isPublic', '==', true),
+        where('eventStatus', '==', 'published'),
+        orderBy('startDate', 'asc'),
+        limit(50)
+      );
+      const querySnapshot = await getDocs(q);
+      
+      return querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        startDate: doc.data().startDate.toDate(),
+        endDate: doc.data().endDate.toDate(),
+        createdAt: doc.data().createdAt.toDate(),
+      })) as Event[];
+    } catch (error) {
+      console.error('Error getting public events:', error);
+      
+      // Fallback: Try without the compound index if it's still building
+      if (error instanceof Error && error.message.includes('requires an index')) {
+        console.log('🔄 Index still building, using fallback query...');
+        try {
+          const fallbackQ = query(
+            collection(db, 'events'),
+            where('isPublic', '==', true),
+            orderBy('startDate', 'asc'),
+            limit(50)
+          );
+          const fallbackSnapshot = await getDocs(fallbackQ);
+          
+          return fallbackSnapshot.docs
+            .map(doc => {
+              const data = doc.data() as any;
+              return {
+                id: doc.id,
+                ...data,
+                startDate: data.startDate.toDate(),
+                endDate: data.endDate.toDate(),
+                createdAt: data.createdAt.toDate(),
+              };
+            })
+            .filter(event => event.eventStatus === 'published') as Event[];
+        } catch (fallbackError) {
+          console.error('Fallback query also failed:', fallbackError);
+          throw fallbackError;
+        }
+      }
+      
+      throw error;
+    }
+  }
+
+  // Ticket Type Management
+  async createTicketType(ticketData: Omit<TicketType, 'id' | 'createdAt'>): Promise<string> {
+    try {
+      const docRef = await addDoc(collection(db, 'ticketTypes'), {
+        ...ticketData,
+        createdAt: Timestamp.now(),
+      });
+      return docRef.id;
+    } catch (error) {
+      console.error('Error creating ticket type:', error);
+      throw error;
+    }
+  }
+
+  async getEventTicketTypes(eventId: string): Promise<TicketType[]> {
+    try {
+      const q = query(
+        collection(db, 'ticketTypes'),
+        where('eventId', '==', eventId)
+      );
+      const querySnapshot = await getDocs(q);
+      
+      return querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        createdAt: doc.data().createdAt.toDate(),
+      })) as TicketType[];
+    } catch (error) {
+      console.error('Error getting ticket types:', error);
+      throw error;
+    }
+  }
+
+  // Registration Management
+  async registerForEvent(
+    userId: string, 
+    eventId: string, 
+    ticketTypeId: string, 
+    notes?: string
+  ): Promise<string> {
+    try {
+      const docRef = await addDoc(collection(db, 'registrations'), {
+        userId,
+        eventId,
+        ticketTypeId,
+        notes: notes || '',
+        status: 'pending',
+        registrationDate: Timestamp.now(),
+        createdAt: Timestamp.now(),
+      });
+      return docRef.id;
+    } catch (error) {
+      console.error('Error registering for event:', error);
+      throw error;
+    }
+  }
+
+  async cancelRegistration(registrationId: string): Promise<void> {
+    try {
+      await updateDoc(doc(db, 'registrations', registrationId), {
+        status: 'cancelled'
+      });
+    } catch (error) {
+      console.error('Error cancelling registration:', error);
+      throw error;
+    }
+  }
+
+  async getUserRegistrations(userId: string): Promise<Registration[]> {
+    try {
+      const q = query(
+        collection(db, 'registrations'),
+        where('userId', '==', userId),
+        orderBy('createdAt', 'desc')
+      );
+      const querySnapshot = await getDocs(q);
+      
+      return querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        registrationDate: doc.data().registrationDate.toDate(),
+        createdAt: doc.data().createdAt.toDate(),
+      })) as Registration[];
+    } catch (error) {
+      console.error('Error getting user registrations:', error);
+      throw error;
+    }
+  }
+
+  async getEventRegistrations(eventId: string): Promise<Registration[]> {
+    try {
+      const q = query(
+        collection(db, 'registrations'),
+        where('eventId', '==', eventId),
+        orderBy('createdAt', 'desc')
+      );
+      const querySnapshot = await getDocs(q);
+      
+      return querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        registrationDate: doc.data().registrationDate.toDate(),
+        createdAt: doc.data().createdAt.toDate(),
+      })) as Registration[];
+    } catch (error) {
+      console.error('Error getting event registrations:', error);
+      throw error;
+    }
+  }
+
+  // Feedback Management
+  async submitFeedback(
+    userId: string,
+    eventId: string,
+    rating: number,
+    comment?: string
+  ): Promise<string> {
+    try {
+      const docRef = await addDoc(collection(db, 'feedback'), {
+        userId,
+        eventId,
+        rating,
+        comment: comment || '',
+        createdAt: Timestamp.now(),
+      });
+      return docRef.id;
+    } catch (error) {
+      console.error('Error submitting feedback:', error);
+      throw error;
+    }
+  }
+
+  async getEventFeedback(eventId: string): Promise<Feedback[]> {
+    try {
+      const q = query(
+        collection(db, 'feedback'),
+        where('eventId', '==', eventId),
+        orderBy('createdAt', 'desc')
+      );
+      const querySnapshot = await getDocs(q);
+      
+      return querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        createdAt: doc.data().createdAt.toDate(),
+      })) as Feedback[];
+    } catch (error) {
+      console.error('Error getting event feedback:', error);
+      throw error;
+    }
+  }
+
+  // Event Resources Management
+  async addEventResource(resourceData: Omit<EventResource, 'id' | 'createdAt'>): Promise<string> {
+    try {
+      const docRef = await addDoc(collection(db, 'eventResources'), {
+        ...resourceData,
+        createdAt: Timestamp.now(),
+      });
+      return docRef.id;
+    } catch (error) {
+      console.error('Error adding event resource:', error);
+      throw error;
+    }
+  }
+
+  async getEventResources(eventId: string): Promise<EventResource[]> {
+    try {
+      const q = query(
+        collection(db, 'eventResources'),
+        where('eventId', '==', eventId),
+        orderBy('createdAt', 'desc')
+      );
+      const querySnapshot = await getDocs(q);
+      
+      return querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        createdAt: doc.data().createdAt.toDate(),
+      })) as EventResource[];
+    } catch (error) {
+      console.error('Error getting event resources:', error);
+      throw error;
+    }
+  }
+}

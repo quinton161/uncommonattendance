@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Delete Users - Firebase Admin</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .warning {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        button {
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background-color: #c82333;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        .log {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+        input[type="email"], input[type="password"] {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Delete Users from Firebase</h1>
+        
+        <div class="warning">
+            <strong>⚠️ WARNING:</strong> This will permanently delete users and all their data from the database. This action cannot be undone!
+        </div>
+
+        <div id="message"></div>
+
+        <h3>Admin Login</h3>
+        <input type="email" id="adminEmail" placeholder="Admin email" value="">
+        <input type="password" id="adminPassword" placeholder="Admin password">
+        <button onclick="loginAdmin()">Login as Admin</button>
+
+        <h3>Delete Users</h3>
+        <button onclick="deleteUser('bongelwa')" id="deleteBongelwa" disabled>Delete User: bongelwa</button>
+        <button onclick="deleteUser('ashely')" id="deleteAshely" disabled>Delete User: ashely</button>
+        <button onclick="deleteBothUsers()" id="deleteBoth" disabled>Delete Both Users</button>
+
+        <div id="log" class="log"></div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+
+    <script>
+        // Firebase configuration (use your existing config)
+        const firebaseConfig = {
+            apiKey: "AIzaSyBkC7A3PjX9sY8Z2tU7V8wX9yZ2a3b4c5d",
+            authDomain: "uncommonattendance.firebaseapp.com",
+            projectId: "uncommonattendance",
+            storageBucket: "uncommonattendance.appspot.com",
+            messagingSenderId: "123456789012",
+            appId: "1:123456789012:web:abcdef1234567890abcdef12"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        let adminUser = null;
+
+        function log(message) {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logDiv.textContent += `[${timestamp}] ${message}\n`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function showMessage(message, type = 'info') {
+            const messageDiv = document.getElementById('message');
+            messageDiv.className = type;
+            messageDiv.textContent = message;
+            setTimeout(() => {
+                messageDiv.textContent = '';
+                messageDiv.className = '';
+            }, 5000);
+        }
+
+        async function loginAdmin() {
+            const email = document.getElementById('adminEmail').value;
+            const password = document.getElementById('adminPassword').value;
+
+            if (!email || !password) {
+                showMessage('Please enter admin email and password', 'error');
+                return;
+            }
+
+            try {
+                log('🔐 Attempting admin login...');
+                await auth.signInWithEmailAndPassword(email, password);
+                adminUser = auth.currentUser;
+                log(`✅ Admin logged in: ${adminUser.email}`);
+                
+                // Enable delete buttons
+                document.getElementById('deleteBongelwa').disabled = false;
+                document.getElementById('deleteAshely').disabled = false;
+                document.getElementById('deleteBoth').disabled = false;
+                
+                showMessage('Admin login successful! You can now delete users.', 'success');
+            } catch (error) {
+                log(`❌ Login failed: ${error.message}`);
+                showMessage(`Login failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function findUser(username) {
+            log(`🔍 Searching for user: ${username}`);
+            
+            // Try to find user by display name
+            const usersRef = db.collection('users');
+            const displayNameQuery = await usersRef.where('displayName', '==', username).get();
+            
+            if (!displayNameQuery.empty) {
+                const userDoc = displayNameQuery.docs[0];
+                const userData = userDoc.data();
+                log(`👤 Found user by display name: ${userData.displayName} (${userData.email}) - ID: ${userDoc.id}`);
+                return { id: userDoc.id, data: userData };
+            }
+            
+            // Try common email patterns
+            const emailPatterns = [
+                `${username}@example.com`,
+                `${username}@gmail.com`,
+                `${username}@yahoo.com`,
+                `${username}@hotmail.com`
+            ];
+            
+            for (const email of emailPatterns) {
+                const emailQuery = await usersRef.where('email', '==', email).get();
+                if (!emailQuery.empty) {
+                    const userDoc = emailQuery.docs[0];
+                    const userData = userDoc.data();
+                    log(`👤 Found user by email: ${userData.displayName} (${userData.email}) - ID: ${userDoc.id}`);
+                    return { id: userDoc.id, data: userData };
+                }
+            }
+            
+            log(`⚠️ User ${username} not found`);
+            return null;
+        }
+
+        async function deleteUserFromCollections(userId, username) {
+            const collections = [
+                { name: 'users', fields: ['uid'] },
+                { name: 'attendance', fields: ['studentId'] },
+                { name: 'dailyAttendance', fields: ['studentId'] },
+                { name: 'events', fields: ['organizerId'] },
+                { name: 'registrations', fields: ['userId'] }
+            ];
+
+            let totalDeleted = 0;
+
+            for (const collection of collections) {
+                try {
+                    const collectionRef = db.collection(collection.name);
+                    
+                    for (const field of collection.fields) {
+                        const query = await collectionRef.where(field, '==', userId).get();
+                        
+                        for (const doc of query.docs) {
+                            await doc.ref.delete();
+                            totalDeleted++;
+                            log(`  🗑️ Deleted from ${collection.name}: ${doc.id}`);
+                        }
+                    }
+                } catch (error) {
+                    log(`  ⚠️ Error processing ${collection.name}: ${error.message}`);
+                }
+            }
+
+            return totalDeleted;
+        }
+
+        async function deleteUser(username) {
+            if (!adminUser) {
+                showMessage('Please login as admin first', 'error');
+                return;
+            }
+
+            if (!confirm(`Are you sure you want to delete user "${username}" and all their data? This cannot be undone!`)) {
+                return;
+            }
+
+            try {
+                log(`\n🔧 Starting deletion for user: ${username}`);
+                
+                const user = await findUser(username);
+                if (!user) {
+                    showMessage(`User ${username} not found`, 'error');
+                    return;
+                }
+
+                // Delete from all collections
+                const deletedCount = await deleteUserFromCollections(user.id, username);
+                
+                // Try to delete from Auth (this might fail if not an admin)
+                try {
+                    await adminUser.delete();
+                    log(`  🔐 Note: Auth deletion requires Firebase Admin SDK`);
+                } catch (authError) {
+                    log(`  ⚠️ Auth deletion skipped (requires admin privileges): ${authError.message}`);
+                }
+
+                log(`✅ Completed deletion for ${username}. Total documents deleted: ${deletedCount + 1}`);
+                showMessage(`Successfully deleted user ${username}`, 'success');
+                
+            } catch (error) {
+                log(`❌ Error deleting user ${username}: ${error.message}`);
+                showMessage(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function deleteBothUsers() {
+            if (!confirm('Are you sure you want to delete BOTH users (bongelwa and ashely) and all their data? This cannot be undone!')) {
+                return;
+            }
+            
+            await deleteUser('bongelwa');
+            await deleteUser('ashely');
+        }
+
+        // Initialize
+        log('🚀 User deletion tool ready');
+        log('📝 Please login as admin to proceed');
+    </script>
+</body>
+</html>

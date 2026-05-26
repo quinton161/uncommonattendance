@@ -1,0 +1,674 @@
+extend type Mutation {
+  """
+  ✨ Insert a single `Event` into the table and return its key. Columns not specified in `data` will receive defaults (e.g. `null`).
+  """
+  event_insert(
+    """
+    Data object to insert into the table.
+    """
+    data: Event_Data!
+  ): Event_KeyOutput! @fdc_generated(from: "Event", purpose: INSERT_SINGLE)
+  """
+  ✨ Insert a single `EventResource` into the table and return its key. Columns not specified in `data` will receive defaults (e.g. `null`).
+  """
+  eventResource_insert(
+    """
+    Data object to insert into the table.
+    """
+    data: EventResource_Data!
+  ): EventResource_KeyOutput! @fdc_generated(from: "EventResource", purpose: INSERT_SINGLE)
+  """
+  ✨ Insert a single `Feedback` into the table and return its key. Columns not specified in `data` will receive defaults (e.g. `null`).
+  """
+  feedback_insert(
+    """
+    Data object to insert into the table.
+    """
+    data: Feedback_Data!
+  ): Feedback_KeyOutput! @fdc_generated(from: "Feedback", purpose: INSERT_SINGLE)
+  """
+  ✨ Insert a single `Registration` into the table and return its key. Columns not specified in `data` will receive defaults (e.g. `null`).
+  """
+  registration_insert(
+    """
+    Data object to insert into the table.
+    """
+    data: Registration_Data!
+  ): Registration_KeyOutput! @fdc_generated(from: "Registration", purpose: INSERT_SINGLE)
+  """
+  ✨ Insert a single `TicketType` into the table and return its key. Columns not specified in `data` will receive defaults (e.g. `null`).
+  """
+  ticketType_insert(
+    """
+    Data object to insert into the table.
+    """
+    data: TicketType_Data!
+  ): TicketType_KeyOutput! @fdc_generated(from: "TicketType", purpose: INSERT_SINGLE)
+  """
+  ✨ Insert a single `User` into the table and return its key. Columns not specified in `data` will receive defaults (e.g. `null`).
+  """
+  user_insert(
+    """
+    Data object to insert into the table.
+    """
+    data: User_Data!
+  ): User_KeyOutput! @fdc_generated(from: "User", purpose: INSERT_SINGLE)
+  """
+  ✨ Insert `Event` objects into the table and return their keys. Columns not specified in `data` will receive defaults (e.g. `null`).
+  """
+  event_insertMany(
+    """
+    List of data objects to insert into the table.
+    """
+    data: [Event_Data!]!
+  ): [Event_KeyOutput!]! @fdc_generated(from: "Event", purpose: INSERT_MULTIPLE)
+  """
+  ✨ Insert `EventResource` objects into the table and return their keys. Columns not specified in `data` will receive defaults (e.g. `null`).
+  """
+  eventResource_insertMany(
+    """
+    List of data objects to insert into the table.
+    """
+    data: [EventResource_Data!]!
+  ): [EventResource_KeyOutput!]! @fdc_generated(from: "EventResource", purpose: INSERT_MULTIPLE)
+  """
+  ✨ Insert `Feedback` objects into the table and return their keys. Columns not specified in `data` will receive defaults (e.g. `null`).
+  """
+  feedback_insertMany(
+    """
+    List of data objects to insert into the table.
+    """
+    data: [Feedback_Data!]!
+  ): [Feedback_KeyOutput!]! @fdc_generated(from: "Feedback", purpose: INSERT_MULTIPLE)
+  """
+  ✨ Insert `Registration` objects into the table and return their keys. Columns not specified in `data` will receive defaults (e.g. `null`).
+  """
+  registration_insertMany(
+    """
+    List of data objects to insert into the table.
+    """
+    data: [Registration_Data!]!
+  ): [Registration_KeyOutput!]! @fdc_generated(from: "Registration", purpose: INSERT_MULTIPLE)
+  """
+  ✨ Insert `TicketType` objects into the table and return their keys. Columns not specified in `data` will receive defaults (e.g. `null`).
+  """
+  ticketType_insertMany(
+    """
+    List of data objects to insert into the table.
+    """
+    data: [TicketType_Data!]!
+  ): [TicketType_KeyOutput!]! @fdc_generated(from: "TicketType", purpose: INSERT_MULTIPLE)
+  """
+  ✨ Insert `User` objects into the table and return their keys. Columns not specified in `data` will receive defaults (e.g. `null`).
+  """
+  user_insertMany(
+    """
+    List of data objects to insert into the table.
+    """
+    data: [User_Data!]!
+  ): [User_KeyOutput!]! @fdc_generated(from: "User", purpose: INSERT_MULTIPLE)
+  """
+  ✨ Insert or update a single `Event` into the table, based on the primary key. Returns the key of the newly inserted or existing updated `Event`.
+  """
+  event_upsert(
+    """
+    Data object to insert or update if it already exists.
+    """
+    data: Event_Data!
+  ): Event_KeyOutput! @fdc_generated(from: "Event", purpose: UPSERT_SINGLE)
+  """
+  ✨ Insert or update a single `EventResource` into the table, based on the primary key. Returns the key of the newly inserted or existing updated `EventResource`.
+  """
+  eventResource_upsert(
+    """
+    Data object to insert or update if it already exists.
+    """
+    data: EventResource_Data!
+  ): EventResource_KeyOutput! @fdc_generated(from: "EventResource", purpose: UPSERT_SINGLE)
+  """
+  ✨ Insert or update a single `Feedback` into the table, based on the primary key. Returns the key of the newly inserted or existing updated `Feedback`.
+  """
+  feedback_upsert(
+    """
+    Data object to insert or update if it already exists.
+    """
+    data: Feedback_Data!
+  ): Feedback_KeyOutput! @fdc_generated(from: "Feedback", purpose: UPSERT_SINGLE)
+  """
+  ✨ Insert or update a single `Registration` into the table, based on the primary key. Returns the key of the newly inserted or existing updated `Registration`.
+  """
+  registration_upsert(
+    """
+    Data object to insert or update if it already exists.
+    """
+    data: Registration_Data!
+  ): Registration_KeyOutput! @fdc_generated(from: "Registration", purpose: UPSERT_SINGLE)
+  """
+  ✨ Insert or update a single `TicketType` into the table, based on the primary key. Returns the key of the newly inserted or existing updated `TicketType`.
+  """
+  ticketType_upsert(
+    """
+    Data object to insert or update if it already exists.
+    """
+    data: TicketType_Data!
+  ): TicketType_KeyOutput! @fdc_generated(from: "TicketType", purpose: UPSERT_SINGLE)
+  """
+  ✨ Insert or update a single `User` into the table, based on the primary key. Returns the key of the newly inserted or existing updated `User`.
+  """
+  user_upsert(
+    """
+    Data object to insert or update if it already exists.
+    """
+    data: User_Data!
+  ): User_KeyOutput! @fdc_generated(from: "User", purpose: UPSERT_SINGLE)
+  """
+  ✨ Insert or update `Event` objects into the table, based on the primary key. Returns the key of the newly inserted or existing updated `Event`.
+  """
+  event_upsertMany(
+    """
+    List of data objects to insert or update if it already exists.
+    """
+    data: [Event_Data!]!
+  ): [Event_KeyOutput!]! @fdc_generated(from: "Event", purpose: UPSERT_MULTIPLE)
+  """
+  ✨ Insert or update `EventResource` objects into the table, based on the primary key. Returns the key of the newly inserted or existing updated `EventResource`.
+  """
+  eventResource_upsertMany(
+    """
+    List of data objects to insert or update if it already exists.
+    """
+    data: [EventResource_Data!]!
+  ): [EventResource_KeyOutput!]! @fdc_generated(from: "EventResource", purpose: UPSERT_MULTIPLE)
+  """
+  ✨ Insert or update `Feedback` objects into the table, based on the primary key. Returns the key of the newly inserted or existing updated `Feedback`.
+  """
+  feedback_upsertMany(
+    """
+    List of data objects to insert or update if it already exists.
+    """
+    data: [Feedback_Data!]!
+  ): [Feedback_KeyOutput!]! @fdc_generated(from: "Feedback", purpose: UPSERT_MULTIPLE)
+  """
+  ✨ Insert or update `Registration` objects into the table, based on the primary key. Returns the key of the newly inserted or existing updated `Registration`.
+  """
+  registration_upsertMany(
+    """
+    List of data objects to insert or update if it already exists.
+    """
+    data: [Registration_Data!]!
+  ): [Registration_KeyOutput!]! @fdc_generated(from: "Registration", purpose: UPSERT_MULTIPLE)
+  """
+  ✨ Insert or update `TicketType` objects into the table, based on the primary key. Returns the key of the newly inserted or existing updated `TicketType`.
+  """
+  ticketType_upsertMany(
+    """
+    List of data objects to insert or update if it already exists.
+    """
+    data: [TicketType_Data!]!
+  ): [TicketType_KeyOutput!]! @fdc_generated(from: "TicketType", purpose: UPSERT_MULTIPLE)
+  """
+  ✨ Insert or update `User` objects into the table, based on the primary key. Returns the key of the newly inserted or existing updated `User`.
+  """
+  user_upsertMany(
+    """
+    List of data objects to insert or update if it already exists.
+    """
+    data: [User_Data!]!
+  ): [User_KeyOutput!]! @fdc_generated(from: "User", purpose: UPSERT_MULTIPLE)
+  """
+  ✨ Update a single `Event` based on `id`, `key` or `first`, setting columns specified in `data`. Returns the key of the updated `Event` or `null` if not found.
+  """
+  event_update(
+    """
+    The unique ID of the object.
+    """
+    id: UUID
+
+    """
+    The key used to identify the object.
+    """
+    key: Event_Key
+
+    """
+    Fetch the first row based on the filters and ordering.
+    """
+    first: Event_FirstRow
+
+    """
+    Data object containing fields to be updated.
+    """
+    data: Event_Data!
+  ): Event_KeyOutput @fdc_generated(from: "Event", purpose: UPDATE_SINGLE)
+  """
+  ✨ Update a single `EventResource` based on `id`, `key` or `first`, setting columns specified in `data`. Returns the key of the updated `EventResource` or `null` if not found.
+  """
+  eventResource_update(
+    """
+    The unique ID of the object.
+    """
+    id: UUID
+
+    """
+    The key used to identify the object.
+    """
+    key: EventResource_Key
+
+    """
+    Fetch the first row based on the filters and ordering.
+    """
+    first: EventResource_FirstRow
+
+    """
+    Data object containing fields to be updated.
+    """
+    data: EventResource_Data!
+  ): EventResource_KeyOutput @fdc_generated(from: "EventResource", purpose: UPDATE_SINGLE)
+  """
+  ✨ Update a single `Feedback` based on `id`, `key` or `first`, setting columns specified in `data`. Returns the key of the updated `Feedback` or `null` if not found.
+  """
+  feedback_update(
+    """
+    The unique ID of the object.
+    """
+    id: UUID
+
+    """
+    The key used to identify the object.
+    """
+    key: Feedback_Key
+
+    """
+    Fetch the first row based on the filters and ordering.
+    """
+    first: Feedback_FirstRow
+
+    """
+    Data object containing fields to be updated.
+    """
+    data: Feedback_Data!
+  ): Feedback_KeyOutput @fdc_generated(from: "Feedback", purpose: UPDATE_SINGLE)
+  """
+  ✨ Update a single `Registration` based on `id`, `key` or `first`, setting columns specified in `data`. Returns the key of the updated `Registration` or `null` if not found.
+  """
+  registration_update(
+    """
+    The unique ID of the object.
+    """
+    id: UUID
+
+    """
+    The key used to identify the object.
+    """
+    key: Registration_Key
+
+    """
+    Fetch the first row based on the filters and ordering.
+    """
+    first: Registration_FirstRow
+
+    """
+    Data object containing fields to be updated.
+    """
+    data: Registration_Data!
+  ): Registration_KeyOutput @fdc_generated(from: "Registration", purpose: UPDATE_SINGLE)
+  """
+  ✨ Update a single `TicketType` based on `id`, `key` or `first`, setting columns specified in `data`. Returns the key of the updated `TicketType` or `null` if not found.
+  """
+  ticketType_update(
+    """
+    The unique ID of the object.
+    """
+    id: UUID
+
+    """
+    The key used to identify the object.
+    """
+    key: TicketType_Key
+
+    """
+    Fetch the first row based on the filters and ordering.
+    """
+    first: TicketType_FirstRow
+
+    """
+    Data object containing fields to be updated.
+    """
+    data: TicketType_Data!
+  ): TicketType_KeyOutput @fdc_generated(from: "TicketType", purpose: UPDATE_SINGLE)
+  """
+  ✨ Update a single `User` based on `id`, `key` or `first`, setting columns specified in `data`. Returns the key of the updated `User` or `null` if not found.
+  """
+  user_update(
+    """
+    The unique ID of the object.
+    """
+    id: UUID
+
+    """
+    The key used to identify the object.
+    """
+    key: User_Key
+
+    """
+    Fetch the first row based on the filters and ordering.
+    """
+    first: User_FirstRow
+
+    """
+    Data object containing fields to be updated.
+    """
+    data: User_Data!
+  ): User_KeyOutput @fdc_generated(from: "User", purpose: UPDATE_SINGLE)
+  """
+  ✨ Update `Event` objects matching `where` conditions (or `all`, if true) according to `data`. Returns the number of rows updated.
+  """
+  event_updateMany(
+    """
+    Filter condition to specify which rows to update.
+    """
+    where: Event_Filter
+
+    """
+    Set to true to update all rows.
+    """
+    all: Boolean = false
+
+    """
+    Data object containing fields to update.
+    """
+    data: Event_Data!
+  ): Int! @fdc_generated(from: "Event", purpose: UPDATE_MULTIPLE)
+  """
+  ✨ Update `EventResource` objects matching `where` conditions (or `all`, if true) according to `data`. Returns the number of rows updated.
+  """
+  eventResource_updateMany(
+    """
+    Filter condition to specify which rows to update.
+    """
+    where: EventResource_Filter
+
+    """
+    Set to true to update all rows.
+    """
+    all: Boolean = false
+
+    """
+    Data object containing fields to update.
+    """
+    data: EventResource_Data!
+  ): Int! @fdc_generated(from: "EventResource", purpose: UPDATE_MULTIPLE)
+  """
+  ✨ Update `Feedback` objects matching `where` conditions (or `all`, if true) according to `data`. Returns the number of rows updated.
+  """
+  feedback_updateMany(
+    """
+    Filter condition to specify which rows to update.
+    """
+    where: Feedback_Filter
+
+    """
+    Set to true to update all rows.
+    """
+    all: Boolean = false
+
+    """
+    Data object containing fields to update.
+    """
+    data: Feedback_Data!
+  ): Int! @fdc_generated(from: "Feedback", purpose: UPDATE_MULTIPLE)
+  """
+  ✨ Update `Registration` objects matching `where` conditions (or `all`, if true) according to `data`. Returns the number of rows updated.
+  """
+  registration_updateMany(
+    """
+    Filter condition to specify which rows to update.
+    """
+    where: Registration_Filter
+
+    """
+    Set to true to update all rows.
+    """
+    all: Boolean = false
+
+    """
+    Data object containing fields to update.
+    """
+    data: Registration_Data!
+  ): Int! @fdc_generated(from: "Registration", purpose: UPDATE_MULTIPLE)
+  """
+  ✨ Update `TicketType` objects matching `where` conditions (or `all`, if true) according to `data`. Returns the number of rows updated.
+  """
+  ticketType_updateMany(
+    """
+    Filter condition to specify which rows to update.
+    """
+    where: TicketType_Filter
+
+    """
+    Set to true to update all rows.
+    """
+    all: Boolean = false
+
+    """
+    Data object containing fields to update.
+    """
+    data: TicketType_Data!
+  ): Int! @fdc_generated(from: "TicketType", purpose: UPDATE_MULTIPLE)
+  """
+  ✨ Update `User` objects matching `where` conditions (or `all`, if true) according to `data`. Returns the number of rows updated.
+  """
+  user_updateMany(
+    """
+    Filter condition to specify which rows to update.
+    """
+    where: User_Filter
+
+    """
+    Set to true to update all rows.
+    """
+    all: Boolean = false
+
+    """
+    Data object containing fields to update.
+    """
+    data: User_Data!
+  ): Int! @fdc_generated(from: "User", purpose: UPDATE_MULTIPLE)
+  """
+  ✨ Delete a single `Event` based on `id`, `key` or `first` and return its key (or `null` if not found).
+  """
+  event_delete(
+    """
+    The unique ID of the object.
+    """
+    id: UUID
+
+    """
+    The key used to identify the object.
+    """
+    key: Event_Key
+
+    """
+    Fetch the first row based on the filters and ordering.
+    """
+    first: Event_FirstRow
+  ): Event_KeyOutput @fdc_generated(from: "Event", purpose: DELETE_SINGLE)
+  """
+  ✨ Delete a single `EventResource` based on `id`, `key` or `first` and return its key (or `null` if not found).
+  """
+  eventResource_delete(
+    """
+    The unique ID of the object.
+    """
+    id: UUID
+
+    """
+    The key used to identify the object.
+    """
+    key: EventResource_Key
+
+    """
+    Fetch the first row based on the filters and ordering.
+    """
+    first: EventResource_FirstRow
+  ): EventResource_KeyOutput @fdc_generated(from: "EventResource", purpose: DELETE_SINGLE)
+  """
+  ✨ Delete a single `Feedback` based on `id`, `key` or `first` and return its key (or `null` if not found).
+  """
+  feedback_delete(
+    """
+    The unique ID of the object.
+    """
+    id: UUID
+
+    """
+    The key used to identify the object.
+    """
+    key: Feedback_Key
+
+    """
+    Fetch the first row based on the filters and ordering.
+    """
+    first: Feedback_FirstRow
+  ): Feedback_KeyOutput @fdc_generated(from: "Feedback", purpose: DELETE_SINGLE)
+  """
+  ✨ Delete a single `Registration` based on `id`, `key` or `first` and return its key (or `null` if not found).
+  """
+  registration_delete(
+    """
+    The unique ID of the object.
+    """
+    id: UUID
+
+    """
+    The key used to identify the object.
+    """
+    key: Registration_Key
+
+    """
+    Fetch the first row based on the filters and ordering.
+    """
+    first: Registration_FirstRow
+  ): Registration_KeyOutput @fdc_generated(from: "Registration", purpose: DELETE_SINGLE)
+  """
+  ✨ Delete a single `TicketType` based on `id`, `key` or `first` and return its key (or `null` if not found).
+  """
+  ticketType_delete(
+    """
+    The unique ID of the object.
+    """
+    id: UUID
+
+    """
+    The key used to identify the object.
+    """
+    key: TicketType_Key
+
+    """
+    Fetch the first row based on the filters and ordering.
+    """
+    first: TicketType_FirstRow
+  ): TicketType_KeyOutput @fdc_generated(from: "TicketType", purpose: DELETE_SINGLE)
+  """
+  ✨ Delete a single `User` based on `id`, `key` or `first` and return its key (or `null` if not found).
+  """
+  user_delete(
+    """
+    The unique ID of the object.
+    """
+    id: UUID
+
+    """
+    The key used to identify the object.
+    """
+    key: User_Key
+
+    """
+    Fetch the first row based on the filters and ordering.
+    """
+    first: User_FirstRow
+  ): User_KeyOutput @fdc_generated(from: "User", purpose: DELETE_SINGLE)
+  """
+  ✨ Delete `Event` objects matching `where` conditions (or `all`, if true). Returns the number of rows deleted.
+  """
+  event_deleteMany(
+    """
+    Filter condition to specify which rows to delete.
+    """
+    where: Event_Filter
+
+    """
+    Set to true to delete all rows.
+    """
+    all: Boolean = false
+  ): Int! @fdc_generated(from: "Event", purpose: DELETE_MULTIPLE)
+  """
+  ✨ Delete `EventResource` objects matching `where` conditions (or `all`, if true). Returns the number of rows deleted.
+  """
+  eventResource_deleteMany(
+    """
+    Filter condition to specify which rows to delete.
+    """
+    where: EventResource_Filter
+
+    """
+    Set to true to delete all rows.
+    """
+    all: Boolean = false
+  ): Int! @fdc_generated(from: "EventResource", purpose: DELETE_MULTIPLE)
+  """
+  ✨ Delete `Feedback` objects matching `where` conditions (or `all`, if true). Returns the number of rows deleted.
+  """
+  feedback_deleteMany(
+    """
+    Filter condition to specify which rows to delete.
+    """
+    where: Feedback_Filter
+
+    """
+    Set to true to delete all rows.
+    """
+    all: Boolean = false
+  ): Int! @fdc_generated(from: "Feedback", purpose: DELETE_MULTIPLE)
+  """
+  ✨ Delete `Registration` objects matching `where` conditions (or `all`, if true). Returns the number of rows deleted.
+  """
+  registration_deleteMany(
+    """
+    Filter condition to specify which rows to delete.
+    """
+    where: Registration_Filter
+
+    """
+    Set to true to delete all rows.
+    """
+    all: Boolean = false
+  ): Int! @fdc_generated(from: "Registration", purpose: DELETE_MULTIPLE)
+  """
+  ✨ Delete `TicketType` objects matching `where` conditions (or `all`, if true). Returns the number of rows deleted.
+  """
+  ticketType_deleteMany(
+    """
+    Filter condition to specify which rows to delete.
+    """
+    where: TicketType_Filter
+
+    """
+    Set to true to delete all rows.
+    """
+    all: Boolean = false
+  ): Int! @fdc_generated(from: "TicketType", purpose: DELETE_MULTIPLE)
+  """
+  ✨ Delete `User` objects matching `where` conditions (or `all`, if true). Returns the number of rows deleted.
+  """
+  user_deleteMany(
+    """
+    Filter condition to specify which rows to delete.
+    """
+    where: User_Filter
+
+    """
+    Set to true to delete all rows.
+    """
+    all: Boolean = false
+  ): Int! @fdc_generated(from: "User", purpose: DELETE_MULTIPLE)
+}

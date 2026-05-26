@@ -1,0 +1,12 @@
+node_modules
+npm-debug.log
+.git
+.firebase
+.firebaserc
+.env.example
+test-firebase.html
+create-test-user.html
+debug-login.html
+location-setup.html
+users-temp.json
+test-users.json

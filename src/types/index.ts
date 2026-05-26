@@ -1,0 +1,242 @@
+// Event Management System Types
+
+export interface User {
+  uid: string;
+  displayName: string;
+  email: string;
+  /** Lowercase copy for duplicate checks in Firestore */
+  emailLower?: string;
+  createdAt: Date;
+  photoUrl?: string;
+  bio?: string;
+  /** Program / cohort label (student-editable in profile) */
+  course?: string;
+  profession?: string;
+  /** Optional bootcamp roster ID (e.g. UN-2026-195) for exports */
+  bootcampStudentId?: string;
+  userType: 'instructor' | 'attendee' | 'admin';
+  /** Firestore `hubs` doc id — students/instructors work in one hub at a time */
+  hubId?: string;
+  hubName?: string;
+  /**
+   * True when Firebase Auth has a Google user but no `users/{uid}` document yet.
+   * User must complete registration (role + hub) before using the app.
+   */
+  needsProfileCompletion?: boolean;
+}
+
+export interface Event {
+  id: string;
+  title: string;
+  startDate: Date;
+  endDate: Date;
+  location: string;
+  description: string;
+  createdAt: Date;
+  instructor: User;
+  instructorId: string;
+  capacity?: number;
+  imageUrl?: string;
+  isPublic: boolean;
+  eventStatus: 'draft' | 'published' | 'cancelled' | 'completed';
+}
+
+export interface TicketType {
+  id: string;
+  name: string;
+  price: number;
+  capacity: number;
+  createdAt: Date;
+  event: Event;
+  eventId: string;
+  description?: string;
+  accessLevel: 'general' | 'vip' | 'premium';
+}
+
+export interface Registration {
+  id: string;
+  registrationDate: Date;
+  status: 'pending' | 'confirmed' | 'cancelled' | 'attended';
+  createdAt: Date;
+  user: User;
+  userId: string;
+  event: Event;
+  eventId: string;
+  ticketType: TicketType;
+  ticketTypeId: string;
+  notes?: string;
+}
+
+export interface EventResource {
+  id: string;
+  title: string;
+  resourceType: 'document' | 'video' | 'audio' | 'image' | 'link';
+  url: string;
+  createdAt: Date;
+  event: Event;
+  eventId: string;
+  description?: string;
+  accessLevel: 'public' | 'registered' | 'premium';
+}
+
+export interface Feedback {
+  id: string;
+  rating: number; // 1-5 stars
+  createdAt: Date;
+  user: User;
+  userId: string;
+  event: Event;
+  eventId: string;
+  comment?: string;
+}
+
+// Legacy types for attendance system (still used by some components)
+export type AttendanceStatus = 'present' | 'late' | 'absent' | 'completed';
+
+/** Staff-recorded absence classification (required when status is explicitly absent). */
+export type AbsenceReason = 'excused' | 'unexcused' | 'dropout';
+
+export interface AttendanceRecord {
+  id: string;
+  studentId: string;
+  studentName: string;
+  checkInTime: Date;
+  checkOutTime?: Date;
+  /** When staff records an explicit absence (no check-in). */
+  absenceReason?: AbsenceReason;
+  absenceNotes?: string;
+  recordedByUid?: string;
+  recordedByName?: string;
+  location?: {
+    // IP-based location (primary)
+    ip?: string;
+    timestamp?: number;
+    // Legacy coordinates (deprecated - kept for backward compatibility)
+    latitude?: number;
+    longitude?: number;
+    address?: string;
+  };
+  date: string; // YYYY-MM-DD format
+  isPresent: boolean;
+  status?: AttendanceStatus;
+  /** Student self check-in after 9:00 AM Harare (when required). */
+  lateReason?: string;
+  /** Student “goal of the day” captured at self check-in. */
+  checkInGoal?: string;
+}
+
+export interface LocationData {
+  latitude?: number;
+  longitude?: number;
+  accuracy?: number;
+  timestamp?: number;
+  ip?: string;
+  address?: string;
+}
+
+// Context Types
+export type HubSelection = { id: string; name: string };
+
+export interface AuthContextType {
+  user: User | null;
+  loading: boolean;
+  login: (email: string, password: string, hub?: HubSelection) => Promise<void>;
+  register: (
+    email: string,
+    password: string,
+    displayName: string,
+    userType: User['userType'],
+    hub?: HubSelection
+  ) => Promise<void>;
+  logout: () => Promise<void>;
+  updateProfile: (data: Partial<User>) => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
+  deleteAccount: () => Promise<void>;
+  loginWithGoogle: (hub?: HubSelection) => Promise<void>;
+  /** Persist hub for students/instructors (e.g. first login or change hub). */
+  setHub: (hub: HubSelection) => Promise<void>;
+  /** Create Firestore profile after first Google sign-in (no existing user doc). */
+  completeGoogleProfile: (
+    displayName: string,
+    userType: User['userType'],
+    hub?: HubSelection
+  ) => Promise<void>;
+  /** Sign out and abandon in-progress Google registration. */
+  cancelGoogleRegistration: () => Promise<void>;
+}
+
+export interface EventContextType {
+  events: Event[];
+  loading: boolean;
+  createEvent: (eventData: Omit<Event, 'id' | 'createdAt' | 'instructor'>) => Promise<string>;
+  updateEvent: (eventId: string, eventData: Partial<Event>) => Promise<void>;
+  deleteEvent: (eventId: string) => Promise<void>;
+  getEvent: (eventId: string) => Promise<Event | null>;
+  getUserEvents: (userId: string) => Promise<Event[]>;
+  getPublicEvents: () => Promise<Event[]>;
+}
+
+export interface RegistrationContextType {
+  registrations: Registration[];
+  loading: boolean;
+  registerForEvent: (eventId: string, ticketTypeId: string, notes?: string) => Promise<string>;
+  cancelRegistration: (registrationId: string) => Promise<void>;
+  getUserRegistrations: (userId: string) => Promise<Registration[]>;
+  getEventRegistrations: (eventId: string) => Promise<Registration[]>;
+}
+
+// ==================== Calling System Types ====================
+
+export type CallType = 'voice' | 'video';
+export type CallStatus = 'ringing' | 'active' | 'ended' | 'declined' | 'missed';
+
+export interface CallSession {
+  id: string;
+  callerId: string;
+  callerName: string;
+  calleeId: string;
+  calleeName: string;
+  type: CallType;
+  status: CallStatus;
+  startedAt: any;
+  endedAt?: any;
+  duration?: number; // in seconds
+}
+
+export interface SignalingMessage {
+  id: string;
+  type: 'offer' | 'answer' | 'ice-candidate' | 'call-request' | 'call-response' | 'call-ended';
+  callId: string;
+  senderId: string;
+  senderName: string;
+  receiverId: string;
+  data?: {
+    sdp?: string; // for offer/answer
+    candidate?: RTCIceCandidateInit; // for ICE
+    callType?: CallType;
+    response?: 'accept' | 'decline';
+  };
+  timestamp: any;
+}
+
+export interface UserPresence {
+  userId: string;
+  displayName: string;
+  isOnline: boolean;
+  lastSeen: any;
+  lastActive: any;
+}
+
+export interface MessageStatus {
+  messageId: string;
+  status: 'sent' | 'delivered' | 'read';
+  updatedAt: any;
+}
+
+export interface TypingIndicator {
+  conversationId: string;
+  userId: string;
+  userName: string;
+  isTyping: boolean;
+  timestamp: any;
+}

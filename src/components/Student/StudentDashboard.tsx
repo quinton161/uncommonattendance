@@ -1,0 +1,484 @@
+import React, { useState, useEffect } from 'react';
+import styled from 'styled-components';
+import { useAuth } from '../../contexts/AuthContext';
+import { AttendanceService } from '../../services/attendanceService';
+import { TimeService } from '../../services/timeService';
+import { effectiveStudentHubId } from '../../services/hubService';
+import { LateCheckInReasonModal } from './LateCheckInReasonModal';
+import { CheckInDailyGoalModal } from './CheckInDailyGoalModal';
+import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
+import { Layout, Container, AppHeader } from '../Common/Layout';
+import { Button } from '../Common/Button';
+import { Card } from '../Common/Card';
+import { AttendanceRecord, LocationData } from '../../types';
+import { theme } from '../../styles/theme';
+
+const DashboardContainer = styled.div`
+  padding: ${theme.spacing.xl} 0;
+  min-height: calc(100vh - 64px);
+`;
+
+const WelcomeSection = styled.div`
+  text-align: center;
+  margin-bottom: ${theme.spacing.xl};
+`;
+
+const WelcomeTitle = styled.h1`
+  color: ${theme.colors.textPrimary};
+  margin-bottom: ${theme.spacing.sm};
+  font-weight: ${theme.fontWeights.bold};
+  font-size: ${theme.fontSizes['2xl']};
+`;
+
+const WelcomeSubtitle = styled.p`
+  color: ${theme.colors.textSecondary};
+  font-size: ${theme.fontSizes.lg};
+`;
+
+const ActionSection = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: ${theme.spacing.lg};
+  margin-bottom: ${theme.spacing.xl};
+`;
+
+const StatusCard = styled(Card)<{ status: 'checked-in' | 'checked-out' }>`
+  text-align: center;
+  background: linear-gradient(135deg, ${theme.colors.primary}10 0%, ${theme.colors.secondary}10 100%);
+  border: 2px solid ${({ status }) => {
+    switch (status) {
+      case 'checked-in': return theme.colors.success;
+      case 'checked-out': return theme.colors.gray300;
+      default: return theme.colors.gray300;
+    }
+  }};
+`;
+
+const StatusIcon = styled.div<{ status: 'checked-in' | 'checked-out' }>`
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  margin: 0 auto ${theme.spacing.md};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: ${theme.fontSizes['2xl']};
+  background: linear-gradient(135deg, ${({ status }) => {
+    switch (status) {
+      case 'checked-in': return theme.colors.success;
+      case 'checked-out': return theme.colors.gray400;
+      default: return theme.colors.gray400;
+    }
+  }}, ${({ status }) => {
+    switch (status) {
+      case 'checked-in': return theme.colors.primary;
+      case 'checked-out': return theme.colors.gray500;
+      default: return theme.colors.gray500;
+    }
+  }});
+  color: ${theme.colors.white};
+`;
+
+const StatusText = styled.h3`
+  margin-bottom: ${theme.spacing.sm};
+  color: ${theme.colors.textPrimary};
+  font-weight: ${theme.fontWeights.semibold};
+`;
+
+const StatusTime = styled.p`
+  color: ${theme.colors.textSecondary};
+  font-size: ${theme.fontSizes.sm};
+  margin-bottom: ${theme.spacing.md};
+`;
+
+
+const ErrorMessage = styled.div`
+  background-color: ${theme.colors.danger}10;
+  border: 1px solid ${theme.colors.danger}30;
+  color: ${theme.colors.danger};
+  padding: ${theme.spacing.sm};
+  border-radius: ${theme.borderRadius.md};
+  font-size: ${theme.fontSizes.sm};
+  text-align: center;
+  margin-bottom: ${theme.spacing.md};
+`;
+
+const HistorySection = styled.div`
+  margin-top: ${theme.spacing.xl};
+`;
+
+const HistoryTitle = styled.h2`
+  margin-bottom: ${theme.spacing.lg};
+  color: ${theme.colors.textPrimary};
+  font-weight: ${theme.fontWeights.semibold};
+  display: flex;
+  align-items: center;
+  gap: ${theme.spacing.sm};
+`;
+
+const HistoryGrid = styled.div`
+  display: grid;
+  gap: ${theme.spacing.md};
+`;
+
+const HistoryItem = styled(Card)`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: linear-gradient(135deg, ${theme.colors.primary}5 0%, ${theme.colors.secondary}5 100%);
+  
+  @media (max-width: ${theme.breakpoints.mobile}) {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: ${theme.spacing.sm};
+  }
+`;
+
+const HistoryDate = styled.div`
+  font-weight: ${theme.fontWeights.medium};
+  color: ${theme.colors.textPrimary};
+`;
+
+const HistoryTimes = styled.div`
+  display: flex;
+  gap: ${theme.spacing.md};
+  font-size: ${theme.fontSizes.sm};
+  color: ${theme.colors.textSecondary};
+  
+  @media (max-width: ${theme.breakpoints.mobile}) {
+    flex-direction: column;
+    gap: ${theme.spacing.xs};
+  }
+`;
+
+const HeaderButtons = styled.div`
+  display: flex;
+  gap: ${theme.spacing.sm};
+  align-items: center;
+`;
+
+interface StudentDashboardProps {
+  onNavigateToProfile?: () => void;
+}
+
+export function StudentDashboard({ onNavigateToProfile }: StudentDashboardProps): React.ReactElement {
+  const { user, logout } = useAuth();
+  const studentHubId = effectiveStudentHubId(user ?? undefined);
+  const [todayAttendance, setTodayAttendance] = useState<AttendanceRecord | null>(null);
+  const [attendanceHistory, setAttendanceHistory] = useState<AttendanceRecord[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [lateReasonModalOpen, setLateReasonModalOpen] = useState(false);
+  const [checkInGoalModalOpen, setCheckInGoalModalOpen] = useState(false);
+  const [lateReasonPendingForGoal, setLateReasonPendingForGoal] = useState<string | null>(null);
+  useBodyScrollLock(lateReasonModalOpen || checkInGoalModalOpen);
+
+  const attendanceService = AttendanceService.getInstance();
+
+  useEffect(() => {
+    loadTodayAttendance();
+    loadAttendanceHistory();
+  }, [user, studentHubId]);
+
+  const loadTodayAttendance = async () => {
+    if (!user) return;
+    
+    try {
+      const attendance = await attendanceService.getTodayAttendance(user.uid, studentHubId);
+      setTodayAttendance(attendance);
+    } catch (err) {
+      console.error('Failed to load today attendance:', err);
+    }
+  };
+
+  const loadAttendanceHistory = async () => {
+    if (!user) return;
+    
+    try {
+      const history = await attendanceService.getAttendanceHistory(user.uid, 10, studentHubId);
+      setAttendanceHistory(history);
+    } catch (err) {
+      console.error('Failed to load attendance history:', err);
+    }
+  };
+
+  const runCheckIn = async (lateReason?: string, checkInGoal?: string) => {
+    if (!user) return;
+    setLoading(true);
+    setError('');
+
+    try {
+      const fallbackName =
+        user.displayName?.trim() ||
+        user.email?.split('@')[0]?.trim() ||
+        'Student';
+
+      let userIp = '0.0.0.0';
+      try {
+        const ipResponse = await fetch('https://api.ipify.org?format=json');
+        if (ipResponse.ok) {
+          const ipData = await ipResponse.json();
+          userIp = ipData.ip || userIp;
+        }
+      } catch (e) {
+        // Ignore IP failures
+      }
+
+      const locationData: LocationData = {
+        ip: userIp,
+        timestamp: Date.now(),
+      };
+
+      const attendance = await attendanceService.checkIn(
+        user.uid,
+        fallbackName,
+        undefined,
+        locationData,
+        false,
+        'qr',
+        studentHubId,
+        lateReason,
+        checkInGoal
+      );
+      setTodayAttendance(attendance);
+      await loadAttendanceHistory();
+    } catch (err: any) {
+      console.error('❌ Check-in failed:', err);
+      setError(err.message || 'Failed to check in');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCheckIn = async () => {
+    if (!user) return;
+    if (
+      !window.confirm(
+        'Check in for today? Your attendance will be recorded for your hub.'
+      )
+    ) {
+      return;
+    }
+    const ts = TimeService.getInstance();
+    if (ts.isLate(ts.getCurrentTime())) {
+      setLateReasonModalOpen(true);
+      return;
+    }
+    setLateReasonPendingForGoal(null);
+    setCheckInGoalModalOpen(true);
+  };
+
+  const handleLateReasonSubmit = async (reason: string) => {
+    setLateReasonModalOpen(false);
+    setLateReasonPendingForGoal(reason);
+    setCheckInGoalModalOpen(true);
+  };
+
+  const handleCheckInGoalSubmit = async (goal: string) => {
+    try {
+      await runCheckIn(lateReasonPendingForGoal ?? undefined, goal);
+      setCheckInGoalModalOpen(false);
+      setLateReasonPendingForGoal(null);
+    } catch {
+      /* error surfaced via setError in runCheckIn */
+    }
+  };
+
+  const handleCheckOut = async () => {
+    if (!user) return;
+    if (
+      !window.confirm(
+        'Check out now? This completes today’s session.'
+      )
+    ) {
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      let userIp = '0.0.0.0';
+      try {
+        const ipResponse = await fetch('https://api.ipify.org?format=json');
+        if (ipResponse.ok) {
+          const ipData = await ipResponse.json();
+          userIp = ipData.ip || userIp;
+        }
+      } catch (e) {
+        // Ignore IP failures
+      }
+
+      const locationData: LocationData = {
+        ip: userIp,
+        timestamp: Date.now(),
+      };
+
+      const attendance = await attendanceService.checkOut(user.uid, locationData, studentHubId);
+      setTodayAttendance(attendance);
+      await loadAttendanceHistory();
+    } catch (err: any) {
+      console.error('❌ Check-out failed:', err);
+      setError(err.message || 'Failed to check out');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (err) {
+      console.error('Failed to logout:', err);
+    }
+  };
+
+  const getAttendanceStatus = (): 'checked-in' | 'checked-out' => {
+    if (!todayAttendance) return 'checked-out';
+    if (todayAttendance.checkInTime && !todayAttendance.checkOutTime) return 'checked-in';
+    return 'checked-out';
+  };
+
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+  };
+
+  const status = getAttendanceStatus();
+
+  return (
+    <Layout>
+      <LateCheckInReasonModal
+        open={lateReasonModalOpen}
+        onClose={() => setLateReasonModalOpen(false)}
+        onSubmit={handleLateReasonSubmit}
+      />
+      <CheckInDailyGoalModal
+        open={checkInGoalModalOpen}
+        onClose={() => {
+          setCheckInGoalModalOpen(false);
+          setLateReasonPendingForGoal(null);
+        }}
+        onSubmit={handleCheckInGoalSubmit}
+      />
+      <AppHeader>
+        <HeaderButtons>
+          {onNavigateToProfile && (
+            <Button variant="ghost" onClick={onNavigateToProfile}>
+              Profile
+            </Button>
+          )}
+          <Button variant="outline" onClick={handleLogout}>
+            Logout
+          </Button>
+        </HeaderButtons>
+      </AppHeader>
+      
+      <DashboardContainer>
+        <Container>
+          <WelcomeSection>
+            <WelcomeTitle>Welcome back, {user?.displayName}!</WelcomeTitle>
+            <WelcomeSubtitle>
+              {new Date().toLocaleDateString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+              })}
+            </WelcomeSubtitle>
+          </WelcomeSection>
+
+          {error && <ErrorMessage>{error}</ErrorMessage>}
+
+          <ActionSection>
+            <StatusCard status={status}>
+              <StatusIcon status={status}>
+                {status === 'checked-in' ? '✓' : '○'}
+              </StatusIcon>
+              
+              <StatusText>
+                {status === 'checked-in'
+                  ? `Checked In${todayAttendance?.status === 'late' ? ' (Late)' : ''}`
+                  : 'Not Checked In'}
+              </StatusText>
+              
+              {todayAttendance?.checkInTime && (
+                <StatusTime>
+                  Check-in: {formatTime(todayAttendance.checkInTime)}
+                  {todayAttendance.checkOutTime && (
+                    <> • Check-out: {formatTime(todayAttendance.checkOutTime)}</>
+                  )}
+                </StatusTime>
+              )}
+
+
+              {status === 'checked-out' ? (
+                <Button
+                  variant="primary"
+                  size="lg"
+                  fullWidth
+                  onClick={handleCheckIn}
+                  loading={loading}
+                  disabled={loading}
+                >
+                  Check In
+                </Button>
+              ) : (
+                <Button
+                  variant="secondary"
+                  size="lg"
+                  fullWidth
+                  onClick={handleCheckOut}
+                  loading={loading}
+                  disabled={loading}
+                >
+                  Check Out
+                </Button>
+              )}
+            </StatusCard>
+          </ActionSection>
+
+          <HistorySection>
+            <HistoryTitle>Recent Attendance</HistoryTitle>
+            <HistoryGrid>
+              {attendanceHistory.length === 0 ? (
+                <Card>
+                  <p style={{ textAlign: 'center', color: theme.colors.textSecondary }}>
+                    No attendance history yet
+                  </p>
+                </Card>
+              ) : (
+                attendanceHistory.map((record) => (
+                  <HistoryItem key={record.id}>
+                    <HistoryDate>
+                      {formatDate(record.date)}
+                    </HistoryDate>
+                    <HistoryTimes>
+                      <span>In: {formatTime(record.checkInTime)}</span>
+                      {record.checkOutTime && (
+                        <span>Out: {formatTime(record.checkOutTime)}</span>
+                      )}
+                    </HistoryTimes>
+                  </HistoryItem>
+                ))
+              )}
+            </HistoryGrid>
+          </HistorySection>
+        </Container>
+      </DashboardContainer>
+    </Layout>
+  );
+}

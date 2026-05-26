@@ -1,0 +1,229 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    function usersPath(uid) {
+      return /databases/$(database)/documents/users/$(uid);
+    }
+
+    function authUserData() {
+      return get(usersPath(request.auth.uid)).data;
+    }
+
+    function isSignedInUserDoc() {
+      return exists(usersPath(request.auth.uid));
+    }
+
+    function isStaff() {
+      return isAuth() && isSignedInUserDoc() &&
+        authUserData().userType in ['admin', 'instructor'];
+    }
+
+    function isAdminUser() {
+      return isAuth() && isSignedInUserDoc() && authUserData().userType == 'admin';
+    }
+
+    function isInstructorUser() {
+      return isAuth() && isSignedInUserDoc() && authUserData().userType == 'instructor';
+    }
+
+    /** Mirrors hubService LEGACY_DEFAULT_HUB_ID + hubIdMatchesScope. */
+    function legacyHubId() {
+      return 'uncommon_victoriafalls';
+    }
+
+    function effectiveHubOnUserDoc(data) {
+      return (!('hubId' in data) || data.hubId == null || data.hubId == '')
+        ? ''
+        : data.hubId;
+    }
+
+    function instructorAssignedHubId() {
+      let h = effectiveHubOnUserDoc(authUserData());
+      return h == '' ? legacyHubId() : h;
+    }
+
+    function hubRecordMatchesInstructorScope(recordHubEffective) {
+      let scope = instructorAssignedHubId();
+      return recordHubEffective == scope || (scope == legacyHubId() && recordHubEffective == '');
+    }
+
+    function userHubMatchesInstructorScope(userData) {
+      let r = effectiveHubOnUserDoc(userData);
+      return hubRecordMatchesInstructorScope(r);
+    }
+
+    /** Attendance row hub field (optional). */
+    function effectiveHubOnAttendance(data) {
+      return (!('hubId' in data) || data.hubId == null || data.hubId == '')
+        ? ''
+        : data.hubId;
+    }
+
+    function attendanceMatchesInstructorScope(attData) {
+      return hubRecordMatchesInstructorScope(effectiveHubOnAttendance(attData));
+    }
+
+    function dailyDocStudentUid(recordId) {
+      return recordId.split('_')[0];
+    }
+
+    function isOwner(uid) {
+      return isAuth() && request.auth.uid == uid;
+    }
+
+    /** Goals under users/{uid}/weeklyGoals — read by owner, any admin, or instructors in same hub as target user */
+    function canReadUserGoals(userId) {
+      return isOwner(userId)
+        || isAdminUser()
+        || (isInstructorUser()
+            && exists(usersPath(userId))
+            && userHubMatchesInstructorScope(get(usersPath(userId)).data));
+    }
+
+    // Hub registry
+    match /hubs/{hubId} {
+      allow read: if isAuth();
+      allow write: if isAdminUser();
+    }
+
+    match /users/{userId} {
+      allow read: if isAuth();
+      allow create: if isAuth();
+      allow update: if isOwner(userId)
+        || isAdminUser()
+        || (isInstructorUser()
+            && exists(usersPath(userId))
+            && userHubMatchesInstructorScope(get(usersPath(userId)).data)
+            && userHubMatchesInstructorScope(request.resource.data));
+      allow delete: if isAdminUser()
+        || (isInstructorUser() && userHubMatchesInstructorScope(resource.data));
+
+      /** Scrum-style weekly + daily goals (student-owned; instructors read same hub; admins read all) */
+      match /weeklyGoals/{weeklyGoalId} {
+        allow read: if canReadUserGoals(userId);
+        allow create: if isAuth() && isOwner(userId);
+        allow update: if isAuth() && isOwner(userId);
+        allow delete: if isAuth() && (isOwner(userId) || isAdminUser());
+
+        match /dailyGoals/{dailyGoalId} {
+          allow read: if canReadUserGoals(userId);
+          allow create: if isAuth() && isOwner(userId);
+          allow update: if isAuth() && isOwner(userId);
+          allow delete: if isAuth() && (isOwner(userId) || isAdminUser());
+        }
+      }
+
+      /** Check-out self-reflection on daily / weekly goals (Harare date doc id) */
+      match /checkoutGoalLogs/{logId} {
+        allow read: if canReadUserGoals(userId);
+        allow create, update: if isAuth() && isOwner(userId);
+        allow delete: if isAdminUser();
+      }
+    }
+
+    match /attendance/{attendanceId} {
+      function attendancePath() {
+        return /databases/$(database)/documents/attendance/$(attendanceId);
+      }
+
+      function canReadOwnAttendance() {
+        return isAuth() && (
+          (exists(attendancePath()) && get(attendancePath()).data.studentId == request.auth.uid)
+          || (!exists(attendancePath()) && attendanceId.matches('.*_' + request.auth.uid + '$'))
+        );
+      }
+
+      allow read: if isStaff() || canReadOwnAttendance();
+
+      allow create: if isAdminUser()
+        || (isInstructorUser() && attendanceMatchesInstructorScope(request.resource.data))
+        || (isAuth() && request.resource.data.studentId == request.auth.uid);
+
+      allow update: if isAuth()
+                    && attendanceId.matches('.*_' + request.auth.uid + '$')
+                    && resource.data.studentId == request.auth.uid
+                    && (!resource.data.keys().hasAny(['checkOutTime']) || resource.data.checkOutTime == null)
+                    && request.resource.data.checkOutTime != null
+                    && request.resource.data.studentId == resource.data.studentId;
+
+      allow update: if isAdminUser()
+        || (isInstructorUser() && attendanceMatchesInstructorScope(resource.data));
+
+      allow delete: if isAdminUser()
+        || (isInstructorUser() && attendanceMatchesInstructorScope(resource.data));
+    }
+
+    match /dailyAttendance/{recordId} {
+      allow read: if isAuth();
+
+      allow write: if isAdminUser()
+        || (isInstructorUser()
+            && exists(usersPath(dailyDocStudentUid(recordId)))
+            && userHubMatchesInstructorScope(get(usersPath(dailyDocStudentUid(recordId))).data));
+
+      allow create: if isAuth() && request.resource.data.studentId == request.auth.uid;
+      allow update: if isAuth() && resource.data.studentId == request.auth.uid;
+    }
+
+    match /system_config/{docId} {
+      allow read: if isAuth();
+      /** Daily QR etc.: staff. App-wide announcements: admins only. */
+      allow write: if (docId == 'app_update' && isAdminUser())
+        || (docId != 'app_update' && isStaff());
+    }
+
+    match /admin_actions/{docId} {
+      allow read, write: if isStaff();
+    }
+
+    /** Student late self check-in explanations — staff review (same hub scope as attendance). */
+    match /late_check_in_events/{eventId} {
+      allow create: if isAuth()
+        && request.resource.data.studentId == request.auth.uid
+        && request.resource.data.reason is string
+        && request.resource.data.reason.size() >= 10
+        && request.resource.data.reason.size() <= 2000
+        && request.resource.data.date is string
+        && request.resource.data.attendanceDocId is string
+        && request.resource.data.studentName is string
+        && (!request.resource.data.keys().hasAny(['hubId'])
+            || request.resource.data.hubId is string);
+
+      allow read: if isAdminUser()
+        || (isInstructorUser()
+            && hubRecordMatchesInstructorScope(
+              resource.data.keys().hasAny(['hubId']) ? resource.data.hubId : ''
+            ));
+    }
+
+    match /events/{eventId} {
+      allow read: if isAuth();
+      allow write: if isStaff();
+    }
+
+    match /ticketTypes/{id} { allow read, write: if isAuth(); }
+    match /registrations/{id} { allow read, write: if isAuth(); }
+    match /eventResources/{id} { allow read, write: if isAuth(); }
+    match /feedback/{id} { allow read, write: if isAuth(); }
+    match /students/{id} { allow read, write: if isAuth(); }
+
+    match /conversations/{conversationId} {
+      function isParticipant() {
+        return isAuth() && (
+          request.auth.uid == conversationId.split('_')[0] ||
+          request.auth.uid == conversationId.split('_')[1]
+        );
+      }
+      allow read, write: if isParticipant();
+      match /messages/{messageId} {
+        allow read, write: if isParticipant();
+      }
+    }
+  }
+}
