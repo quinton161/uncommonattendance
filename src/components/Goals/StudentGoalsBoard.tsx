@@ -27,7 +27,6 @@ import {
   AlertTriangle,
   Calendar,
   CheckCircle,
-  CheckSquare,
   ChevronDown,
   ChevronUp,
   Pencil,
@@ -560,34 +559,392 @@ const ErrorBanner = styled.div`
   gap: ${theme.spacing.sm};
 `;
 
-const TodayStrip = styled.div`
-  background: linear-gradient(135deg, rgba(0, 82, 204, 0.08) 0%, rgba(0, 61, 153, 0.06) 100%);
-  border: 1px solid rgba(0, 82, 204, 0.2);
-  border-radius: ${theme.borderRadius['2xl']};
-  padding: ${theme.spacing.lg} ${theme.spacing.xl};
+const GoalCalendarCard = styled.div`
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: ${theme.spacing.sm};
   margin-bottom: ${theme.spacing.xl};
-  box-shadow: ${theme.shadows.sm};
+  padding: ${theme.spacing.md};
+  background: linear-gradient(135deg, #e9f6f4 0%, #f5fbff 100%);
+  border: 1px solid rgba(0, 82, 204, 0.1);
+  border-radius: 28px;
+  box-shadow: 0 18px 44px rgba(10, 22, 40, 0.08);
+
+  @media (max-width: ${theme.breakpoints.tablet}) {
+    grid-template-columns: 1fr;
+  }
 `;
 
-const TodayTitle = styled.div`
-  font-weight: ${theme.fontWeights.bold};
-  font-family: ${theme.fonts.heading};
-  margin-bottom: ${theme.spacing.md};
-  color: ${theme.colors.primary};
+const PlannerSidebar = styled.aside`
+  display: grid;
+  align-content: start;
+  gap: ${theme.spacing.sm};
+`;
+
+const MiniCalendar = styled.div`
+  background: ${theme.colors.white};
+  border: 1px solid rgba(0, 82, 204, 0.08);
+  border-radius: 18px;
+  padding: ${theme.spacing.md};
+`;
+
+const CalendarHeader = styled.div`
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: ${theme.spacing.sm};
-  font-size: ${theme.fontSizes.lg};
+  margin-bottom: ${theme.spacing.md};
 `;
 
-const TodayRow = styled.div`
-  font-size: ${theme.fontSizes.sm};
-  padding: ${theme.spacing.sm} 0;
-  border-bottom: 1px solid ${theme.colors.gray200};
-  &:last-child {
-    border-bottom: none;
-    padding-bottom: 0;
+const CalendarTitle = styled.h2`
+  margin: 0;
+  font-family: ${theme.fonts.heading};
+  font-size: ${theme.fontSizes.base};
+  color: ${theme.colors.textPrimary};
+`;
+
+const CalendarNav = styled.button`
+  width: 30px;
+  height: 30px;
+  border-radius: ${theme.borderRadius.md};
+  background: ${theme.colors.gray50};
+  color: ${theme.colors.textPrimary};
+  border: 1px solid ${theme.colors.gray200};
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  &:hover {
+    background: ${theme.colors.gray100};
   }
+`;
+
+const WeekdayGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  margin-bottom: 6px;
+`;
+
+const WeekdayLabel = styled.div`
+  text-align: center;
+  font-size: 10px;
+  font-weight: ${theme.fontWeights.bold};
+  color: ${theme.colors.textLight};
+  text-transform: uppercase;
+`;
+
+const CalendarGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+`;
+
+const CalendarDay = styled.button<{ $selected?: boolean; $muted?: boolean; $today?: boolean }>`
+  min-height: 30px;
+  border-radius: 10px;
+  border: 1px solid ${({ $selected, $today }) => ($selected || $today ? theme.colors.primary : 'transparent')};
+  background: ${({ $selected }) => ($selected ? theme.colors.primary : theme.colors.white)};
+  color: ${({ $selected, $muted }) => ($selected ? theme.colors.white : $muted ? theme.colors.textLight : theme.colors.textPrimary)};
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  font-size: ${theme.fontSizes.sm};
+  font-weight: ${theme.fontWeights.semibold};
+
+  &:hover {
+    background: ${({ $selected }) => ($selected ? theme.colors.primary : '#f8faff')};
+  }
+`;
+
+const GoalDotRow = styled.span`
+  display: flex;
+  gap: 2px;
+  min-height: 4px;
+`;
+
+const GoalDot = styled.span<{ $status: GoalStatus }>`
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: ${({ $status }) =>
+    $status === 'completed' ? theme.colors.success : $status === 'in_progress' ? theme.colors.primary : theme.colors.warning};
+`;
+
+const FocusReminderCard = styled.div`
+  background: linear-gradient(135deg, ${theme.colors.primary} 0%, ${theme.colors.primaryDark} 100%);
+  color: ${theme.colors.white};
+  border-radius: 18px;
+  padding: ${theme.spacing.lg};
+`;
+
+const FocusLabel = styled.div`
+  font-size: ${theme.fontSizes.xs};
+  opacity: 0.82;
+  margin-bottom: ${theme.spacing.sm};
+`;
+
+const FocusTitle = styled.div`
+  font-family: ${theme.fonts.heading};
+  font-size: ${theme.fontSizes.lg};
+  font-weight: ${theme.fontWeights.bold};
+  margin-bottom: 4px;
+`;
+
+const FocusMeta = styled.div`
+  font-size: ${theme.fontSizes.xs};
+  opacity: 0.88;
+`;
+
+const FilterCard = styled.div`
+  background: ${theme.colors.white};
+  border: 1px solid rgba(0, 82, 204, 0.08);
+  border-radius: 18px;
+  padding: ${theme.spacing.md};
+`;
+
+const FilterTitle = styled.div`
+  font-family: ${theme.fonts.heading};
+  font-weight: ${theme.fontWeights.bold};
+  color: ${theme.colors.textPrimary};
+  margin-bottom: ${theme.spacing.sm};
+`;
+
+const FilterItem = styled.div<{ $active?: boolean }>`
+  display: flex;
+  align-items: center;
+  gap: ${theme.spacing.xs};
+  color: ${({ $active }) => ($active ? theme.colors.textPrimary : theme.colors.textLight)};
+  font-size: ${theme.fontSizes.xs};
+  padding: 5px 0;
+`;
+
+const FilterCheck = styled.span<{ $active?: boolean }>`
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  border: 1px solid ${({ $active }) => ($active ? theme.colors.primary : theme.colors.gray300)};
+  background: ${({ $active }) => ($active ? theme.colors.primary : theme.colors.white)};
+`;
+
+const DaySchedulePanel = styled.div`
+  background: ${theme.colors.white};
+  border: 1px solid rgba(0, 82, 204, 0.08);
+  border-radius: 22px;
+  padding: ${theme.spacing.md};
+  min-width: 0;
+`;
+
+const ScheduleHeader = styled.div`
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: ${theme.spacing.md};
+  margin-bottom: ${theme.spacing.md};
+  padding: ${theme.spacing.xs} ${theme.spacing.xs} 0;
+`;
+
+const ScheduleTitle = styled.h2`
+  margin: 0;
+  font-family: ${theme.fonts.heading};
+  font-size: ${theme.fontSizes.xl};
+  color: ${theme.colors.textPrimary};
+`;
+
+const ScheduleSub = styled.p`
+  margin: 4px 0 0;
+  font-size: ${theme.fontSizes.sm};
+  color: ${theme.colors.textSecondary};
+`;
+
+const ViewTabs = styled.div`
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: ${theme.colors.gray50};
+  border-radius: ${theme.borderRadius.full};
+  padding: 4px;
+`;
+
+const ViewTab = styled.span<{ $active?: boolean }>`
+  border-radius: ${theme.borderRadius.full};
+  padding: 6px 10px;
+  font-size: ${theme.fontSizes.xs};
+  color: ${({ $active }) => ($active ? theme.colors.textPrimary : theme.colors.textSecondary)};
+  background: ${({ $active }) => ($active ? theme.colors.white : 'transparent')};
+  font-weight: ${({ $active }) => ($active ? theme.fontWeights.bold : theme.fontWeights.medium)};
+`;
+
+const PlannerToolbar = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: ${theme.spacing.sm};
+`;
+
+const WeekScroller = styled.div`
+  overflow-x: auto;
+  padding-bottom: 2px;
+`;
+
+const WeekHeaderGrid = styled.div`
+  display: grid;
+  grid-template-columns: 54px repeat(7, minmax(132px, 1fr));
+  gap: 6px;
+  min-width: 1000px;
+  margin-bottom: ${theme.spacing.sm};
+`;
+
+const WeekHeaderSpacer = styled.div`
+  color: ${theme.colors.textLight};
+  font-size: 10px;
+  display: flex;
+  align-items: flex-end;
+  padding-bottom: ${theme.spacing.sm};
+`;
+
+const PlannerDayHeader = styled.button<{ $selected?: boolean; $today?: boolean }>`
+  border: 1px solid ${({ $selected }) => ($selected ? 'rgba(0, 82, 204, 0.18)' : 'transparent')};
+  border-radius: 14px;
+  background: ${({ $selected, $today }) => ($selected ? 'rgba(0, 82, 204, 0.08)' : $today ? '#eef6ff' : theme.colors.gray50)};
+  padding: ${theme.spacing.sm};
+  color: ${theme.colors.textPrimary};
+  text-align: center;
+`;
+
+const PlannerDayName = styled.div`
+  font-size: 10px;
+  color: ${theme.colors.textSecondary};
+  margin-bottom: 4px;
+`;
+
+const PlannerDayNumber = styled.div`
+  font-family: ${theme.fonts.heading};
+  font-size: ${theme.fontSizes.xl};
+  font-weight: ${theme.fontWeights.bold};
+`;
+
+const PlannerBoardGrid = styled.div`
+  display: grid;
+  grid-template-columns: 54px repeat(7, minmax(132px, 1fr));
+  gap: 6px;
+  min-width: 1000px;
+`;
+
+const PlannerTimeRail = styled.div`
+  display: grid;
+  grid-template-rows: repeat(3, 112px);
+  gap: 6px;
+`;
+
+const PlannerTimeLabel = styled.div`
+  color: ${theme.colors.textLight};
+  font-size: 10px;
+  padding-top: 8px;
+  border-top: 1px solid ${theme.colors.gray100};
+`;
+
+const PlannerDayColumn = styled.div<{ $selected?: boolean }>`
+  min-height: 348px;
+  border-radius: 16px;
+  background: ${({ $selected }) => ($selected ? '#f3f8ff' : '#fbfcff')};
+  border: 1px solid ${({ $selected }) => ($selected ? 'rgba(0, 82, 204, 0.14)' : theme.colors.gray100)};
+  padding: ${theme.spacing.sm};
+  display: flex;
+  flex-direction: column;
+  gap: ${theme.spacing.sm};
+`;
+
+const ScheduleCheck = styled.input`
+  margin-top: 3px;
+`;
+
+const PlannerGoalCard = styled.div<{ $status: GoalStatus; $overdue?: boolean }>`
+  border-radius: 14px;
+  padding: ${theme.spacing.sm};
+  background: ${({ $status, $overdue }) =>
+    $overdue
+      ? '#ffecec'
+      : $status === 'completed'
+        ? '#eaf7ef'
+        : $status === 'in_progress'
+          ? '#e7f1ff'
+          : '#fff3dc'};
+  border: 1px solid
+    ${({ $status, $overdue }) =>
+      $overdue
+        ? 'rgba(231, 76, 60, 0.2)'
+        : $status === 'completed'
+          ? 'rgba(39, 174, 96, 0.2)'
+          : $status === 'in_progress'
+            ? 'rgba(0, 82, 204, 0.18)'
+            : 'rgba(243, 156, 18, 0.2)'};
+`;
+
+const PlannerGoalTop = styled.div`
+  display: flex;
+  align-items: flex-start;
+  gap: ${theme.spacing.xs};
+`;
+
+const PlannerGoalBody = styled.div`
+  flex: 1;
+  min-width: 0;
+`;
+
+const PlannerGoalTitle = styled.strong`
+  display: block;
+  color: ${theme.colors.textPrimary};
+  font-size: ${theme.fontSizes.xs};
+  line-height: 1.35;
+`;
+
+const PlannerGoalMeta = styled.div`
+  margin-top: 4px;
+  color: ${theme.colors.textSecondary};
+  font-size: 10px;
+  line-height: 1.35;
+`;
+
+const PlannerGoalActions = styled.div`
+  display: flex;
+  gap: 4px;
+  margin-top: ${theme.spacing.sm};
+`;
+
+const MiniAction = styled.button`
+  border: 1px solid rgba(0, 82, 204, 0.14);
+  background: rgba(255, 255, 255, 0.7);
+  color: ${theme.colors.primary};
+  border-radius: 8px;
+  width: 26px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+
+  &:hover {
+    background: ${theme.colors.white};
+  }
+`;
+
+const PlannerEmptySlot = styled.div`
+  border: 1px dashed ${theme.colors.gray200};
+  border-radius: 14px;
+  min-height: 58px;
+  color: ${theme.colors.textLight};
+  font-size: ${theme.fontSizes.xs};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: ${theme.spacing.sm};
 `;
 
 const StaffStudentCard = styled.div`
@@ -666,6 +1023,68 @@ export interface StudentGoalsBoardProps {
 }
 
 const STATUS_OPTIONS: GoalStatus[] = ['pending', 'in_progress', 'completed'];
+const WEEKDAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+const PLANNER_TIME_LABELS = ['Focus', 'Next', 'Later'];
+
+function dateToIso(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function dateFromIso(iso: string): Date {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y, (m || 1) - 1, d || 1);
+}
+
+function monthTitle(d: Date): string {
+  return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+}
+
+function dateLongLabel(iso: string): string {
+  return dateFromIso(iso).toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+  });
+}
+
+function dateShortMonthLabel(iso: string): string {
+  return dateFromIso(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function dayShortLabel(iso: string): string {
+  return dateFromIso(iso).toLocaleDateString('en-US', { weekday: 'short' });
+}
+
+function buildWeekDays(iso: string): string[] {
+  const selected = dateFromIso(iso);
+  const mondayOffset = selected.getDay() === 0 ? -6 : 1 - selected.getDay();
+  const monday = new Date(selected);
+  monday.setDate(selected.getDate() + mondayOffset);
+  return Array.from({ length: 7 }, (_, idx) => {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + idx);
+    return dateToIso(d);
+  });
+}
+
+function buildMonthDays(monthDate: Date): Array<{ iso: string; day: number; inMonth: boolean }> {
+  const year = monthDate.getFullYear();
+  const month = monthDate.getMonth();
+  const first = new Date(year, month, 1);
+  const start = new Date(year, month, 1 - first.getDay());
+  return Array.from({ length: 42 }, (_, idx) => {
+    const d = new Date(start);
+    d.setDate(start.getDate() + idx);
+    return {
+      iso: dateToIso(d),
+      day: d.getDate(),
+      inMonth: d.getMonth() === month,
+    };
+  });
+}
 
 function isOverdueDaily(d: DailyGoal, today: string): boolean {
   return d.date < today && d.status !== 'completed';
@@ -720,6 +1139,8 @@ export const StudentGoalsBoard: React.FC<StudentGoalsBoardProps> = ({ hubScopeId
     date: todayStr,
     status: 'pending' as GoalStatus,
   });
+  const [selectedGoalDate, setSelectedGoalDate] = useState(todayStr);
+  const [visibleGoalMonth, setVisibleGoalMonth] = useState(() => dateFromIso(todayStr));
 
   const userId = user?.uid ?? '';
 
@@ -999,6 +1420,32 @@ export const StudentGoalsBoard: React.FC<StudentGoalsBoardProps> = ({ hubScopeId
     });
     return out;
   }, [weeklyGoals, dailyMap, todayStr]);
+
+  const calendarDailies = useMemo(() => {
+    const out: { weekly: WeeklyGoal; daily: DailyGoal }[] = [];
+    weeklyGoals.forEach((w) => {
+      (dailyMap[w.id] || []).forEach((d) => out.push({ weekly: w, daily: d }));
+    });
+    return out;
+  }, [weeklyGoals, dailyMap]);
+
+  const dailyByDate = useMemo(() => {
+    return calendarDailies.reduce<Record<string, { weekly: WeeklyGoal; daily: DailyGoal }[]>>(
+      (acc, item) => {
+        acc[item.daily.date] = [...(acc[item.daily.date] || []), item];
+        return acc;
+      },
+      {}
+    );
+  }, [calendarDailies]);
+
+  const calendarDays = useMemo(() => buildMonthDays(visibleGoalMonth), [visibleGoalMonth]);
+  const selectedDayGoals = dailyByDate[selectedGoalDate] || [];
+  const selectedWeekDays = useMemo(() => buildWeekDays(selectedGoalDate), [selectedGoalDate]);
+
+  const shiftGoalMonth = (delta: number) => {
+    setVisibleGoalMonth((current) => new Date(current.getFullYear(), current.getMonth() + delta, 1));
+  };
 
   const goalStats = useMemo(() => {
     const total = weeklyGoals.length;
@@ -1343,20 +1790,177 @@ export const StudentGoalsBoard: React.FC<StudentGoalsBoardProps> = ({ hubScopeId
 
       {!staffMode && (
         <>
-          {allTodayDailies.length > 0 && (
-            <TodayStrip>
-              <TodayTitle>
-                <CheckSquare size={20} aria-hidden strokeWidth={2} /> Today&apos;s focus
-              </TodayTitle>
-              {allTodayDailies.map(({ weekly, daily }) => (
-                <TodayRow key={`${weekly.id}-${daily.id}`}>
-                  <strong style={{ color: theme.colors.textPrimary }}>{daily.title}</strong>{' '}
-                  <span style={{ color: theme.colors.textSecondary }}>({weekly.title})</span> — {GOAL_STATUS_LABEL[daily.status]}
-                  {isOverdueDaily(daily, todayStr) ? ' · Overdue' : ''}
-                </TodayRow>
-              ))}
-            </TodayStrip>
-          )}
+          <GoalCalendarCard>
+            <PlannerSidebar>
+              <MiniCalendar>
+                <CalendarHeader>
+                  <CalendarNav type="button" aria-label="Previous month" onClick={() => shiftGoalMonth(-1)}>
+                    ‹
+                  </CalendarNav>
+                  <CalendarTitle>{monthTitle(visibleGoalMonth)}</CalendarTitle>
+                  <CalendarNav type="button" aria-label="Next month" onClick={() => shiftGoalMonth(1)}>
+                    ›
+                  </CalendarNav>
+                </CalendarHeader>
+                <WeekdayGrid>
+                  {WEEKDAY_LABELS.map((day, idx) => (
+                    <WeekdayLabel key={`${day}-${idx}`}>{day}</WeekdayLabel>
+                  ))}
+                </WeekdayGrid>
+                <CalendarGrid>
+                  {calendarDays.map((day) => {
+                    const goals = dailyByDate[day.iso] || [];
+                    return (
+                      <CalendarDay
+                        key={day.iso}
+                        type="button"
+                        $selected={day.iso === selectedGoalDate}
+                        $muted={!day.inMonth}
+                        $today={day.iso === todayStr}
+                        onClick={() => {
+                          setSelectedGoalDate(day.iso);
+                          setVisibleGoalMonth(dateFromIso(day.iso));
+                        }}
+                      >
+                        <span>{day.day}</span>
+                        <GoalDotRow>
+                          {goals.slice(0, 3).map(({ daily }) => (
+                            <GoalDot key={daily.id} $status={daily.status} />
+                          ))}
+                        </GoalDotRow>
+                      </CalendarDay>
+                    );
+                  })}
+                </CalendarGrid>
+              </MiniCalendar>
+
+              <FocusReminderCard>
+                <FocusLabel>Today&apos;s focus</FocusLabel>
+                <FocusTitle>{allTodayDailies[0]?.daily.title || "Plan today's goals"}</FocusTitle>
+                <FocusMeta>
+                  {allTodayDailies[0]
+                    ? `${allTodayDailies[0].weekly.title} · ${GOAL_STATUS_LABEL[allTodayDailies[0].daily.status]}`
+                    : 'Add a daily goal from a weekly goal below.'}
+                </FocusMeta>
+              </FocusReminderCard>
+
+              <FilterCard>
+                <FilterTitle>Filters</FilterTitle>
+                <FilterItem $active>
+                  <FilterCheck $active /> Daily goals ({calendarDailies.length})
+                </FilterItem>
+                <FilterItem $active>
+                  <FilterCheck $active /> Today ({allTodayDailies.length})
+                </FilterItem>
+                <FilterItem>
+                  <FilterCheck /> Completed ({calendarDailies.filter(({ daily }) => daily.status === 'completed').length})
+                </FilterItem>
+                <FilterItem>
+                  <FilterCheck /> Overdue ({goalStats.overdue})
+                </FilterItem>
+              </FilterCard>
+            </PlannerSidebar>
+
+            <DaySchedulePanel>
+              <ScheduleHeader>
+                <div>
+                  <ScheduleTitle>{dateShortMonthLabel(selectedWeekDays[0])} - {dateShortMonthLabel(selectedWeekDays[6])}</ScheduleTitle>
+                  <ScheduleSub>
+                    {dateLongLabel(selectedGoalDate)} · {selectedDayGoals.length} selected day goal
+                    {selectedDayGoals.length === 1 ? '' : 's'}
+                  </ScheduleSub>
+                </div>
+                <PlannerToolbar>
+                  <ViewTabs aria-label="Calendar view">
+                    <ViewTab>Daily</ViewTab>
+                    <ViewTab $active>Weekly</ViewTab>
+                    <ViewTab>Monthly</ViewTab>
+                  </ViewTabs>
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    type="button"
+                    disabled={!weeklyGoals.length}
+                    onClick={() => weeklyGoals[0] && openDailyModal(weeklyGoals[0].id)}
+                  >
+                    <Plus size={14} aria-hidden strokeWidth={2} /> Create Goal
+                  </Button>
+                </PlannerToolbar>
+              </ScheduleHeader>
+
+              <WeekScroller>
+                <WeekHeaderGrid>
+                  <WeekHeaderSpacer>GMT+2</WeekHeaderSpacer>
+                  {selectedWeekDays.map((iso) => (
+                    <PlannerDayHeader
+                      key={iso}
+                      type="button"
+                      $selected={iso === selectedGoalDate}
+                      $today={iso === todayStr}
+                      onClick={() => {
+                        setSelectedGoalDate(iso);
+                        setVisibleGoalMonth(dateFromIso(iso));
+                      }}
+                    >
+                      <PlannerDayName>{dayShortLabel(iso)}</PlannerDayName>
+                      <PlannerDayNumber>{dateFromIso(iso).getDate()}</PlannerDayNumber>
+                    </PlannerDayHeader>
+                  ))}
+                </WeekHeaderGrid>
+
+                <PlannerBoardGrid>
+                  <PlannerTimeRail>
+                    {PLANNER_TIME_LABELS.map((label) => (
+                      <PlannerTimeLabel key={label}>{label}</PlannerTimeLabel>
+                    ))}
+                  </PlannerTimeRail>
+
+                  {selectedWeekDays.map((iso) => {
+                    const goals = dailyByDate[iso] || [];
+                    return (
+                      <PlannerDayColumn key={iso} $selected={iso === selectedGoalDate}>
+                        {goals.length === 0 ? (
+                          <PlannerEmptySlot>No goals</PlannerEmptySlot>
+                        ) : (
+                          goals.map(({ weekly, daily }) => (
+                            <PlannerGoalCard
+                              key={`${weekly.id}-${daily.id}`}
+                              $status={daily.status}
+                              $overdue={isOverdueDaily(daily, todayStr)}
+                            >
+                              <PlannerGoalTop>
+                                <ScheduleCheck
+                                  type="checkbox"
+                                  checked={daily.status === 'completed'}
+                                  onChange={() => toggleDailyComplete(weekly.id, daily)}
+                                  aria-label="Mark daily goal completed"
+                                />
+                                <PlannerGoalBody>
+                                  <PlannerGoalTitle>{daily.title}</PlannerGoalTitle>
+                                  <PlannerGoalMeta>
+                                    {weekly.title} · {GOAL_STATUS_LABEL[daily.status]}
+                                    {isOverdueDaily(daily, todayStr) ? ' · Overdue' : ''}
+                                  </PlannerGoalMeta>
+                                </PlannerGoalBody>
+                              </PlannerGoalTop>
+                              <PlannerGoalActions>
+                                <MiniAction type="button" aria-label="Edit daily goal" onClick={() => openDailyModal(weekly.id, daily)}>
+                                  <Pencil size={13} aria-hidden strokeWidth={2} />
+                                </MiniAction>
+                                <MiniAction type="button" aria-label="Delete daily goal" onClick={() => deleteDaily(weekly.id, daily)}>
+                                  <Trash2 size={13} aria-hidden strokeWidth={2} />
+                                </MiniAction>
+                              </PlannerGoalActions>
+                            </PlannerGoalCard>
+                          ))
+                        )}
+                      </PlannerDayColumn>
+                    );
+                  })}
+                </PlannerBoardGrid>
+              </WeekScroller>
+            </DaySchedulePanel>
+          </GoalCalendarCard>
 
           <Card>
             <form onSubmit={handleAddWeekly}>
