@@ -224,7 +224,6 @@ export class AttendanceService {
 
     try {
       const { createNotification } = await import('./notificationFeedService');
-      const { resolvedHubLabel } = await import('./hubService');
       const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
       await createNotification({
         type: isLate ? 'late' : 'check_in',

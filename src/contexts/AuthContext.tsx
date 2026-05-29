@@ -268,7 +268,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         } catch {
           // Network error — use minimal user from Firebase Auth
-          const isAdmin = fbUser.email === ADMIN_EMAIL;
           const isStaff = isUncommonOrgStaffEmail(fbUser.email);
           setUser({
             uid:         fbUser.uid,

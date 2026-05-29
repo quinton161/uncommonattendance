@@ -62,7 +62,6 @@ export const HubLeaderboardSection: React.FC<Props> = ({ range }) => {
 
   const totalEnrolled = rows.reduce((s, r) => s + r.enrolled, 0);
   const totalPresent = rows.reduce((s, r) => s + r.present, 0);
-  const totalLate = rows.reduce((s, r) => s + r.late, 0);
   const chartData = rows.map((r) => ({
     name: r.hubName.replace(/^Uncommon\s+/i, ''),
     rate: r.attendanceRate,

@@ -9,7 +9,6 @@ import {
   query,
   serverTimestamp,
   updateDoc,
-  where,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import type { AppNotification, NotificationType } from '../types/notifications';
