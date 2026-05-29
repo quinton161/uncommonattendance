@@ -49,7 +49,8 @@
     "maintenance:refresh-browsers": "npx update-browserslist-db@latest",
     "maintenance:verify": "npm test -- --watchAll=false && npm run build",
     "maintenance:monthly": "npm run maintenance:outdated && npm run maintenance:audit && npm run maintenance:refresh-browsers && npm run maintenance:verify",
-    "seed:hubs": "npx ts-node firestore-seed-hubs.ts"
+    "seed:hubs": "npx ts-node firestore-seed-hubs.ts",
+    "provision:user": "node scripts/provision-user.mjs"
   },
   "eslintConfig": {
     "extends": [

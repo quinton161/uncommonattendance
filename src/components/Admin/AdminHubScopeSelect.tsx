@@ -2,7 +2,15 @@ import React, { useEffect, useState } from 'react';
 import styled from 'styled-components';
 import { theme } from '../../styles/theme';
 import type { User } from '../../types';
-import { fetchHubs, hubLabel, hubTooltip, type Hub, DEFAULT_HUBS } from '../../services/hubService';
+import {
+  fetchHubs,
+  hubLabel,
+  hubTooltip,
+  instructorAssignedHubId,
+  resolvedHubLabel,
+  type Hub,
+  DEFAULT_HUBS,
+} from '../../services/hubService';
 
 const Wrap = styled.div`
   display: flex;
@@ -28,6 +36,18 @@ const Select = styled.select`
   color: ${theme.colors.textPrimary};
 `;
 
+const ReadOnlyHub = styled.div`
+  padding: ${theme.spacing.sm} ${theme.spacing.md};
+  border: 1px solid ${theme.colors.gray300};
+  border-radius: ${theme.borderRadius.md};
+  font-size: ${theme.fontSizes.sm};
+  background: ${theme.colors.gray50};
+  color: ${theme.colors.textPrimary};
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+`;
+
 export interface AdminHubScopeSelectProps {
   user: User | null;
   value: string;
@@ -36,7 +56,7 @@ export interface AdminHubScopeSelectProps {
   label?: string;
 }
 
-/** Staff hub filter — admins and instructors can view one hub or all hubs when empty. */
+/** Admins: filter one hub or all. Instructors: assigned hub only (read-only). */
 export function AdminHubScopeSelect({
   user,
   value,
@@ -57,6 +77,19 @@ export function AdminHubScopeSelect({
   }, []);
 
   if (user?.userType !== 'admin' && user?.userType !== 'instructor') return null;
+
+  if (user.userType === 'instructor') {
+    const hubId = instructorAssignedHubId(user);
+    const hub = hubs.find((h) => h.id === hubId);
+    return (
+      <Wrap>
+        <Label htmlFor={id}>{label}</Label>
+        <ReadOnlyHub id={id} title={hub ? hubTooltip(hub) : undefined}>
+          {hub ? hubLabel(hub) : resolvedHubLabel({ hubId })}
+        </ReadOnlyHub>
+      </Wrap>
+    );
+  }
 
   return (
     <Wrap>

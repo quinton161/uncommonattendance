@@ -19,7 +19,7 @@ import { User, AuthContextType, HubSelection } from '../types';
 import { uniqueToast } from '../utils/toastUtils';
 import { getFirebaseAuthErrorMessage } from '../utils/firebaseAuthErrors';
 import DataService from '../services/DataService';
-import { ADMIN_EMAIL } from '../constants/admin';
+import { ADMIN_EMAIL, isAdminEmail } from '../constants/admin';
 import { isUncommonOrgStaffEmail } from '../constants/staff';
 
 function needsHubRole(userType: User['userType']): boolean {
@@ -57,6 +57,19 @@ function emailAlreadyRegisteredError(): Error & { code: 'auth/email-already-in-u
   ) as Error & { code: 'auth/email-already-in-use' };
   e.code = 'auth/email-already-in-use';
   return e;
+}
+
+/** Firestore `userType: admin` or legacy primary admin email → full admin access. */
+function sessionUserType(
+  fbEmail: string | null | undefined,
+  profileType: unknown,
+  opts?: { inferStaffEmail?: boolean }
+): User['userType'] {
+  const t = String(profileType || '').toLowerCase();
+  if (t === 'admin' || isAdminEmail(fbEmail)) return 'admin';
+  if (t === 'instructor') return 'instructor';
+  if (opts?.inferStaffEmail && isUncommonOrgStaffEmail(fbEmail)) return 'instructor';
+  return 'attendee';
 }
 
 function isDirectoryProfileComplete(d: Record<string, unknown> | undefined): boolean {
@@ -181,7 +194,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               emailLower:  emailLowerFromUserDoc(d, dirEmail),
               displayName: (d.displayName as string) || fbUser.displayName || 'User',
               photoUrl:    fbUser.photoURL || (d.photoUrl as string | undefined),
-              userType:    isAdmin ? 'admin' : ((d.userType as User['userType']) || 'attendee'),
+              userType:    sessionUserType(fbUser.email, d.userType),
               bio:         d.bio as string | undefined,
               course:      d.course as string | undefined,
               profession:  d.profession as string | undefined,
@@ -262,7 +275,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             email:       fbUser.email!,
             displayName: fbUser.displayName || 'User',
             photoUrl:    fbUser.photoURL ?? undefined,
-            userType:    isAdmin ? 'admin' : isStaff ? 'instructor' : 'attendee',
+            userType:    sessionUserType(fbUser.email, undefined, { inferStaffEmail: isStaff }),
             bio:         '',
             createdAt:   new Date(),
           });
@@ -393,15 +406,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const emailTrim = email.trim();
     const cred = await signInWithEmailAndPassword(auth, emailTrim, password);
     try {
-      const isAdmin = cred.user.email === ADMIN_EMAIL;
+      const isAdmin = isAdminEmail(cred.user.email);
 
       let snapLogin = await getDoc(doc(db, 'users', cred.user.uid));
       if (!snapLogin.exists() || !isDirectoryProfileComplete(snapLogin.data() as Record<string, unknown>)) {
-        const ut: User['userType'] = isAdmin
-          ? 'admin'
-          : isUncommonOrgStaffEmail(cred.user.email)
-            ? 'instructor'
-            : 'attendee';
+        const existingType = snapLogin.exists()
+          ? (snapLogin.data() as Record<string, unknown>).userType
+          : undefined;
+        const ut: User['userType'] = sessionUserType(cred.user.email, existingType, {
+          inferStaffEmail: isUncommonOrgStaffEmail(cred.user.email),
+        });
         await restoreDirectoryProfileAfterPasswordSignIn(cred, {
           displayName: cred.user.displayName || 'User',
           userType: ut,

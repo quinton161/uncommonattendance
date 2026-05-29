@@ -10,6 +10,7 @@ import {
   User,
   Users,
   X,
+  Trophy,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { theme } from '../../styles/theme';
@@ -200,7 +201,11 @@ const NavButton = styled.button<{ $active?: boolean }>`
 
 const NavIcon = styled.span<{ $active?: boolean }>`
   display: inline-flex;
-  color: ${({ $active }) => ($active ? theme.colors.white : '#94a3b8')};
+  color: ${({ $active }) => ($active ? theme.colors.white : theme.colors.gray600)};
+
+  svg {
+    color: currentColor;
+  }
 `;
 
 const ActiveDot = styled.span`
@@ -315,6 +320,7 @@ const SidebarInner: React.FC<SidebarProps> = ({ onClose }) => {
     { id: 'users', path: '/users', label: 'Students', icon: <Users size={18} /> },
     { id: 'goals', path: '/goals', label: 'Goals Board', icon: <Target size={18} /> },
     { id: 'events', path: '/events', label: 'Events', icon: <Calendar size={18} /> },
+    { id: 'rankings', path: '/rankings', label: 'Rankings', icon: <Trophy size={18} /> },
     { id: 'profile', path: '/profile', label: 'Profile', icon: <User size={18} /> },
   ];
 
@@ -323,6 +329,7 @@ const SidebarInner: React.FC<SidebarProps> = ({ onClose }) => {
     { id: 'attendance', path: '/attendance', label: 'Attendance', icon: <QrCode size={18} /> },
     { id: 'goals', path: '/goals', label: 'My Goals', icon: <Target size={18} /> },
     { id: 'events', path: '/events', label: 'Events', icon: <Calendar size={18} /> },
+    { id: 'rankings', path: '/rankings', label: 'Rankings', icon: <Trophy size={18} /> },
     { id: 'profile', path: '/profile', label: 'Profile', icon: <User size={18} /> },
   ];
 
@@ -337,7 +344,7 @@ const SidebarInner: React.FC<SidebarProps> = ({ onClose }) => {
   return (
     <SidebarContent>
       <Header>
-        <Brand type="button" onClick={() => handleNavigate('/dashboard')}>
+        <Brand type="button" data-ui="nav" onClick={() => handleNavigate('/dashboard')}>
           <Logo>
             <img src="/shapes.svg" alt="Uncommon Attendance" />
           </Logo>
@@ -346,7 +353,7 @@ const SidebarInner: React.FC<SidebarProps> = ({ onClose }) => {
             <BrandSub>Attendance</BrandSub>
           </BrandText>
         </Brand>
-        <CloseButton type="button" aria-label="Close navigation" onClick={onClose}>
+        <CloseButton type="button" data-ui="nav" aria-label="Close navigation" onClick={onClose}>
           <X size={16} />
         </CloseButton>
       </Header>
@@ -359,6 +366,7 @@ const SidebarInner: React.FC<SidebarProps> = ({ onClose }) => {
             <NavButton
               key={item.id}
               type="button"
+              data-ui="nav"
               $active={active}
               onClick={() => handleNavigate(item.path)}
             >
@@ -380,7 +388,7 @@ const SidebarInner: React.FC<SidebarProps> = ({ onClose }) => {
             <UserRole>{roleLabel}</UserRole>
           </UserMeta>
         </UserRow>
-        <LogoutButton type="button" onClick={logout}>
+        <LogoutButton type="button" data-ui="nav" onClick={logout}>
           <LogOut size={15} />
           Sign out
         </LogoutButton>

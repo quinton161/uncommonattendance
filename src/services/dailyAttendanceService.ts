@@ -12,6 +12,23 @@ import { db } from './firebase';
 import { AttendanceRecord } from '../types';
 import { TimeService } from './timeService';
 
+const DAILY_ATTENDANCE_PERMISSION_MSG =
+  'Could not save daily attendance. Ask your instructor to verify your hub and profile.';
+
+function mapDailyAttendanceWriteError(err: unknown, context: string): never {
+  const code =
+    err && typeof err === 'object' && 'code' in err
+      ? (err as { code?: string }).code
+      : undefined;
+  if (code === 'permission-denied') {
+    if (process.env.NODE_ENV === 'development') {
+      console.error(`[DailyAttendanceService] ${context} permission-denied`, err);
+    }
+    throw new Error(DAILY_ATTENDANCE_PERMISSION_MSG);
+  }
+  throw err instanceof Error ? err : new Error(String(err));
+}
+
 export interface DailyAttendanceStats {
   totalDays: number;
   presentDays: number;
@@ -76,7 +93,7 @@ export class DailyAttendanceService {
         createdAt: Timestamp.fromDate(dailyRecord.createdAt),
       });
       console.log(`✅ Marked ${studentName} as present for ${today}`);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error(`❌ Failed to mark ${studentName} as present:`, error);
       // Fallback: Try a minimal update if the full record fails
       try {
@@ -88,7 +105,7 @@ export class DailyAttendanceService {
         }, { merge: true });
       } catch (innerError) {
         console.error('❌ Fallback marking also failed:', innerError);
-        throw error;
+        mapDailyAttendanceWriteError(innerError, `markPresentToday fallback dailyAttendance/${dailyRecordId}`);
       }
     }
   }

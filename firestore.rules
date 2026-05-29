@@ -77,6 +77,14 @@ service cloud.firestore {
       return isAuth() && request.auth.uid == uid;
     }
 
+    function isStudentOwner(studentId) {
+      return isAuth() && studentId == request.auth.uid;
+    }
+
+    function ownsAttendanceDoc(attendanceId) {
+      return isAuth() && attendanceId.matches('.*_' + request.auth.uid + '$');
+    }
+
     /** Goals under users/{uid}/weeklyGoals — read by owner or staff; writes remain owner/admin scoped below. */
     function canReadUserGoals(userId) {
       return isOwner(userId)
@@ -125,25 +133,27 @@ service cloud.firestore {
     }
 
     match /attendance/{attendanceId} {
-      function canReadOwnAttendance() {
-        return isAuth() && (
-          resource.data.studentId == request.auth.uid
-          || attendanceId.matches('.*_' + request.auth.uid + '$')
-        );
-      }
-
-      allow read: if isStaff() || canReadOwnAttendance();
+      /** All signed-in users may read (hub/monthly leaderboards). */
+      allow read: if isAuth();
 
       allow create: if isAdminUser()
         || (isInstructorUser() && attendanceMatchesInstructorScope(request.resource.data))
-        || (isAuth() && request.resource.data.studentId == request.auth.uid);
+        || (isStudentOwner(request.resource.data.studentId));
 
-      allow update: if isAuth()
-                    && attendanceId.matches('.*_' + request.auth.uid + '$')
+      /** Student check-out (partial update). */
+      allow update: if ownsAttendanceDoc(attendanceId)
                     && resource.data.studentId == request.auth.uid
                     && (!resource.data.keys().hasAny(['checkOutTime']) || resource.data.checkOutTime == null)
                     && request.resource.data.checkOutTime != null
                     && request.resource.data.studentId == resource.data.studentId;
+
+      /** Student check-in when a row exists without checkInTime (e.g. staff marked absent). */
+      allow update: if ownsAttendanceDoc(attendanceId)
+                    && resource.data.studentId == request.auth.uid
+                    && request.resource.data.studentId == request.auth.uid
+                    && (!resource.data.keys().hasAny(['checkInTime']) || resource.data.checkInTime == null)
+                    && request.resource.data.keys().hasAny(['checkInTime'])
+                    && request.resource.data.checkInTime != null;
 
       allow update: if isAdminUser()
         || (isInstructorUser() && attendanceMatchesInstructorScope(resource.data));
@@ -153,7 +163,11 @@ service cloud.firestore {
     }
 
     match /dailyAttendance/{recordId} {
-      allow read: if isAuth();
+      /** Students read own rows (`{uid}_{date}`); staff read all. */
+      allow read: if isAuth() && (
+        isStaff()
+        || dailyDocStudentUid(recordId) == request.auth.uid
+      );
 
       allow write: if isAdminUser()
         || (isInstructorUser()
@@ -193,6 +207,25 @@ service cloud.firestore {
             && hubRecordMatchesInstructorScope(
               resource.data.keys().hasAny(['hubId']) ? resource.data.hubId : ''
             ));
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if isAuth();
+      allow create: if isAuth();
+      /** Mark-as-read uses arrayUnion on readBy only. */
+      allow update: if isAuth();
+      allow delete: if isAdminUser();
+    }
+
+    match /monthly_awards/{awardId} {
+      allow read: if isAuth();
+      allow create, update: if isStaff();
+      allow delete: if isAdminUser();
+    }
+
+    match /hub_monthly_stats/{statId} {
+      allow read: if isAuth();
+      allow write: if isStaff();
     }
 
     match /events/{eventId} {

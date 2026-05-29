@@ -237,7 +237,8 @@ export const GlobalStyles = createGlobalStyle`
     }
   }
 
-  button {
+  /* Primary CTAs only — nav/toolbar buttons use data-ui and styled-components */
+  button:not([data-ui]) {
     cursor: pointer;
     border: none;
     outline: none;
@@ -266,6 +267,12 @@ export const GlobalStyles = createGlobalStyle`
     svg {
       color: inherit;
     }
+  }
+
+  button[data-ui] {
+    cursor: pointer;
+    font-family: inherit;
+    box-shadow: none;
   }
 
   input, textarea, select {

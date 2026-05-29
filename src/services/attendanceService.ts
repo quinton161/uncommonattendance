@@ -2,11 +2,11 @@ import {
   collection, doc, setDoc, getDoc, getDocs,
   query, where, orderBy, updateDoc,
   Timestamp, deleteDoc, serverTimestamp,
-  addDoc,
+  addDoc, onSnapshot,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import DataService from './DataService';
-import { hubIdMatchesScope } from './hubService';
+import { hubIdMatchesScope, resolvedHubLabel } from './hubService';
 import { AbsenceReason, AttendanceRecord, AttendanceStatus, LocationData } from '../types';
 import { DailyAttendanceService } from './dailyAttendanceService';
 import { TimeService } from './timeService';
@@ -22,6 +22,23 @@ export interface StaffAbsentPayload {
   recordedByName: string;
 }
 
+const ATTENDANCE_PERMISSION_MSG =
+  'Could not save attendance. Ask your instructor to verify your hub and profile.';
+
+function mapFirestoreWriteError(err: unknown, context: string): never {
+  const code =
+    err && typeof err === 'object' && 'code' in err
+      ? (err as { code?: string }).code
+      : undefined;
+  if (code === 'permission-denied') {
+    if (process.env.NODE_ENV === 'development') {
+      console.error(`[AttendanceService] ${context} permission-denied`, err);
+    }
+    throw new Error(ATTENDANCE_PERMISSION_MSG);
+  }
+  throw err instanceof Error ? err : new Error(String(err));
+}
+
 export class AttendanceService {
   private static instance: AttendanceService;
   private timeService = TimeService.getInstance();
@@ -31,6 +48,30 @@ export class AttendanceService {
       AttendanceService.instance = new AttendanceService();
     }
     return AttendanceService.instance;
+  }
+
+  /** Resolve hub from arg or Firestore user profile (Harare attendance must always be hub-scoped). */
+  private async resolveHubForStudent(
+    studentId: string,
+    hubId?: string
+  ): Promise<{ hubId: string; hubName: string }> {
+    const trimmed = hubId?.trim();
+    if (trimmed) {
+      return { hubId: trimmed, hubName: resolvedHubLabel({ hubId: trimmed }) };
+    }
+    try {
+      const userSnap = await getDoc(doc(db, 'users', studentId));
+      const data = userSnap.exists() ? userSnap.data() : null;
+      const fromProfile = data?.hubId != null ? String(data.hubId).trim() : '';
+      if (fromProfile) {
+        return { hubId: fromProfile, hubName: resolvedHubLabel({ hubId: fromProfile, hubName: data?.hubName }) };
+      }
+    } catch (e) {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('[AttendanceService] resolveHubForStudent failed', e);
+      }
+    }
+    return { hubId: '', hubName: '' };
   }
 
   // ── Check-in ────────────────────────────────────────────────────────────────
@@ -109,6 +150,8 @@ export class AttendanceService {
       }
     }
 
+    const hub = await this.resolveHubForStudent(studentId, hubId);
+
     const record: any = {
       id:               docId,
       studentId,
@@ -124,8 +167,9 @@ export class AttendanceService {
       updatedAt:        serverTimestamp(),
     };
 
-    if (hubId) {
-      record.hubId = hubId;
+    if (hub.hubId) {
+      record.hubId = hub.hubId;
+      record.hubName = hub.hubName;
     }
 
     if (isLate && isStudentQrSelfCheckIn && lateReason?.trim()) {
@@ -140,14 +184,18 @@ export class AttendanceService {
       record.location = { ip: location.ip, timestamp: location.timestamp ?? Date.now() };
     }
 
-    await setDoc(docRef, record);
+    try {
+      await setDoc(docRef, record);
+    } catch (e) {
+      mapFirestoreWriteError(e, `checkIn setDoc attendance/${docId}`);
+    }
 
     if (isLate && isStudentQrSelfCheckIn && lateReason?.trim()) {
       try {
         await addDoc(collection(db, 'late_check_in_events'), {
           studentId,
           studentName,
-          hubId: hubId?.trim() ?? '',
+          hubId: hub.hubId || '',
           date: today,
           reason: lateReason.trim(),
           attendanceDocId: docId,
@@ -172,6 +220,23 @@ export class AttendanceService {
       await DailyAttendanceService.getInstance().markPresentToday(studentId, studentName);
     } catch (e) {
       console.warn('dailyAttendance sync failed (non-fatal):', e);
+    }
+
+    try {
+      const { createNotification } = await import('./notificationFeedService');
+      const { resolvedHubLabel } = await import('./hubService');
+      const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+      await createNotification({
+        type: isLate ? 'late' : 'check_in',
+        title: isLate ? 'Late check-in' : 'Check-in',
+        body: `${studentName} at ${timeStr}`,
+        hubId: hub.hubId || undefined,
+        hubName: hub.hubName || undefined,
+        studentId,
+        studentName,
+      });
+    } catch {
+      /* non-fatal */
     }
 
     console.log(`✅ ${studentName} checked in — ${status} at ${now.toISOString()}`);
@@ -199,12 +264,20 @@ export class AttendanceService {
       throw new Error('This check-in belongs to a different hub than your profile. Contact support if you changed hubs.');
     }
 
+    const hub = await this.resolveHubForStudent(studentId, recHub || studentHubId);
+    const checkoutDate =
+      typeof data.date === 'string' && data.date.length >= 10
+        ? data.date
+        : today;
+
     // Include studentId so Firestore rules see it on the merged request.resource (partial updates).
     const base = {
       studentId: data.studentId ?? studentId,
+      date: checkoutDate,
       checkOutTime: Timestamp.fromDate(now),
       status: 'completed' as const,
       updatedAt: serverTimestamp(),
+      ...(hub.hubId && !recHub ? { hubId: hub.hubId, hubName: hub.hubName } : {}),
     };
     const update =
       location?.ip && location.ip !== '0.0.0.0'
@@ -218,7 +291,31 @@ export class AttendanceService {
           }
         : base;
 
-    await updateDoc(doc(db, 'attendance', docId), update);
+    try {
+      await updateDoc(doc(db, 'attendance', docId), update);
+    } catch (e) {
+      mapFirestoreWriteError(e, `checkOut updateDoc attendance/${docId}`);
+    }
+
+    try {
+      const { createNotification } = await import('./notificationFeedService');
+      const { resolvedHubLabel } = await import('./hubService');
+      const name = String(data.studentName || '');
+      const hId = (recHub || studentHubId || '').trim();
+      const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+      await createNotification({
+        type: 'check_out',
+        title: 'Check-out',
+        body: `${name || 'Student'} at ${timeStr}`,
+        hubId: hId || undefined,
+        hubName: hId ? resolvedHubLabel({ hubId: hId }) : undefined,
+        studentId,
+        studentName: name,
+      });
+    } catch {
+      /* non-fatal */
+    }
+
     return {
       ...data,
       checkInTime:  data.checkInTime.toDate(),
@@ -372,6 +469,14 @@ export class AttendanceService {
     }
   }
 
+  private mapAttendanceSnapData(d: Record<string, unknown>): AttendanceRecord {
+    return {
+      ...d,
+      checkInTime: this.safeFirestoreDate(d.checkInTime),
+      checkOutTime: this.safeFirestoreDate(d.checkOutTime),
+    } as AttendanceRecord;
+  }
+
   async getTodayAttendance(studentId?: string, hubId?: string): Promise<AttendanceRecord | null> {
     if (!studentId) return null;
     const today = this.timeService.getCurrentDateString();
@@ -379,11 +484,64 @@ export class AttendanceService {
     if (!snap.exists()) return null;
     const d = snap.data();
     if (hubId && !hubIdMatchesScope(d.hubId, hubId)) return null;
-    return {
-      ...d,
-      checkInTime:  this.safeFirestoreDate(d.checkInTime),
-      checkOutTime: this.safeFirestoreDate(d.checkOutTime),
-    } as AttendanceRecord;
+    return this.mapAttendanceSnapData(d);
+  }
+
+  /**
+   * Live listener for today's attendance doc (`{yyyy-mm-dd}_{studentId}`).
+   * Used by the student dashboard so check-in/out updates without a full page reload.
+   */
+  subscribeToTodayAttendance(
+    studentId: string,
+    hubId: string | undefined,
+    onChange: (record: AttendanceRecord | null) => void,
+    onError?: (err: Error) => void
+  ): () => void {
+    if (!studentId?.trim()) return () => {};
+
+    const today = this.timeService.getCurrentDateString();
+    const docRef = doc(db, 'attendance', `${today}_${studentId}`);
+
+    const emitFromSnap = (snap: Awaited<ReturnType<typeof getDoc>>) => {
+      if (!snap.exists()) {
+        onChange(null);
+        return;
+      }
+      const d = snap.data() as Record<string, unknown> | undefined;
+      if (!d) {
+        onChange(null);
+        return;
+      }
+      if (hubId && !hubIdMatchesScope(d.hubId as string | undefined, hubId)) {
+        onChange(null);
+        return;
+      }
+      onChange(this.mapAttendanceSnapData(d));
+    };
+
+    const handleListenerError = (err: unknown) => {
+      const code =
+        err && typeof err === 'object' && 'code' in err
+          ? String((err as { code?: string }).code)
+          : '';
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[AttendanceService] subscribeToTodayAttendance', err);
+      }
+      const message =
+        code === 'permission-denied'
+          ? 'Could not load attendance. Your account may need updated permissions — try signing out and back in, or contact your hub admin.'
+          : err instanceof Error
+            ? err.message
+            : 'Failed to load attendance';
+      onError?.(new Error(message));
+    };
+
+    // Prime with getDoc so a missing today row does not leave the UI stuck loading.
+    void getDoc(docRef)
+      .then((snap) => emitFromSnap(snap))
+      .catch(handleListenerError);
+
+    return onSnapshot(docRef, emitFromSnap, handleListenerError);
   }
 
   async isCurrentlyCheckedIn(studentId: string, hubId?: string): Promise<boolean> {

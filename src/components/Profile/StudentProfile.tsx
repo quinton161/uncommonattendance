@@ -3,6 +3,7 @@ import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import styled from 'styled-components';
 import { motion, AnimatePresence } from 'framer-motion';
+import { StudentPresenceBadge } from '../Recognition/StudentPresenceBadge';
 import { 
   FiUser, 
   FiAtSign, 
@@ -651,6 +652,11 @@ export const StudentProfile: React.FC = () => {
               />
             ) : (
               <Name>{stats.displayName || 'Student Name'}</Name>
+            )}
+            {user?.uid && user?.hubId && (
+              <div style={{ marginTop: 8 }}>
+                <StudentPresenceBadge studentId={user.uid} hubId={user.hubId} />
+              </div>
             )}
             <Badge status={stats.status}>{stats.status.replace('-', ' ')}</Badge>
           </div>

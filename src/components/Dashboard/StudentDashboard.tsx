@@ -9,6 +9,7 @@ import { CheckInDailyGoalModal } from '../Student/CheckInDailyGoalModal';
 import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
 import type { AttendanceRecord, LocationData } from '../../types';
 import { Button } from '../Common/Button';
+import { StudentPresenceBadge } from '../Recognition/StudentPresenceBadge';
 
 const AttSvc = AttendanceService.getInstance();
 
@@ -25,29 +26,63 @@ export function StudentDashboard(): React.ReactElement {
   useBodyScrollLock(lateReasonModalOpen || checkInGoalModalOpen);
 
   useEffect(() => {
-    // keep existing behavior: initial load
-    // implemented via the existing attendanceService in original codebase
-    // (unchanged logic is below; this is the repo's original dashboard implementation)
-    const load = async () => {
-      if (!user) return;
-      setLoading(true);
-      setError('');
-      try {
-        const [attendance, history] = await Promise.all([
-          AttSvc.getTodayAttendance(user.uid, studentHubId),
-          AttSvc.getAttendanceHistory(user.uid, 10, studentHubId),
-        ]);
-        setTodayAttendance(attendance);
-        setAttendanceHistory(history);
-      } catch (e: any) {
-        console.error('Failed to load attendance:', e);
-        setError(e?.message || 'Failed to load attendance');
-      } finally {
+    if (!user?.uid) return;
+
+    let cancelled = false;
+    setLoading(true);
+    setError('');
+
+    const unsubToday = AttSvc.subscribeToTodayAttendance(
+      user.uid,
+      studentHubId,
+      (record) => {
+        if (cancelled) return;
+        setTodayAttendance(record);
+        setLoading(false);
+        setError('');
+      },
+      (err) => {
+        if (cancelled) return;
+        console.error('Failed to subscribe to today attendance:', err);
+        setError(err.message || 'Failed to load attendance');
         setLoading(false);
       }
+    );
+
+    return () => {
+      cancelled = true;
+      unsubToday();
     };
-    load();
-  }, [user, studentHubId]);
+  }, [user?.uid, studentHubId]);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    let cancelled = false;
+    AttSvc.getAttendanceHistory(user.uid, 10, studentHubId)
+      .then((rows) => {
+        if (!cancelled) setAttendanceHistory(rows);
+      })
+      .catch((e: unknown) => {
+        if (cancelled) return;
+        console.error('Failed to load attendance history:', e);
+        const code =
+          e && typeof e === 'object' && 'code' in e
+            ? String((e as { code?: string }).code)
+            : '';
+        const msg =
+          code === 'permission-denied'
+            ? 'Could not load attendance history. Sign out and back in, or contact your hub admin.'
+            : e instanceof Error
+              ? e.message
+              : 'Failed to load attendance history';
+        setError((prev) => prev || msg);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.uid, studentHubId]);
 
   const runCheckIn = async (lateReason?: string, checkInGoal?: string) => {
     if (!user) return;
@@ -234,6 +269,11 @@ export function StudentDashboard(): React.ReactElement {
         <div className="rounded-[20px] bg-gradient-to-br from-[#0052CC] to-[#003D99] p-6 text-white">
           <p className="text-xs font-bold uppercase tracking-widest text-white/60">Student home</p>
           <h2 className="mt-2 text-2xl font-bold">Welcome back, {user?.displayName || 'Student'}</h2>
+          {user?.uid && user?.hubId && (
+            <div className="mt-2">
+              <StudentPresenceBadge studentId={user.uid} hubId={user.hubId} />
+            </div>
+          )}
           <p className="mt-1 text-sm text-blue-100">
             {new Date().toLocaleDateString('en-US', {
               weekday: 'long',

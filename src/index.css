@@ -188,3 +188,15 @@ button[style*='background: rgb(30, 58, 138)'] * {
   border-radius: 14px !important;
   font-size: 0.875rem !important;
 }
+
+/* Nav / toolbar icon buttons — avoid global primary button styles */
+button[data-ui='icon'],
+button[data-ui='nav'] {
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+button[data-ui='icon']:hover,
+button[data-ui='nav']:hover {
+  transform: none !important;
+}

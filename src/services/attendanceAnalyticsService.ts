@@ -1,9 +1,10 @@
-import { format, parseISO, subDays } from 'date-fns';
+import { format, parseISO, subDays, startOfMonth, endOfMonth } from 'date-fns';
 import { AttendanceRecord, AttendanceStatus } from '../types';
 import { db } from './firebase';
 import { collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
 import { TimeService } from './timeService';
-import { hubIdMatchesScope } from './hubService';
+import { DEFAULT_HUBS, fetchHubs, hubIdMatchesScope, resolvedHubLabel } from './hubService';
+import type { HubMonthlyRankingRow, StudentLeaderboardRow } from '../types/notifications';
 
 // Date range preset type
 export interface DateRangePreset {
@@ -665,6 +666,216 @@ export class AttendanceAnalyticsService {
     );
 
     return unsubscribe;
+  }
+
+  /** Calendar month in Harare (yyyy-MM-dd bounds). */
+  calendarMonthRange(year: number, monthIndex0: number): DateRange {
+    const anchor = new Date(year, monthIndex0, 15);
+    const startDate = format(startOfMonth(anchor), 'yyyy-MM-dd');
+    const endDate = format(endOfMonth(anchor), 'yyyy-MM-dd');
+    return {
+      preset: { label: 'Month', value: 'month' },
+      startDate,
+      endDate,
+    };
+  }
+
+  currentCalendarMonthRange(): DateRange {
+    const ts = TimeService.getInstance();
+    const today = ts.getCurrentDateString();
+    const [y, m] = today.split('-').map(Number);
+    return this.calendarMonthRange(y, (m || 1) - 1);
+  }
+
+  async getHubMonthlyRankings(range: DateRange): Promise<HubMonthlyRankingRow[]> {
+    const weekdays = eachWeekdayInRange(range.startDate, range.endDate);
+    const schoolDays = weekdays.length;
+    if (schoolDays === 0) return [];
+
+    let hubs = DEFAULT_HUBS;
+    try {
+      const fetched = await fetchHubs();
+      if (fetched.length > 0) hubs = fetched;
+    } catch {
+      /* use defaults */
+    }
+
+    let students: any[] = [];
+    let records: any[] = [];
+    try {
+      const [usersSnap, attendanceSnap] = await Promise.all([
+        getDocs(collection(db, 'users')),
+        getDocs(
+          query(
+            collection(db, 'attendance'),
+            where('date', '>=', range.startDate),
+            where('date', '<=', range.endDate)
+          )
+        ),
+      ]);
+      students = usersSnap.docs
+        .map((d) => ({ id: d.id, ...d.data() }))
+        .filter((u: any) => {
+          const t = String(u.userType || '').toLowerCase();
+          return t === 'attendee' || t === 'student';
+        });
+      records = attendanceSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    } catch (e) {
+      console.warn('getHubMonthlyRankings query failed:', e);
+      return [];
+    }
+
+    const rows: Omit<HubMonthlyRankingRow, 'rank'>[] = hubs.map((hub) => {
+      const hubStudents = students.filter((u: any) =>
+        hubIdMatchesScope(u.hubId, hub.id)
+      );
+      const enrolled = hubStudents.length;
+      const studentIds = new Set(hubStudents.map((u: any) => u.id || u.uid));
+
+      let present = 0;
+      let late = 0;
+      const bestByStudentDay = new Map<string, any>();
+
+      records.forEach((r: any) => {
+        if (!studentIds.has(r.studentId)) return;
+        if (!hubIdMatchesScope(r.hubId, hub.id)) return;
+        const day = recordSchoolDateHarare(r);
+        if (!day || !weekdays.includes(day)) return;
+        const key = `${r.studentId}_${day}`;
+        const ex = bestByStudentDay.get(key);
+        if (!ex) {
+          bestByStudentDay.set(key, r);
+          return;
+        }
+        const tNew = checkInToDate(r as AttendanceRecord)?.getTime() ?? 0;
+        const tOld = checkInToDate(ex as AttendanceRecord)?.getTime() ?? 0;
+        if (tNew >= tOld) bestByStudentDay.set(key, r);
+      });
+
+      bestByStudentDay.forEach((r) => {
+        const n = normalizeStatus(r as AttendanceRecord);
+        if (n === 'late') late++;
+        else if (n === 'present') present++;
+      });
+
+      const attendedDays = present + late;
+      const expected = enrolled * schoolDays;
+      const absent = Math.max(0, expected - attendedDays);
+      const attendanceRate =
+        expected > 0 ? Math.round((attendedDays / expected) * 100) : 0;
+
+      return {
+        hubId: hub.id,
+        hubName: hub.name,
+        enrolled,
+        present,
+        late,
+        absent,
+        attendanceRate,
+      };
+    });
+
+    return rows
+      .sort((a, b) => b.attendanceRate - a.attendanceRate)
+      .map((r, i) => ({ ...r, rank: i + 1 }));
+  }
+
+  async getMonthlyStudentLeaders(
+    hubId: string | undefined,
+    range: DateRange,
+    limit = 50
+  ): Promise<StudentLeaderboardRow[]> {
+    const weekdays = eachWeekdayInRange(range.startDate, range.endDate);
+    const totalWd = weekdays.length;
+    if (totalWd === 0) return [];
+
+    let students: any[] = [];
+    let records: any[] = [];
+    const userById = new Map<string, any>();
+
+    try {
+      const [usersSnap, attendanceSnap] = await Promise.all([
+        getDocs(collection(db, 'users')),
+        getDocs(
+          query(
+            collection(db, 'attendance'),
+            where('date', '>=', range.startDate),
+            where('date', '<=', range.endDate)
+          )
+        ),
+      ]);
+      usersSnap.docs.forEach((d) => userById.set(d.id, { id: d.id, ...d.data() }));
+      students = Array.from(userById.values()).filter((u: any) => {
+        const t = String(u.userType || '').toLowerCase();
+        return t === 'attendee' || t === 'student';
+      });
+      if (hubId) {
+        students = students.filter((u: any) => hubIdMatchesScope(u.hubId, hubId));
+      }
+      records = attendanceSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      if (hubId) {
+        records = records.filter((r: any) => hubIdMatchesScope(r.hubId, hubId));
+      }
+    } catch (e) {
+      console.warn('getMonthlyStudentLeaders query failed:', e);
+      return [];
+    }
+
+    const recordsByStudent = new Map<string, any[]>();
+    records.forEach((r) => {
+      const sid = r.studentId;
+      if (!sid) return;
+      if (!recordsByStudent.has(sid)) recordsByStudent.set(sid, []);
+      recordsByStudent.get(sid)!.push(r);
+    });
+
+    const rows = students.map((u: any) => {
+      const studentId = u.id;
+      const rlist = recordsByStudent.get(studentId) || [];
+      const byDate = dedupeRecordsByDate(rlist);
+      let present = 0;
+      let late = 0;
+      weekdays.forEach((dateStr) => {
+        const rec = byDate.get(dateStr);
+        if (!rec) return;
+        const n = normalizeStatus(rec as AttendanceRecord);
+        if (n === 'late') late++;
+        else present++;
+      });
+      const daily: Array<{ status: string }> = [];
+      weekdays.forEach((dateStr) => {
+        const rec = byDate.get(dateStr);
+        if (!rec) daily.push({ status: 'absent' });
+        else daily.push({ status: normalizeStatus(rec as AttendanceRecord) });
+      });
+      const { current } = computeStreaks(daily);
+      const daysAttended = present + late;
+      const absent = totalWd - daysAttended;
+      const attendanceRate = totalWd > 0 ? Math.round((daysAttended / totalWd) * 100) : 0;
+
+      return {
+        studentId,
+        studentName: u.displayName || u.name || u.email || 'Student',
+        email: u.email as string | undefined,
+        photoUrl: (u.photoUrl || u.photoURL) as string | undefined,
+        hubId: u.hubId as string | undefined,
+        hubName: resolvedHubLabel(u),
+        attendanceRate,
+        present,
+        late,
+        absent,
+        totalDays: totalWd,
+        streak: current,
+      };
+    });
+
+    return rows
+      .sort((a, b) => {
+        if (b.attendanceRate !== a.attendanceRate) return b.attendanceRate - a.attendanceRate;
+        return b.present + b.late - (a.present + a.late);
+      })
+      .slice(0, limit)
+      .map((row, i) => ({ ...row, rank: i + 1 }));
   }
 }
 

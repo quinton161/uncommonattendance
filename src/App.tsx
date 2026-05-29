@@ -23,6 +23,7 @@ import { DirectAuthTest } from './components/Auth/DirectAuthTest';
 import { GlobalStyles } from './styles/GlobalStyles';
 import { theme } from './styles/theme';
 import { AppUpdateNotifier } from './components/Common/AppUpdateNotifier';
+import { RankingsPage } from './pages/RankingsPage';
 import { ToastContainer } from 'react-toastify';
 import { uniqueToast } from './utils/toastUtils';
 import DataService from './services/DataService';
@@ -88,6 +89,7 @@ const AppRoutes: React.FC = () => {
           <Route path="/goals" element={<StudentGoalsBoard />} />
           <Route path="/events" element={<EventsPage />} />
           <Route path="/profile" element={<StudentProfile />} />
+          <Route path="/rankings" element={<RankingsPage />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </Layout>
@@ -113,6 +115,7 @@ const AppRoutes: React.FC = () => {
             }
           />
           <Route path="/profile" element={<AdminProfile />} />
+          <Route path="/rankings" element={<RankingsPage />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </Layout>

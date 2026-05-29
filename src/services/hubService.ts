@@ -35,7 +35,10 @@ export function hubScopeForStaff(user: User | null): string | undefined {
  */
 export function effectiveStaffHubScope(user: User | null, adminHubFilter: string): string | undefined {
   if (!user) return undefined;
-  if (user.userType === 'admin' || user.userType === 'instructor') {
+  if (user.userType === 'instructor') {
+    return instructorAssignedHubId(user);
+  }
+  if (user.userType === 'admin') {
     const id = adminHubFilter?.trim();
     return id || undefined;
   }

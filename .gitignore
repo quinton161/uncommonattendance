@@ -24,6 +24,11 @@
 test-users.json
 users-temp.json
 
+# Local Admin SDK key for scripts/provision-user.mjs
+scripts/serviceAccountKey.json
+**/serviceAccountKey.json
+!scripts/serviceAccountKey.json.example
+
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

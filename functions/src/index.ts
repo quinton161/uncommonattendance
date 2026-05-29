@@ -107,3 +107,251 @@ export const deleteStudentAuthUser = functions
       throw new functions.https.HttpsError('internal', 'Could not delete Auth user.');
     }
   });
+
+interface ProvisionUserPayload {
+  email?: string;
+  displayName?: string;
+  userType?: string;
+  hubId?: string;
+  hubName?: string;
+}
+
+async function resolveHubName(db: admin.firestore.Firestore, hubId: string, hubName?: string): Promise<string> {
+  const trimmedName = hubName?.trim();
+  if (trimmedName) return trimmedName;
+  if (!hubId) return '';
+  try {
+    const hubSnap = await db.doc(`hubs/${hubId}`).get();
+    if (hubSnap.exists) {
+      const n = hubSnap.data()?.name;
+      if (n && String(n).trim()) return String(n).trim();
+    }
+  } catch {
+    /* use id */
+  }
+  return hubId;
+}
+
+/**
+ * Staff-provisioned accounts: creates Firebase Auth user + Firestore profile.
+ * Admins: any role. Instructors: students in their hub only. Password via reset email on client.
+ */
+export const provisionUser = functions
+  .region('us-central1')
+  .https.onCall(async (data: ProvisionUserPayload, context: CallableContext) => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError('unauthenticated', 'Sign in required.');
+    }
+
+    const email = data?.email?.trim().toLowerCase();
+    const displayName = data?.displayName?.trim();
+    const userTypeRaw = String(data?.userType || '').toLowerCase();
+    const hubId = data?.hubId?.trim() || '';
+
+    if (!email || !email.includes('@')) {
+      throw new functions.https.HttpsError('invalid-argument', 'Valid email is required.');
+    }
+    if (!displayName || displayName.length < 2) {
+      throw new functions.https.HttpsError('invalid-argument', 'Display name is required.');
+    }
+
+    let userType: 'admin' | 'instructor' | 'attendee';
+    if (userTypeRaw === 'admin') userType = 'admin';
+    else if (userTypeRaw === 'instructor') userType = 'instructor';
+    else if (userTypeRaw === 'attendee' || userTypeRaw === 'student') userType = 'attendee';
+    else {
+      throw new functions.https.HttpsError('invalid-argument', 'Invalid user type.');
+    }
+
+    const db = admin.firestore();
+    const callerUid = context.auth.uid;
+    const callerSnap = await db.doc(`users/${callerUid}`).get();
+    if (!callerSnap.exists) {
+      throw new functions.https.HttpsError('failed-precondition', 'Staff profile missing.');
+    }
+
+    const caller = callerSnap.data()!;
+    const callerType = String(caller.userType || '').toLowerCase();
+    const instructorHub = effectiveHub(caller) || LEGACY_HUB;
+
+    if (callerType === 'instructor') {
+      if (userType !== 'attendee') {
+        throw new functions.https.HttpsError(
+          'permission-denied',
+          'Instructors can only create student accounts.'
+        );
+      }
+      if (!hubId || !hubMatchesInstructorScope(hubId, instructorHub)) {
+        throw new functions.https.HttpsError(
+          'permission-denied',
+          'Students must be assigned to your hub.'
+        );
+      }
+    } else if (callerType !== 'admin') {
+      throw new functions.https.HttpsError('permission-denied', 'Only staff can create accounts.');
+    }
+
+    if ((userType === 'instructor' || userType === 'attendee') && !hubId) {
+      throw new functions.https.HttpsError(
+        'invalid-argument',
+        'Hub is required for instructors and students.'
+      );
+    }
+
+    try {
+      await admin.auth().getUserByEmail(email);
+      throw new functions.https.HttpsError('already-exists', 'An account with this email already exists.');
+    } catch (e: unknown) {
+      if (e instanceof functions.https.HttpsError) throw e;
+      const code = (e as { code?: string })?.code;
+      if (code !== 'auth/user-not-found') {
+        console.error('provisionUser getUserByEmail', e);
+        throw new functions.https.HttpsError('internal', 'Could not verify email.');
+      }
+    }
+
+    let authUser: admin.auth.UserRecord;
+    try {
+      authUser = await admin.auth().createUser({
+        email,
+        displayName,
+        emailVerified: false,
+      });
+    } catch (e: unknown) {
+      const code = (e as { code?: string })?.code;
+      if (code === 'auth/email-already-exists') {
+        throw new functions.https.HttpsError('already-exists', 'Email already registered.');
+      }
+      console.error('provisionUser createUser', e);
+      throw new functions.https.HttpsError('internal', 'Could not create login account.');
+    }
+
+    const hubName = await resolveHubName(db, hubId, data?.hubName);
+    const profile: Record<string, unknown> = {
+      uid: authUser.uid,
+      email,
+      emailLower: email,
+      displayName,
+      userType,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      photoUrl: null,
+      bio: '',
+      provisioned: true,
+      provisionedBy: callerUid,
+      mustSetPassword: true,
+    };
+    if (hubId) {
+      profile.hubId = hubId;
+      profile.hubName = hubName || hubId;
+    }
+
+    try {
+      await db.doc(`users/${authUser.uid}`).set(profile);
+    } catch (e) {
+      try {
+        await admin.auth().deleteUser(authUser.uid);
+      } catch {
+        /* ignore */
+      }
+      console.error('provisionUser firestore write', e);
+      throw new functions.https.HttpsError('internal', 'Could not save user profile.');
+    }
+
+    return { uid: authUser.uid, email, userType };
+  });
+
+const HUB_IDS = [
+  'uncommon_kuwadzana',
+  'uncommon_belvedere',
+  'uncommon_victoriafalls',
+];
+
+/** 1st of each month 02:00 Africa/Harare — rollup previous month awards per hub. */
+export const rollupMonthlyAwards = functions
+  .region('us-central1')
+  .pubsub.schedule('0 2 1 * *')
+  .timeZone('Africa/Harare')
+  .onRun(async () => {
+    const db = admin.firestore();
+    const now = new Date();
+    const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const period = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, '0')}`;
+    const startDate = `${period}-01`;
+    const lastDay = new Date(prev.getFullYear(), prev.getMonth() + 1, 0).getDate();
+    const endDate = `${period}-${String(lastDay).padStart(2, '0')}`;
+
+    const attendanceSnap = await db
+      .collection('attendance')
+      .where('date', '>=', startDate)
+      .where('date', '<=', endDate)
+      .get();
+
+    const usersSnap = await db.collection('users').get();
+    const students = usersSnap.docs.filter((d) => {
+      const t = String(d.data().userType || '').toLowerCase();
+      return t === 'attendee' || t === 'student';
+    });
+
+    for (const hubId of HUB_IDS) {
+      const hubStudents = students.filter((d) => {
+        const h = String(d.data().hubId || '').trim();
+        return h === hubId || (!h && hubId === LEGACY_HUB);
+      });
+      const studentIds = new Set(hubStudents.map((d) => d.id));
+      const roster = hubStudents.map((d) => ({
+        id: d.id,
+        name: String(d.data().displayName || d.data().name || 'Student'),
+      }));
+
+      const counts = new Map<string, { present: number; late: number; name: string }>();
+      roster.forEach((s) => counts.set(s.id, { present: 0, late: 0, name: s.name }));
+
+      attendanceSnap.docs.forEach((docSnap) => {
+        const r = docSnap.data();
+        if (!studentIds.has(r.studentId)) return;
+        const h = String(r.hubId || '').trim();
+        if (h && h !== hubId && !(h === '' && hubId === LEGACY_HUB)) return;
+        if (h === '' && hubId !== LEGACY_HUB) return;
+        if (h && h !== hubId) return;
+        const day = r.date as string;
+        if (!day || day < startDate || day > endDate) return;
+        const status = String(r.status || '').toLowerCase();
+        const row = counts.get(r.studentId);
+        if (!row) return;
+        if (status === 'late' || status.includes('late')) row.late++;
+        else if (status === 'present' || status === 'completed') row.present++;
+      });
+
+      const leaders = [...counts.entries()]
+        .map(([studentId, c]) => {
+          const total = c.present + c.late;
+          return {
+            studentId,
+            studentName: c.name,
+            present: c.present,
+            late: c.late,
+            attendanceRate: total > 0 ? Math.min(100, total * 10) : 0,
+          };
+        })
+        .sort((a, b) => b.present + b.late - (a.present + a.late))
+        .slice(0, 3)
+        .map((row, i) => ({ ...row, rank: i + 1 }));
+
+      await db.doc(`monthly_awards/${period}_${hubId}`).set({
+        period,
+        hubId,
+        hubName: hubId,
+        winners: leaders,
+        computedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+
+    await db.doc(`hub_monthly_stats/${period}`).set({
+      period,
+      startDate,
+      endDate,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return null;
+  });

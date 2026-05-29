@@ -1198,7 +1198,7 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
           <p>
           Manage students below; admins are hidden. Summary cards count students only (instructors have their own card). Check-in and check-out times use Africa/Harare (school time).
           {(user?.userType === 'admin' || user?.userType === 'instructor') &&
-            ' Use Hub to view one location or all hubs.'}
+            ' Use Hub to view one location or all hubs (instructors: assigned hub only).'}
           {user?.userType === 'instructor' &&
             ' Instructors can edit students only in their own assigned hub.'}
         </p>
