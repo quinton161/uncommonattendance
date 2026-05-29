@@ -136,6 +136,8 @@ const StatGrid = styled.div`
   grid-template-columns: repeat(4, 1fr);
   gap: ${theme.spacing.md};
   margin-bottom: ${theme.spacing.xl};
+  position: relative;
+  z-index: 1;
   @media (max-width: ${theme.breakpoints.laptop}) {
     grid-template-columns: repeat(2, 1fr);
   }
@@ -561,16 +563,20 @@ const ErrorBanner = styled.div`
 
 const GoalCalendarCard = styled.div`
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr);
-  gap: ${theme.spacing.sm};
+  grid-template-columns: minmax(220px, 260px) minmax(0, 1fr);
+  gap: ${theme.spacing.lg};
+  align-items: start;
   margin-bottom: ${theme.spacing.xl};
   padding: ${theme.spacing.md};
   background: linear-gradient(135deg, #e9f6f4 0%, #f5fbff 100%);
   border: 1px solid rgba(0, 82, 204, 0.1);
   border-radius: 28px;
   box-shadow: 0 18px 44px rgba(10, 22, 40, 0.08);
+  overflow: hidden;
+  position: relative;
+  isolation: isolate;
 
-  @media (max-width: ${theme.breakpoints.tablet}) {
+  @media (max-width: ${theme.breakpoints.laptop}) {
     grid-template-columns: 1fr;
   }
 `;
@@ -579,6 +585,10 @@ const PlannerSidebar = styled.aside`
   display: grid;
   align-content: start;
   gap: ${theme.spacing.sm};
+  min-width: 0;
+  width: 100%;
+  position: relative;
+  z-index: 2;
 `;
 
 const MiniCalendar = styled.div`
@@ -737,10 +747,17 @@ const DaySchedulePanel = styled.div`
   border-radius: 22px;
   padding: ${theme.spacing.md};
   min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  position: relative;
+  z-index: 1;
+  box-sizing: border-box;
 `;
 
 const ScheduleHeader = styled.div`
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
   gap: ${theme.spacing.md};
@@ -789,7 +806,10 @@ const PlannerToolbar = styled.div`
 
 const WeekScroller = styled.div`
   overflow-x: auto;
+  overflow-y: visible;
   padding-bottom: 2px;
+  max-width: 100%;
+  -webkit-overflow-scrolling: touch;
 `;
 
 const WeekHeaderGrid = styled.div`
