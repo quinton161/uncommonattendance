@@ -6,6 +6,7 @@ import { theme } from '../../styles/theme';
 
 interface TopBarProps {
   onMenuClick?: () => void;
+  isMenuOpen?: boolean;
 }
 
 const Bar = styled.header`
@@ -36,18 +37,26 @@ const MenuButton = styled.button`
   width: 40px;
   height: 40px;
   border: 0;
-  border-radius: 8px;
+  border-radius: 10px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   background: #ffffff;
-  color: ${theme.colors.textSecondary};
+  color: ${theme.colors.primary};
   cursor: pointer;
+  border: 1px solid #e6ecff;
   box-shadow: none;
+  transition: background 0.2s ease;
 
-  @media (min-width: ${theme.breakpoints.laptop}) {
-    display: none;
+  &:hover {
+    background: #f8faff;
   }
+
+  &:focus-visible {
+    outline: 2px solid #93c5fd;
+    outline-offset: 2px;
+  }
+
 `;
 
 const HamburgerLines = styled.span`
@@ -61,7 +70,7 @@ const HamburgerLines = styled.span`
     width: 100%;
     height: 2px;
     border-radius: 2px;
-    background: ${theme.colors.textPrimary};
+    background: ${theme.colors.primary};
   }
 `;
 
@@ -146,7 +155,7 @@ const activeRouteFromPath = (pathname: string) => {
 
 const getInitial = (name?: string) => name?.trim()?.[0]?.toUpperCase() || 'U';
 
-export const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
+export const TopBar: React.FC<TopBarProps> = ({ onMenuClick, isMenuOpen = false }) => {
   const { user } = useAuth();
   const location = useLocation();
   const activeRoute = activeRouteFromPath(location.pathname.toLowerCase());
@@ -160,7 +169,12 @@ export const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
   return (
     <Bar>
       <Left>
-        <MenuButton type="button" aria-label="Open navigation" onClick={onMenuClick}>
+        <MenuButton
+          type="button"
+          aria-label={isMenuOpen ? 'Close navigation' : 'Open navigation'}
+          aria-expanded={isMenuOpen}
+          onClick={onMenuClick}
+        >
           <HamburgerLines aria-hidden="true">
             <span />
             <span />

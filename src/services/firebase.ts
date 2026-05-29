@@ -1,7 +1,7 @@
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
 import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { enableIndexedDbPersistence, getFirestore } from 'firebase/firestore';
 import { getFunctions } from 'firebase/functions';
 import { getStorage } from 'firebase/storage';
 
@@ -50,5 +50,12 @@ export const db = getFirestore(app);
 export const storage = getStorage(app);
 /** Same region as Cloud Functions deployment (see `firebase deploy --only functions`). */
 export const functions = getFunctions(app, 'us-central1');
+
+// Optional offline cache; non-fatal if unavailable (e.g., private mode, tests, multi-tab lock).
+if (typeof window !== 'undefined') {
+  void enableIndexedDbPersistence(db).catch(() => {
+    /* ignore persistence setup failures */
+  });
+}
 
 export default app;

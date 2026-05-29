@@ -100,9 +100,15 @@ export const LoginPage: React.FC = () => {
   };
 
   const handleGoogle = async () => {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!isAdminEmail(normalizedEmail) && !selectedHub) {
+      toast.error('Select your hub before signing in with Google.');
+      return;
+    }
+
     setLoading(true);
     try {
-      await loginWithGoogle();
+      await loginWithGoogle(selectedHub ?? undefined);
     } catch (err) {
       toast.error(getErrorMsg(err));
     } finally {

@@ -66,6 +66,19 @@ function isDirectoryProfileComplete(d: Record<string, unknown> | undefined): boo
   return !!(emailOk && typeOk);
 }
 
+/** Prevent auth bootstrap from hanging forever on slow/blocked Firestore requests. */
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs);
+  });
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 /**
  * After email/password sign-in: (re)create `users/{uid}` when the directory row was deleted
  * but Firebase Auth still exists (e.g. admin delete without Auth cleanup).
@@ -119,15 +132,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let mounted = true;
+    const BOOT_TIMEOUT_MS = 12000;
+    const FIRESTORE_OP_TIMEOUT_MS = 8000;
+    const stopGlobalLoadingTimer = setTimeout(() => {
+      if (!mounted) return;
+      setLoading(false);
+    }, BOOT_TIMEOUT_MS);
+
     const unsub = onAuthStateChanged(auth, async (fbUser) => {
+      if (!mounted) return;
       if (fbUser) {
         try {
-          let snap = await getDoc(doc(db, 'users', fbUser.uid));
+          let snap = await withTimeout(
+            getDoc(doc(db, 'users', fbUser.uid)),
+            FIRESTORE_OP_TIMEOUT_MS,
+            'users profile read'
+          );
 
           // Retry up to 3× for new accounts (race between Auth and Firestore write)
           for (let i = 0; i < 3 && !snap.exists(); i++) {
             await new Promise(r => setTimeout(r, 1000));
-            snap = await getDoc(doc(db, 'users', fbUser.uid));
+            snap = await withTimeout(
+              getDoc(doc(db, 'users', fbUser.uid)),
+              FIRESTORE_OP_TIMEOUT_MS,
+              'users profile read retry'
+            );
           }
 
           const isAdmin    = fbUser.email === ADMIN_EMAIL;
@@ -137,7 +167,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const d = snap.data() as Record<string, unknown>;
             const dirEmail = directoryEmailFromUserDoc(d, fbUser.email);
             try {
-              await updateDoc(doc(db, 'users', fbUser.uid), { lastLoginAt: serverTimestamp() });
+              await withTimeout(
+                updateDoc(doc(db, 'users', fbUser.uid), { lastLoginAt: serverTimestamp() }),
+                FIRESTORE_OP_TIMEOUT_MS,
+                'users lastLoginAt update'
+              );
             } catch {
               /* non-fatal */
             }
@@ -166,7 +200,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               photoUrl:    fbUser.photoURL || null,
               bio:         '',
             };
-            await setDoc(doc(db, 'users', fbUser.uid), fallback);
+            await withTimeout(
+              setDoc(doc(db, 'users', fbUser.uid), fallback),
+              FIRESTORE_OP_TIMEOUT_MS,
+              'admin fallback profile write'
+            );
             setUser({
               uid: fallback.uid,
               email: fallback.email,
@@ -200,7 +238,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               photoUrl:    fbUser.photoURL || null,
               bio:         '',
             };
-            await setDoc(doc(db, 'users', fbUser.uid), fallback);
+            await withTimeout(
+              setDoc(doc(db, 'users', fbUser.uid), fallback),
+              FIRESTORE_OP_TIMEOUT_MS,
+              'legacy fallback profile write'
+            );
             setUser({
               uid: fallback.uid,
               email: fallback.email,
@@ -230,7 +272,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       setLoading(false);
     });
-    return unsub;
+    return () => {
+      mounted = false;
+      clearTimeout(stopGlobalLoadingTimer);
+      unsub();
+    };
   }, []);
 
   // ── register ─────────────────────────────────────────────────────────────────

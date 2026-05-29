@@ -33,9 +33,11 @@ export function StudentDashboard(): React.ReactElement {
       setLoading(true);
       setError('');
       try {
-        const attendance = await AttSvc.getTodayAttendance(user.uid, studentHubId);
+        const [attendance, history] = await Promise.all([
+          AttSvc.getTodayAttendance(user.uid, studentHubId),
+          AttSvc.getAttendanceHistory(user.uid, 10, studentHubId),
+        ]);
         setTodayAttendance(attendance);
-        const history = await AttSvc.getAttendanceHistory(user.uid, 10, studentHubId);
         setAttendanceHistory(history);
       } catch (e: any) {
         console.error('Failed to load attendance:', e);

@@ -4,7 +4,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { EventProvider } from './contexts/EventContext';
 import { AuthPage } from './components/Auth/AuthPage';
-import { ResetPasswordPage } from './components/Auth/ResetPasswordPage';
+import ResetPasswordPage from './components/Auth/ResetPasswordPage';
 import { HubSelectGate } from './components/Auth/HubSelectGate';
 import { GoogleRegisterGate } from './components/Auth/GoogleRegisterGate';
 import { StudentDashboard } from './components/Dashboard/StudentDashboard';

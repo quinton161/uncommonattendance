@@ -107,7 +107,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     <LayoutWrapper>
       <Sidebar isOpen={mobileOpen} onClose={() => setMobileOpen(false)} />
       <ContentColumn>
-        <TopBar onMenuClick={() => setMobileOpen(true)} />
+        <TopBar onMenuClick={() => setMobileOpen((open) => !open)} isMenuOpen={mobileOpen} />
         <Main>{children}</Main>
       </ContentColumn>
     </LayoutWrapper>

@@ -73,7 +73,7 @@ function tryParseOobFromPasted(text: string): string | null {
  * Public route: completes Firebase password reset using `oobCode` from the email link
  * (or pasted). Updates Auth password; Firestore user docs stay as-is.
  */
-export const ResetPasswordPage: React.FC = () => {
+export default function ResetPasswordPage(): React.ReactElement {
   const [searchParams] = useSearchParams();
   const [oobCode, setOobCode] = useState<string | null>(null);
   const [emailHint, setEmailHint] = useState<string | null>(null);
@@ -270,4 +270,4 @@ export const ResetPasswordPage: React.FC = () => {
       </StyledCard>
     </Wrap>
   );
-};
+}

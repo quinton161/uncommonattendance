@@ -18,10 +18,17 @@ import { deleteStudentAuthUserCallable } from './staffAuthCleanup';
 class DataService {
   private static instance: DataService;
   private useFirebase = true;
+  private usersCache: { rows: any[]; expiresAt: number } | null = null;
+  private usersInFlight: Promise<any[]> | null = null;
 
   static getInstance(): DataService {
     if (!DataService.instance) DataService.instance = new DataService();
     return DataService.instance;
+  }
+
+  private invalidateUsersCache(): void {
+    this.usersCache = null;
+    this.usersInFlight = null;
   }
 
   private isStudent(u: any)    { const t = String(u?.userType || '').trim().toLowerCase(); return !t || t==='attendee'||t==='student'; }
@@ -196,16 +203,39 @@ class DataService {
 
   async getUsers(hubId?: string): Promise<any[]> {
     try {
-      const all = (await getDocs(collection(db, 'users'))).docs.map((d) => {
-        const data = d.data();
-        return {
-          ...data,
-          /** Document id ΓÇö must win over optional `id` field stored inside the document */
-          id: d.id,
-          uid: data.uid ?? d.id,
-          createdAt: data.createdAt?.toDate(),
+      const now = Date.now();
+      const cacheTtlMs = 30_000;
+
+      let all: any[] | null = null;
+      if (this.usersCache && this.usersCache.expiresAt > now) {
+        all = this.usersCache.rows;
+      } else {
+        if (!this.usersInFlight) {
+          this.usersInFlight = getDocs(collection(db, 'users'))
+            .then((snap) =>
+              snap.docs.map((d) => {
+                const data = d.data();
+                return {
+                  ...data,
+                  /** Document id ΓÇö must win over optional `id` field stored inside the document */
+                  id: d.id,
+                  uid: data.uid ?? d.id,
+                  createdAt: data.createdAt?.toDate(),
+                };
+              })
+            )
+            .finally(() => {
+              this.usersInFlight = null;
+            });
+        }
+
+        all = await this.usersInFlight;
+        this.usersCache = {
+          rows: all,
+          expiresAt: Date.now() + cacheTtlMs,
         };
-      });
+      }
+
       return this.usersForHub(all, hubId);
     } catch {
       return [];
@@ -235,6 +265,7 @@ class DataService {
       }
     }
     await updateDoc(doc(db,'users',userId), data);
+    this.invalidateUsersCache();
     uniqueToast.success('User updated!');
   }
 
@@ -307,6 +338,7 @@ class DataService {
     await Promise.all([authCleanupPromise, profilePhotoCleanupPromise]);
 
     await deleteDoc(doc(db, 'users', uid));
+    this.invalidateUsersCache();
     if (!opts?.suppressToast) {
       uniqueToast.success('User deleted!');
     }
@@ -743,6 +775,7 @@ class DataService {
     ]);
     await Promise.all([...aSnap.docs,...rSnap.docs,...cSnap.docs].map(d=>deleteDoc(d.ref)));
 
+    this.invalidateUsersCache();
     uniqueToast.success(`Reset complete: ${del.length} users, ${aSnap.size} attendance records deleted.`);
     return { deletedUsers: del.length, deletedAttendance: aSnap.size, preservedUsers: keep.length };
   }
