@@ -11,6 +11,7 @@ import { StudentDashboard } from './components/Dashboard/StudentDashboard';
 import AdminDashboard from './components/Dashboard/AdminDashboard';
 import { AttendancePage } from './components/Admin/AttendancePage';
 import { UsersPage } from './components/Admin/UsersPage';
+import { StaffAccountsPage } from './components/Admin/StaffAccountsPage';
 import { StudentGoalsBoard } from './components/Goals/StudentGoalsBoard';
 import { AdminProfile } from './components/Profile/AdminProfile';
 import { StudentProfile } from './components/Profile/StudentProfile';
@@ -104,6 +105,7 @@ const AppRoutes: React.FC = () => {
           <Route path="/dashboard" element={<AdminDashboard />} />
           <Route path="/attendance" element={<AttendancePage />} />
           <Route path="/users" element={<UsersPage />} />
+          <Route path="/staff" element={<StaffAccountsPage />} />
           <Route path="/events" element={<EventsPage />} />
           <Route
             path="/goals"

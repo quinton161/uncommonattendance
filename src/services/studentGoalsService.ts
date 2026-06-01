@@ -212,7 +212,38 @@ export function sortDailiesByDate(dailies: DailyGoal[]): DailyGoal[] {
   return [...dailies].sort((a, b) => a.date.localeCompare(b.date));
 }
 
+/** Same minimum as student self check-in (`AttendanceService.CHECK_IN_GOAL_MIN_LEN`). */
+export const DAILY_GOAL_CHECKIN_MIN_TITLE_LEN = 3;
+
 const CHECKIN_DAILY_DESC = 'Synced from check-in';
+
+/**
+ * Returns today's daily goal title from the Goals board when it is long enough for check-in.
+ * Lets students who already wrote today's goal skip re-typing it at check-in.
+ */
+export async function getTodayDailyGoalTitleForCheckIn(
+  userId: string,
+  dateStr?: string
+): Promise<string | undefined> {
+  const date = dateStr?.trim() || TimeService.getInstance().getCurrentDateString();
+  if (!userId || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return undefined;
+
+  try {
+    const weeksSnap = await getDocs(query(weeklyCol(userId), orderBy('weekStart', 'desc')));
+    for (const w of weeksSnap.docs) {
+      const dSnap = await getDocs(query(dailyCol(userId, w.id), where('date', '==', date)));
+      for (const d of dSnap.docs) {
+        const title = String(d.data().title ?? '').trim();
+        if (title.length >= DAILY_GOAL_CHECKIN_MIN_TITLE_LEN) return title;
+      }
+    }
+  } catch (e) {
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('[studentGoalsService] getTodayDailyGoalTitleForCheckIn failed', e);
+    }
+  }
+  return undefined;
+}
 
 /**
  * Upserts today’s daily goal under the student’s weekly scaffold: prefers a weekly goal whose

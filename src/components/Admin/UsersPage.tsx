@@ -21,20 +21,7 @@ import {
   TodayIcon,
   SearchIcon
 } from '../Common/Icons';
-import { FiLogOut, FiLock, FiAlertTriangle } from 'react-icons/fi';
-import { isAdminEmail } from '../../constants/admin';
-
-function formatInstructorLastLogin(row: any): string {
-  const v = row?.lastLoginAt;
-  if (!v) return '—';
-  try {
-    const d = typeof v?.toDate === 'function' ? v.toDate() : v instanceof Date ? v : null;
-    if (!d || Number.isNaN(d.getTime())) return '—';
-    return d.toLocaleString('en-GB', { timeZone: 'Africa/Harare', dateStyle: 'medium', timeStyle: 'short' });
-  } catch {
-    return '—';
-  }
-}
+import { FiLogOut, FiAlertTriangle } from 'react-icons/fi';
 
 const PageContainer = styled.div`
   padding: ${theme.spacing.xl};
@@ -486,13 +473,6 @@ const MobileMetaLabel = styled.strong`
   text-transform: uppercase;
 `;
 
-const SectionTitle = styled.h2`
-  font-family: ${theme.fonts.heading};
-  font-size: ${theme.fontSizes.xl};
-  margin: 0 0 ${theme.spacing.md};
-  color: ${theme.colors.primary};
-`;
-
 const UserEmail = styled.p`
   margin: 0;
   max-width: 100%;
@@ -539,28 +519,6 @@ const SearchIconAbsolute = styled(SearchIcon)`
 const DangerOutlineButton = styled(Button)`
   border-color: #dc2626;
   color: #b91c1c;
-`;
-
-const SectionBreak = styled.section`
-  margin-top: ${theme.spacing['2xl']};
-`;
-
-const SectionCaption = styled.div`
-  margin-bottom: ${theme.spacing.lg};
-  color: ${theme.colors.textSecondary};
-  font-size: ${theme.fontSizes.sm};
-  line-height: 1.45;
-`;
-
-const InstructorActionButton = styled(Button)`
-  padding: 8px 12px;
-  width: 100%;
-  max-width: 220px;
-`;
-
-const InstructorDeleteButton = styled(DeleteButton)`
-  width: 100%;
-  max-width: 220px;
 `;
 
 const MobileMarkPresentButton = styled(MarkPresentButton)`
@@ -654,68 +612,6 @@ const DesktopTable = styled.div`
   @media (max-width: ${theme.breakpoints.tablet}) {
     display: none;
   }
-`;
-
-/** 5-column layout: name, hub, last sign-in, type badge, actions (stacked so buttons never bleed over Type). */
-const InstructorTableHeader = styled(TableHeader)`
-  grid-template-columns:
-    minmax(200px, 2fr)
-    minmax(110px, 1fr)
-    minmax(140px, 1.1fr)
-    minmax(120px, 0.65fr)
-    minmax(200px, 1.25fr);
-`;
-
-const InstructorTableRow = styled(TableRow)`
-  grid-template-columns:
-    minmax(200px, 2fr)
-    minmax(110px, 1fr)
-    minmax(140px, 1.1fr)
-    minmax(120px, 0.65fr)
-    minmax(200px, 1.25fr);
-
-  & > *:nth-child(1),
-  & > *:nth-child(2),
-  & > *:nth-child(3) {
-    min-width: 0;
-  }
-
-  & > *:nth-child(4) {
-    min-width: 120px;
-    position: relative;
-    z-index: 2;
-    background: ${theme.colors.white};
-  }
-
-  & > *:nth-child(5) {
-    min-width: 0;
-    position: relative;
-    z-index: 1;
-    justify-self: end;
-    width: 100%;
-    max-width: 100%;
-  }
-
-  &:hover > *:nth-child(4) {
-    background: ${theme.colors.white};
-  }
-`;
-
-/** Type badge sits in its own column — keeps “INSTRUCTOR” from sitting under action buttons. */
-const InstructorTypeCell = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-`;
-
-const InstructorActionButtons = styled(ActionButtons)`
-  flex-direction: column;
-  align-items: flex-end;
-  justify-content: center;
-  gap: ${theme.spacing.sm};
-  width: 100%;
-  max-width: 100%;
-  box-sizing: border-box;
 `;
 
 const StatusBadge = styled.span<{ $isActive: boolean }>`
@@ -836,8 +732,7 @@ interface UsersPageProps {
 export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [userToDelete, setUserToDelete] = useState<any>(null);
-  const { user, resetPassword } = useAuth();
-  const [resetSending, setResetSending] = useState<string | null>(null);
+  const { user } = useAuth();
   const [adminHubFilter, setAdminHubFilter] = useState(() => initialStaffHubFilter(user));
   const effectiveHub = useMemo(() => effectiveStaffHubScope(user, adminHubFilter), [user, adminHubFilter]);
   const hubScopeActive = Boolean(effectiveHub);
@@ -845,8 +740,6 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
     user?.userType === 'admin' ||
     (user?.userType === 'instructor' && Boolean(effectiveHub) && staffMayAccessHubForWrite(user, effectiveHub));
   const [users, setUsers] = useState<any[]>([]);
-  /** All instructors (every hub) — only populated for admins. */
-  const [allInstructors, setAllInstructors] = useState<any[]>([]);
   const [attendance, setAttendance] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [checkoutAllLoading, setCheckoutAllLoading] = useState(false);
@@ -859,22 +752,13 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
       setLoading(true);
       await dataService.testConnection();
 
-      const isStaff = user?.userType === 'admin' || user?.userType === 'instructor';
-      const [usersData, attendanceData, instructorsEveryHub] = await Promise.all([
+      const [usersData, attendanceData] = await Promise.all([
         dataService.getUsers(effectiveHub),
         dataService.getAttendance(undefined, effectiveHub),
-        isStaff ? dataService.getInstructors() : Promise.resolve([] as any[]),
       ]);
 
       setUsers(usersData);
       setAttendance(attendanceData);
-      if (isStaff) {
-        setAllInstructors(
-          instructorsEveryHub.filter((row: any) => row.email && !isAdminEmail(row.email))
-        );
-      } else {
-        setAllInstructors([]);
-      }
     } catch (error) {
       console.error('Error loading data:', error);
       uniqueToast.error('Failed to load user data');
@@ -928,37 +812,6 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
       return name.includes(q) || email.includes(q);
     });
   }, [attendees, searchTerm]);
-
-  const instructorRows = useMemo(() => {
-    const inst =
-      user?.userType === 'admin'
-        ? allInstructors
-        : users.filter((u) => u.userType === 'instructor' && u.email && !isAdminEmail(u.email));
-    const q = searchTerm.trim().toLowerCase();
-    if (!q) return inst;
-    return inst.filter((u) => {
-      const name = (u.displayName || '').toLowerCase();
-      const email = (u.email || '').toLowerCase();
-      return name.includes(q) || email.includes(q);
-    });
-  }, [user?.userType, allInstructors, users, searchTerm]);
-
-  const handleSendPasswordReset = async (email: string) => {
-    if (!email) return;
-    setResetSending(email);
-    try {
-      await resetPassword(email);
-      uniqueToast.success(`Password reset email sent to ${email}. They can set a new password from the link or paste the code on the reset page.`);
-    } catch (e: unknown) {
-      const msg =
-        e && typeof e === 'object' && 'message' in e
-          ? String((e as { message?: string }).message)
-          : 'Could not send reset email.';
-      uniqueToast.error(msg);
-    } finally {
-      setResetSending(null);
-    }
-  };
 
   if (user?.userType !== 'admin' && user?.userType !== 'instructor') {
     return (
@@ -1188,15 +1041,13 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
     const uid = u.id || u.uid;
     return !!getTodayAttendance(uid)?.checkInTime;
   }).length;
-  const instructorCount = allInstructors.length;
-
   return (
     <PageContainer>
       <Header>
         <HeaderTitle>
-          <PageHeading>Users</PageHeading>
+          <PageHeading>Students</PageHeading>
           <p>
-          Manage students below; admins are hidden. Summary cards count students only (instructors have their own card). Check-in and check-out times use Africa/Harare (school time).
+          Manage students (attendees) for your hub. Staff accounts are on the Staff page in the sidebar. Check-in and check-out times use Africa/Harare (school time).
           {(user?.userType === 'admin' || user?.userType === 'instructor') &&
             ' Use Hub to view one location or all hubs (instructors: assigned hub only).'}
           {user?.userType === 'instructor' &&
@@ -1267,12 +1118,6 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
           <StatIcon><TodayIcon size={32} /></StatIcon>
           <StatValue>{checkedInTodayCount}</StatValue>
           <StatLabel>Checked In Today</StatLabel>
-        </StatCard>
-        
-        <StatCard>
-          <StatIcon><PersonIcon size={32} /></StatIcon>
-          <StatValue>{instructorCount}</StatValue>
-          <StatLabel>Instructors</StatLabel>
         </StatCard>
       </StatsGrid>
 
@@ -1345,15 +1190,14 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
           <p>No students match your search. Clear the search or try another name or email.</p>
         </EmptyState>
         )}
-        {attendees.length === 0 &&
-          (user?.userType !== 'admin' || instructorRows.length === 0) && (
+        {attendees.length === 0 && (
         <EmptyState>
-          <h3>No Manageable Users Found</h3>
+          <h3>No students found</h3>
           <p>
             No attendees match this hub yet.{' '}
             {user?.userType === 'admin'
-              ? 'Use Hub to pick a location or all hubs. Instructor accounts are listed below when present.'
-              : 'Instructor accounts are not shown in the student list.'}
+              ? 'Use Hub to pick a location or all hubs.'
+              : 'Students in other hubs are not shown here.'}
           </p>
         </EmptyState>
         )}
@@ -1558,85 +1402,6 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
             })}
           </FullWidthBlock>
         </>
-        )}
-        {(user?.userType === 'admin' || user?.userType === 'instructor') && instructorRows.length > 0 && (
-          <SectionBreak>
-            <SectionTitle>
-              All instructor accounts (every hub)
-            </SectionTitle>
-            <SectionCaption>
-              Every instructor in the organization. Last sign-in updates when they open the app (Harare time).
-              {user?.userType === 'admin'
-                ? ' Password reset uses Firebase email. Removing a student also removes their Firebase login when Cloud Functions are deployed; otherwise delete the user in Firebase Authentication (Console) so the email can register again.'
-                : ' Instructor accounts are view-only for instructors.'}
-            </SectionCaption>
-            <DesktopTable>
-              <UsersTable>
-                <TableWrapper>
-                  <InstructorTableHeader>
-                    <div>Name / email</div>
-                    <div>Hub</div>
-                    <div>Last sign-in</div>
-                    <div>Type</div>
-                    <RightAlignedCell>Actions</RightAlignedCell>
-                  </InstructorTableHeader>
-                  {instructorRows.map((row) => {
-                    const uid = row.id || row.uid;
-                    const isSelf = uid === user?.uid;
-                    return (
-                      <InstructorTableRow key={`inst-${uid}`}>
-                        <UserInfo>
-                          <UserAvatar $isActive={false}>{getInitials(row.displayName || 'Instructor')}</UserAvatar>
-                          <UserDetails>
-                            <UserNameHeading>
-                              <TableIcon>
-                                <PersonIcon size={14} />
-                              </TableIcon>
-                              {row.displayName || 'Instructor'}
-                            </UserNameHeading>
-                            <UserEmail>{row.email}</UserEmail>
-                          </UserDetails>
-                        </UserInfo>
-                        <ValueTextSmall>
-                          {resolvedHubLabel(row)}
-                        </ValueTextSmall>
-                        <ValueTextSmall>
-                          {formatInstructorLastLogin(row)}
-                        </ValueTextSmall>
-                        <InstructorTypeCell>
-                          <UserType type="instructor">instructor</UserType>
-                        </InstructorTypeCell>
-                        <InstructorActionButtons>
-                          {user?.userType === 'admin' ? (
-                            <>
-                              <InstructorActionButton
-                                type="button"
-                                variant="outline"
-                                onClick={() => handleSendPasswordReset(row.email)}
-                                disabled={resetSending === row.email || !row.email}
-                              >
-                                <InlineIcon>
-                                  <FiLock size={14} />
-                                </InlineIcon>
-                                {resetSending === row.email ? 'Sending…' : 'Password reset email'}
-                              </InstructorActionButton>
-                              {!isSelf && (
-                                <InstructorDeleteButton variant="ghost" onClick={() => handleOpenDelete(row)}>
-                                  Remove
-                                </InstructorDeleteButton>
-                              )}
-                            </>
-                          ) : (
-                            <ValueTextSmall>View only</ValueTextSmall>
-                          )}
-                        </InstructorActionButtons>
-                      </InstructorTableRow>
-                    );
-                  })}
-                </TableWrapper>
-              </UsersTable>
-            </DesktopTable>
-          </SectionBreak>
         )}
         </>
       )}

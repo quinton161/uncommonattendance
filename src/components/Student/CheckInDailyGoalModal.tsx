@@ -72,6 +72,8 @@ export interface CheckInDailyGoalModalProps {
   open: boolean;
   onClose: () => void;
   onSubmit: (goal: string) => void | Promise<void>;
+  /** Pre-fill when the student already has a shorter or alternate draft on Goals. */
+  initialGoal?: string;
   minChars?: number;
 }
 
@@ -79,14 +81,15 @@ export const CheckInDailyGoalModal: React.FC<CheckInDailyGoalModalProps> = ({
   open,
   onClose,
   onSubmit,
+  initialGoal = '',
   minChars = AttendanceService.CHECK_IN_GOAL_MIN_LEN,
 }) => {
   const [text, setText] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (open) setText('');
-  }, [open]);
+    if (open) setText(initialGoal.trim());
+  }, [open, initialGoal]);
 
   if (!open) return null;
 
@@ -115,8 +118,8 @@ export const CheckInDailyGoalModal: React.FC<CheckInDailyGoalModalProps> = ({
       <Panel onClick={(e) => e.stopPropagation()}>
         <Title id="checkin-goal-title">Today&apos;s goal</Title>
         <Sub>
-          What do you want to focus on or achieve today? It is saved here and on your Goals page under
-          this week&apos;s daily goals (we create the week if needed).
+          What do you want to focus on or achieve today? If you already added today&apos;s goal on the
+          Goals page (at least {minChars} characters), you can use that at check-in without retyping.
         </Sub>
         <Label htmlFor="checkin-daily-goal">Your goal for today (required)</Label>
         <TextArea

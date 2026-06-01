@@ -28,6 +28,8 @@ users-temp.json
 scripts/serviceAccountKey.json
 **/serviceAccountKey.json
 !scripts/serviceAccountKey.json.example
+# MCP config may contain Bearer tokens (use mcp.json.example as template)
+.cursor/mcp.json
 
 npm-debug.log*
 yarn-debug.log*

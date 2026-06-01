@@ -19,13 +19,13 @@
     "firebase": "^12.4.0",
     "firebase-admin": "^13.7.0",
     "framer-motion": "^12.38.0",
+    "gsap": "^3.12.2",
     "jspdf": "^4.0.0",
     "jspdf-autotable": "^5.0.7",
     "lucide-react": "^0.577.0",
     "node-polyfill-webpack-plugin": "^4.1.0",
     "nodemailer": "^8.0.1",
     "qrcode.react": "^4.2.0",
-    "gsap": "^3.12.2",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "react-icons": "^5.6.0",
@@ -50,7 +50,8 @@
     "maintenance:verify": "npm test -- --watchAll=false && npm run build",
     "maintenance:monthly": "npm run maintenance:outdated && npm run maintenance:audit && npm run maintenance:refresh-browsers && npm run maintenance:verify",
     "seed:hubs": "npx ts-node firestore-seed-hubs.ts",
-    "provision:user": "node scripts/provision-user.mjs"
+    "provision:user": "node scripts/provision-user.mjs",
+    "functions:build": "npm --prefix functions run build"
   },
   "eslintConfig": {
     "extends": [
@@ -89,6 +90,7 @@
     "@types/simple-peer": "^9.11.9",
     "@types/tough-cookie": "^4.0.5",
     "autoprefixer": "^10.4.20",
+    "http-proxy-middleware": "^2.0.9",
     "postcss": "^8.4.39",
     "tailwindcss": "^3.4.4"
   }

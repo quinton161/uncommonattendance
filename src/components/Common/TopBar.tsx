@@ -191,6 +191,7 @@ const routeLabels: Record<string, { title: string; sub: string }> = {
   dashboard: { title: 'Dashboard', sub: 'Track attendance at a glance' },
   attendance: { title: 'Attendance', sub: 'QR check-in and daily records' },
   users: { title: 'Students', sub: 'Manage hub members' },
+  staff: { title: 'Staff', sub: 'Instructors and administrators' },
   goals: { title: 'Goals Board', sub: 'Daily intentions and progress' },
   events: { title: 'Events', sub: 'Hub sessions and activities' },
   profile: { title: 'Profile', sub: 'Your account settings' },
@@ -198,6 +199,7 @@ const routeLabels: Record<string, { title: string; sub: string }> = {
 };
 
 const activeRouteFromPath = (pathname: string) => {
+  if (pathname.includes('/staff')) return 'staff';
   if (pathname.includes('/users')) return 'users';
   if (pathname.includes('/attendance')) return 'attendance';
   if (pathname.includes('/goals')) return 'goals';

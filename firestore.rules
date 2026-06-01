@@ -85,6 +85,27 @@ service cloud.firestore {
       return isAuth() && attendanceId.matches('.*_' + request.auth.uid + '$');
     }
 
+    function isPromotingToAdmin() {
+      return request.resource.data.userType == 'admin'
+        && (resource == null || resource.data.userType != 'admin');
+    }
+
+    function isDemotingAdmin() {
+      return resource != null
+        && resource.data.userType == 'admin'
+        && request.resource.data.userType != 'admin';
+    }
+
+    function isProtectedBootstrapAdminEmail() {
+      return resource != null
+        && resource.data.keys().hasAll(['email'])
+        && resource.data.email == 'quintonndlovu161@gmail.com';
+    }
+
+    function adminRoleChangeAllowed() {
+      return isAdminUser() && (!isDemotingAdmin() || !isProtectedBootstrapAdminEmail());
+    }
+
     /** Goals under users/{uid}/weeklyGoals — read by owner or staff; writes remain owner/admin scoped below. */
     function canReadUserGoals(userId) {
       return isOwner(userId)
@@ -99,10 +120,18 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow read: if isAuth();
-      allow create: if isAuth();
-      allow update: if isOwner(userId)
-        || isAdminUser()
+      allow create: if isAuth()
+        && (request.resource.data.userType != 'admin' || isAdminUser());
+      allow update: if adminRoleChangeAllowed()
+        || (isOwner(userId)
+            && !isPromotingToAdmin()
+            && !isDemotingAdmin()
+            && request.resource.data.userType != 'admin')
         || (isInstructorUser()
+            && !isPromotingToAdmin()
+            && !isDemotingAdmin()
+            && request.resource.data.userType != 'admin'
+            && (resource == null || resource.data.userType != 'admin')
             && exists(usersPath(userId))
             && userHubMatchesInstructorScope(get(usersPath(userId)).data)
             && userHubMatchesInstructorScope(request.resource.data));

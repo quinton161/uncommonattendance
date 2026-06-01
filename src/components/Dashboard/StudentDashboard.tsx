@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { AttendanceService } from '../../services/attendanceService';
 import { effectiveStudentHubId } from '../../services/hubService';
+import { getTodayDailyGoalTitleForCheckIn } from '../../services/studentGoalsService';
 import { TimeService } from '../../services/timeService';
 import { LateCheckInReasonModal } from '../Student/LateCheckInReasonModal';
 import { CheckInDailyGoalModal } from '../Student/CheckInDailyGoalModal';
@@ -22,6 +23,7 @@ export function StudentDashboard(): React.ReactElement {
   const [error, setError] = useState('');
   const [lateReasonModalOpen, setLateReasonModalOpen] = useState(false);
   const [checkInGoalModalOpen, setCheckInGoalModalOpen] = useState(false);
+  const [checkInGoalInitial, setCheckInGoalInitial] = useState('');
   const [lateReasonPendingForGoal, setLateReasonPendingForGoal] = useState<string | null>(null);
   useBodyScrollLock(lateReasonModalOpen || checkInGoalModalOpen);
 
@@ -134,6 +136,31 @@ export function StudentDashboard(): React.ReactElement {
     }
   };
 
+  const openCheckInGoalStep = async (lateReason?: string) => {
+    if (!user) return;
+    setLateReasonPendingForGoal(lateReason ?? null);
+
+    const existingGoal = await getTodayDailyGoalTitleForCheckIn(user.uid);
+    if (existingGoal) {
+      const preview =
+        existingGoal.length > 100 ? `${existingGoal.slice(0, 100)}…` : existingGoal;
+      const useExisting = window.confirm(
+        `You already have today's goal on your Goals page:\n\n"${preview}"\n\nUse this goal for check-in? (Choose Cancel to enter a different goal.)`
+      );
+      if (useExisting) {
+        try {
+          await runCheckIn(lateReason, existingGoal);
+        } catch {
+          /* error surfaced via setError in runCheckIn */
+        }
+        return;
+      }
+    }
+
+    setCheckInGoalInitial(existingGoal ?? '');
+    setCheckInGoalModalOpen(true);
+  };
+
   const handleCheckIn = async () => {
     if (!user) return;
     if (!window.confirm('Check in for today? Your attendance will be recorded for your hub.')) {
@@ -144,14 +171,12 @@ export function StudentDashboard(): React.ReactElement {
       setLateReasonModalOpen(true);
       return;
     }
-    setLateReasonPendingForGoal(null);
-    setCheckInGoalModalOpen(true);
+    await openCheckInGoalStep();
   };
 
   const handleLateReasonSubmit = async (reason: string) => {
     setLateReasonModalOpen(false);
-    setLateReasonPendingForGoal(reason);
-    setCheckInGoalModalOpen(true);
+    await openCheckInGoalStep(reason);
   };
 
   const handleCheckInGoalSubmit = async (goal: string) => {
@@ -204,19 +229,28 @@ export function StudentDashboard(): React.ReactElement {
 
   const getAttendanceStatus = (): 'checked-in' | 'checked-out' => {
     if (!todayAttendance) return 'checked-out';
-    if (todayAttendance.checkInTime && !todayAttendance.checkOutTime) return 'checked-in';
+    const hasCheckIn =
+      todayAttendance.checkInTime instanceof Date &&
+      !Number.isNaN(todayAttendance.checkInTime.getTime());
+    const hasCheckOut =
+      todayAttendance.checkOutTime instanceof Date &&
+      !Number.isNaN(todayAttendance.checkOutTime.getTime());
+    if (hasCheckIn && !hasCheckOut) return 'checked-in';
     return 'checked-out';
   };
 
-  const formatTime = (date: Date) => {
+  const formatTime = (date?: Date | null) => {
+    if (!date || !(date instanceof Date) || Number.isNaN(date.getTime())) return '—';
     return date.toLocaleTimeString('en-US', {
       hour: '2-digit',
       minute: '2-digit',
     });
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return 'Unknown date';
+    const date = new Date(`${dateString}T12:00:00`);
+    if (Number.isNaN(date.getTime())) return dateString;
     return date.toLocaleDateString('en-US', {
       weekday: 'long',
       year: 'numeric',
@@ -226,8 +260,12 @@ export function StudentDashboard(): React.ReactElement {
   };
 
   const status = getAttendanceStatus();
-  const checkedInToday = Boolean(todayAttendance?.checkInTime);
-  const checkedOutToday = Boolean(todayAttendance?.checkOutTime);
+  const checkedInToday =
+    todayAttendance?.checkInTime instanceof Date &&
+    !Number.isNaN(todayAttendance.checkInTime.getTime());
+  const checkedOutToday =
+    todayAttendance?.checkOutTime instanceof Date &&
+    !Number.isNaN(todayAttendance.checkOutTime.getTime());
   const todayStatusLabel = checkedOutToday
     ? 'Day completed'
     : checkedInToday
@@ -258,8 +296,10 @@ export function StudentDashboard(): React.ReactElement {
       />
       <CheckInDailyGoalModal
         open={checkInGoalModalOpen}
+        initialGoal={checkInGoalInitial}
         onClose={() => {
           setCheckInGoalModalOpen(false);
+          setCheckInGoalInitial('');
           setLateReasonPendingForGoal(null);
         }}
         onSubmit={handleCheckInGoalSubmit}
@@ -379,7 +419,9 @@ export function StudentDashboard(): React.ReactElement {
                     </div>
                     <div className="flex flex-wrap gap-3 text-sm text-gray-500">
                       <span>In: {formatTime(record.checkInTime)}</span>
-                      {record.checkOutTime && <span>Out: {formatTime(record.checkOutTime)}</span>}
+                      {record.checkOutTime ? (
+                        <span>Out: {formatTime(record.checkOutTime)}</span>
+                      ) : null}
                     </div>
                   </div>
                 ))}

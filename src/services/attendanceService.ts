@@ -141,11 +141,23 @@ export class AttendanceService {
       }
     }
 
+    let resolvedCheckInGoal = checkInGoal?.trim() ?? '';
+    if (isStudentQrSelfCheckIn && resolvedCheckInGoal.length < AttendanceService.CHECK_IN_GOAL_MIN_LEN) {
+      try {
+        const { getTodayDailyGoalTitleForCheckIn } = await import('./studentGoalsService');
+        const fromGoalsBoard = await getTodayDailyGoalTitleForCheckIn(studentId, today);
+        if (fromGoalsBoard) resolvedCheckInGoal = fromGoalsBoard;
+      } catch (e) {
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('[AttendanceService] could not load today goal from Goals board', e);
+        }
+      }
+    }
+
     if (isStudentQrSelfCheckIn) {
-      const g = checkInGoal?.trim() ?? '';
-      if (g.length < AttendanceService.CHECK_IN_GOAL_MIN_LEN) {
+      if (resolvedCheckInGoal.length < AttendanceService.CHECK_IN_GOAL_MIN_LEN) {
         throw new Error(
-          `Check-in requires today's goal (at least ${AttendanceService.CHECK_IN_GOAL_MIN_LEN} characters).`
+          `Check-in requires today's goal (at least ${AttendanceService.CHECK_IN_GOAL_MIN_LEN} characters). Add one on the Goals page or when you check in.`
         );
       }
     }
@@ -176,8 +188,8 @@ export class AttendanceService {
       record.lateReason = lateReason.trim();
     }
 
-    if (isStudentQrSelfCheckIn && checkInGoal?.trim()) {
-      record.checkInGoal = checkInGoal.trim();
+    if (isStudentQrSelfCheckIn && resolvedCheckInGoal) {
+      record.checkInGoal = resolvedCheckInGoal;
     }
 
     if (location?.ip && location.ip !== '0.0.0.0') {
@@ -206,10 +218,10 @@ export class AttendanceService {
       }
     }
 
-    if (isStudentQrSelfCheckIn && checkInGoal?.trim()) {
+    if (isStudentQrSelfCheckIn && resolvedCheckInGoal) {
       try {
         const { upsertDailyGoalFromCheckIn } = await import('./studentGoalsService');
-        await upsertDailyGoalFromCheckIn(studentId, checkInGoal.trim(), today);
+        await upsertDailyGoalFromCheckIn(studentId, resolvedCheckInGoal, today);
       } catch (e) {
         console.warn('goals sync from check-in failed (non-fatal):', e);
       }
@@ -482,7 +494,6 @@ export class AttendanceService {
     const snap  = await getDoc(doc(db, 'attendance', `${today}_${studentId}`));
     if (!snap.exists()) return null;
     const d = snap.data();
-    if (hubId && !hubIdMatchesScope(d.hubId, hubId)) return null;
     return this.mapAttendanceSnapData(d);
   }
 
@@ -492,7 +503,7 @@ export class AttendanceService {
    */
   subscribeToTodayAttendance(
     studentId: string,
-    hubId: string | undefined,
+    _hubId: string | undefined,
     onChange: (record: AttendanceRecord | null) => void,
     onError?: (err: Error) => void
   ): () => void {
@@ -508,10 +519,6 @@ export class AttendanceService {
       }
       const d = snap.data() as Record<string, unknown> | undefined;
       if (!d) {
-        onChange(null);
-        return;
-      }
-      if (hubId && !hubIdMatchesScope(d.hubId as string | undefined, hubId)) {
         onChange(null);
         return;
       }
@@ -617,11 +624,9 @@ export class AttendanceService {
 
   async getAttendanceHistory(studentId: string, limitCount = 30, hubId?: string): Promise<AttendanceRecord[]> {
     const q = query(collection(db, 'attendance'), where('studentId', '==', studentId));
-    let rows = (await getDocs(q)).docs.map((d) => ({
-      ...d.data(),
-      checkInTime: d.data().checkInTime?.toDate(),
-      checkOutTime: d.data().checkOutTime?.toDate(),
-    })) as AttendanceRecord[];
+    let rows = (await getDocs(q)).docs.map((d) =>
+      this.mapAttendanceSnapData({ id: d.id, ...d.data() } as Record<string, unknown>)
+    );
     if (hubId) {
       rows = rows.filter((r) => this.matchesStudentHub(r, hubId));
     }
@@ -647,8 +652,9 @@ export class AttendanceService {
       q = query(collection(db,'attendance'), orderBy('date','desc'));
     }
 
-    return (await getDocs(q)).docs
-      .map(d => ({ ...d.data(), checkInTime: d.data().checkInTime?.toDate(), checkOutTime: d.data().checkOutTime?.toDate() }) as AttendanceRecord)
+    return (await getDocs(q)).docs.map((d) =>
+      this.mapAttendanceSnapData({ id: d.id, ...d.data() } as Record<string, unknown>)
+    )
       .filter(r => {
         const dateStr = r.date ?? (r.checkInTime ? new Date(r.checkInTime).toISOString().split('T')[0] : '');
         const matchDate   = dateStr >= startDate && dateStr <= endDate;

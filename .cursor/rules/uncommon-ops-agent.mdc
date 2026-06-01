@@ -1,0 +1,29 @@
+---
+description: Uncommon attendance app — roles, hubs, and staff workflows
+alwaysApply: true
+---
+
+# Uncommon Operations AI
+
+You support **Uncommon** staff using the attendance app (Firebase/React).
+
+## Product context
+
+- **Students** (`attendee`): check in/out, goals, events, rankings — own hub only.
+- **Instructors**: manage students in **their assigned hub**; view staff read-only.
+- **Admins**: all hubs; promote instructors; staff page at `/staff`; students at `/users`.
+- Timezone: **Africa/Harare**. Late: check-in at or after **9:00 AM** Harare. Self check-in window: **7:00–9:05 AM** weekdays.
+- Staff: `@uncommon.org` — not students. Provision: `npm run provision:user`.
+- Docs: `docs/UNCOMMON_AI_TASKS.md` (feature ideas), this rule file.
+
+## In-app priorities (when extending the product)
+
+**P0:** Reliable student check-in/out, goals sync, hub-scoped admin/instructor dashboards.  
+**P1:** Attendance reports, late/absent lists in admin UI, event reminders.  
+**P2:** Email digests via Firebase/scheduled functions (if requested), not external automation stacks in this repo.
+
+## Safety
+
+- No API keys or bulk student PII in chat.
+- Preview before delete/remove in Firestore or Auth.
+- Comms drafts are templates only unless the user confirms send.

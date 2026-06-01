@@ -14,6 +14,7 @@ import {
   addDailyGoal,
   addWeeklyGoal,
   computeWeeklyProgress,
+  DAILY_GOAL_CHECKIN_MIN_TITLE_LEN,
   deleteDailyGoal,
   deleteWeeklyGoalCascade,
   sortDailiesByDate,
@@ -1378,15 +1379,26 @@ export const StudentGoalsBoard: React.FC<StudentGoalsBoardProps> = ({ hubScopeId
   const submitDaily = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!userId || !dailyModal) return;
-    if (!dailyForm.title.trim()) {
+    const title = dailyForm.title.trim();
+    if (!title) {
       uniqueToast.error('Title is required');
+      return;
+    }
+    if (
+      !staffMode &&
+      dailyForm.date === todayStr &&
+      title.length < DAILY_GOAL_CHECKIN_MIN_TITLE_LEN
+    ) {
+      uniqueToast.error(
+        `Today's goal needs at least ${DAILY_GOAL_CHECKIN_MIN_TITLE_LEN} characters so check-in can use it.`
+      );
       return;
     }
     setSaving(true);
     try {
       if (dailyModal.edit) {
         await updateDailyGoal(userId, dailyModal.weeklyId, dailyModal.edit.id, {
-          title: dailyForm.title,
+          title,
           description: dailyForm.description,
           date: dailyForm.date,
           status: dailyForm.status,
@@ -1394,7 +1406,7 @@ export const StudentGoalsBoard: React.FC<StudentGoalsBoardProps> = ({ hubScopeId
         uniqueToast.success('Daily goal updated');
       } else {
         await addDailyGoal(userId, dailyModal.weeklyId, {
-          title: dailyForm.title,
+          title,
           description: dailyForm.description,
           date: dailyForm.date,
           status: dailyForm.status,

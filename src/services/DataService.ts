@@ -263,10 +263,72 @@ class DataService {
       if (!staffMayAccessHubForWrite(actingUser, snap.data()?.hubId)) {
         throw new Error('You can only edit accounts in your hub.');
       }
+      if (data?.userType === 'admin') {
+        throw new Error('Only administrators can grant admin access.');
+      }
+    }
+    if (data?.userType === 'admin' && actingUser?.userType !== 'admin') {
+      throw new Error('Only administrators can grant admin access.');
     }
     await updateDoc(doc(db,'users',userId), data);
     this.invalidateUsersCache();
     uniqueToast.success('User updated!');
+  }
+
+  /**
+   * Grant or revoke full admin dashboard access (Firestore userType only).
+   * Only acting admins may call; bootstrap ADMIN_EMAIL cannot be demoted.
+   */
+  async setUserRole(
+    targetUserId: string,
+    newRole: 'admin' | 'instructor' | 'attendee',
+    actingUser: User | null | undefined
+  ): Promise<void> {
+    if (!actingUser || actingUser.userType !== 'admin') {
+      throw new Error('Only administrators can change staff roles.');
+    }
+
+    const uid = targetUserId?.trim();
+    if (!uid) throw new Error('Missing user id.');
+
+    const snap = await getDoc(doc(db, 'users', uid));
+    if (!snap.exists()) throw new Error('User not found.');
+
+    const current = snap.data() as Record<string, unknown>;
+    const currentType = String(current.userType || '').toLowerCase();
+    const email = String(current.email || '').trim();
+
+    if (newRole === 'admin') {
+      if (currentType === 'admin') {
+        throw new Error('This account already has admin access.');
+      }
+      if (currentType !== 'instructor' && currentType !== 'attendee') {
+        throw new Error('Only instructors or students can be promoted to admin.');
+      }
+      await updateDoc(doc(db, 'users', uid), { userType: 'admin' });
+      this.invalidateUsersCache();
+      uniqueToast.success(
+        'Admin access granted. Ask them to sign out and sign in again to refresh their session.'
+      );
+      return;
+    }
+
+    if (currentType === 'admin') {
+      if (isAdminEmail(email)) {
+        throw new Error('The primary bootstrap admin account cannot be demoted.');
+      }
+      const patch: { userType: string; hubId?: string; hubName?: string } = { userType: 'instructor' };
+      if (!current.hubId) {
+        patch.hubId = 'uncommon_victoriafalls';
+        patch.hubName = resolvedHubLabel({ hubId: patch.hubId });
+      }
+      await updateDoc(doc(db, 'users', uid), patch);
+      this.invalidateUsersCache();
+      uniqueToast.success('Admin access removed. They are an instructor again.');
+      return;
+    }
+
+    throw new Error('No role change to apply.');
   }
 
   async deleteUser(userId: string, opts?: { suppressToast?: boolean; actingUser?: User | null }): Promise<void> {
@@ -784,6 +846,23 @@ class DataService {
     try {
       return (await getDocs(query(collection(db,'users'), where('userType','==','instructor')))).docs.map(d=>({id:d.id,...d.data()}));
     } catch { return []; }
+  }
+
+  /** Instructors and admins for the staff directory (admin role management). */
+  async getStaffDirectory(): Promise<any[]> {
+    try {
+      const [instSnap, adminSnap] = await Promise.all([
+        getDocs(query(collection(db, 'users'), where('userType', '==', 'instructor'))),
+        getDocs(query(collection(db, 'users'), where('userType', '==', 'admin'))),
+      ]);
+      const byId = new Map<string, any>();
+      for (const d of [...instSnap.docs, ...adminSnap.docs]) {
+        byId.set(d.id, { id: d.id, ...d.data() });
+      }
+      return Array.from(byId.values());
+    } catch {
+      return [];
+    }
   }
 }
 
