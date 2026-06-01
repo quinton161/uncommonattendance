@@ -861,7 +861,7 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
         undefined,
         true,
         user?.userType === 'instructor' ? 'instructor' : 'admin',
-        targetHubId || effectiveHub
+        targetHubId
       );
       uniqueToast.success(`${studentName} marked as present!`);
       // Refresh the attendance data
@@ -978,7 +978,7 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
     try {
       // Use AttendanceService with skipTimeCheck=true to allow marking after deadline
       const attendanceService = AttendanceService.getInstance();
-      const promises = absentStudents.map(student =>
+      const promises = absentStudents.map((student) =>
         attendanceService.checkIn(
           student.id || student.uid,
           student.displayName || 'Unknown User',
@@ -986,7 +986,7 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
           undefined,
           true,
           user?.userType === 'instructor' ? 'instructor' : 'admin',
-          effectiveHub
+          student.hubId
         )
       );
       await Promise.all(promises);

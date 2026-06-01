@@ -200,3 +200,5 @@ button[data-ui='icon']:hover,
 button[data-ui='nav']:hover {
   transform: none !important;
 }
+
+/* Notification drawer — see GlobalStyles .notification-drawer + NotificationPanel styled cards */

@@ -227,6 +227,17 @@ export const GlobalStyles = createGlobalStyle`
     margin-bottom: ${theme.spacing.md};
   }
 
+  /* Notification drawer cards — override global body text color */
+  .notification-drawer .notification-card-message,
+  .notification-drawer .notification-card-message p,
+  .notification-drawer .notification-card-message span:not(.notification-type-badge) {
+    color: #ffffff !important;
+  }
+
+  .notification-drawer .notification-type-badge {
+    color: #000000 !important;
+  }
+
   a {
     color: ${theme.colors.primary};
     text-decoration: none;

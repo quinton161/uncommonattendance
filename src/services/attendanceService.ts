@@ -6,7 +6,11 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase';
 import DataService from './DataService';
-import { hubIdMatchesScope, resolvedHubLabel } from './hubService';
+import {
+  assertCallerHubMatchesProfile,
+  fetchStudentHubProfile,
+} from './hubIntegrity';
+import { hubIdMatchesScope } from './hubService';
 import { AbsenceReason, AttendanceRecord, AttendanceStatus, LocationData } from '../types';
 import { DailyAttendanceService } from './dailyAttendanceService';
 import { TimeService } from './timeService';
@@ -50,28 +54,17 @@ export class AttendanceService {
     return AttendanceService.instance;
   }
 
-  /** Resolve hub from arg or Firestore user profile (Harare attendance must always be hub-scoped). */
+  /**
+   * Hub for attendance always comes from the student’s Firestore profile (honest per-hub data).
+   * Optional callerHubId is only validated for self check-in — never used to override the profile.
+   */
   private async resolveHubForStudent(
     studentId: string,
-    hubId?: string
+    callerHubId?: string
   ): Promise<{ hubId: string; hubName: string }> {
-    const trimmed = hubId?.trim();
-    if (trimmed) {
-      return { hubId: trimmed, hubName: resolvedHubLabel({ hubId: trimmed }) };
-    }
-    try {
-      const userSnap = await getDoc(doc(db, 'users', studentId));
-      const data = userSnap.exists() ? userSnap.data() : null;
-      const fromProfile = data?.hubId != null ? String(data.hubId).trim() : '';
-      if (fromProfile) {
-        return { hubId: fromProfile, hubName: resolvedHubLabel({ hubId: fromProfile, hubName: data?.hubName }) };
-      }
-    } catch (e) {
-      if (process.env.NODE_ENV === 'development') {
-        console.warn('[AttendanceService] resolveHubForStudent failed', e);
-      }
-    }
-    return { hubId: '', hubName: '' };
+    const profile = await fetchStudentHubProfile(studentId);
+    assertCallerHubMatchesProfile(callerHubId, profile.hubId);
+    return profile;
   }
 
   // ── Check-in ────────────────────────────────────────────────────────────────
@@ -179,10 +172,8 @@ export class AttendanceService {
       updatedAt:        serverTimestamp(),
     };
 
-    if (hub.hubId) {
-      record.hubId = hub.hubId;
-      record.hubName = hub.hubName;
-    }
+    record.hubId = hub.hubId;
+    record.hubName = hub.hubName;
 
     if (isLate && isStudentQrSelfCheckIn && lateReason?.trim()) {
       record.lateReason = lateReason.trim();
@@ -229,7 +220,12 @@ export class AttendanceService {
 
     // Mirror to dailyAttendance (best-effort — don't let a failure block check-in)
     try {
-      await DailyAttendanceService.getInstance().markPresentToday(studentId, studentName);
+      await DailyAttendanceService.getInstance().markPresentToday(
+        studentId,
+        studentName,
+        hub.hubId,
+        hub.hubName
+      );
     } catch (e) {
       console.warn('dailyAttendance sync failed (non-fatal):', e);
     }
@@ -270,12 +266,12 @@ export class AttendanceService {
       throw new Error('Already checked out today');
     }
     const recHub = (data.hubId && String(data.hubId).trim()) || '';
-    const scope = studentHubId?.trim() || '';
-    if (recHub && scope && recHub !== scope) {
-      throw new Error('This check-in belongs to a different hub than your profile. Contact support if you changed hubs.');
+    const hub = await this.resolveHubForStudent(studentId, studentHubId);
+    if (recHub && !hubIdMatchesScope(recHub, hub.hubId)) {
+      throw new Error(
+        'This check-in belongs to a different hub than your profile. Contact support if you changed hubs.'
+      );
     }
-
-    const hub = await this.resolveHubForStudent(studentId, recHub || studentHubId);
     const checkoutDate =
       typeof data.date === 'string' && data.date.length >= 10
         ? data.date
@@ -288,7 +284,7 @@ export class AttendanceService {
       checkOutTime: Timestamp.fromDate(now),
       status: 'completed' as const,
       updatedAt: serverTimestamp(),
-      ...(hub.hubId && !recHub ? { hubId: hub.hubId, hubName: hub.hubName } : {}),
+      ...(!recHub ? { hubId: hub.hubId, hubName: hub.hubName } : {}),
     };
     const update =
       location?.ip && location.ip !== '0.0.0.0'
@@ -385,6 +381,9 @@ export class AttendanceService {
    */
   async recordStaffAbsent(p: StaffAbsentPayload): Promise<void> {
     if (!p.absenceReason) throw new Error('Select an absence reason before saving.');
+    const hub = await fetchStudentHubProfile(p.studentId);
+    assertCallerHubMatchesProfile(p.hubId, hub.hubId);
+
     const docId = `${p.date}_${p.studentId}`;
     const docRef = doc(db, 'attendance', docId);
     const snap = await getDoc(docRef);
@@ -405,7 +404,8 @@ export class AttendanceService {
         absenceNotes: (p.absenceNotes || '').trim(),
         recordedByUid: p.recordedByUid,
         recordedByName: p.recordedByName,
-        ...(p.hubId ? { hubId: p.hubId } : {}),
+        hubId: hub.hubId,
+        hubName: hub.hubName,
         method: 'staff_absent',
         updatedAt: serverTimestamp(),
         createdAt: prev.createdAt || serverTimestamp(),

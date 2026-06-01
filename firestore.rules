@@ -69,6 +69,25 @@ service cloud.firestore {
       return hubRecordMatchesInstructorScope(effectiveHubOnAttendance(attData));
     }
 
+    /** Attendance hub must match the student’s profile hub (honest per-hub data). */
+    function attendanceHubMatchesStudentProfile(studentId) {
+      return studentId is string
+        && exists(usersPath(studentId))
+        && effectiveHubOnUserDoc(get(usersPath(studentId)).data) != ''
+        && effectiveHubOnAttendance(request.resource.data)
+            == effectiveHubOnUserDoc(get(usersPath(studentId)).data);
+    }
+
+    function studentAttendanceHubHonest() {
+      return request.resource.data.keys().hasAll(['hubId', 'hubName'])
+        && request.resource.data.hubId is string
+        && request.resource.data.hubId.size() > 0
+        && exists(usersPath(request.auth.uid))
+        && effectiveHubOnUserDoc(get(usersPath(request.auth.uid)).data) != ''
+        && effectiveHubOnAttendance(request.resource.data)
+            == effectiveHubOnUserDoc(get(usersPath(request.auth.uid)).data);
+    }
+
     function dailyDocStudentUid(recordId) {
       return recordId.split('_')[0];
     }
@@ -165,9 +184,10 @@ service cloud.firestore {
       /** All signed-in users may read (hub/monthly leaderboards). */
       allow read: if isAuth();
 
-      allow create: if isAdminUser()
-        || (isInstructorUser() && attendanceMatchesInstructorScope(request.resource.data))
-        || (isStudentOwner(request.resource.data.studentId));
+      allow create: if (isAdminUser()
+          || (isInstructorUser() && attendanceMatchesInstructorScope(request.resource.data)))
+        && attendanceHubMatchesStudentProfile(request.resource.data.studentId)
+        || (isStudentOwner(request.resource.data.studentId) && studentAttendanceHubHonest());
 
       /** Student check-out (partial update). */
       allow update: if ownsAttendanceDoc(attendanceId)

@@ -61,7 +61,12 @@ export class DailyAttendanceService {
   /**
    * Mark a student as present for today when they check in
    */
-  async markPresentToday(studentId: string, studentName: string): Promise<void> {
+  async markPresentToday(
+    studentId: string,
+    studentName: string,
+    hubId: string,
+    hubName: string
+  ): Promise<void> {
     const timeService = TimeService.getInstance();
     const today = timeService.getCurrentDateString();
     
@@ -80,6 +85,8 @@ export class DailyAttendanceService {
       id: dailyRecordId,
       studentId,
       studentName,
+      hubId,
+      hubName,
       date: today,
       isPresent: true,
       markedAt: new Date(),
@@ -99,6 +106,8 @@ export class DailyAttendanceService {
       try {
         await setDoc(doc(db, 'dailyAttendance', dailyRecordId), {
           studentId,
+          hubId,
+          hubName,
           date: today,
           isPresent: true,
           markedAt: Timestamp.now()
