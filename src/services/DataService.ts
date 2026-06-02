@@ -20,6 +20,26 @@ class DataService {
   private useFirebase = true;
   private usersCache: { rows: any[]; expiresAt: number } | null = null;
   private usersInFlight: Promise<any[]> | null = null;
+  private withTimeout = async <T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs);
+    });
+    try {
+      return await Promise.race([promise, timeout]);
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  };
+  private async deleteDocsInChunks(
+    refs: Array<{ ref: { path: string } }>,
+    chunkSize = 30
+  ): Promise<void> {
+    for (let i = 0; i < refs.length; i += chunkSize) {
+      const chunk = refs.slice(i, i + chunkSize);
+      await Promise.all(chunk.map((d: any) => deleteDoc(d.ref)));
+    }
+  }
 
   static getInstance(): DataService {
     if (!DataService.instance) DataService.instance = new DataService();
@@ -331,7 +351,10 @@ class DataService {
     throw new Error('No role change to apply.');
   }
 
-  async deleteUser(userId: string, opts?: { suppressToast?: boolean; actingUser?: User | null }): Promise<void> {
+  async deleteUser(
+    userId: string,
+    opts?: { suppressToast?: boolean; actingUser?: User | null; requireAuthDelete?: boolean }
+  ): Promise<void> {
     const uid = userId?.trim();
     if (!uid) {
       throw new Error('Missing user id');
@@ -352,12 +375,21 @@ class DataService {
       (acting.userType === 'admin' || acting.userType === 'instructor') &&
       uid !== acting.uid;
 
+    const requireAuthDelete = opts?.requireAuthDelete ?? true;
     const authCleanupPromise = canTryDeleteAuth
-      ? deleteStudentAuthUserCallable(uid).catch((e) => {
-          console.warn(
-            'deleteStudentAuthUser: callable failed or not deployed. Email may still be reserved in Firebase Auth.',
-            e
+      ? this.withTimeout(
+          deleteStudentAuthUserCallable(uid),
+          12000,
+          'deleteStudentAuthUser callable'
+        ).catch((e) => {
+          const msg =
+            e instanceof Error ? e.message : 'unknown callable failure';
+          const detailed = new Error(
+            `Could not delete Firebase Auth user (admin console) for this account: ${msg}. ` +
+              'Deploy/enable function `deleteStudentAuthUser` and try again.'
           );
+          if (requireAuthDelete) throw detailed;
+          console.warn(detailed.message);
         })
       : Promise.resolve();
 
@@ -383,21 +415,27 @@ class DataService {
       }
     );
 
-    const [attendSnap, regSnap, convoSnap] = await Promise.all([
-      attendanceQueryPromise,
-      registrationsQueryPromise,
-      conversationsQueryPromise,
-    ]);
+    // Ensure Auth user deletion succeeds first (fast-fail if function is missing/unavailable).
+    await authCleanupPromise;
 
-    const cleanupDeletes: Promise<void>[] = [];
-    cleanupDeletes.push(...attendSnap.docs.map((d) => deleteDoc(d.ref)));
-    if (regSnap) cleanupDeletes.push(...regSnap.docs.map((d) => deleteDoc(d.ref)));
-    if (convoSnap) cleanupDeletes.push(...convoSnap.docs.map((d) => deleteDoc(d.ref)));
-    if (cleanupDeletes.length > 0) {
-      await Promise.all(cleanupDeletes);
+    const [attendSnap, regSnap, convoSnap] = await this.withTimeout(
+      Promise.all([attendanceQueryPromise, registrationsQueryPromise, conversationsQueryPromise]),
+      15000,
+      'deleteUser query cleanup'
+    );
+
+    const refsToDelete = [
+      ...attendSnap.docs,
+      ...(regSnap ? regSnap.docs : []),
+      ...(convoSnap ? convoSnap.docs : []),
+    ];
+    if (refsToDelete.length > 0) {
+      await this.withTimeout(this.deleteDocsInChunks(refsToDelete), 15000, 'deleteUser related records');
     }
 
-    await Promise.all([authCleanupPromise, profilePhotoCleanupPromise]);
+    await this.withTimeout(profilePhotoCleanupPromise, 6000, 'deleteUser profile photo cleanup').catch(() => {
+      /* non-fatal */
+    });
 
     await deleteDoc(doc(db, 'users', uid));
     this.invalidateUsersCache();

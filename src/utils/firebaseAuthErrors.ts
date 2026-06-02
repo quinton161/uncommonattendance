@@ -21,6 +21,8 @@ export function getFirebaseAuthErrorMessage(code: string | undefined, fallback =
     'auth/popup-blocked': 'Pop-up was blocked. Allow pop-ups for this site.',
     'auth/cancelled-popup-request': 'Sign-in was cancelled.',
     'auth/account-exists-with-different-credential': 'An account already exists with a different sign-in method.',
+    'auth/unauthorized-domain':
+      'Google sign-in is blocked for this website domain. Ask an admin to add this domain in Firebase Console → Authentication → Settings → Authorized domains.',
   };
 
   return messages[code] || fallback;
@@ -44,6 +46,8 @@ export function getStudentLoginAuthErrorMessage(code: string | undefined, fallba
     'auth/user-disabled': 'This account is disabled. Ask your instructor or admin.',
     'auth/too-many-requests': 'Too many attempts. Wait a few minutes, then try again.',
     'auth/network-request-failed': 'Network problem. Check your connection and try again.',
+    'auth/unauthorized-domain':
+      'This site domain is not authorized for Google sign-in yet. Ask your admin to add it in Firebase Authentication settings.',
   };
 
   if (studentLogin[code]) return studentLogin[code];

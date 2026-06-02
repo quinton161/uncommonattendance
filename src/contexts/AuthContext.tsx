@@ -513,6 +513,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       uniqueToast.success(`Welcome, ${result.user.displayName}!`, { autoClose: 3000 });
     } catch (err: any) {
       if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') return;
+      if (err.code === 'auth/unauthorized-domain') {
+        const origin = typeof window !== 'undefined' ? window.location.origin : 'this domain';
+        uniqueToast.error(
+          `Google sign-in is not enabled for ${origin}. Add it in Firebase Console → Authentication → Settings → Authorized domains.`,
+          { autoClose: 8000 }
+        );
+        throw err;
+      }
       uniqueToast.error(getFirebaseAuthErrorMessage(err.code, 'Google sign-in failed.'), { autoClose: 5000 });
       throw err;
     }
@@ -624,8 +632,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // ── deleteAccount ─────────────────────────────────────────────────────────────
   const deleteAccount = async () => {
     if (!auth.currentUser || !user) throw new Error('Not logged in');
-    await DataService.getInstance().deleteUser(user.uid, { actingUser: user });
-    await deleteUser(auth.currentUser);
+    try {
+      await DataService.getInstance().deleteUser(user.uid, { actingUser: user, requireAuthDelete: false });
+      await deleteUser(auth.currentUser);
+      uniqueToast.success('Account deleted successfully.', { autoClose: 3000 });
+    } catch (e: any) {
+      if (e?.code === 'auth/requires-recent-login') {
+        throw new Error('For security, sign out and sign in again, then delete your account.');
+      }
+      throw e;
+    }
   };
 
   const value: AuthContextType = {

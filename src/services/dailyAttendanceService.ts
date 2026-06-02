@@ -138,6 +138,37 @@ export class DailyAttendanceService {
   /**
    * Get attendance statistics for a student
    */
+  private async getDailyRowsByDocIds(studentId: string, daysToCheck: number): Promise<any[]> {
+    const ts = TimeService.getInstance();
+    const todayStr = ts.getCurrentDateString();
+    const today = new Date(`${todayStr}T12:00:00`);
+    const dates: string[] = [];
+    for (let i = 0; i <= daysToCheck; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() - i);
+      dates.push(ts.toHarareDateString(d));
+    }
+
+    const snaps = await Promise.all(
+      dates.map((dateStr) => getDoc(doc(db, 'dailyAttendance', `${studentId}_${dateStr}`)))
+    );
+
+    const out: any[] = [];
+    snaps.forEach((snap, idx) => {
+      if (!snap.exists()) return;
+      const data = snap.data();
+      out.push({
+        id: snap.id,
+        date: dates[idx],
+        isPresent: Boolean(data.isPresent),
+        markedAt: data.markedAt?.toDate ? data.markedAt.toDate() : undefined,
+      });
+    });
+
+    out.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    return out;
+  }
+
   async getAttendanceStats(studentId: string, daysToCheck: number = 30): Promise<DailyAttendanceStats> {
     try {
       console.log('📊 Getting attendance stats for:', studentId, 'days:', daysToCheck);
@@ -151,20 +182,9 @@ export class DailyAttendanceService {
 
       console.log('📅 Date range:', startDateStr, 'to', endDateStr);
 
-      const q = query(collection(db, 'dailyAttendance'), where('studentId', '==', studentId));
-      const querySnapshot = await getDocs(q);
-      const records: any[] = [];
-
-      querySnapshot.forEach((docSnap) => {
-        const data = docSnap.data();
-        if (data.date < startDateStr || data.date > endDateStr) return;
-        records.push({
-          date: data.date,
-          isPresent: data.isPresent,
-          markedAt: data.markedAt?.toDate(),
-        });
-      });
-      records.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+      const records = (await this.getDailyRowsByDocIds(studentId, daysToCheck)).filter(
+        (r) => r.date >= startDateStr && r.date <= endDateStr
+      );
 
       console.log('📋 Found', records.length, 'attendance records in range');
 
@@ -260,20 +280,13 @@ export class DailyAttendanceService {
    * Get recent attendance activity
    */
   async getRecentActivity(studentId: string, limitCount: number = 10): Promise<any[]> {
-    const q = query(collection(db, 'dailyAttendance'), where('studentId', '==', studentId));
-    const querySnapshot = await getDocs(q);
-    const activities: any[] = [];
-
-    querySnapshot.forEach((docSnap) => {
-      const data = docSnap.data();
-      activities.push({
-        date: data.date,
-        isPresent: data.isPresent,
-        markedAt: data.markedAt?.toDate(),
-        type: data.isPresent ? 'present' : 'absent',
-        description: data.isPresent ? 'Marked Present' : 'Marked Absent',
-      });
-    });
+    const activities = (await this.getDailyRowsByDocIds(studentId, Math.max(limitCount * 4, 45))).map((data) => ({
+      date: data.date,
+      isPresent: data.isPresent,
+      markedAt: data.markedAt,
+      type: data.isPresent ? 'present' : 'absent',
+      description: data.isPresent ? 'Marked Present' : 'Marked Absent',
+    }));
     activities.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
     return activities.slice(0, limitCount);
   }
