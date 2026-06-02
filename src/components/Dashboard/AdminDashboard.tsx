@@ -32,6 +32,7 @@ export const AdminDashboard: React.FC = () => {
 
   const pageRef = useRef<HTMLDivElement>(null);
   const unsubRef = useRef<(() => void) | null>(null);
+  const summarySigRef = useRef<string>('');
 
   useEffect(() => {
     fetchHubs()
@@ -79,8 +80,18 @@ export const AdminDashboard: React.FC = () => {
         const unsub = (DataSvc as any).subscribeToTodayAttendance
           ? (DataSvc as any).subscribeToTodayAttendance(
               (r: any) => {
-                // subscribeToTodayAttendance emits a summary object, not an attendance array
-                setTodaySummary(r);
+                // Avoid noisy double-renders: two listeners (date + range) often emit identical summaries.
+                const nextSig = JSON.stringify({
+                  totalUsers: r?.totalUsers ?? 0,
+                  presentCount: r?.presentCount ?? 0,
+                  absentCount: r?.absentCount ?? 0,
+                  lateCount: r?.lateCount ?? 0,
+                  attendanceSize: Array.isArray(r?.attendanceList) ? r.attendanceList.length : 0,
+                });
+                if (nextSig !== summarySigRef.current) {
+                  summarySigRef.current = nextSig;
+                  setTodaySummary(r);
+                }
                 setLoading(false);
               },
               hubId
@@ -129,12 +140,20 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
+  const isStudent = (u: Record<string, unknown>) => {
+    const t = String(u?.userType || '').trim().toLowerCase();
+    return !t || t === 'attendee' || t === 'student';
+  };
+
   const present = todaySummary?.presentCount ?? todaySummary?.presentCount === 0 ? todaySummary.presentCount : 0;
   const late = todaySummary?.lateCount ?? 0;
   const absent = todaySummary?.absentCount ?? 0;
 
-  const total = students.length;
-  const checkedIn = present + late;
+  const total =
+    todaySummary?.totalUsers ??
+    students.filter(isStudent).length;
+  const checkedIn = present;
+  const onTime = Math.max(0, present - late);
   const rate = total > 0 ? Math.round((checkedIn / total) * 100) : 0;
   const chartData = [
     { name: 'Present', value: present, color: '#0052CC' },
@@ -205,10 +224,27 @@ export const AdminDashboard: React.FC = () => {
       )}
 
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-        <StatCard label="Total Students" value={loading ? '—' : total} icon={<Users size={19} />} color="blue" sub="Enrolled" />
-        <StatCard label="Present" value={loading ? '—' : present} icon={<CheckCircle2 size={19} />} color="green" sub="On time" />
+        <StatCard label="Total Students" value={loading ? '—' : total} icon={<Users size={19} />} color="blue" sub="Rostered" />
+        <StatCard label="Present" value={loading ? '—' : present} icon={<CheckCircle2 size={19} />} color="green" sub={`On time: ${onTime}`} />
         <StatCard label="Late" value={loading ? '—' : late} icon={<Clock size={19} />} color="orange" sub="After 9 AM" />
         <StatCard label="Absent" value={loading ? '—' : absent} icon={<XCircle size={19} />} color="red" sub="No check-in" />
+      </div>
+
+      <div className="gsap-target rounded-2xl border border-[rgba(0,82,204,0.08)] bg-white px-4 py-3 text-xs text-gray-600">
+        {loading ? (
+          <span>Checking stats…</span>
+        ) : (
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+            <span className="font-semibold text-gray-700">Health check:</span>
+            <span>Present ({present}) = On-time ({onTime}) + Late ({late})</span>
+            <span>Total ({total}) = Present ({present}) + Absent ({absent})</span>
+            {total !== present + absent && (
+              <span className="font-semibold text-amber-700">
+                Mismatch detected: {total - (present + absent)} student(s) have no attendance row yet.
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="gsap-target">

@@ -39,6 +39,23 @@ function formatInstructorLastLogin(row: Record<string, unknown>): string {
   }
 }
 
+function isStaffActive(row: Record<string, unknown>, activeMinutes = 15): boolean {
+  const v = row?.lastLoginAt;
+  if (!v) return false;
+  try {
+    const d =
+      typeof (v as { toDate?: () => Date })?.toDate === 'function'
+        ? (v as { toDate: () => Date }).toDate()
+        : v instanceof Date
+          ? v
+          : null;
+    if (!d || Number.isNaN(d.getTime())) return false;
+    return Date.now() - d.getTime() <= activeMinutes * 60 * 1000;
+  } catch {
+    return false;
+  }
+}
+
 const PageContainer = styled.div`
   padding: ${theme.spacing.xl};
   width: 100%;
@@ -296,6 +313,22 @@ const ValueTextSmall = styled.div`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+`;
+
+const LastLoginCell = styled.div`
+  display: inline-flex;
+  align-items: center;
+  gap: ${theme.spacing.xs};
+  min-width: 0;
+`;
+
+const ActiveDot = styled.span`
+  width: 8px;
+  height: 8px;
+  border-radius: ${theme.borderRadius.full};
+  background: #22c55e;
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.15);
+  flex-shrink: 0;
 `;
 
 const RightAlignedCell = styled.div`
@@ -619,7 +652,10 @@ export const StaffAccountsPage: React.FC<StaffAccountsPageProps> = ({ onBack }) 
                     </UserDetails>
                   </UserInfo>
                   <ValueTextSmall>{resolvedHubLabel(row)}</ValueTextSmall>
-                  <ValueTextSmall>{formatInstructorLastLogin(row)}</ValueTextSmall>
+                  <LastLoginCell>
+                    {isStaffActive(row) && <ActiveDot title="Active recently" aria-label="Staff active recently" />}
+                    <ValueTextSmall>{formatInstructorLastLogin(row)}</ValueTextSmall>
+                  </LastLoginCell>
                   <div>
                     <UserType type={role}>{role}</UserType>
                   </div>
