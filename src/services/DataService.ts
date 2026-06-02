@@ -375,7 +375,7 @@ class DataService {
       (acting.userType === 'admin' || acting.userType === 'instructor') &&
       uid !== acting.uid;
 
-    const requireAuthDelete = opts?.requireAuthDelete ?? true;
+    const requireAuthDelete = opts?.requireAuthDelete ?? false;
     const authCleanupPromise = canTryDeleteAuth
       ? this.withTimeout(
           deleteStudentAuthUserCallable(uid),
