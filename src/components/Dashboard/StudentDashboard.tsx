@@ -4,7 +4,7 @@ import { AttendanceService } from '../../services/attendanceService';
 import { effectiveStudentHubId } from '../../services/hubService';
 import { getTodayDailyGoalTitleForCheckIn } from '../../services/studentGoalsService';
 import { TimeService } from '../../services/timeService';
-import { isStudentSelfCheckout } from '../../utils/attendanceCheckout';
+import { hasRecordedCheckout, isStaffCheckout } from '../../utils/attendanceCheckout';
 import { LateCheckInReasonModal } from '../Student/LateCheckInReasonModal';
 import { CheckInDailyGoalModal } from '../Student/CheckInDailyGoalModal';
 
@@ -233,7 +233,7 @@ export function StudentDashboard(): React.ReactElement {
     const hasCheckIn =
       todayAttendance.checkInTime instanceof Date &&
       !Number.isNaN(todayAttendance.checkInTime.getTime());
-    if (hasCheckIn && !isStudentSelfCheckout(todayAttendance)) return 'checked-in';
+    if (hasCheckIn && !hasRecordedCheckout(todayAttendance)) return 'checked-in';
     return 'checked-out';
   };
 
@@ -259,15 +259,19 @@ export function StudentDashboard(): React.ReactElement {
   const checkedInToday =
     todayAttendance?.checkInTime instanceof Date &&
     !Number.isNaN(todayAttendance.checkInTime.getTime());
-  const checkedOutToday = isStudentSelfCheckout(todayAttendance ?? {});
+  const checkedOutToday = hasRecordedCheckout(todayAttendance ?? {});
+  const staffCheckedOutToday = isStaffCheckout(todayAttendance ?? {});
   const todayStatusLabel = checkedOutToday
-    ? 'Day completed'
+    ? staffCheckedOutToday
+      ? 'Checked out by staff'
+      : 'Day completed'
     : checkedInToday
       ? todayAttendance?.status === 'late'
         ? 'Checked in late'
         : 'Checked in'
       : 'Not checked in';
-  const studentCheckOutTime = checkedOutToday ? todayAttendance?.checkOutTime : undefined;
+  const displayCheckOutTime = checkedOutToday ? todayAttendance?.checkOutTime : undefined;
+  const checkOutLabel = staffCheckedOutToday ? 'Check-out (staff)' : 'Check-out';
   const nextActionLabel = status === 'checked-out' ? 'Check In' : 'Check Out';
   const snapshot = {
     total: attendanceHistory.length,
@@ -367,9 +371,9 @@ export function StudentDashboard(): React.ReactElement {
                   </span>
                 </div>
                 <div className="mt-2 flex items-center justify-between gap-3">
-                  <span>Check-out</span>
+                  <span>{checkOutLabel}</span>
                   <span className="font-semibold text-gray-800">
-                    {studentCheckOutTime ? formatTime(studentCheckOutTime) : 'Not yet'}
+                    {displayCheckOutTime ? formatTime(displayCheckOutTime) : 'Not yet'}
                   </span>
                 </div>
               </div>
@@ -414,8 +418,11 @@ export function StudentDashboard(): React.ReactElement {
                     </div>
                     <div className="flex flex-wrap gap-3 text-sm text-gray-500">
                       <span>In: {formatTime(record.checkInTime)}</span>
-                      {isStudentSelfCheckout(record) ? (
-                        <span>Out: {formatTime(record.checkOutTime)}</span>
+                      {hasRecordedCheckout(record) ? (
+                        <span>
+                          Out{isStaffCheckout(record) ? ' (staff)' : ''}:{' '}
+                          {formatTime(record.checkOutTime)}
+                        </span>
                       ) : null}
                     </div>
                   </div>

@@ -7,7 +7,7 @@ import DataService from '../../services/DataService';
 import { AttendanceService } from '../../services/attendanceService';
 import { DailyAttendanceService } from '../../services/dailyAttendanceService';
 import { TimeService } from '../../services/timeService';
-import { isStudentSelfCheckout } from '../../utils/attendanceCheckout';
+import { hasRecordedCheckout, isStaffCheckout } from '../../utils/attendanceCheckout';
 import type { AttendanceRecord } from '../../types';
 import { uniqueToast } from '../../utils/toastUtils';
 import {
@@ -376,8 +376,8 @@ export const MyAttendancePage: React.FC<MyAttendancePageProps> = ({ onBack, isEm
                     <TimeDisplay>
                       <LogoutIcon size={14} />
                       <span className="time">
-                        {isStudentSelfCheckout(record)
-                          ? formatTime(record.checkOutTime)
+                        {hasRecordedCheckout(record)
+                          ? `${formatTime(record.checkOutTime)}${isStaffCheckout(record) ? ' (staff)' : ''}`
                           : '—'}
                       </span>
                     </TimeDisplay>

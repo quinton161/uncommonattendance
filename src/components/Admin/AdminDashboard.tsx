@@ -6,7 +6,7 @@ import { Layout, Container, AppHeader } from '../Common/Layout';
 import { Button } from '../Common/Button';
 import { Card } from '../Common/Card';
 import { AttendanceRecord } from '../../types';
-import { isStudentSelfCheckout } from '../../utils/attendanceCheckout';
+import { hasRecordedCheckout } from '../../utils/attendanceCheckout';
 import { theme } from '../../styles/theme';
 
 const DashboardContainer = styled.div`
@@ -217,11 +217,11 @@ export const AdminDashboard: React.FC = () => {
     switch (filter) {
       case 'present':
         return todayAttendance.filter(
-          (record) => record.checkInTime && !isStudentSelfCheckout(record)
+          (record) => record.checkInTime && !hasRecordedCheckout(record)
         );
       case 'absent':
         return todayAttendance.filter(
-          (record) => isStudentSelfCheckout(record) || !record.checkInTime
+          (record) => hasRecordedCheckout(record) || !record.checkInTime
         );
       default:
         return todayAttendance;
@@ -245,7 +245,7 @@ export const AdminDashboard: React.FC = () => {
   };
 
   const getStudentStatus = (record: AttendanceRecord): 'present' | 'absent' => {
-    return record.checkInTime && !isStudentSelfCheckout(record) ? 'present' : 'absent';
+    return record.checkInTime && !hasRecordedCheckout(record) ? 'present' : 'absent';
   };
 
   const filteredAttendance = getFilteredAttendance();
@@ -359,8 +359,11 @@ export const AdminDashboard: React.FC = () => {
                       <StudentName>{record.studentName}</StudentName>
                       <AttendanceDetails>
                         <span>Check-in: {formatTime(record.checkInTime)}</span>
-                        {isStudentSelfCheckout(record) && record.checkOutTime && (
-                          <span>Check-out: {formatTime(record.checkOutTime)}</span>
+                        {hasRecordedCheckout(record) && record.checkOutTime && (
+                          <span>
+                            Check-out{record.checkOutMethod === 'staff' ? ' (staff)' : ''}:{' '}
+                            {formatTime(record.checkOutTime)}
+                          </span>
                         )}
                         {record.location?.address && (
                           <span>📍 {record.location.address}</span>

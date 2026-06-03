@@ -13,7 +13,7 @@ import {
 import { AdminHubScopeSelect } from './AdminHubScopeSelect';
 import { TimeService } from '../../services/timeService';
 import { AttendanceService } from '../../services/attendanceService';
-import { isStudentSelfCheckout } from '../../utils/attendanceCheckout';
+import { hasRecordedCheckout, isStaffCheckout, isStudentSelfCheckout } from '../../utils/attendanceCheckout';
 import { DeleteUserModal } from './DeleteUserModal';
 import { uniqueToast } from '../../utils/toastUtils';
 import {
@@ -22,7 +22,7 @@ import {
   TodayIcon,
   SearchIcon
 } from '../Common/Icons';
-import { FiAlertTriangle } from 'react-icons/fi';
+import { FiAlertTriangle, FiLogOut } from 'react-icons/fi';
 
 const PageContainer = styled.div`
   padding: ${theme.spacing.xl};
@@ -737,6 +737,8 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [invalidUncommonLoading, setInvalidUncommonLoading] = useState(false);
+  const [checkoutAllLoading, setCheckoutAllLoading] = useState(false);
+  const [checkoutStudentId, setCheckoutStudentId] = useState<string | null>(null);
   const dataService = DataService.getInstance();
 
   const loadData = useCallback(async () => {
@@ -777,16 +779,22 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
       checkOutMethod: todayAttendance?.checkOutMethod,
     };
     const hasIn = !!checkInDate;
+    const checkedOut = hasRecordedCheckout(record);
     const studentOut = isStudentSelfCheckout(record);
-    const isCheckedInNow = hasIn && !studentOut;
+    const staffOut = isStaffCheckout(record);
+    const isCheckedInNow = hasIn && !checkedOut;
     const statusLabel = !hasIn
       ? 'Not present'
       : studentOut
         ? 'Checked out'
-        : 'Checked in';
+        : staffOut
+          ? 'Staff check-out'
+          : 'Checked in';
     const checkInDisp = formatAttTime(checkInDate) ?? '—';
-    const checkOutDisp = studentOut ? formatAttTime(checkOutDate) ?? '—' : '—';
-    return { hasIn, studentOut, isCheckedInNow, statusLabel, checkInDisp, checkOutDisp };
+    let checkOutDisp = '—';
+    if (studentOut) checkOutDisp = formatAttTime(checkOutDate) ?? '—';
+    else if (staffOut) checkOutDisp = `Staff ${formatAttTime(checkOutDate) ?? '—'}`;
+    return { hasIn, checkedOut, studentOut, staffOut, isCheckedInNow, statusLabel, checkInDisp, checkOutDisp };
   };
 
   const getTodayAttendance = (userId: string) => {
@@ -976,7 +984,7 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
       const isPresent =
         todayAttendance &&
         todayAttendance.checkInTime &&
-        !isStudentSelfCheckout({
+        !hasRecordedCheckout({
           checkOutTime: toDateSafe(todayAttendance.checkOutTime),
           checkOutMethod: todayAttendance.checkOutMethod,
         });
@@ -1018,11 +1026,73 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
     }
   };
 
+  const handleCheckOutStudent = async (
+    studentId: string,
+    studentName: string,
+    studentHubId?: string
+  ) => {
+    if (!hubScopeActive || !canWriteSelectedHub) {
+      uniqueToast.info('Select your hub before checking out students.');
+      return;
+    }
+    if (
+      !window.confirm(
+        `Check out ${studentName} for today? This records a staff check-out time (Harare).`
+      )
+    ) {
+      return;
+    }
+    setCheckoutStudentId(studentId);
+    try {
+      await AttendanceService.getInstance().checkOutAsStaff(studentId, studentHubId);
+      uniqueToast.success(`${studentName} checked out.`);
+      await loadData();
+    } catch (error: unknown) {
+      console.error('Staff check-out failed:', error);
+      const msg = error instanceof Error ? error.message : 'Failed to check out student.';
+      uniqueToast.error(msg);
+    } finally {
+      setCheckoutStudentId(null);
+    }
+  };
+
+  const handleCheckOutAllOpen = async () => {
+    if (!hubScopeActive || !canWriteSelectedHub) {
+      uniqueToast.info(
+        user?.userType === 'instructor'
+          ? 'Select your assigned hub before checking out students.'
+          : 'Select a single hub so check-out applies to that hub only.'
+      );
+      return;
+    }
+    if (checkoutAllLoading || loading) return;
+    if (
+      !window.confirm(
+        'Check out everyone still checked in today? Staff check-out times will be recorded (Harare).'
+      )
+    ) {
+      return;
+    }
+    setCheckoutAllLoading(true);
+    try {
+      const { checkedOut } = await AttendanceService.getInstance().checkOutAllOpenToday(effectiveHub);
+      uniqueToast.success(
+        checkedOut === 0 ? 'No open sessions to check out.' : `Checked out ${checkedOut} student(s).`
+      );
+      await loadData();
+    } catch (error) {
+      console.error('Failed to check out all:', error);
+      uniqueToast.error('Failed to check out everyone.');
+    } finally {
+      setCheckoutAllLoading(false);
+    }
+  };
+
   const presentNowCount = attendees.filter(u => {
     const uid = u.id || u.uid;
     const t = getTodayAttendance(uid);
     if (!t?.checkInTime) return false;
-    return !isStudentSelfCheckout({
+    return !hasRecordedCheckout({
       checkOutTime: toDateSafe(t.checkOutTime),
       checkOutMethod: t.checkOutMethod,
     });
@@ -1037,7 +1107,7 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
         <HeaderTitle>
           <PageHeading>Students</PageHeading>
           <p>
-          Manage students (attendees) for your hub. Staff accounts are on the Staff page in the sidebar. Check-in and check-out times use Africa/Harare (school time). Only students can record their own check-out in the app.
+          Manage students (attendees) for your hub. Staff accounts are on the Staff page in the sidebar. Check-in and check-out times use Africa/Harare (school time). Staff can check out students from this page; students can also check themselves out on their dashboard.
           {(user?.userType === 'admin' || user?.userType === 'instructor') &&
             ' Use Hub to view one location or all hubs (instructors: assigned hub only).'}
           {user?.userType === 'instructor' &&
@@ -1054,10 +1124,18 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
           <SuccessButton
             variant="primary"
             onClick={handleMarkAllPresent}
-            disabled={!hubScopeActive || !canWriteSelectedHub || loading}
+            disabled={!hubScopeActive || !canWriteSelectedHub || loading || checkoutAllLoading}
           >
             <CheckCircleIcon size={18} /> Mark All Present
           </SuccessButton>
+          <Button
+            variant="outline"
+            onClick={handleCheckOutAllOpen}
+            disabled={!hubScopeActive || !canWriteSelectedHub || loading || checkoutAllLoading}
+          >
+            <FiLogOut size={18} style={{ marginRight: 8 }} />
+            {checkoutAllLoading ? 'Checking out…' : 'Check out everyone'}
+          </Button>
           <SearchWrap>
             <SearchIconAbsolute size={20} />
             <SearchInput
@@ -1079,7 +1157,7 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
       </Header>
 
       <StatsCaption>
-        Student totals match the list (attendees only). “Checked in today” includes anyone who checked in at least once today. “Currently present” means checked in and not checked out yet (student check-out only).
+        Student totals match the list (attendees only). “Checked in today” includes anyone who checked in at least once today. “Currently present” means checked in and not checked out yet (by student or staff).
       </StatsCaption>
       <StatsGrid>
         <StatCard>
@@ -1201,7 +1279,7 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
             const todayAttendance = getTodayAttendance(uid);
             const {
               hasIn,
-              studentOut,
+              checkedOut,
               isCheckedInNow,
               statusLabel,
               checkInDisp,
@@ -1256,12 +1334,28 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
                 </div>
 
                 <ActionButtonsEnd>
-                  {canWriteStudentHub && (
+                  {canWriteStudentHub && hasIn && !checkedOut && (
                     <MarkPresentButton onClick={() => handleMarkPresent(uid, userData.displayName || 'Unknown User', userData.hubId)}>
                       <CheckCircleIcon size={14} /> <span>Mark Present</span>
                     </MarkPresentButton>
                   )}
-                  {canWriteStudentHub && hasIn && !studentOut && (
+                  {canWriteStudentHub && hasIn && !checkedOut && (
+                    <Button
+                      variant="outline"
+                      loading={checkoutStudentId === uid}
+                      disabled={checkoutAllLoading || checkoutStudentId === uid}
+                      onClick={() =>
+                        handleCheckOutStudent(
+                          uid,
+                          userData.displayName || 'Unknown User',
+                          userData.hubId
+                        )
+                      }
+                    >
+                      <FiLogOut size={14} /> Check out
+                    </Button>
+                  )}
+                  {canWriteStudentHub && hasIn && !checkedOut && (
                     <Button
                       variant="outline"
                       onClick={() => handleUnmarkPresent(uid, userData.displayName || 'Unknown User', userData.hubId)}
@@ -1294,7 +1388,7 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
               const todayAttendance = getTodayAttendance(uid);
               const {
                 hasIn,
-                studentOut,
+                checkedOut,
                 isCheckedInNow,
                 statusLabel,
                 checkInDisp,
@@ -1356,12 +1450,28 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
 
                   <CardSection>
                     <ActionButtons>
-                      {canWriteStudentHub && (
+                      {canWriteStudentHub && hasIn && !checkedOut && (
                         <MobileMarkPresentButton onClick={() => handleMarkPresent(uid, userData.displayName || 'Unknown User', userData.hubId)}>
                           <CheckCircleIcon size={14} /> <span>Mark Present</span>
                         </MobileMarkPresentButton>
                       )}
-                      {canWriteStudentHub && hasIn && !studentOut && (
+                      {canWriteStudentHub && hasIn && !checkedOut && (
+                        <Button
+                          variant="outline"
+                          loading={checkoutStudentId === uid}
+                          disabled={checkoutAllLoading || checkoutStudentId === uid}
+                          onClick={() =>
+                            handleCheckOutStudent(
+                              uid,
+                              userData.displayName || 'Unknown User',
+                              userData.hubId
+                            )
+                          }
+                        >
+                          <FiLogOut size={14} /> Check out
+                        </Button>
+                      )}
+                      {canWriteStudentHub && hasIn && !checkedOut && (
                         <Button
                           variant="outline"
                           onClick={() => handleUnmarkPresent(uid, userData.displayName || 'Unknown User', userData.hubId)}

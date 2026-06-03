@@ -637,15 +637,16 @@ class DataService {
           absenceNotes = rec.absenceNotes;
           recordedByName = rec.recordedByName;
         } else if (rec.checkInTime) {
-          const studentCheckedOut =
-            rec.checkOutTime && rec.checkOutMethod === 'student';
+          const recordedCheckout =
+            rec.checkOutTime &&
+            (rec.checkOutMethod === 'student' || rec.checkOutMethod === 'staff');
           status = s === 'late'
             ? 'late'
-            : studentCheckedOut
+            : recordedCheckout
               ? 'completed'
               : 'present';
           checkInTime  = rec.checkInTime;
-          checkOutTime = studentCheckedOut ? rec.checkOutTime : null;
+          checkOutTime = recordedCheckout ? rec.checkOutTime : null;
           isLate = status==='late' || this.calcIsLate(rec.checkInTime);
           lateReason = typeof rec.lateReason === 'string' && rec.lateReason.trim() ? rec.lateReason.trim() : undefined;
           checkInGoal =
@@ -752,9 +753,13 @@ class DataService {
       const d = this.dateStr(r);
       if (!d) return;
       const ex = byDate.get(d);
-      const rStudentOut = r.checkOutTime && r.checkOutMethod === 'student';
-      const exStudentOut = ex?.checkOutTime && ex?.checkOutMethod === 'student';
-      if (!ex || (rStudentOut && !exStudentOut)) byDate.set(d, r);
+      const rOut =
+        r.checkOutTime &&
+        (r.checkOutMethod === 'student' || r.checkOutMethod === 'staff');
+      const exOut =
+        ex?.checkOutTime &&
+        (ex?.checkOutMethod === 'student' || ex?.checkOutMethod === 'staff');
+      if (!ex || (rOut && !exOut)) byDate.set(d, r);
     });
     const unique = Array.from(byDate.values()).sort(
       (a, b) =>

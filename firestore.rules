@@ -104,15 +104,24 @@ service cloud.firestore {
       return isAuth() && attendanceId.matches('.*_' + request.auth.uid + '$');
     }
 
-    /** Staff must not write student checkOutTime — only the student self check-out rule may. */
-    function staffSetsStudentCheckOutTime() {
-      return request.resource.data.diff(resource.data).affectedKeys().hasAny(['checkOutTime'])
-        && request.resource.data.checkOutTime != null;
+    function staffTouchesCheckout() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasAny([
+        'checkOutTime', 'checkOutMethod', 'checkOutByUid', 'status'
+      ]);
     }
 
-    function staffSetsStudentCompletedStatus() {
-      return request.resource.data.diff(resource.data).affectedKeys().hasAny(['status'])
-        && request.resource.data.status == 'completed';
+    function staffCheckoutUpdateValid() {
+      return request.resource.data.checkOutMethod == 'staff'
+        && request.resource.data.checkOutTime != null
+        && request.resource.data.status == 'completed'
+        && resource.data.checkInTime != null
+        && (!resource.data.keys().hasAny(['checkOutMethod'])
+            || resource.data.checkOutMethod != 'student');
+    }
+
+    function staffImpersonatesStudentCheckout() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasAny(['checkOutMethod'])
+        && request.resource.data.checkOutMethod == 'student';
     }
 
     function isPromotingToAdmin() {
@@ -219,8 +228,8 @@ service cloud.firestore {
 
       allow update: if (isAdminUser()
           || (isInstructorUser() && attendanceMatchesInstructorScope(resource.data)))
-        && !staffSetsStudentCheckOutTime()
-        && !staffSetsStudentCompletedStatus();
+        && !staffImpersonatesStudentCheckout()
+        && (!staffTouchesCheckout() || staffCheckoutUpdateValid());
 
       allow delete: if isAdminUser()
         || (isInstructorUser() && attendanceMatchesInstructorScope(resource.data));

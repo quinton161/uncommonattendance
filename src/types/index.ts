@@ -102,11 +102,10 @@ export interface AttendanceRecord {
   studentName: string;
   checkInTime: Date;
   checkOutTime?: Date;
-  /** Set to `student` only when the student taps Check Out in the app. */
-  checkOutMethod?: 'student';
-  /** Staff end-of-day close — does not count as a student check-out. */
-  staffSessionClosedAt?: Date;
-  staffSessionClosedBy?: 'bulk';
+  /** `student` = self check-out; `staff` = instructor/admin checked them out. */
+  checkOutMethod?: 'student' | 'staff';
+  /** Staff uid when checkOutMethod is `staff`. */
+  checkOutByUid?: string;
   /** When staff records an explicit absence (no check-in). */
   absenceReason?: AbsenceReason;
   absenceNotes?: string;

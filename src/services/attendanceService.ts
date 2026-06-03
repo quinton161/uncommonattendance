@@ -11,7 +11,7 @@ import {
   fetchStudentHubProfile,
 } from './hubIntegrity';
 import { hubIdMatchesScope } from './hubService';
-import { isStudentSelfCheckout } from '../utils/attendanceCheckout';
+import { hasRecordedCheckout, isStudentSelfCheckout } from '../utils/attendanceCheckout';
 import { AbsenceReason, AttendanceRecord, AttendanceStatus, LocationData } from '../types';
 import { DailyAttendanceService } from './dailyAttendanceService';
 import { TimeService } from './timeService';
@@ -268,7 +268,12 @@ export class AttendanceService {
       throw new Error('No check-in record found for today');
     }
     const data = snap.data();
-    if (data.checkOutTime && data.checkOutMethod === 'student') {
+    if (
+      hasRecordedCheckout({
+        checkOutTime: this.safeFirestoreDate(data.checkOutTime),
+        checkOutMethod: data.checkOutMethod,
+      })
+    ) {
       throw new Error('Already checked out today');
     }
     const recHub = (data.hubId && String(data.hubId).trim()) || '';
@@ -337,6 +342,134 @@ export class AttendanceService {
       checkOutMethod: 'student',
       status:       'completed',
     } as AttendanceRecord;
+  }
+
+  /**
+   * Staff (admin/instructor): check out a student for today. Uses Africa/Harare time.
+   */
+  async checkOutAsStaff(studentId: string, hubId?: string): Promise<AttendanceRecord> {
+    const staffUid = auth.currentUser?.uid;
+    if (!staffUid) throw new Error('You must be signed in to check out a student.');
+
+    const now = this.timeService.getCurrentTime();
+    const today = this.timeService.getCurrentDateString();
+    const docId = `${today}_${studentId}`;
+    const snap = await getDoc(doc(db, 'attendance', docId));
+
+    if (!snap.exists()) {
+      throw new Error('No check-in record found for today');
+    }
+    const data = snap.data();
+    if (
+      hasRecordedCheckout({
+        checkOutTime: this.safeFirestoreDate(data.checkOutTime),
+        checkOutMethod: data.checkOutMethod,
+      })
+    ) {
+      throw new Error('Student is already checked out today');
+    }
+    const recHub = (data.hubId && String(data.hubId).trim()) || '';
+    const hub = await this.resolveHubForStudent(studentId, hubId);
+    if (recHub && !hubIdMatchesScope(recHub, hub.hubId)) {
+      throw new Error('This check-in belongs to a different hub than the student profile.');
+    }
+    const checkoutDate =
+      typeof data.date === 'string' && data.date.length >= 10 ? data.date : today;
+
+    const update = {
+      studentId: data.studentId ?? studentId,
+      date: checkoutDate,
+      checkOutTime: Timestamp.fromDate(now),
+      checkOutMethod: 'staff' as const,
+      checkOutByUid: staffUid,
+      status: 'completed' as const,
+      updatedAt: serverTimestamp(),
+      ...(!recHub ? { hubId: hub.hubId, hubName: hub.hubName } : {}),
+    };
+
+    try {
+      await updateDoc(doc(db, 'attendance', docId), update);
+    } catch (e) {
+      mapFirestoreWriteError(e, `checkOutAsStaff updateDoc attendance/${docId}`);
+    }
+
+    try {
+      const { createNotification } = await import('./notificationFeedService');
+      const { resolvedHubLabel } = await import('./hubService');
+      const name = String(data.studentName || '');
+      const hId = (recHub || hubId || '').trim();
+      const timeStr = this.timeService.formatClockTime(now);
+      await createNotification({
+        type: 'check_out',
+        title: 'Staff check-out',
+        body: `${name || 'Student'} at ${timeStr}`,
+        hubId: hId || undefined,
+        hubName: hId ? resolvedHubLabel({ hubId: hId }) : undefined,
+        studentId,
+        studentName: name,
+      });
+    } catch {
+      /* non-fatal */
+    }
+
+    return {
+      ...data,
+      checkInTime: data.checkInTime.toDate(),
+      checkOutTime: now,
+      checkOutMethod: 'staff',
+      checkOutByUid: staffUid,
+      status: 'completed',
+    } as AttendanceRecord;
+  }
+
+  /** Staff: check out every student still checked in today (optional hub filter). */
+  async checkOutAllOpenToday(hubId?: string): Promise<{ checkedOut: number }> {
+    const today = this.timeService.getCurrentDateString();
+    const { start, end } = this.timeService.getHarareDayUtcBounds(today);
+    const [snapDate, snapRange] = await Promise.all([
+      getDocs(query(collection(db, 'attendance'), where('date', '==', today))),
+      getDocs(
+        query(
+          collection(db, 'attendance'),
+          where('checkInTime', '>=', Timestamp.fromDate(start)),
+          where('checkInTime', '<=', Timestamp.fromDate(end))
+        )
+      ),
+    ]);
+    const byId = new Map<string, (typeof snapDate.docs)[0]>();
+    [...snapDate.docs, ...snapRange.docs].forEach((d) => {
+      if (!byId.has(d.id)) byId.set(d.id, d);
+    });
+
+    const toClose = Array.from(byId.values()).filter((d) => {
+      const x = d.data();
+      if (!x.checkInTime) return false;
+      if (
+        hasRecordedCheckout({
+          checkOutTime: this.safeFirestoreDate(x.checkOutTime),
+          checkOutMethod: x.checkOutMethod,
+        })
+      ) {
+        return false;
+      }
+      if (hubId && !hubIdMatchesScope(x.hubId, hubId)) return false;
+      return true;
+    });
+
+    let checkedOut = 0;
+    for (const d of toClose) {
+      const sid = String(d.data().studentId || '').trim();
+      if (!sid) continue;
+      try {
+        await this.checkOutAsStaff(sid, hubId);
+        checkedOut += 1;
+      } catch (e) {
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('[AttendanceService] checkOutAllOpenToday skip', sid, e);
+        }
+      }
+    }
+    return { checkedOut };
   }
 
   /**
@@ -449,7 +582,6 @@ export class AttendanceService {
       ...d,
       checkInTime: this.safeFirestoreDate(d.checkInTime),
       checkOutTime: this.safeFirestoreDate(d.checkOutTime),
-      staffSessionClosedAt: this.safeFirestoreDate(d.staffSessionClosedAt),
     } as AttendanceRecord;
   }
 
@@ -525,7 +657,7 @@ export class AttendanceService {
     const now    = this.timeService.getCurrentTime();
     const tooLate = this.timeService.isTooLateToCheckIn(now);
     const inWindow = this.timeService.canCheckIn(now);
-    const checkedOut = isStudentSelfCheckout(r ?? {});
+    const checkedOut = hasRecordedCheckout(r ?? {});
     const checkedIn  = !!(r?.checkInTime && !checkedOut);
     const hasIn      = !!r?.checkInTime;
 
@@ -639,7 +771,7 @@ export class AttendanceService {
         const x = d.data();
         return (
           x.checkInTime &&
-          !isStudentSelfCheckout({
+          !hasRecordedCheckout({
             checkOutTime: this.safeFirestoreDate(x.checkOutTime),
             checkOutMethod: x.checkOutMethod,
           })
