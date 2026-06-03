@@ -6,6 +6,7 @@ import { Layout, Container, AppHeader } from '../Common/Layout';
 import { Button } from '../Common/Button';
 import { Card } from '../Common/Card';
 import { AttendanceRecord } from '../../types';
+import { isStudentSelfCheckout } from '../../utils/attendanceCheckout';
 import { theme } from '../../styles/theme';
 
 const DashboardContainer = styled.div`
@@ -215,12 +216,12 @@ export const AdminDashboard: React.FC = () => {
   const getFilteredAttendance = () => {
     switch (filter) {
       case 'present':
-        return todayAttendance.filter(record => 
-          record.checkInTime && !record.checkOutTime
+        return todayAttendance.filter(
+          (record) => record.checkInTime && !isStudentSelfCheckout(record)
         );
       case 'absent':
-        return todayAttendance.filter(record => 
-          record.checkOutTime || !record.checkInTime
+        return todayAttendance.filter(
+          (record) => isStudentSelfCheckout(record) || !record.checkInTime
         );
       default:
         return todayAttendance;
@@ -244,7 +245,7 @@ export const AdminDashboard: React.FC = () => {
   };
 
   const getStudentStatus = (record: AttendanceRecord): 'present' | 'absent' => {
-    return record.checkInTime && !record.checkOutTime ? 'present' : 'absent';
+    return record.checkInTime && !isStudentSelfCheckout(record) ? 'present' : 'absent';
   };
 
   const filteredAttendance = getFilteredAttendance();
@@ -358,7 +359,7 @@ export const AdminDashboard: React.FC = () => {
                       <StudentName>{record.studentName}</StudentName>
                       <AttendanceDetails>
                         <span>Check-in: {formatTime(record.checkInTime)}</span>
-                        {record.checkOutTime && (
+                        {isStudentSelfCheckout(record) && record.checkOutTime && (
                           <span>Check-out: {formatTime(record.checkOutTime)}</span>
                         )}
                         {record.location?.address && (

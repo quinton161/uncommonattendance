@@ -4,7 +4,7 @@ import {
   Timestamp, deleteDoc, serverTimestamp,
   addDoc, onSnapshot,
 } from 'firebase/firestore';
-import { db } from './firebase';
+import { db, auth } from './firebase';
 import DataService from './DataService';
 import {
   assertCallerHubMatchesProfile,
@@ -254,6 +254,11 @@ export class AttendanceService {
   // ── Check-out ───────────────────────────────────────────────────────────────
 
   async checkOut(studentId: string, location?: LocationData, studentHubId?: string): Promise<AttendanceRecord> {
+    const callerUid = auth.currentUser?.uid;
+    if (!callerUid || callerUid !== studentId) {
+      throw new Error('Only the signed-in student can check out for themselves.');
+    }
+
     const now   = this.timeService.getCurrentTime();
     const today = this.timeService.getCurrentDateString();
     const docId = `${today}_${studentId}`;
@@ -332,51 +337,6 @@ export class AttendanceService {
       checkOutMethod: 'student',
       status:       'completed',
     } as AttendanceRecord;
-  }
-
-  /**
-   * Staff only: mark open sessions as staff-closed for Harare today.
-   * Does not set student `checkOutTime` — students only get that from self check-out.
-   */
-  async checkOutAllOpenToday(hubId?: string): Promise<{ checkedOut: number }> {
-    const today = this.timeService.getCurrentDateString();
-    const { start, end } = this.timeService.getHarareDayUtcBounds(today);
-    const [snapDate, snapRange] = await Promise.all([
-      getDocs(query(collection(db, 'attendance'), where('date', '==', today))),
-      getDocs(
-        query(
-          collection(db, 'attendance'),
-          where('checkInTime', '>=', Timestamp.fromDate(start)),
-          where('checkInTime', '<=', Timestamp.fromDate(end))
-        )
-      ),
-    ]);
-    const byId = new Map<string, (typeof snapDate.docs)[0]>();
-    [...snapDate.docs, ...snapRange.docs].forEach((d) => {
-      if (!byId.has(d.id)) byId.set(d.id, d);
-    });
-    const now = this.timeService.getCurrentTime();
-    const tClosed = Timestamp.fromDate(now);
-    const toClose = Array.from(byId.values()).filter((d) => {
-      const x = d.data();
-      const studentOut = x.checkOutTime && x.checkOutMethod === 'student';
-      if (!(x.checkInTime && !studentOut && !x.staffSessionClosedAt)) return false;
-      if (hubId && !hubIdMatchesScope(x.hubId, hubId)) return false;
-      return true;
-    });
-    for (let i = 0; i < toClose.length; i += 10) {
-      const chunk = toClose.slice(i, i + 10);
-      await Promise.all(
-        chunk.map((d) =>
-          updateDoc(d.ref, {
-            staffSessionClosedAt: tClosed,
-            staffSessionClosedBy: 'bulk',
-            updatedAt: serverTimestamp(),
-          })
-        )
-      );
-    }
-    return { checkedOut: toClose.length };
   }
 
   /**
@@ -675,8 +635,17 @@ export class AttendanceService {
     const today = this.timeService.getCurrentDateString();
     const q     = query(collection(db,'attendance'), where('date','==',today), where('isPresent','==',true));
     return (await getDocs(q)).docs
-      .filter(d => d.data().checkInTime && !d.data().checkOutTime)
-      .map(d => ({ ...d.data(), checkInTime: d.data().checkInTime.toDate() })) as AttendanceRecord[];
+      .filter((d) => {
+        const x = d.data();
+        return (
+          x.checkInTime &&
+          !isStudentSelfCheckout({
+            checkOutTime: this.safeFirestoreDate(x.checkOutTime),
+            checkOutMethod: x.checkOutMethod,
+          })
+        );
+      })
+      .map((d) => this.mapAttendanceSnapData({ id: d.id, ...d.data() } as Record<string, unknown>));
   }
 
   /**

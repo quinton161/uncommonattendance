@@ -211,11 +211,8 @@ class DataService {
   }
 
   async updateAttendance(id: string, data: any): Promise<void> {
-    const payload: any = { ...data, updatedAt: Timestamp.now() };
-    if (data.checkOutTime) {
-      payload.checkOutTime = Timestamp.fromDate(data.checkOutTime);
-      payload.status = 'completed';
-    }
+    const { checkOutTime: _ignoredCheckout, checkOutMethod: _ignoredMethod, ...rest } = data ?? {};
+    const payload: any = { ...rest, updatedAt: Timestamp.now() };
     await updateDoc(doc(db,'attendance',id), payload);
   }
 
@@ -640,9 +637,15 @@ class DataService {
           absenceNotes = rec.absenceNotes;
           recordedByName = rec.recordedByName;
         } else if (rec.checkInTime) {
-          status = s==='late' ? 'late' : s==='completed' ? 'completed' : 'present';
+          const studentCheckedOut =
+            rec.checkOutTime && rec.checkOutMethod === 'student';
+          status = s === 'late'
+            ? 'late'
+            : studentCheckedOut
+              ? 'completed'
+              : 'present';
           checkInTime  = rec.checkInTime;
-          checkOutTime = rec.checkOutTime;
+          checkOutTime = studentCheckedOut ? rec.checkOutTime : null;
           isLate = status==='late' || this.calcIsLate(rec.checkInTime);
           lateReason = typeof rec.lateReason === 'string' && rec.lateReason.trim() ? rec.lateReason.trim() : undefined;
           checkInGoal =
@@ -749,7 +752,9 @@ class DataService {
       const d = this.dateStr(r);
       if (!d) return;
       const ex = byDate.get(d);
-      if (!ex || r.status === 'completed' || (!ex.checkOutTime && r.checkOutTime)) byDate.set(d, r);
+      const rStudentOut = r.checkOutTime && r.checkOutMethod === 'student';
+      const exStudentOut = ex?.checkOutTime && ex?.checkOutMethod === 'student';
+      if (!ex || (rStudentOut && !exStudentOut)) byDate.set(d, r);
     });
     const unique = Array.from(byDate.values()).sort(
       (a, b) =>

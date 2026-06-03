@@ -110,6 +110,11 @@ service cloud.firestore {
         && request.resource.data.checkOutTime != null;
     }
 
+    function staffSetsStudentCompletedStatus() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasAny(['status'])
+        && request.resource.data.status == 'completed';
+    }
+
     function isPromotingToAdmin() {
       return request.resource.data.userType == 'admin'
         && (resource == null || resource.data.userType != 'admin');
@@ -214,7 +219,8 @@ service cloud.firestore {
 
       allow update: if (isAdminUser()
           || (isInstructorUser() && attendanceMatchesInstructorScope(resource.data)))
-        && !staffSetsStudentCheckOutTime();
+        && !staffSetsStudentCheckOutTime()
+        && !staffSetsStudentCompletedStatus();
 
       allow delete: if isAdminUser()
         || (isInstructorUser() && attendanceMatchesInstructorScope(resource.data));
