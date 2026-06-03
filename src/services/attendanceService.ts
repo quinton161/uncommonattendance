@@ -11,6 +11,7 @@ import {
   fetchStudentHubProfile,
 } from './hubIntegrity';
 import { hubIdMatchesScope } from './hubService';
+import { isStudentSelfCheckout } from '../utils/attendanceCheckout';
 import { AbsenceReason, AttendanceRecord, AttendanceStatus, LocationData } from '../types';
 import { DailyAttendanceService } from './dailyAttendanceService';
 import { TimeService } from './timeService';
@@ -262,7 +263,7 @@ export class AttendanceService {
       throw new Error('No check-in record found for today');
     }
     const data = snap.data();
-    if (data.checkOutTime) {
+    if (data.checkOutTime && data.checkOutMethod === 'student') {
       throw new Error('Already checked out today');
     }
     const recHub = (data.hubId && String(data.hubId).trim()) || '';
@@ -282,6 +283,7 @@ export class AttendanceService {
       studentId: data.studentId ?? studentId,
       date: checkoutDate,
       checkOutTime: Timestamp.fromDate(now),
+      checkOutMethod: 'student' as const,
       status: 'completed' as const,
       updatedAt: serverTimestamp(),
       ...(!recHub ? { hubId: hub.hubId, hubName: hub.hubName } : {}),
@@ -327,13 +329,14 @@ export class AttendanceService {
       ...data,
       checkInTime:  data.checkInTime.toDate(),
       checkOutTime: now,
+      checkOutMethod: 'student',
       status:       'completed',
     } as AttendanceRecord;
   }
 
   /**
-   * Staff only (Firestore `isStaff` write): close every open session for Harare today.
-   * Merges `date == today` with check-in time in today’s Harare window so legacy rows still match.
+   * Staff only: mark open sessions as staff-closed for Harare today.
+   * Does not set student `checkOutTime` — students only get that from self check-out.
    */
   async checkOutAllOpenToday(hubId?: string): Promise<{ checkedOut: number }> {
     const today = this.timeService.getCurrentDateString();
@@ -353,10 +356,11 @@ export class AttendanceService {
       if (!byId.has(d.id)) byId.set(d.id, d);
     });
     const now = this.timeService.getCurrentTime();
-    const tOut = Timestamp.fromDate(now);
+    const tClosed = Timestamp.fromDate(now);
     const toClose = Array.from(byId.values()).filter((d) => {
       const x = d.data();
-      if (!(x.checkInTime && !x.checkOutTime)) return false;
+      const studentOut = x.checkOutTime && x.checkOutMethod === 'student';
+      if (!(x.checkInTime && !studentOut && !x.staffSessionClosedAt)) return false;
       if (hubId && !hubIdMatchesScope(x.hubId, hubId)) return false;
       return true;
     });
@@ -365,8 +369,8 @@ export class AttendanceService {
       await Promise.all(
         chunk.map((d) =>
           updateDoc(d.ref, {
-            checkOutTime: tOut,
-            status: 'completed',
+            staffSessionClosedAt: tClosed,
+            staffSessionClosedBy: 'bulk',
             updatedAt: serverTimestamp(),
           })
         )
@@ -485,6 +489,7 @@ export class AttendanceService {
       ...d,
       checkInTime: this.safeFirestoreDate(d.checkInTime),
       checkOutTime: this.safeFirestoreDate(d.checkOutTime),
+      staffSessionClosedAt: this.safeFirestoreDate(d.staffSessionClosedAt),
     } as AttendanceRecord;
   }
 
@@ -552,7 +557,7 @@ export class AttendanceService {
 
   async isCurrentlyCheckedIn(studentId: string, hubId?: string): Promise<boolean> {
     const r = await this.getTodayAttendance(studentId, hubId);
-    return !!(r?.checkInTime && !r.checkOutTime);
+    return !!(r?.checkInTime && !isStudentSelfCheckout(r));
   }
 
   async getCurrentAttendanceState(studentId: string, hubId?: string) {
@@ -560,8 +565,8 @@ export class AttendanceService {
     const now    = this.timeService.getCurrentTime();
     const tooLate = this.timeService.isTooLateToCheckIn(now);
     const inWindow = this.timeService.canCheckIn(now);
-    const checkedIn  = !!(r?.checkInTime && !r?.checkOutTime);
-    const checkedOut = !!r?.checkOutTime;
+    const checkedOut = isStudentSelfCheckout(r ?? {});
+    const checkedIn  = !!(r?.checkInTime && !checkedOut);
     const hasIn      = !!r?.checkInTime;
 
     let status: 'not_checked_in'|'checked_in'|'checked_out'|'absent'|'late' = 'not_checked_in';

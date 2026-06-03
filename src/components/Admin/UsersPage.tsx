@@ -13,6 +13,7 @@ import {
 import { AdminHubScopeSelect } from './AdminHubScopeSelect';
 import { TimeService } from '../../services/timeService';
 import { AttendanceService } from '../../services/attendanceService';
+import { hasStaffSessionClosed, isStudentSelfCheckout } from '../../utils/attendanceCheckout';
 import { DeleteUserModal } from './DeleteUserModal';
 import { uniqueToast } from '../../utils/toastUtils';
 import {
@@ -777,6 +778,36 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
     return d ? ts.formatClockTime(d) : null;
   };
 
+  const attendanceRowMeta = (todayAttendance: any) => {
+    const checkInDate = toDateSafe(todayAttendance?.checkInTime);
+    const checkOutDate = toDateSafe(todayAttendance?.checkOutTime);
+    const staffClosedDate = toDateSafe(todayAttendance?.staffSessionClosedAt);
+    const record = {
+      checkOutTime: checkOutDate,
+      checkOutMethod: todayAttendance?.checkOutMethod,
+      staffSessionClosedAt: staffClosedDate,
+    };
+    const hasIn = !!checkInDate;
+    const studentOut = isStudentSelfCheckout(record);
+    const staffClosed = hasStaffSessionClosed(record);
+    const isCheckedInNow = hasIn && !studentOut && !staffClosed;
+    const statusLabel = !hasIn
+      ? 'Not present'
+      : studentOut
+        ? 'Checked out'
+        : staffClosed
+          ? 'Session closed'
+          : 'Checked in';
+    const checkInDisp = formatAttTime(checkInDate) ?? '—';
+    let checkOutDisp = '—';
+    if (studentOut) {
+      checkOutDisp = formatAttTime(checkOutDate) ?? '—';
+    } else if (staffClosed) {
+      checkOutDisp = `Staff ${formatAttTime(staffClosedDate) ?? '—'}`;
+    }
+    return { hasIn, studentOut, staffClosed, isCheckedInNow, statusLabel, checkInDisp, checkOutDisp };
+  };
+
   const getTodayAttendance = (userId: string) => {
     const today = ts.getCurrentDateString();
     const matchesToday = (a: any) => {
@@ -961,7 +992,13 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
       if (userData.userType === 'admin' || userData.userType === 'instructor') return false;
       const uid = userData.id || userData.uid;
       const todayAttendance = getTodayAttendance(uid);
-      const isPresent = todayAttendance && todayAttendance.checkInTime && !todayAttendance.checkOutTime;
+      const isPresent =
+        todayAttendance &&
+        todayAttendance.checkInTime &&
+        !isStudentSelfCheckout({
+          checkOutTime: toDateSafe(todayAttendance.checkOutTime),
+          checkOutMethod: todayAttendance.checkOutMethod,
+        });
       return !isPresent;
     });
 
@@ -1012,7 +1049,7 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
     if (checkoutAllLoading || loading) return;
     if (
       !window.confirm(
-        'Check out everyone who is still checked in today (sets check-out time to now, Harare)?'
+        'Close open sessions for today? This marks sessions as staff-closed and does not record a student check-out time.'
       )
     ) {
       return;
@@ -1021,7 +1058,7 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
     try {
       const { checkedOut } = await AttendanceService.getInstance().checkOutAllOpenToday(effectiveHub);
       uniqueToast.success(
-        checkedOut === 0 ? 'No open sessions to close.' : `Checked out ${checkedOut} student(s).`
+        checkedOut === 0 ? 'No open sessions to close.' : `Closed ${checkedOut} open session(s).`
       );
       await loadData();
     } catch (error) {
@@ -1035,7 +1072,13 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
   const presentNowCount = attendees.filter(u => {
     const uid = u.id || u.uid;
     const t = getTodayAttendance(uid);
-    return !!(t?.checkInTime && !t?.checkOutTime);
+    if (!t?.checkInTime) return false;
+    return !isStudentSelfCheckout({
+      checkOutTime: toDateSafe(t.checkOutTime),
+      checkOutMethod: t.checkOutMethod,
+    }) && !hasStaffSessionClosed({
+      staffSessionClosedAt: toDateSafe(t.staffSessionClosedAt),
+    });
   }).length;
   const checkedInTodayCount = attendees.filter(u => {
     const uid = u.id || u.uid;
@@ -1076,7 +1119,7 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
             <InlineIcon>
               <FiLogOut size={18} />
             </InlineIcon>
-            {checkoutAllLoading ? 'Checking out…' : 'Check out everyone'}
+            {checkoutAllLoading ? 'Closing sessions…' : 'Close open sessions (staff)'}
           </Button>
           <SearchWrap>
             <SearchIconAbsolute size={20} />
@@ -1099,7 +1142,7 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
       </Header>
 
       <StatsCaption>
-        Student totals match the list (attendees only). “Checked in today” includes anyone who checked in at least once today, even if they have since checked out. “Currently present” means checked in and not checked out yet.
+        Student totals match the list (attendees only). “Checked in today” includes anyone who checked in at least once today. “Currently present” means checked in, not student-checked-out, and not staff-closed yet.
       </StatsCaption>
       <StatsGrid>
         <StatCard>
@@ -1219,12 +1262,14 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
           {filteredAttendees.map((userData) => {
             const uid = userData.id || userData.uid;
             const todayAttendance = getTodayAttendance(uid);
-            const hasIn = !!todayAttendance?.checkInTime;
-            const hasOut = !!todayAttendance?.checkOutTime;
-            const isCheckedInNow = hasIn && !hasOut;
-            const statusLabel = !hasIn ? 'Not present' : hasOut ? 'Checked out' : 'Checked in';
-            const checkInDisp = formatAttTime(todayAttendance?.checkInTime) ?? '—';
-            const checkOutDisp = formatAttTime(todayAttendance?.checkOutTime) ?? '—';
+            const {
+              hasIn,
+              studentOut,
+              isCheckedInNow,
+              statusLabel,
+              checkInDisp,
+              checkOutDisp,
+            } = attendanceRowMeta(todayAttendance);
             const canWriteStudentHub =
               user?.userType === 'admin' || staffMayAccessHubForWrite(user, userData.hubId);
 
@@ -1279,7 +1324,7 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
                       <CheckCircleIcon size={14} /> <span>Mark Present</span>
                     </MarkPresentButton>
                   )}
-                  {canWriteStudentHub && hasIn && !hasOut && (
+                  {canWriteStudentHub && hasIn && !studentOut && (
                     <Button
                       variant="outline"
                       onClick={() => handleUnmarkPresent(uid, userData.displayName || 'Unknown User', userData.hubId)}
@@ -1310,12 +1355,14 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
             {filteredAttendees.map((userData) => {
               const uid = userData.id || userData.uid;
               const todayAttendance = getTodayAttendance(uid);
-              const hasIn = !!todayAttendance?.checkInTime;
-              const hasOut = !!todayAttendance?.checkOutTime;
-              const isCheckedInNow = hasIn && !hasOut;
-              const statusLabel = !hasIn ? 'Not present' : hasOut ? 'Checked out' : 'Checked in';
-              const checkInDisp = formatAttTime(todayAttendance?.checkInTime) ?? '—';
-              const checkOutDisp = formatAttTime(todayAttendance?.checkOutTime) ?? '—';
+              const {
+                hasIn,
+                studentOut,
+                isCheckedInNow,
+                statusLabel,
+                checkInDisp,
+                checkOutDisp,
+              } = attendanceRowMeta(todayAttendance);
               const canWriteStudentHub =
                 user?.userType === 'admin' || staffMayAccessHubForWrite(user, userData.hubId);
 
@@ -1377,7 +1424,7 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
                           <CheckCircleIcon size={14} /> <span>Mark Present</span>
                         </MobileMarkPresentButton>
                       )}
-                      {canWriteStudentHub && hasIn && !hasOut && (
+                      {canWriteStudentHub && hasIn && !studentOut && (
                         <Button
                           variant="outline"
                           onClick={() => handleUnmarkPresent(uid, userData.displayName || 'Unknown User', userData.hubId)}

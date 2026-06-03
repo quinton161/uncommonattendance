@@ -104,6 +104,12 @@ service cloud.firestore {
       return isAuth() && attendanceId.matches('.*_' + request.auth.uid + '$');
     }
 
+    /** Staff must not write student checkOutTime — only the student self check-out rule may. */
+    function staffSetsStudentCheckOutTime() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasAny(['checkOutTime'])
+        && request.resource.data.checkOutTime != null;
+    }
+
     function isPromotingToAdmin() {
       return request.resource.data.userType == 'admin'
         && (resource == null || resource.data.userType != 'admin');
@@ -192,8 +198,10 @@ service cloud.firestore {
       /** Student check-out (partial update). */
       allow update: if ownsAttendanceDoc(attendanceId)
                     && resource.data.studentId == request.auth.uid
-                    && (!resource.data.keys().hasAny(['checkOutTime']) || resource.data.checkOutTime == null)
+                    && !(resource.data.keys().hasAny(['checkOutMethod'])
+                         && resource.data.checkOutMethod == 'student')
                     && request.resource.data.checkOutTime != null
+                    && request.resource.data.checkOutMethod == 'student'
                     && request.resource.data.studentId == resource.data.studentId;
 
       /** Student check-in when a row exists without checkInTime (e.g. staff marked absent). */
@@ -204,8 +212,9 @@ service cloud.firestore {
                     && request.resource.data.keys().hasAny(['checkInTime'])
                     && request.resource.data.checkInTime != null;
 
-      allow update: if isAdminUser()
-        || (isInstructorUser() && attendanceMatchesInstructorScope(resource.data));
+      allow update: if (isAdminUser()
+          || (isInstructorUser() && attendanceMatchesInstructorScope(resource.data)))
+        && !staffSetsStudentCheckOutTime();
 
       allow delete: if isAdminUser()
         || (isInstructorUser() && attendanceMatchesInstructorScope(resource.data));

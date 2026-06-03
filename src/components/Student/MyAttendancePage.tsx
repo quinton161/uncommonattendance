@@ -4,7 +4,11 @@ import { useAuth } from '../../contexts/AuthContext';
 import { theme } from '../../styles/theme';
 import { UncommonLogo } from '../Common/UncommonLogo';
 import DataService from '../../services/DataService';
+import { AttendanceService } from '../../services/attendanceService';
 import { DailyAttendanceService } from '../../services/dailyAttendanceService';
+import { TimeService } from '../../services/timeService';
+import { isStudentSelfCheckout } from '../../utils/attendanceCheckout';
+import type { AttendanceRecord } from '../../types';
 import { uniqueToast } from '../../utils/toastUtils';
 import {
   CheckCircleIcon,
@@ -210,7 +214,7 @@ interface MyAttendancePageProps {
 
 export const MyAttendancePage: React.FC<MyAttendancePageProps> = ({ onBack, isEmbedded = true }) => {
   const { user } = useAuth();
-  const [attendanceHistory, setAttendanceHistory] = useState<any[]>([]);
+  const [attendanceHistory, setAttendanceHistory] = useState<AttendanceRecord[]>([]);
   const [stats, setStats] = useState({
     presentDays: 0,
     attendanceRate: 0,
@@ -223,6 +227,8 @@ export const MyAttendancePage: React.FC<MyAttendancePageProps> = ({ onBack, isEm
   const [customDays, setCustomDays] = useState(7);
   const dataService = DataService.getInstance();
   const dailyAttendanceService = DailyAttendanceService.getInstance();
+  const attendanceService = AttendanceService.getInstance();
+  const ts = TimeService.getInstance();
 
   const fetchAttendanceStats = useCallback(async () => {
     if (!user) return;
@@ -234,13 +240,13 @@ export const MyAttendancePage: React.FC<MyAttendancePageProps> = ({ onBack, isEm
     try {
       await dataService.testConnection();
       const stats = await dailyAttendanceService.getAttendanceStats(user.uid, daysToCheck);
-      const history = await dailyAttendanceService.getRecentActivity(user.uid, daysToCheck);
+      const history = await attendanceService.getAttendanceHistory(user.uid, daysToCheck, user.hubId);
       setStats({
         presentDays: stats.presentDays,
         attendanceRate: Math.round(stats.attendanceRate),
         currentStreak: stats.currentStreak,
-        averageTime: '-', // Not available in stats
-        lateCheckIns: 0 // Not available in stats
+        averageTime: '-',
+        lateCheckIns: 0
       });
       setAttendanceHistory(history);
     } catch (error) {
@@ -264,13 +270,9 @@ export const MyAttendancePage: React.FC<MyAttendancePageProps> = ({ onBack, isEm
     };
   };
 
-  const formatTime = (date: Date | null) => {
-    if (!date) return '-';
-    return new Intl.DateTimeFormat('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true
-    }).format(date);
+  const formatTime = (date?: Date | null) => {
+    if (!date || !(date instanceof Date) || Number.isNaN(date.getTime())) return '—';
+    return ts.formatClockTime(date);
   };
 
   return (
@@ -373,7 +375,11 @@ export const MyAttendancePage: React.FC<MyAttendancePageProps> = ({ onBack, isEm
                     
                     <TimeDisplay>
                       <LogoutIcon size={14} />
-                      <span className="time">{formatTime(record.checkOutTime)}</span>
+                      <span className="time">
+                        {isStudentSelfCheckout(record)
+                          ? formatTime(record.checkOutTime)
+                          : '—'}
+                      </span>
                     </TimeDisplay>
                   </HistoryTimes>
                 </HistoryItem>
