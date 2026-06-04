@@ -11,18 +11,10 @@ import {
   staffMayAccessHubForWrite,
 } from '../../services/hubService';
 import { AdminHubScopeSelect } from './AdminHubScopeSelect';
-import { TimeService } from '../../services/timeService';
-import { AttendanceService } from '../../services/attendanceService';
-import { hasRecordedCheckout, isStaffCheckout, isStudentSelfCheckout } from '../../utils/attendanceCheckout';
 import { DeleteUserModal } from './DeleteUserModal';
 import { uniqueToast } from '../../utils/toastUtils';
-import {
-  PersonIcon,
-  CheckCircleIcon,
-  TodayIcon,
-  SearchIcon
-} from '../Common/Icons';
-import { FiAlertTriangle, FiLogOut } from 'react-icons/fi';
+import { PersonIcon, SearchIcon } from '../Common/Icons';
+import { FiAlertTriangle } from 'react-icons/fi';
 
 const PageContainer = styled.div`
   padding: ${theme.spacing.xl};
@@ -119,32 +111,15 @@ const HeaderTitle = styled.div`
 
 
 
-const StatusDot = styled.span<{ $isActive: boolean }>`
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  display: inline-block;
-  margin-right: ${theme.spacing.xs};
-  background: ${props => props.$isActive ? '#16a34a' : '#9ca3af'};
-  box-shadow: ${props => props.$isActive ? '0 0 6px rgba(34, 197, 94, 0.4)' : 'none'};
-`;
-
 const CardSection = styled.div`
   padding-top: ${theme.spacing.md};
   border-top: 1px solid ${theme.colors.gray100};
   margin-top: ${theme.spacing.md};
 `;
 
-const TimeCell = styled.span`
-  font-weight: ${theme.fontWeights.medium};
-  color: ${theme.colors.textPrimary};
-  font-variant-numeric: tabular-nums;
-  font-size: ${theme.fontSizes.sm};
-`;
-
 const TableRow = styled.div`
   display: grid;
-  grid-template-columns: minmax(180px, 2fr) minmax(100px, 1.2fr) 100px minmax(100px, 120px) minmax(88px, 1fr) minmax(88px, 1fr) minmax(160px,auto);
+  grid-template-columns: minmax(200px, 2fr) minmax(120px, 1.2fr) 100px minmax(100px, auto);
   gap: ${theme.spacing.md};
   padding: ${theme.spacing.md} ${theme.spacing.lg};
   border-bottom: 1px solid ${theme.colors.gray100};
@@ -176,7 +151,7 @@ const TableRow = styled.div`
   }
 `;
 
-const UserAvatar = styled.div<{ $isActive?: boolean }>`
+const UserAvatar = styled.div`
   width: 44px;
   height: 44px;
   border-radius: ${theme.borderRadius.full};
@@ -187,10 +162,6 @@ const UserAvatar = styled.div<{ $isActive?: boolean }>`
   color: ${theme.colors.white};
   font-weight: ${theme.fontWeights.semibold};
   font-size: ${theme.fontSizes.sm};
-  border: 2px solid ${props => props.$isActive ? '#16a34a' : 'transparent'};
-  box-shadow: ${props => props.$isActive ? '0 0 0 2px #dcfce7' : 'none'};
-  transition: all 0.3s ease;
-  position: relative;
   flex-shrink: 0;
 
   img {
@@ -252,7 +223,7 @@ const TableWrapper = styled.div`
 
 const TableHeader = styled.div`
   display: grid;
-  grid-template-columns: minmax(180px, 2fr) minmax(100px, 1.2fr) 100px minmax(100px, 120px) minmax(88px, 1fr) minmax(88px, 1fr) minmax(160px,auto);
+  grid-template-columns: minmax(200px, 2fr) minmax(120px, 1.2fr) 100px minmax(100px, auto);
   gap: ${theme.spacing.md};
   padding: ${theme.spacing.md} ${theme.spacing.lg};
   background: ${theme.colors.gray50};
@@ -319,30 +290,6 @@ const SearchInput = styled.input`
   }
 `;
 
-const MarkPresentButton = styled(Button)`
-  background: ${theme.colors.success};
-  border-color: ${theme.colors.success};
-  color: white;
-  padding: 8px 16px;
-  font-size: ${theme.fontSizes.sm};
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-width: 120px;
-  
-  &:hover {
-    background: #16a34a;
-    border-color: #16a34a;
-  }
-   
-  span {
-    display: inline !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-  }
-`;
-
 const ActionButtons = styled.div`
   display: flex;
   gap: ${theme.spacing.sm};
@@ -368,11 +315,6 @@ const AccessDeniedWrapper = styled.div`
 const PageHeading = styled.h1`
   margin: 0;
   line-height: 1.2;
-`;
-
-const SuccessButton = styled(Button)`
-  background-color: ${theme.colors.success};
-  border-color: ${theme.colors.success};
 `;
 
 const AlertBox = styled.div`
@@ -448,13 +390,6 @@ const MobileHeaderContent = styled.div`
   min-width: 0;
 `;
 
-const MobileHeaderRow = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: ${theme.spacing.sm};
-`;
-
 const MobileUserTitle = styled(UserNameHeading)`
   font-size: ${theme.fontSizes.base};
   font-weight: ${theme.fontWeights.bold};
@@ -514,10 +449,6 @@ const DangerOutlineButton = styled(Button)`
   color: #b91c1c;
 `;
 
-const MobileMarkPresentButton = styled(MarkPresentButton)`
-  flex: 1;
-`;
-
 const UserDetails = styled.div`
   min-width: 0;
   overflow: hidden;
@@ -573,59 +504,10 @@ const MobileUserHeader = styled.div`
   }
 `;
 
-const MobileTimesRow = styled.div`
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: ${theme.spacing.sm};
-  margin-bottom: ${theme.spacing.md};
-  padding: ${theme.spacing.sm} 0;
-  border-top: 1px solid ${theme.colors.gray100};
-  font-size: ${theme.fontSizes.sm};
-
-  @media (max-width: ${theme.breakpoints.mobile}) {
-    grid-template-columns: 1fr;
-    font-size: ${theme.fontSizes.xs};
-  }
-`;
-
-const MobileTimeBlock = styled.div`
-  strong {
-    display: block;
-    color: ${theme.colors.textSecondary};
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    margin-bottom: 4px;
-  }
-`;
-
-// MobileUserActions styled component removed (unused) to satisfy CI linting.
-
 const DesktopTable = styled.div`
   @media (max-width: ${theme.breakpoints.tablet}) {
     display: none;
   }
-`;
-
-const StatusBadge = styled.span<{ $isActive: boolean }>`
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-  padding: ${theme.spacing.xs} ${theme.spacing.sm};
-  border-radius: ${theme.borderRadius.full};
-  font-size: ${theme.fontSizes.xs};
-  font-weight: ${theme.fontWeights.medium};
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  
-  ${props => props.$isActive ? `
-    background: rgba(34, 197, 94, 0.1);
-    color: #16a34a;
-  ` : `
-    background: rgba(107, 114, 128, 0.1);
-    color: #6b7280;
-  `}
 `;
 
 const StatsGrid = styled.div`
@@ -698,25 +580,6 @@ const StatLabel = styled.div`
   }
 `;
 
-const StatsCaption = styled.p`
-  font-size: ${theme.fontSizes.xs};
-  color: ${theme.colors.textSecondary};
-  margin: 0 0 ${theme.spacing.md} 0;
-  line-height: 1.45;
-  max-width: 52rem;
-`;
-
-function toDateSafe(value: any): Date | null {
-  if (!value) return null;
-  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
-  if (typeof value?.toDate === 'function') {
-    const d = value.toDate();
-    return d instanceof Date && !Number.isNaN(d.getTime()) ? d : null;
-  }
-  const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? null : d;
-}
-
 interface UsersPageProps {
   onBack?: () => void;
   onChat?: (studentId: string, studentName: string, studentPhotoUrl?: string) => void;
@@ -728,96 +591,30 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
   const { user } = useAuth();
   const [adminHubFilter, setAdminHubFilter] = useState(() => initialStaffHubFilter(user));
   const effectiveHub = useMemo(() => effectiveStaffHubScope(user, adminHubFilter), [user, adminHubFilter]);
-  const hubScopeActive = Boolean(effectiveHub);
-  const canWriteSelectedHub =
-    user?.userType === 'admin' ||
-    (user?.userType === 'instructor' && Boolean(effectiveHub) && staffMayAccessHubForWrite(user, effectiveHub));
   const [users, setUsers] = useState<any[]>([]);
-  const [attendance, setAttendance] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [invalidUncommonLoading, setInvalidUncommonLoading] = useState(false);
-  const [checkoutAllLoading, setCheckoutAllLoading] = useState(false);
-  const [checkoutStudentId, setCheckoutStudentId] = useState<string | null>(null);
   const dataService = DataService.getInstance();
 
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
       await dataService.testConnection();
-
-      const [usersData, attendanceData] = await Promise.all([
-        dataService.getUsers(effectiveHub),
-        dataService.getAttendance(undefined, effectiveHub),
-      ]);
-
+      const usersData = await dataService.getUsers(effectiveHub);
       setUsers(usersData);
-      setAttendance(attendanceData);
     } catch (error) {
       console.error('Error loading data:', error);
       uniqueToast.error('Failed to load user data');
     } finally {
       setLoading(false);
     }
-  }, [dataService, effectiveHub, user?.userType]);
+  }, [dataService, effectiveHub]);
 
   useEffect(() => {
     void loadData();
   }, [loadData]);
 
-  const ts = TimeService.getInstance();
-  const formatAttTime = (value: any): string | null => {
-    const d = toDateSafe(value);
-    return d ? ts.formatClockTime(d) : null;
-  };
-
-  const attendanceRowMeta = (todayAttendance: any) => {
-    const checkInDate = toDateSafe(todayAttendance?.checkInTime);
-    const checkOutDate = toDateSafe(todayAttendance?.checkOutTime);
-    const record = {
-      checkOutTime: checkOutDate,
-      checkOutMethod: todayAttendance?.checkOutMethod,
-    };
-    const hasIn = !!checkInDate;
-    const checkedOut = hasRecordedCheckout(record);
-    const studentOut = isStudentSelfCheckout(record);
-    const staffOut = isStaffCheckout(record);
-    const isCheckedInNow = hasIn && !checkedOut;
-    const statusLabel = !hasIn
-      ? 'Not present'
-      : studentOut
-        ? 'Checked out'
-        : staffOut
-          ? 'Staff check-out'
-          : 'Checked in';
-    const checkInDisp = formatAttTime(checkInDate) ?? '—';
-    let checkOutDisp = '—';
-    if (studentOut) checkOutDisp = formatAttTime(checkOutDate) ?? '—';
-    else if (staffOut) checkOutDisp = `Staff ${formatAttTime(checkOutDate) ?? '—'}`;
-    return { hasIn, checkedOut, studentOut, staffOut, isCheckedInNow, statusLabel, checkInDisp, checkOutDisp };
-  };
-
-  const getTodayAttendance = (userId: string) => {
-    const today = ts.getCurrentDateString();
-    const matchesToday = (a: any) => {
-      const sid = a.studentId || a.userId;
-      if (sid !== userId) return false;
-      if (a.date) return a.date === today;
-      const ci = toDateSafe(a.checkInTime);
-      if (!ci) return false;
-      return ts.toHarareDateString(ci) === today;
-    };
-    const todays = attendance.filter(matchesToday);
-    if (todays.length === 0) return undefined;
-    return todays.sort((a, b) => {
-      const ta = toDateSafe(a.checkInTime)?.getTime() ?? 0;
-      const tb = toDateSafe(b.checkInTime)?.getTime() ?? 0;
-      return tb - ta;
-    })[0];
-  };
-
-  // getUserStats and formatTime were previously defined but unused helpers.
-  // They have been removed to keep CI linting happy.
   const getInitials = (name: string) => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase();
   };
@@ -866,70 +663,6 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
     setShowDeleteModal(true);
   };
 
-  const handleMarkPresent = async (studentId: string, studentName: string, targetHubId?: string) => {
-    if (user?.userType === 'instructor' && !staffMayAccessHubForWrite(user, targetHubId)) {
-      uniqueToast.error('You can only record attendance for students in your hub.');
-      return;
-    }
-    try {
-      // Use AttendanceService with skipTimeCheck=true to allow marking after deadline
-      const attendanceService = AttendanceService.getInstance();
-      await attendanceService.checkIn(
-        studentId,
-        studentName,
-        undefined,
-        undefined,
-        true,
-        user?.userType === 'instructor' ? 'instructor' : 'admin',
-        targetHubId
-      );
-      uniqueToast.success(`${studentName} marked as present!`);
-      // Refresh the attendance data
-      loadData();
-    } catch (error) {
-      console.error('Failed to mark present:', error);
-      uniqueToast.error(`Failed to mark ${studentName} as present`);
-    }
-  };
-
-  const handleUnmarkPresent = async (
-    studentId: string,
-    studentName: string,
-    targetHubId?: string
-  ) => {
-    if (user?.userType === 'instructor' && !staffMayAccessHubForWrite(user, targetHubId)) {
-      uniqueToast.error('You can only update attendance for students in your hub.');
-      return;
-    }
-    if (!window.confirm(`Unmark ${studentName} as present for today?`)) return;
-
-    try {
-      const today = ts.getCurrentDateString();
-      const removed = await AttendanceService.getInstance().unmarkPresentForDate(
-        studentId,
-        today,
-        targetHubId || effectiveHub
-      );
-      if (!removed) {
-        uniqueToast.info(`${studentName} has no present record for today.`);
-        return;
-      }
-
-      setAttendance((prev) =>
-        prev.filter((r: any) => {
-          const sid = r.studentId || r.userId;
-          const date = r.date || '';
-          return !(String(sid) === String(studentId) && String(date) === String(today));
-        })
-      );
-      uniqueToast.success(`${studentName} unmarked successfully.`);
-      void loadData();
-    } catch (error) {
-      console.error('Failed to unmark present:', error);
-      uniqueToast.error(`Failed to unmark ${studentName}.`);
-    }
-  };
-
   const handleCloseDelete = () => {
     setShowDeleteModal(false);
     setUserToDelete(null);
@@ -968,151 +701,18 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
     }
   };
 
-  const handleMarkAllPresent = async () => {
-    if (!hubScopeActive || !canWriteSelectedHub) {
-      uniqueToast.info(
-        user?.userType === 'instructor'
-          ? 'Select your assigned hub before using bulk actions.'
-          : 'Select a single hub so bulk actions apply to that hub only.'
-      );
-      return;
-    }
-    const absentStudents = users.filter(userData => {
-      if (userData.userType === 'admin' || userData.userType === 'instructor') return false;
-      const uid = userData.id || userData.uid;
-      const todayAttendance = getTodayAttendance(uid);
-      const isPresent =
-        todayAttendance &&
-        todayAttendance.checkInTime &&
-        !hasRecordedCheckout({
-          checkOutTime: toDateSafe(todayAttendance.checkOutTime),
-          checkOutMethod: todayAttendance.checkOutMethod,
-        });
-      return !isPresent;
-    });
-
-    if (absentStudents.length === 0) {
-      uniqueToast.info('All students are already marked as present.');
-      return;
-    }
-
-    if (!window.confirm(`Are you sure you want to mark all ${absentStudents.length} absent students as present?`)) {
-      return;
-    }
-
-    setLoading(true);
-    try {
-      // Use AttendanceService with skipTimeCheck=true to allow marking after deadline
-      const attendanceService = AttendanceService.getInstance();
-      const promises = absentStudents.map((student) =>
-        attendanceService.checkIn(
-          student.id || student.uid,
-          student.displayName || 'Unknown User',
-          undefined,
-          undefined,
-          true,
-          user?.userType === 'instructor' ? 'instructor' : 'admin',
-          student.hubId
-        )
-      );
-      await Promise.all(promises);
-      uniqueToast.success(`Marked ${absentStudents.length} students as present!`);
-      loadData();
-    } catch (error) {
-      console.error('Failed to mark all present:', error);
-      uniqueToast.error('Failed to mark all students as present');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleCheckOutStudent = async (
-    studentId: string,
-    studentName: string,
-    studentHubId?: string
-  ) => {
-    if (!hubScopeActive || !canWriteSelectedHub) {
-      uniqueToast.info('Select your hub before checking out students.');
-      return;
-    }
-    if (
-      !window.confirm(
-        `Check out ${studentName} for today? This records a staff check-out time (Harare).`
-      )
-    ) {
-      return;
-    }
-    setCheckoutStudentId(studentId);
-    try {
-      await AttendanceService.getInstance().checkOutAsStaff(studentId, studentHubId);
-      uniqueToast.success(`${studentName} checked out.`);
-      await loadData();
-    } catch (error: unknown) {
-      console.error('Staff check-out failed:', error);
-      const msg = error instanceof Error ? error.message : 'Failed to check out student.';
-      uniqueToast.error(msg);
-    } finally {
-      setCheckoutStudentId(null);
-    }
-  };
-
-  const handleCheckOutAllOpen = async () => {
-    if (!hubScopeActive || !canWriteSelectedHub) {
-      uniqueToast.info(
-        user?.userType === 'instructor'
-          ? 'Select your assigned hub before checking out students.'
-          : 'Select a single hub so check-out applies to that hub only.'
-      );
-      return;
-    }
-    if (checkoutAllLoading || loading) return;
-    if (
-      !window.confirm(
-        'Check out everyone still checked in today? Staff check-out times will be recorded (Harare).'
-      )
-    ) {
-      return;
-    }
-    setCheckoutAllLoading(true);
-    try {
-      const { checkedOut } = await AttendanceService.getInstance().checkOutAllOpenToday(effectiveHub);
-      uniqueToast.success(
-        checkedOut === 0 ? 'No open sessions to check out.' : `Checked out ${checkedOut} student(s).`
-      );
-      await loadData();
-    } catch (error) {
-      console.error('Failed to check out all:', error);
-      uniqueToast.error('Failed to check out everyone.');
-    } finally {
-      setCheckoutAllLoading(false);
-    }
-  };
-
-  const presentNowCount = attendees.filter(u => {
-    const uid = u.id || u.uid;
-    const t = getTodayAttendance(uid);
-    if (!t?.checkInTime) return false;
-    return !hasRecordedCheckout({
-      checkOutTime: toDateSafe(t.checkOutTime),
-      checkOutMethod: t.checkOutMethod,
-    });
-  }).length;
-  const checkedInTodayCount = attendees.filter(u => {
-    const uid = u.id || u.uid;
-    return !!getTodayAttendance(uid)?.checkInTime;
-  }).length;
   return (
     <PageContainer>
       <Header>
         <HeaderTitle>
           <PageHeading>Students</PageHeading>
           <p>
-          Manage students (attendees) for your hub. Staff accounts are on the Staff page in the sidebar. Check-in and check-out times use Africa/Harare (school time). Staff can check out students from this page; students can also check themselves out on their dashboard.
-          {(user?.userType === 'admin' || user?.userType === 'instructor') &&
-            ' Use Hub to view one location or all hubs (instructors: assigned hub only).'}
-          {user?.userType === 'instructor' &&
-            ' Instructors can edit students only in their own assigned hub.'}
-        </p>
+            Student roster and accounts — record check-in, check-out, and daily attendance on the Attendance page.
+            {(user?.userType === 'admin' || user?.userType === 'instructor') &&
+              ' Use Hub to view one location or all hubs (instructors: assigned hub only).'}
+            {user?.userType === 'instructor' &&
+              ' Instructors can remove students only in their assigned hub.'}
+          </p>
         </HeaderTitle>
         <HeaderActions>
           <AdminHubScopeSelect
@@ -1121,21 +721,6 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
             onChange={setAdminHubFilter}
             id="users-page-hub-filter"
           />
-          <SuccessButton
-            variant="primary"
-            onClick={handleMarkAllPresent}
-            disabled={!hubScopeActive || !canWriteSelectedHub || loading || checkoutAllLoading}
-          >
-            <CheckCircleIcon size={18} /> Mark All Present
-          </SuccessButton>
-          <Button
-            variant="outline"
-            onClick={handleCheckOutAllOpen}
-            disabled={!hubScopeActive || !canWriteSelectedHub || loading || checkoutAllLoading}
-          >
-            <FiLogOut size={18} style={{ marginRight: 8 }} />
-            {checkoutAllLoading ? 'Checking out…' : 'Check out everyone'}
-          </Button>
           <SearchWrap>
             <SearchIconAbsolute size={20} />
             <SearchInput
@@ -1156,26 +741,11 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
         </HeaderActions>
       </Header>
 
-      <StatsCaption>
-        Student totals match the list (attendees only). “Checked in today” includes anyone who checked in at least once today. “Currently present” means checked in and not checked out yet (by student or staff).
-      </StatsCaption>
       <StatsGrid>
         <StatCard>
           <StatIcon><PersonIcon size={32} /></StatIcon>
           <StatValue>{attendees.length}</StatValue>
-          <StatLabel>Students</StatLabel>
-        </StatCard>
-        
-        <StatCard>
-          <StatIcon><CheckCircleIcon size={32} /></StatIcon>
-          <StatValue>{presentNowCount}</StatValue>
-          <StatLabel>Currently Present</StatLabel>
-        </StatCard>
-        
-        <StatCard>
-          <StatIcon><TodayIcon size={32} /></StatIcon>
-          <StatValue>{checkedInTodayCount}</StatValue>
-          <StatLabel>Checked In Today</StatLabel>
+          <StatLabel>Students in roster</StatLabel>
         </StatCard>
       </StatsGrid>
 
@@ -1265,33 +835,20 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
             <UsersTable>
               <TableWrapper>
                 <TableHeader>
-                  <div>User Information</div>
+                  <div>User</div>
                   <div>Hub</div>
                   <div>Type</div>
-                  <div>Today</div>
-                  <div>Check-in</div>
-                  <div>Check-out</div>
                   <RightAlignedCell>Actions</RightAlignedCell>
                 </TableHeader>
-          
+
           {filteredAttendees.map((userData) => {
-            const uid = userData.id || userData.uid;
-            const todayAttendance = getTodayAttendance(uid);
-            const {
-              hasIn,
-              checkedOut,
-              isCheckedInNow,
-              statusLabel,
-              checkInDisp,
-              checkOutDisp,
-            } = attendanceRowMeta(todayAttendance);
-            const canWriteStudentHub =
-              user?.userType === 'admin' || staffMayAccessHubForWrite(user, userData.hubId);
+            const canDelete =
+              user?.userType === 'admin' || instructorCanDeleteStudent(userData);
 
             return (
               <TableRow key={userData.id}>
                 <UserInfo>
-                  <UserAvatar $isActive={!!isCheckedInNow}>
+                  <UserAvatar>
                     {userData.photoUrl ? (
                       <img src={userData.photoUrl} alt={userData.displayName} />
                     ) : (
@@ -1309,67 +866,19 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
                   </UserDetails>
                 </UserInfo>
 
-                <ValueTextSmall>
-                  {resolvedHubLabel(userData)}
-                </ValueTextSmall>
+                <ValueTextSmall>{resolvedHubLabel(userData)}</ValueTextSmall>
 
                 <div>
-                  <UserType type={userData.userType}>
-                    {userData.userType}
-                  </UserType>
-                </div>
-
-                <div>
-                  <StatusBadge $isActive={!!isCheckedInNow}>
-                    <StatusDot $isActive={!!isCheckedInNow} />
-                    {statusLabel}
-                  </StatusBadge>
-                </div>
-
-                <div>
-                  <TimeCell>{checkInDisp}</TimeCell>
-                </div>
-                <div>
-                  <TimeCell>{checkOutDisp}</TimeCell>
+                  <UserType type={userData.userType}>{userData.userType}</UserType>
                 </div>
 
                 <ActionButtonsEnd>
-                  {canWriteStudentHub && hasIn && !checkedOut && (
-                    <MarkPresentButton onClick={() => handleMarkPresent(uid, userData.displayName || 'Unknown User', userData.hubId)}>
-                      <CheckCircleIcon size={14} /> <span>Mark Present</span>
-                    </MarkPresentButton>
-                  )}
-                  {canWriteStudentHub && hasIn && !checkedOut && (
-                    <Button
-                      variant="outline"
-                      loading={checkoutStudentId === uid}
-                      disabled={checkoutAllLoading || checkoutStudentId === uid}
-                      onClick={() =>
-                        handleCheckOutStudent(
-                          uid,
-                          userData.displayName || 'Unknown User',
-                          userData.hubId
-                        )
-                      }
-                    >
-                      <FiLogOut size={14} /> Check out
-                    </Button>
-                  )}
-                  {canWriteStudentHub && hasIn && !checkedOut && (
-                    <Button
-                      variant="outline"
-                      onClick={() => handleUnmarkPresent(uid, userData.displayName || 'Unknown User', userData.hubId)}
-                    >
-                      Unmark
-                    </Button>
-                  )}
-                  {canWriteStudentHub && (user?.userType === 'admin' || instructorCanDeleteStudent(userData)) && (
+                  {canDelete ? (
                     <DeleteButton variant="ghost" onClick={() => handleOpenDelete(userData)}>
                       Delete
                     </DeleteButton>
-                  )}
-                  {!canWriteStudentHub && (
-                    <ValueTextSmall title="View only. Instructors can edit only their assigned hub.">
+                  ) : (
+                    <ValueTextSmall title="View only. Instructors can remove students only in their assigned hub.">
                       View only
                     </ValueTextSmall>
                   )}
@@ -1384,108 +893,47 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
           {/* Mobile Card Layout */}
           <FullWidthBlock>
             {filteredAttendees.map((userData) => {
-              const uid = userData.id || userData.uid;
-              const todayAttendance = getTodayAttendance(uid);
-              const {
-                hasIn,
-                checkedOut,
-                isCheckedInNow,
-                statusLabel,
-                checkInDisp,
-                checkOutDisp,
-              } = attendanceRowMeta(todayAttendance);
-              const canWriteStudentHub =
-                user?.userType === 'admin' || staffMayAccessHubForWrite(user, userData.hubId);
+              const canDelete =
+                user?.userType === 'admin' || instructorCanDeleteStudent(userData);
 
               return (
                 <MobileUserCard key={`mobile-${userData.id}`}>
                   <MobileUserHeader>
-                    <UserAvatar $isActive={!!isCheckedInNow}>
+                    <UserAvatar>
                       {userData.photoUrl ? (
-                        <img 
-                          src={userData.photoUrl} 
-                          alt={userData.displayName} 
-                        />
+                        <img src={userData.photoUrl} alt={userData.displayName} />
                       ) : (
                         getInitials(userData.displayName || 'Unknown')
                       )}
                     </UserAvatar>
                     <MobileHeaderContent>
-                      <MobileHeaderRow>
-                        <MobileUserTitle>
-                          <TableIcon>
-                            <PersonIcon size={14} />
-                          </TableIcon>
-                          {userData.displayName || 'Unknown User'}
-                        </MobileUserTitle>
-                        <StatusBadge $isActive={!!isCheckedInNow}>
-                          <StatusDot $isActive={!!isCheckedInNow} />
-                          {statusLabel}
-                        </StatusBadge>
-                      </MobileHeaderRow>
+                      <MobileUserTitle>
+                        <TableIcon>
+                          <PersonIcon size={14} />
+                        </TableIcon>
+                        {userData.displayName || 'Unknown User'}
+                      </MobileUserTitle>
                       <MobileSubText>{userData.email}</MobileSubText>
                       <MobileSubText>Hub: {resolvedHubLabel(userData)}</MobileSubText>
                     </MobileHeaderContent>
                   </MobileUserHeader>
-                  
+
                   <MobileUserDetailsSingle>
                     <div>
-                      <MobileMetaLabel>Type</MobileMetaLabel><br />
-                      <UserTypeItem type={userData.userType}>
-                        {userData.userType}
-                      </UserTypeItem>
+                      <MobileMetaLabel>Type</MobileMetaLabel>
+                      <br />
+                      <UserTypeItem type={userData.userType}>{userData.userType}</UserTypeItem>
                     </div>
                   </MobileUserDetailsSingle>
 
-                  <MobileTimesRow>
-                    <MobileTimeBlock>
-                      <strong>Check-in</strong>
-                      {checkInDisp}
-                    </MobileTimeBlock>
-                    <MobileTimeBlock>
-                      <strong>Check-out</strong>
-                      {checkOutDisp}
-                    </MobileTimeBlock>
-                  </MobileTimesRow>
-
                   <CardSection>
                     <ActionButtons>
-                      {canWriteStudentHub && hasIn && !checkedOut && (
-                        <MobileMarkPresentButton onClick={() => handleMarkPresent(uid, userData.displayName || 'Unknown User', userData.hubId)}>
-                          <CheckCircleIcon size={14} /> <span>Mark Present</span>
-                        </MobileMarkPresentButton>
-                      )}
-                      {canWriteStudentHub && hasIn && !checkedOut && (
-                        <Button
-                          variant="outline"
-                          loading={checkoutStudentId === uid}
-                          disabled={checkoutAllLoading || checkoutStudentId === uid}
-                          onClick={() =>
-                            handleCheckOutStudent(
-                              uid,
-                              userData.displayName || 'Unknown User',
-                              userData.hubId
-                            )
-                          }
-                        >
-                          <FiLogOut size={14} /> Check out
-                        </Button>
-                      )}
-                      {canWriteStudentHub && hasIn && !checkedOut && (
-                        <Button
-                          variant="outline"
-                          onClick={() => handleUnmarkPresent(uid, userData.displayName || 'Unknown User', userData.hubId)}
-                        >
-                          Unmark
-                        </Button>
-                      )}
-                      {canWriteStudentHub && (user?.userType === 'admin' || instructorCanDeleteStudent(userData)) && (
+                      {canDelete ? (
                         <DeleteButton variant="outline" size="sm" onClick={() => handleOpenDelete(userData)}>
-                          Delete
+                          Delete account
                         </DeleteButton>
-                      )}
-                      {!canWriteStudentHub && (
-                        <ValueTextSmall title="View only. Instructors can edit only their assigned hub.">
+                      ) : (
+                        <ValueTextSmall title="View only. Instructors can remove students only in their assigned hub.">
                           View only
                         </ValueTextSmall>
                       )}

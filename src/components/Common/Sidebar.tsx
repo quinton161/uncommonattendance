@@ -317,8 +317,8 @@ const SidebarInner: React.FC<SidebarProps> = ({ onClose }) => {
 
   const staffNav: NavItem[] = [
     { id: 'dashboard', path: '/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
-    { id: 'attendance', path: '/attendance', label: 'Attendance', icon: <QrCode size={18} /> },
-    { id: 'users', path: '/users', label: 'Students', icon: <Users size={18} /> },
+    { id: 'attendance', path: '/attendance', label: 'Check-in / check-out', icon: <QrCode size={18} /> },
+    { id: 'users', path: '/users', label: 'Roster & accounts', icon: <Users size={18} /> },
     { id: 'staff', path: '/staff', label: 'Staff', icon: <Shield size={18} /> },
     { id: 'goals', path: '/goals', label: 'Goals Board', icon: <Target size={18} /> },
     { id: 'events', path: '/events', label: 'Events', icon: <Calendar size={18} /> },

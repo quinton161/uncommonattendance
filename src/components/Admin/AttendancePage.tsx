@@ -16,11 +16,9 @@ import {
   buildAttendanceExportRows,
 } from '../../utils/attendanceCsv';
 import { AbsenceRecordModal } from './AbsenceRecordModal';
-import {
-  CheckCircleIcon,
-  TodayIcon,
-  LocationOnIcon
-} from '../Common/Icons';
+import { useStaffAttendanceActions } from '../../hooks/useStaffAttendanceActions';
+import { CheckCircleIcon, LocationOnIcon } from '../Common/Icons';
+import { FiLogOut } from 'react-icons/fi';
 
 function recordMatchesDate(a: any, dateStr: string, ts: TimeService): boolean {
   if (a.date === dateStr) return true;
@@ -293,96 +291,96 @@ const ActionButtonsContainer = styled.div`
   }
 `;
 
-const AttendanceTable = styled.div`
+const AttendanceTableWrap = styled.div`
   background: ${theme.colors.white};
   border-radius: ${theme.borderRadius.lg};
   box-shadow: ${theme.shadows.md};
   overflow: hidden;
-  
-  @media (max-width: ${theme.breakpoints.tablet}) {
-    box-shadow: none;
-    background: transparent;
-  }
 `;
 
-const TableHeader = styled.div`
-  display: grid;
-  grid-template-columns: 2fr minmax(100px, 1fr) 100px 110px 100px minmax(100px, 1fr) minmax(120px, 1.2fr) 130px;
-  gap: ${theme.spacing.md};
-  padding: ${theme.spacing.lg} ${theme.spacing.xl};
-  background: linear-gradient(135deg, ${theme.colors.primary}05 0%, ${theme.colors.primaryLight}10 100%);
-  border-bottom: 2px solid ${theme.colors.primary}20;
-  font-weight: ${theme.fontWeights.semibold};
-  color: ${theme.colors.textPrimary};
-  font-size: ${theme.fontSizes.sm};
+const TableScroll = styled.div`
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+`;
+
+const AttendanceTable = styled.table`
+  width: 100%;
+  min-width: 920px;
+  border-collapse: collapse;
+  table-layout: fixed;
+`;
+
+const Th = styled.th`
+  padding: ${theme.spacing.md} ${theme.spacing.lg};
+  text-align: left;
+  font-size: ${theme.fontSizes.xs};
+  font-weight: ${theme.fontWeights.bold};
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  
-  @media (max-width: ${theme.breakpoints.desktop}) {
-    grid-template-columns: 2fr minmax(72px, 1fr) 82px 82px 82px minmax(72px, 1fr) minmax(88px, 1fr) 100px;
-    gap: ${theme.spacing.sm};
-    padding: ${theme.spacing.md} ${theme.spacing.lg};
-    font-size: ${theme.fontSizes.xs};
+  color: ${theme.colors.textSecondary};
+  background: ${theme.colors.gray50};
+  border-bottom: 2px solid ${theme.colors.gray200};
+  vertical-align: middle;
+`;
+
+const Td = styled.td`
+  padding: ${theme.spacing.md} ${theme.spacing.lg};
+  border-bottom: 1px solid ${theme.colors.gray100};
+  vertical-align: middle;
+  font-size: ${theme.fontSizes.sm};
+  color: ${theme.colors.textPrimary};
+`;
+
+const BodyRow = styled.tr`
+  &:hover td {
+    background: ${theme.colors.gray50};
   }
-  
-  @media (max-width: ${theme.breakpoints.tablet}) {
-    display: none;
+
+  &:last-child td {
+    border-bottom: none;
   }
 `;
 
-const TableRow = styled.div`
-  display: grid;
-  grid-template-columns: 2fr minmax(100px, 1fr) 100px 110px 100px minmax(100px, 1fr) minmax(120px, 1.2fr) 130px;
-  gap: ${theme.spacing.md};
-  padding: ${theme.spacing.lg} ${theme.spacing.xl};
-  border-bottom: 1px solid ${theme.colors.gray100};
-  transition: all 0.2s ease;
-  align-items: center;
-  
+const TimeCell = styled.span`
+  display: block;
+  font-variant-numeric: tabular-nums;
+  font-size: ${theme.fontSizes.sm};
+  color: ${theme.colors.textPrimary};
+  font-weight: ${theme.fontWeights.medium};
+`;
+
+const SuccessButton = styled(Button)`
+  background-color: ${theme.colors.success};
+  border-color: ${theme.colors.success};
+`;
+
+const ActionTd = styled(Td)`
+  text-align: right;
+  width: 128px;
+`;
+
+const StatusSubtext = styled.div`
+  margin-top: 4px;
+  font-size: ${theme.fontSizes.xs};
+  color: ${theme.colors.textSecondary};
+  font-weight: ${theme.fontWeights.normal};
+  text-transform: none;
+  letter-spacing: normal;
+  line-height: 1.35;
+`;
+
+const AbsenceLink = styled.button`
+  margin-top: 4px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: ${theme.colors.primary};
+  font-size: ${theme.fontSizes.xs};
+  cursor: pointer;
+  text-decoration: underline;
+
   &:hover {
-    background: linear-gradient(135deg, ${theme.colors.primary}02 0%, ${theme.colors.primaryLight}05 100%);
-    transform: translateY(-1px);
-    box-shadow: 0 2px 8px ${theme.colors.primary}10;
-  }
-  
-  &:last-child {
-    border-bottom: none;
-  }
-  
-  @media (max-width: ${theme.breakpoints.desktop}) {
-    grid-template-columns: 2fr minmax(72px, 1fr) 82px 82px 82px minmax(72px, 1fr) minmax(88px, 1fr) 100px;
-    gap: ${theme.spacing.sm};
-    padding: ${theme.spacing.md} ${theme.spacing.lg};
-  }
-  
-  @media (max-width: ${theme.breakpoints.tablet}) {
-    display: block;
-    background: ${theme.colors.white};
-    border-radius: ${theme.borderRadius.lg};
-    box-shadow: ${theme.shadows.sm};
-    margin-bottom: ${theme.spacing.md};
-    padding: ${theme.spacing.lg};
-    border-bottom: none;
-    
-    &:hover {
-      transform: translateY(-2px);
-      box-shadow: ${theme.shadows.md};
-    }
-  }
-  
-  @media (max-width: ${theme.breakpoints.mobile}) {
-    padding: ${theme.spacing.md};
-    margin-bottom: ${theme.spacing.sm};
-  }
-  
-  @media (max-width: 420px) {
-    padding: ${theme.spacing.sm};
-    margin-bottom: ${theme.spacing.xs};
-    border-radius: ${theme.borderRadius.md};
-  }
-  
-  @media (max-width: 360px) {
-    padding: ${theme.spacing.xs};
+    color: ${theme.colors.primaryDark};
   }
 `;
 
@@ -445,40 +443,22 @@ const StudentAvatar = styled.div`
 const StudentDetails = styled.div`
   min-width: 0;
   flex: 1;
-  
+
   h4 {
-    margin: 0 0 ${theme.spacing.xs} 0;
+    margin: 0 0 2px 0;
     font-size: ${theme.fontSizes.base};
     font-weight: ${theme.fontWeights.semibold};
     color: ${theme.colors.textPrimary};
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    line-height: 1.3;
+    word-break: break-word;
   }
-  
+
   p {
     margin: 0;
     font-size: ${theme.fontSizes.sm};
     color: ${theme.colors.textSecondary};
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  
-  @media (max-width: ${theme.breakpoints.tablet}) {
-    h4 {
-      font-size: ${theme.fontSizes.lg};
-      white-space: normal;
-      overflow: visible;
-      text-overflow: unset;
-    }
-    
-    p {
-      font-size: ${theme.fontSizes.base};
-      white-space: normal;
-      overflow: visible;
-      text-overflow: unset;
-    }
+    line-height: 1.35;
+    word-break: break-word;
   }
 `;
 
@@ -493,32 +473,6 @@ const ProfileIssueTag = styled.span`
   font-size: ${theme.fontSizes.xs};
   font-weight: ${theme.fontWeights.semibold};
   vertical-align: middle;
-`;
-
-const DateDisplay = styled.div`
-  font-size: ${theme.fontSizes.sm};
-  color: ${theme.colors.textSecondary};
-  display: flex;
-  align-items: center;
-  gap: ${theme.spacing.xs};
-  
-  .date {
-    font-weight: ${theme.fontWeights.semibold};
-    color: ${theme.colors.textPrimary};
-  }
-  
-  @media (max-width: ${theme.breakpoints.tablet}) {
-    font-size: ${theme.fontSizes.base};
-    margin-bottom: ${theme.spacing.xs};
-    
-    &:before {
-      content: 'Date:';
-      font-weight: ${theme.fontWeights.medium};
-      color: ${theme.colors.textSecondary};
-      margin-right: ${theme.spacing.sm};
-      min-width: 80px;
-    }
-  }
 `;
 
 const StatusBadge = styled.div<{ status: 'present' | 'late' | 'absent' | 'completed' }>`
@@ -578,122 +532,15 @@ const StatusBadge = styled.div<{ status: 'present' | 'late' | 'absent' | 'comple
 // NOTE: TimeInfo and LocationInfo were previously defined styled components
 // that are no longer used. They have been removed to satisfy CI lint rules.
 
-const MobileDataGrid = styled.div`
-  display: none;
-  
-  @media (max-width: ${theme.breakpoints.tablet}) {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: ${theme.spacing.md};
-    margin-top: ${theme.spacing.md};
-  }
-`;
-
-const MobileDataItem = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: ${theme.spacing.xs};
-`;
-
-const InfoNote = styled.div`
-  text-align: center;
-  color: ${theme.colors.textSecondary};
-  font-size: ${theme.fontSizes.sm};
-  font-style: italic;
-  padding: ${theme.spacing.sm};
-  background: ${theme.colors.gray50};
-  border-radius: ${theme.borderRadius.md};
-`;
-
-const MetaCell = styled.div`
-  font-size: ${theme.fontSizes.sm};
-  color: ${theme.colors.textPrimary};
-  min-width: 0;
+const HubCell = styled.span`
+  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-
-  @media (max-width: ${theme.breakpoints.tablet}) {
-    white-space: normal;
-    word-break: break-word;
-  }
 `;
 
-const ActionButtons = styled.div`
-  display: flex;
-  gap: ${theme.spacing.sm};
-  align-items: center;
-  justify-content: flex-end;
-  
-  @media (max-width: ${theme.breakpoints.tablet}) {
-    justify-content: flex-start;
-    margin-top: ${theme.spacing.md};
-    padding-top: ${theme.spacing.md};
-    border-top: 1px solid ${theme.colors.gray100};
-  }
-  
-  @media (max-width: 420px) {
-    flex-direction: column;
-    align-items: stretch;
-    gap: ${theme.spacing.xs};
-    margin-top: ${theme.spacing.sm};
-    padding-top: ${theme.spacing.sm};
-  }
-`;
-
-const ActionButton = styled.button<{ variant: 'edit' | 'delete' }>`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: ${theme.spacing.xs};
-  padding: ${theme.spacing.sm} ${theme.spacing.md};
-  border: 1px solid;
-  border-radius: ${theme.borderRadius.md};
-  background: ${theme.colors.white};
-  font-size: ${theme.fontSizes.sm};
-  font-weight: ${theme.fontWeights.medium};
-  cursor: pointer;
-  transition: all 0.2s ease;
-  min-height: 36px;
-  
-  ${props => props.variant === 'edit' ? `
-    color: ${theme.colors.primary};
-    border-color: ${theme.colors.primary}20;
-    
-    &:hover {
-      background: ${theme.colors.primary}05;
-      border-color: ${theme.colors.primary}40;
-      transform: translateY(-1px);
-    }
-  ` : `
-    color: #dc2626;
-    border-color: rgba(239, 68, 68, 0.2);
-    
-    &:hover {
-      background: rgba(239, 68, 68, 0.05);
-      border-color: rgba(239, 68, 68, 0.4);
-      transform: translateY(-1px);
-    }
-  `}
-  
-  @media (max-width: ${theme.breakpoints.tablet}) {
-    padding: ${theme.spacing.md} ${theme.spacing.lg};
-    font-size: ${theme.fontSizes.base};
-    min-height: 44px;
-  }
-  
-  @media (max-width: 420px) {
-    padding: ${theme.spacing.lg};
-    font-size: ${theme.fontSizes.lg};
-    min-height: 48px;
-    font-weight: ${theme.fontWeights.semibold};
-  }
-  
-  @media (max-width: 360px) {
-    padding: ${theme.spacing.xl} ${theme.spacing.lg};
-    font-size: ${theme.fontSizes.xl};
-    min-height: 52px;
-  }
+const RowActionButton = styled(Button)`
+  min-width: 108px;
 `;
 
 const LoadingState = styled.div`
@@ -725,6 +572,12 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
   const { user } = useAuth();
   const [adminHubFilter, setAdminHubFilter] = useState(() => initialStaffHubFilter(user));
   const effectiveHub = useMemo(() => effectiveStaffHubScope(user, adminHubFilter), [user, adminHubFilter]);
+  const hubScopeActive = Boolean(effectiveHub);
+  const canWriteSelectedHub =
+    user?.userType === 'admin' ||
+    (user?.userType === 'instructor' &&
+      Boolean(effectiveHub) &&
+      staffMayAccessHubForWrite(user, effectiveHub));
   const [attendanceSummary, setAttendanceSummary] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const timeService = TimeService.getInstance();
@@ -775,7 +628,23 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
 
     // For non-today dates, do a one-time fetch.
     loadAttendanceSummary();
-  }, [selectedDate, loadAttendanceSummary, effectiveHub]);
+  }, [selectedDate, loadAttendanceSummary, effectiveHub, timeService]);
+
+  const refreshAttendance = useCallback(async () => {
+    const summary = await dataService.getDailyAttendanceSummary(selectedDate, effectiveHub);
+    setAttendanceSummary(summary);
+  }, [dataService, selectedDate, effectiveHub]);
+
+  const staffActions = useStaffAttendanceActions({
+    user,
+    effectiveHub,
+    hubScopeActive,
+    canWriteSelectedHub,
+    onRefresh: refreshAttendance,
+    attendanceList: attendanceSummary?.attendanceList,
+  });
+
+  const isToday = selectedDate === timeService.getCurrentDateString();
 
   const getFilteredAttendance = () => {
     if (!attendanceSummary) return [];
@@ -888,22 +757,6 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
     }
   };
 
-  const handleDeleteAttendance = async (record: any) => {
-    if (window.confirm(`Are you sure you want to delete the attendance record for ${record.userName} on ${selectedDate}?`)) {
-      try {
-        // TODO: Implement actual delete functionality
-        console.log('Delete attendance record:', record);
-        // TODO: Toast removed for CI build. success(`Attendance record for ${record.userName} deleted successfully!`, { autoClose: 3000 });
-        
-        // Reload the attendance data
-        await loadAttendanceSummary();
-      } catch (error) {
-        console.error('Error deleting attendance record:', error);
-        // TODO: Toast removed for CI build. error('Failed to delete attendance record. Please try again.', { autoClose: 4000 });
-      }
-    }
-  };
-
   if (user?.userType !== 'admin' && user?.userType !== 'instructor') {
     return (
       <PageContainer>
@@ -931,7 +784,10 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
             margin: 0 
           }}>
             Attendance Records</h1>
-          <p>View and manage all attendance records</p>
+          <p>
+            Check-in and check-out for the selected date (Africa/Harare). Staff can mark present after the
+            student window closes.
+          </p>
         </HeaderTitle>
         {onBack && (
           <Button variant="outline" onClick={onBack}>
@@ -994,6 +850,37 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
       </FilterSection>
       
       <ActionButtonsContainer>
+        {isToday && (
+          <>
+            <SuccessButton
+              variant="primary"
+              onClick={() => void staffActions.markAllPresent()}
+              disabled={
+                !hubScopeActive ||
+                !canWriteSelectedHub ||
+                loading ||
+                staffActions.checkoutAllLoading ||
+                staffActions.bulkLoading
+              }
+            >
+              <CheckCircleIcon size={18} /> Check in all
+            </SuccessButton>
+            <Button
+              variant="outline"
+              onClick={() => void staffActions.checkOutAllOpen()}
+              disabled={
+                !hubScopeActive ||
+                !canWriteSelectedHub ||
+                loading ||
+                staffActions.checkoutAllLoading ||
+                staffActions.bulkLoading
+              }
+            >
+              <FiLogOut size={18} style={{ marginRight: 8 }} />
+              {staffActions.checkoutAllLoading ? 'Checking out…' : 'Check out everyone'}
+            </Button>
+          </>
+        )}
         <Button variant="outline" onClick={() => { setSelectedDate(''); setStatusFilter('all'); setSearchQuery(''); }}>
           Clear Filters
         </Button>
@@ -1026,146 +913,137 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
           <p>No attendance records match your current filters.</p>
         </EmptyState>
       ) : (
-        <AttendanceTable>
-          <TableHeader>
-            <div>Student</div>
-            <div>Hub</div>
-            <div>Date</div>
-            <div>Status</div>
-            <div>Absence</div>
-            <div>Notes</div>
-            <div>Late reason</div>
-            <div>Actions</div>
-          </TableHeader>
-          
-          {getFilteredAttendance().map((record) => (
-              <TableRow key={record.userId}>
-                <StudentInfo>
-                  <StudentAvatar>
-                    {getInitials(record.userName || 'Unknown')}
-                  </StudentAvatar>
-                  <StudentDetails>
-                    <h4>
-                      {record.userName || 'Unknown Student'}
-                      {(record as any).profileMissing && (
-                        <ProfileIssueTag title="This attendance row could not be linked to a valid student profile.">
-                          Profile issue
-                        </ProfileIssueTag>
-                      )}
-                    </h4>
-                    <p>{record.userEmail}</p>
-                  </StudentDetails>
-                </StudentInfo>
-
-                <MetaCell
-                  title={resolvedHubLabel({
+        <AttendanceTableWrap>
+          <TableScroll>
+            <AttendanceTable>
+              <colgroup>
+                <col style={{ width: '30%' }} />
+                <col style={{ width: '14%' }} />
+                <col style={{ width: '16%' }} />
+                <col style={{ width: '11%' }} />
+                <col style={{ width: '13%' }} />
+                <col style={{ width: '16%' }} />
+              </colgroup>
+              <thead>
+                <tr>
+                  <Th>Student</Th>
+                  <Th>Hub</Th>
+                  <Th>Status</Th>
+                  <Th>Check-in</Th>
+                  <Th>Check-out</Th>
+                  <Th style={{ textAlign: 'right' }}>Action</Th>
+                </tr>
+              </thead>
+              <tbody>
+                {getFilteredAttendance().map((record) => {
+                  const meta = staffActions.rowMeta(record);
+                  const canWriteRow =
+                    user?.userType === 'admin' ||
+                    (user?.userType === 'instructor' && staffMayAccessHubForWrite(user, record.hubId));
+                  const studentId = record.userId;
+                  const studentName = record.userName || 'Unknown Student';
+                  const hubLabel = resolvedHubLabel({
                     hubId: (record as any).hubId,
                     hubName: (record as any).hubName,
-                  })}
-                >
-                  {resolvedHubLabel({
-                    hubId: (record as any).hubId,
-                    hubName: (record as any).hubName,
-                  })}
-                </MetaCell>
-                
-                <DateDisplay>
-                  <TodayIcon size={14} />
-                  <span className="date">{selectedDate}</span>
-                </DateDisplay>
-                
-                <div>
-                  <StatusBadge status={record.status}>
-                    <CheckCircleIcon size={12} />
-                    {record.status === 'completed' ? 'present' : record.status}
-                    {(record.status === 'late' || record.isLate) && (
-                      <span style={{ color: '#f59e0b', marginLeft: '4px' }}>(Late)</span>
-                    )}
-                  </StatusBadge>
-                </div>
+                  });
+                  const statusKey =
+                    record.status === 'completed' ? 'completed' : record.status;
 
-                <MetaCell title={record.status === 'absent' ? absenceReasonLabel(record.absenceReason) : undefined}>
-                  {record.status === 'absent' ? absenceReasonLabel(record.absenceReason) : '—'}
-                </MetaCell>
-                <MetaCell title={record.absenceNotes || undefined}>
-                  {record.absenceNotes ? record.absenceNotes : '—'}
-                </MetaCell>
-                <MetaCell title={record.lateReason || undefined}>
-                  {record.status !== 'absent' && (record.status === 'late' || record.isLate) && record.lateReason
-                    ? record.lateReason
-                    : '—'}
-                </MetaCell>
-                
-                <ActionButtons>
-                  {(user?.userType === 'admin' ||
-                    (user?.userType === 'instructor' && staffMayAccessHubForWrite(user, record.hubId))) &&
-                    record.status === 'absent' && (
-                      <ActionButton
-                        variant="edit"
-                        onClick={() => handleOpenAbsenceModal(record)}
-                        title={record.absenceReason ? 'Edit absence reason' : 'Record absence reason'}
-                      >
-                        {record.absenceReason ? 'Edit absence' : 'Record absence'}
-                      </ActionButton>
-                    )}
-                  {user?.userType === 'admin' && (
-                    <ActionButton
-                      variant="delete"
-                      onClick={() => handleDeleteAttendance(record)}
-                      title="Delete attendance record"
-                    >
-                      Delete
-                    </ActionButton>
-                  )}
-                </ActionButtons>
-                
-                {/* Mobile-only organized layout */}
-                <MobileDataGrid>
-                  <MobileDataItem>
-                    <DateDisplay>
-                      <TodayIcon size={16} />
-                      <span className="date">{selectedDate}</span>
-                    </DateDisplay>
-                    <div>
-                      <StatusBadge status={record.status}>
-                        <CheckCircleIcon size={12} />
-                        {record.status === 'completed' ? 'present' : record.status}
-                        {(record.status === 'late' || record.isLate) && (
-                          <span style={{ color: '#f59e0b', marginLeft: '4px' }}>(Late)</span>
+                  return (
+                    <BodyRow key={record.userId}>
+                      <Td>
+                        <StudentInfo>
+                          <StudentAvatar>
+                            {getInitials(record.userName || 'Unknown')}
+                          </StudentAvatar>
+                          <StudentDetails>
+                            <h4>
+                              {record.userName || 'Unknown Student'}
+                              {(record as any).profileMissing && (
+                                <ProfileIssueTag title="This attendance row could not be linked to a valid student profile.">
+                                  Profile issue
+                                </ProfileIssueTag>
+                              )}
+                            </h4>
+                            <p>{record.userEmail}</p>
+                          </StudentDetails>
+                        </StudentInfo>
+                      </Td>
+                      <Td title={hubLabel}>
+                        <HubCell>{hubLabel}</HubCell>
+                      </Td>
+                      <Td>
+                        <StatusBadge status={statusKey}>
+                          <CheckCircleIcon size={12} />
+                          {record.status === 'completed' ? 'present' : record.status}
+                        </StatusBadge>
+                        {record.status === 'absent' && (
+                          <StatusSubtext>
+                            {absenceReasonLabel(record.absenceReason)}
+                            {record.absenceNotes ? ` — ${record.absenceNotes}` : ''}
+                            {canWriteRow && (
+                              <>
+                                <br />
+                                <AbsenceLink type="button" onClick={() => handleOpenAbsenceModal(record)}>
+                                  {record.absenceReason ? 'Edit absence' : 'Record absence'}
+                                </AbsenceLink>
+                              </>
+                            )}
+                          </StatusSubtext>
                         )}
-                      </StatusBadge>
-                    </div>
-                  </MobileDataItem>
-                  
-                  <MobileDataItem>
-                    {record.status === 'absent' ? (
-                      <>
-                        <MetaCell style={{ fontSize: theme.fontSizes.xs, color: theme.colors.textSecondary }}>
-                          Absence: {absenceReasonLabel(record.absenceReason)}
-                        </MetaCell>
-                        {record.absenceNotes && (
-                          <MetaCell style={{ fontSize: theme.fontSizes.xs, marginTop: theme.spacing.xs }}>
-                            Notes: {record.absenceNotes}
-                          </MetaCell>
+                        {(record.status === 'late' || record.isLate) && record.lateReason && (
+                          <StatusSubtext title={record.lateReason}>Late: {record.lateReason}</StatusSubtext>
                         )}
-                      </>
-                    ) : record.status === 'late' || record.isLate ? (
-                      <MetaCell
-                        style={{ fontSize: theme.fontSizes.xs, color: theme.colors.textSecondary }}
-                        title={record.lateReason || undefined}
-                      >
-                        {record.lateReason ? <>Late reason: {record.lateReason}</> : '—'}
-                      </MetaCell>
-                    ) : (
-                      <InfoNote>
-                        Check-in/out times available in Daily Tracker
-                      </InfoNote>
-                    )}
-                  </MobileDataItem>
-                </MobileDataGrid>
-              </TableRow>
-            ))}
-        </AttendanceTable>
+                      </Td>
+                      <Td>
+                        <TimeCell>{meta.checkInDisp}</TimeCell>
+                      </Td>
+                      <Td>
+                        <TimeCell>{meta.checkOutDisp}</TimeCell>
+                      </Td>
+                      <ActionTd>
+                        {canWriteRow && isToday && !meta.hasIn && (
+                          <RowActionButton
+                            variant="primary"
+                            size="sm"
+                            onClick={() =>
+                              void staffActions.markPresent(studentId, studentName, record.hubId)
+                            }
+                          >
+                            Check in
+                          </RowActionButton>
+                        )}
+                        {canWriteRow && isToday && meta.hasIn && !meta.checkedOut && (
+                          <RowActionButton
+                            variant="outline"
+                            size="sm"
+                            loading={staffActions.checkoutStudentId === studentId}
+                            disabled={staffActions.checkoutAllLoading}
+                            onClick={() =>
+                              void staffActions.checkOutStudent(studentId, studentName, record.hubId)
+                            }
+                          >
+                            <FiLogOut size={14} /> Check out
+                          </RowActionButton>
+                        )}
+                        {canWriteRow && isToday && meta.hasIn && meta.checkedOut && (
+                          <TimeCell style={{ color: theme.colors.textSecondary, fontWeight: 400 }}>
+                            Done
+                          </TimeCell>
+                        )}
+                        {(!canWriteRow || !isToday) && (
+                          <TimeCell style={{ color: theme.colors.textSecondary, fontWeight: 400 }}>
+                            —
+                          </TimeCell>
+                        )}
+                      </ActionTd>
+                    </BodyRow>
+                  );
+                })}
+              </tbody>
+            </AttendanceTable>
+          </TableScroll>
+        </AttendanceTableWrap>
       )}
       {absenceModal && user && (
         <AbsenceRecordModal
@@ -1180,7 +1058,7 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
           initialReason={absenceModal.initialReason}
           initialNotes={absenceModal.initialNotes}
           onSaved={() => {
-            void loadAttendanceSummary();
+            void refreshAttendance();
           }}
         />
       )}
