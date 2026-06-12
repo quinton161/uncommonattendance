@@ -15,6 +15,7 @@ import {
 } from 'firebase/auth';
 import { doc, setDoc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../services/firebase';
+import { preparePasswordResetCallable } from '../services/passwordResetPrep';
 import { User, AuthContextType, HubSelection } from '../types';
 import { uniqueToast } from '../utils/toastUtils';
 import { getFirebaseAuthErrorMessage } from '../utils/firebaseAuthErrors';
@@ -622,11 +623,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // ── resetPassword ─────────────────────────────────────────────────────────────
   const resetPassword = async (email: string) => {
+    const trimmed = email.trim();
+    if (!trimmed) {
+      throw Object.assign(new Error('Enter your email address.'), { code: 'auth/invalid-email' });
+    }
+
+    await preparePasswordResetCallable(trimmed);
+
     const origin = typeof window !== 'undefined' ? window.location.origin : '';
-    await sendPasswordResetEmail(auth, email.trim(), {
-      url: `${origin}/reset-password`,
-      handleCodeInApp: true,
-    });
+    const actionCodeSettings = origin
+      ? { url: `${origin}/reset-password`, handleCodeInApp: false as const }
+      : undefined;
+    await sendPasswordResetEmail(auth, trimmed, actionCodeSettings);
   };
 
   // ── deleteAccount ─────────────────────────────────────────────────────────────

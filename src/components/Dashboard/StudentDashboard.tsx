@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { AttendanceService } from '../../services/attendanceService';
 import { effectiveStudentHubId } from '../../services/hubService';
@@ -12,6 +12,7 @@ import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
 import type { AttendanceRecord, LocationData } from '../../types';
 import { Button } from '../Common/Button';
 import { StudentPresenceBadge } from '../Recognition/StudentPresenceBadge';
+import TimeSyncStatus from '../Common/TimeSyncStatus';
 
 const AttSvc = AttendanceService.getInstance();
 
@@ -26,7 +27,30 @@ export function StudentDashboard(): React.ReactElement {
   const [checkInGoalModalOpen, setCheckInGoalModalOpen] = useState(false);
   const [checkInGoalInitial, setCheckInGoalInitial] = useState('');
   const [lateReasonPendingForGoal, setLateReasonPendingForGoal] = useState<string | null>(null);
+  const [harareClock, setHarareClock] = useState('');
+  const [checkInWindowHint, setCheckInWindowHint] = useState('');
   useBodyScrollLock(lateReasonModalOpen || checkInGoalModalOpen);
+
+  const refreshHarareClock = useCallback(() => {
+    const ts = TimeService.getInstance();
+    const now = ts.getCurrentTime();
+    setHarareClock(ts.formatClockTime(now));
+    if (ts.isBeforeSessionStart(now)) {
+      setCheckInWindowHint('Check-in opens at 7:00 AM (Harare school time).');
+    } else if (ts.isTooLateToCheckIn(now)) {
+      setCheckInWindowHint('Check-in closed after 9:05 AM (Harare). Ask your instructor.');
+    } else if (!ts.canCheckIn(now)) {
+      setCheckInWindowHint('Check-in window: 7:00–9:05 AM Harare.');
+    } else {
+      setCheckInWindowHint('');
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshHarareClock();
+    const id = window.setInterval(refreshHarareClock, 30_000);
+    return () => window.clearInterval(id);
+  }, [refreshHarareClock]);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -167,8 +191,26 @@ export function StudentDashboard(): React.ReactElement {
     if (!window.confirm('Check in for today? Your attendance will be recorded for your hub.')) {
       return;
     }
+
     const ts = TimeService.getInstance();
-    if (ts.isLate(ts.getCurrentTime())) {
+    await ts.forceSync();
+    const now = ts.getCurrentTime();
+    const late = ts.isLate(now);
+
+    if (ts.isBeforeSessionStart(now)) {
+      setError('Check-in opens at 7:00 AM Harare school time.');
+      return;
+    }
+    if (ts.isTooLateToCheckIn(now)) {
+      setError('Check-in closed after 9:05 AM Harare. Ask your instructor.');
+      return;
+    }
+    if (!ts.canCheckIn(now)) {
+      setError('Check-in is only available 7:00–9:05 AM Harare.');
+      return;
+    }
+
+    if (late) {
       setLateReasonModalOpen(true);
       return;
     }
@@ -314,13 +356,14 @@ export function StudentDashboard(): React.ReactElement {
             </div>
           )}
           <p className="mt-1 text-sm text-blue-100">
-            {new Date().toLocaleDateString('en-US', {
-              weekday: 'long',
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric',
-            })}
+            {ts.formatDate(ts.getCurrentTime())}
           </p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white">
+              School time: {harareClock || ts.formatClockTime(ts.getCurrentTime())} (Harare)
+            </span>
+            <TimeSyncStatus />
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -364,6 +407,15 @@ export function StudentDashboard(): React.ReactElement {
               </h3>
 
               <div className="my-4 w-full rounded-2xl bg-[#F8FAFF] p-3 text-left text-sm text-gray-500">
+                <div className="mb-2 flex items-center justify-between gap-3 border-b border-gray-100 pb-2 text-xs">
+                  <span>Harare time</span>
+                  <span className="font-semibold text-gray-800">
+                    {harareClock || ts.formatClockTime(ts.getCurrentTime())}
+                  </span>
+                </div>
+                {checkInWindowHint ? (
+                  <p className="mb-2 text-xs font-medium text-amber-700">{checkInWindowHint}</p>
+                ) : null}
                 <div className="flex items-center justify-between gap-3">
                   <span>Check-in</span>
                   <span className="font-semibold text-gray-800">

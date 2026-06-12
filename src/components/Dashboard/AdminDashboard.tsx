@@ -55,16 +55,22 @@ export const AdminDashboard: React.FC = () => {
         unsubRef.current = null;
       }
 
-      // QR code
+      // QR code — staff only (students cannot write system_config)
       try {
-        let qr = await qrCodeService.getDailyCode();
-        if (!qr) {
-          await qrCodeService.generateDailyCode();
-          qr = await qrCodeService.getDailyCode();
-        }
+        const qr = await qrCodeService.ensureTodayCode(true);
         setQrCode(qr ?? null);
-      } catch {
+        if (!qr) {
+          toast.warn('Could not load today\'s check-in code. Tap Generate Code.');
+        }
+      } catch (err: unknown) {
         setQrCode(null);
+        const code =
+          err && typeof err === 'object' && 'code' in err ? String((err as { code?: string }).code) : '';
+        toast.error(
+          code === 'permission-denied'
+            ? 'No permission to create today\'s check-in code.'
+            : 'Failed to load check-in code.'
+        );
       }
 
       // Students
@@ -114,7 +120,25 @@ export const AdminDashboard: React.FC = () => {
   }, [selectedHub, loadHub]);
 
   useEffect(() => {
-    const unsub = qrCodeService.subscribeToDailyCode((qr) => setQrCode(qr));
+    let healing = false;
+    const unsub = qrCodeService.subscribeToDailyCode((qr) => {
+      if (qr) {
+        setQrCode(qr);
+        return;
+      }
+      // Stale/missing doc: auto-create for staff (avoids empty QR after midnight Harare).
+      if (healing) return;
+      healing = true;
+      void qrCodeService
+        .ensureTodayCode(true)
+        .then((fresh) => {
+          if (fresh) setQrCode(fresh);
+        })
+        .catch(() => {})
+        .finally(() => {
+          healing = false;
+        });
+    });
     return unsub;
   }, []);
 
@@ -135,9 +159,41 @@ export const AdminDashboard: React.FC = () => {
       const code = await qrCodeService.getDailyCode();
       if (code) setQrCode(code);
       toast.success('New code generated!');
+    } catch (err: unknown) {
+      toast.error('Could not generate code. Check connection and permissions.');
     } finally {
       setGenQr(false);
     }
+  };
+
+  const copyCheckInCode = async (code: string) => {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(code);
+        toast.success('Code copied!');
+        return;
+      }
+    } catch {
+      /* fallback below */
+    }
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = code;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      if (ok) {
+        toast.success('Code copied!');
+        return;
+      }
+    } catch {
+      /* show manual hint */
+    }
+    toast.info('Select the code and copy manually (long-press on mobile).');
   };
 
   const isStudent = (u: Record<string, unknown>) => {
@@ -337,13 +393,15 @@ export const AdminDashboard: React.FC = () => {
                 </div>
 
                 <div className="flex items-center gap-2 bg-white/15 backdrop-blur rounded-xl px-4 py-2 w-full justify-between">
-                  <span className="text-base font-bold tracking-[0.2em] font-mono">{qrCode.code}</span>
+                  <span
+                    className="text-base font-bold tracking-[0.2em] font-mono select-all"
+                    title="Tap to select, then copy"
+                  >
+                    {qrCode.code}
+                  </span>
                   <button
                     type="button"
-                    onClick={() => {
-                      navigator.clipboard.writeText(qrCode.code);
-                      toast.success('Code copied!');
-                    }}
+                    onClick={() => void copyCheckInCode(qrCode.code)}
                     title="Copy code"
                     aria-label="Copy code"
                   >
@@ -402,7 +460,7 @@ export const AdminDashboard: React.FC = () => {
               <div className="flex items-start gap-2">
                 <Zap size={12} className="text-violet-400 mt-0.5 flex-shrink-0" />
                 <p className="text-xs text-gray-400 leading-relaxed">
-                  Today's QR was auto-generated at startup. Students can scan it or enter the code manually to check in.
+                  Today&apos;s code is created when staff open this dashboard. Share the QR or code with students for check-in.
                 </p>
               </div>
             </div>

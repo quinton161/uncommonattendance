@@ -6,7 +6,7 @@ export function getFirebaseAuthErrorMessage(code: string | undefined, fallback =
     'auth/invalid-credential':
       'That email and password did not match. Check for typos, try Forgot password, or use Create account if you have not registered yet. If an admin removed your profile but your login still exists, reset your password and sign in again.',
     'auth/user-not-found':
-      'No account found with this email. Use Create account, or check the spelling of your address.',
+      'No password account found for this email. Use Create account, sign in with Google if you registered that way, or check the spelling.',
     'auth/wrong-password':
       'Incorrect password. Use Forgot password if you are unsure, or confirm Caps Lock is off.',
     'auth/invalid-email': 'That email address doesn’t look valid.',
@@ -22,7 +22,15 @@ export function getFirebaseAuthErrorMessage(code: string | undefined, fallback =
     'auth/cancelled-popup-request': 'Sign-in was cancelled.',
     'auth/account-exists-with-different-credential': 'An account already exists with a different sign-in method.',
     'auth/unauthorized-domain':
-      'Google sign-in is blocked for this website domain. Ask an admin to add this domain in Firebase Console → Authentication → Settings → Authorized domains.',
+      'This website domain is not authorized. Ask an admin to add it in Firebase Console → Authentication → Settings → Authorized domains.',
+    'auth/unauthorized-continue-uri':
+      'Password reset cannot redirect back to this site. Ask an admin to add this domain under Authentication → Settings → Authorized domains.',
+    'auth/invalid-continue-uri': 'Password reset link is misconfigured. Contact support.',
+    'auth/missing-continue-uri': 'Password reset link is misconfigured. Contact support.',
+    'auth/invalid-action-code':
+      'This reset link or code is invalid or has expired. Request a new password reset email.',
+    'auth/expired-action-code':
+      'This reset link has expired. Request a new password reset email from the sign-in page.',
   };
 
   return messages[code] || fallback;

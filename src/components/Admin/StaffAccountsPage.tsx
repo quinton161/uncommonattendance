@@ -13,6 +13,7 @@ import {
 import { AdminHubScopeSelect } from './AdminHubScopeSelect';
 import { DeleteUserModal } from './DeleteUserModal';
 import { uniqueToast } from '../../utils/toastUtils';
+import { getAuthOrCallableErrorMessage } from '../../utils/callableErrors';
 import { PersonIcon, SearchIcon } from '../Common/Icons';
 import { FiLock } from 'react-icons/fi';
 import { Shield } from 'lucide-react';
@@ -507,10 +508,11 @@ export const StaffAccountsPage: React.FC<StaffAccountsPageProps> = ({ onBack }) 
     setResetSending(email);
     try {
       await resetPassword(email);
-      uniqueToast.success(`Password reset email sent to ${email}.`);
+      uniqueToast.success(`If ${email} is registered, a reset link was sent. Check inbox and spam.`);
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Could not send reset email.';
-      uniqueToast.error(msg);
+      uniqueToast.error(
+        getAuthOrCallableErrorMessage(e, 'Could not send reset email. Check the address and try again.')
+      );
     } finally {
       setResetSending(null);
     }

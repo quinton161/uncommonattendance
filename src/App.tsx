@@ -28,7 +28,6 @@ import { RankingsPage } from './pages/RankingsPage';
 import { ToastContainer } from 'react-toastify';
 import { uniqueToast } from './utils/toastUtils';
 import DataService from './services/DataService';
-import { qrCodeService } from './services/qrCodeService';
 import 'react-toastify/dist/ReactToastify.css';
 import styled from 'styled-components';
 
@@ -177,12 +176,7 @@ function App() {
         const dataService = DataService.getInstance();
         const isConnected = await dataService.testConnection();
         
-        if (isConnected) {
-          const existingCode = await qrCodeService.getDailyCode();
-          if (!existingCode) {
-            await qrCodeService.generateDailyCode();
-          }
-        } else if (process.env.NODE_ENV === 'development') {
+        if (!isConnected && process.env.NODE_ENV === 'development') {
           console.warn('[App] Backend connection failed, offline mode');
         }
       } catch (error) {

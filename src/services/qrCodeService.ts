@@ -43,20 +43,41 @@ class QRCodeService {
   async generateDailyCode(): Promise<string> {
     const today = this.timeService.getCurrentDateString();
     const newCode = this.generateRandomCode();
-    
-    // Set expiration to end of the day (23:59:59)
-    const expiresAt = new Date();
-    expiresAt.setHours(23, 59, 59, 999);
+    const expiresAt = new Date(`${today}T23:59:59.999+02:00`);
 
     const qrData: DailyQRCode = {
       code: newCode,
       createdAt: serverTimestamp(),
       expiresAt: Timestamp.fromDate(expiresAt),
-      date: today
+      date: today,
     };
 
     await setDoc(doc(db, 'system_config', 'daily_qr_code'), qrData);
     return newCode;
+  }
+
+  async ensureTodayCode(canWrite: boolean): Promise<DailyQRCode | null> {
+    const today = this.timeService.getCurrentDateString();
+    const docRef = doc(db, 'system_config', 'daily_qr_code');
+    const docSnap = await getDoc(docRef);
+
+    if (docSnap.exists()) {
+      const data = docSnap.data() as DailyQRCode;
+      if (data.date === today) {
+        return data;
+      }
+    }
+
+    if (!canWrite) {
+      return null;
+    }
+
+    try {
+      await this.generateDailyCode();
+      return this.getDailyCode();
+    } catch (err: unknown) {
+      throw err;
+    }
   }
 
   async getDailyCode(): Promise<DailyQRCode | null> {

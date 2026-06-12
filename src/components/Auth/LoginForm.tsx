@@ -6,6 +6,7 @@ import { Input } from '../Common/Input';
 import { Card } from '../Common/Card';
 import { theme } from '../../styles/theme';
 import { FiAlertTriangle, FiCheckCircle } from 'react-icons/fi';
+import { getAuthOrCallableErrorMessage } from '../../utils/callableErrors';
 
 
 interface LoginFormProps {
@@ -445,10 +446,10 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onToggleMode }) => {
     try {
       await resetPassword(formData.email);
       setSuccess(
-        'If an account exists for this email, you will get reset instructions. Open the link or go to the app’s Password reset page and paste the link / code, then set a new password.'
+        'If this email is registered, check your inbox and spam for a reset link. Open it to set your app password — then sign in with email + password or continue using Google.'
       );
-    } catch (err: any) {
-      setError(err.message || 'Failed to send reset email');
+    } catch (err: unknown) {
+      setError(getAuthOrCallableErrorMessage(err, 'Could not send reset email. Try again or ask your instructor.'));
     }
   };
 

@@ -1,5 +1,6 @@
 import * as admin from 'firebase-admin';
 import type { DocumentData } from 'firebase-admin/firestore';
+import * as crypto from 'crypto';
 import * as functions from 'firebase-functions';
 
 admin.initializeApp();
@@ -258,6 +259,87 @@ export const provisionUser = functions
     }
 
     return { uid: authUser.uid, email, userType };
+  });
+
+interface PreparePasswordResetPayload {
+  email?: string;
+}
+
+const PASSWORD_RESET_RATE_LIMIT = 3;
+const PASSWORD_RESET_WINDOW_MS = 15 * 60 * 1000;
+
+function userHasPasswordProvider(user: admin.auth.UserRecord): boolean {
+  return user.providerData.some((p) => p.providerId === 'password');
+}
+
+async function enforcePasswordResetRateLimit(email: string): Promise<void> {
+  const db = admin.firestore();
+  const emailHash = crypto.createHash('sha256').update(email).digest('hex');
+  const ref = db.doc(`passwordResetRate/${emailHash}`);
+  const now = Date.now();
+
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) {
+      tx.set(ref, {
+        count: 1,
+        windowStart: now,
+        expiresAt: admin.firestore.Timestamp.fromMillis(now + PASSWORD_RESET_WINDOW_MS),
+      });
+      return;
+    }
+    const data = snap.data()!;
+    const windowStart = Number(data.windowStart) || 0;
+    let count = Number(data.count) || 0;
+    if (now - windowStart > PASSWORD_RESET_WINDOW_MS) {
+      tx.set(ref, {
+        count: 1,
+        windowStart: now,
+        expiresAt: admin.firestore.Timestamp.fromMillis(now + PASSWORD_RESET_WINDOW_MS),
+      });
+      return;
+    }
+    if (count >= PASSWORD_RESET_RATE_LIMIT) {
+      throw new functions.https.HttpsError(
+        'resource-exhausted',
+        'Too many reset attempts. Try again in a few minutes.'
+      );
+    }
+    tx.update(ref, { count: count + 1 });
+  });
+}
+
+/**
+ * Prepares password reset for Google-only Auth users by linking a password provider.
+ * Client then calls sendPasswordResetEmail. Unauthenticated — user is logged out when resetting.
+ */
+export const preparePasswordReset = functions
+  .region('us-central1')
+  .https.onCall(async (data: PreparePasswordResetPayload) => {
+    const email = data?.email?.trim().toLowerCase();
+    if (!email || !email.includes('@')) {
+      throw new functions.https.HttpsError('invalid-argument', 'Valid email is required.');
+    }
+
+    await enforcePasswordResetRateLimit(email);
+
+    try {
+      const authUser = await admin.auth().getUserByEmail(email);
+      if (!userHasPasswordProvider(authUser)) {
+        const tempPassword = crypto.randomBytes(32).toString('base64url');
+        await admin.auth().updateUser(authUser.uid, { password: tempPassword });
+      }
+    } catch (e: unknown) {
+      const code = (e as { code?: string })?.code;
+      if (code === 'auth/user-not-found') {
+        return { ok: true };
+      }
+      if (e instanceof functions.https.HttpsError) throw e;
+      console.error('preparePasswordReset', e);
+      throw new functions.https.HttpsError('internal', 'Could not prepare password reset.');
+    }
+
+    return { ok: true };
   });
 
 const HUB_IDS = [

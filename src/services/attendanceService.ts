@@ -90,13 +90,13 @@ export class AttendanceService {
     if (!studentId?.trim()) throw new Error('Student ID is required');
     if (!studentName?.trim()) throw new Error('Student name is required');
 
+    await this.timeService.forceSync();
     const now   = this.timeService.getCurrentTime();
     const today = this.timeService.getCurrentDateString();
 
-    // Weekend guard (skip for admin)
+    // Weekend guard (skip for admin) — Harare calendar, not device local timezone.
     if (!skipTimeCheck) {
-      const dow = now.getDay();
-      if (dow === 0 || dow === 6) {
+      if (!this.timeService.isHarareWeekday(today)) {
         throw new Error('Attendance is not recorded on weekends.');
       }
       if (!this.timeService.canCheckIn(now)) {
