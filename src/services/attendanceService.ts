@@ -114,7 +114,7 @@ export class AttendanceService {
       location: location?.ip ? { ip: location.ip, timestamp: location.timestamp ?? Date.now() } : undefined,
     });
 
-    return { studentId, checkOutTime: new Date() } as any;
+    return { studentId, checkOutTime: new Date(), checkOutMethod: 'student' } as any;
   }
 
   async checkOutAsStaff(studentId: string, hubId?: string): Promise<AttendanceRecord> {
@@ -127,7 +127,7 @@ export class AttendanceService {
       checkOutMethod: 'staff',
     });
 
-    return { studentId, checkOutTime: new Date() } as any;
+    return { studentId, checkOutTime: new Date(), checkOutMethod: 'staff' } as any;
   }
 
   async checkOutAllOpenToday(hubId?: string): Promise<{ checkedOut: number }> {
