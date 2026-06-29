@@ -431,15 +431,6 @@ const ProfileIssueTag = styled.span`
   vertical-align: middle;
 `;
 
-const HubCell = styled.span`
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 12px;
-  color: ${theme.colors.textSecondary};
-`;
-
 const TimeCell = styled.span`
   display: block;
   font-variant-numeric: tabular-nums;
