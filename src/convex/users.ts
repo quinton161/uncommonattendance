@@ -32,6 +32,28 @@ export const storeUser = mutation({
       .withIndex("by_clerkId", (q) => q.eq("clerkId", args.clerkId))
       .unique();
 
+    // Prevent duplicate accounts: if another user with this email already exists
+    // under a different Clerk ID, merge the Clerk IDs or reject.
+    if (!existingUser) {
+      const dupEmail = await ctx.db
+        .query("users")
+        .withIndex("by_emailLower", (q) => q.eq("emailLower", args.email.toLowerCase()))
+        .unique();
+      if (dupEmail) {
+        // Attach this Clerk ID to the existing account instead of creating a duplicate
+        await ctx.db.patch(dupEmail._id, {
+          clerkId: args.clerkId,
+          email: args.email,
+          emailLower: args.email.toLowerCase(),
+          displayName: args.displayName || dupEmail.displayName,
+          profileImageUrl: args.photoUrl,
+          updatedAt: Date.now(),
+          firstVisit: false,
+        });
+        return dupEmail._id;
+      }
+    }
+
     if (existingUser) {
       const patch: any = {
         email: args.email,
@@ -161,8 +183,10 @@ export const deleteUser = mutation({
       .query("users")
       .withIndex("by_clerkId", (q) => q.eq("clerkId", identity.subject))
       .unique();
-    if (!adminUser || (adminUser.userType !== "admin" && adminUser.userType !== "instructor")) {
-      throw new Error("Unauthorized");
+    if (!adminUser) throw new Error("Unauthorized");
+    // Only the main admin (quinton.ndlovu@uncommon.org) can delete users
+    if (adminUser.email.toLowerCase() !== "quinton.ndlovu@uncommon.org") {
+      throw new Error("Only the main administrator can delete accounts.");
     }
     
     await ctx.db.delete(args.userId);

@@ -17,7 +17,7 @@ import { getAuthOrCallableErrorMessage } from '../../utils/callableErrors';
 import { PersonIcon, SearchIcon } from '../Common/Icons';
 import { FiLock } from 'react-icons/fi';
 import { Shield } from 'lucide-react';
-import { isAdminEmail } from '../../constants/admin';
+import { isAdminEmail, ADMIN_EMAIL } from '../../constants/admin';
 
 function formatInstructorLastLogin(row: Record<string, unknown>): string {
   const v = row?.lastLoginAt;
@@ -692,7 +692,7 @@ export const StaffAccountsPage: React.FC<StaffAccountsPageProps> = ({ onBack }) 
                           </InlineIcon>
                           {resetSending === row.email ? 'Sending…' : 'Password reset'}
                         </StaffActionButton>
-                        {!isSelf && role !== 'admin' && (
+                        {!isSelf && role !== 'admin' && user?.email?.toLowerCase() === ADMIN_EMAIL && (
                           <DeleteButton variant="ghost" onClick={() => handleOpenDelete(row)}>
                             Remove
                           </DeleteButton>
