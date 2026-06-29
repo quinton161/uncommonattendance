@@ -554,7 +554,7 @@ const SignInForm: React.FC<SignInFormProps> = ({ onSwitchToRegister }) => {
           </InputWrap>
         </Field>
         <SubmitBtn type="submit" disabled={loading || !email || !password}>
-          {loading ? 'Signing in…' : 'Sign In'}
+          {loading ? 'Verifying…' : 'Continue'}
         </SubmitBtn>
       </form>
       <FooterNote>
@@ -756,7 +756,7 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin }) => {
         </Field>
 
         <SubmitBtn type="submit" disabled={loading || (role === 'student' && !hubId) || !form.name || !form.email || !form.password || !form.confirmPassword}>
-          {loading ? 'Creating account…' : 'Sign Up'}
+          {loading ? 'Creating account…' : 'Continue'}
         </SubmitBtn>
       </form>
 
