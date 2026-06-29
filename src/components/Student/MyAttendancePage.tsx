@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import styled from 'styled-components';
 import { useAuth } from '../../contexts/AuthContext';
 import { theme } from '../../styles/theme';
-import { UncommonLogo } from '../Common/UncommonLogo';
 import DataService from '../../services/DataService';
 import { AttendanceService } from '../../services/attendanceService';
 import { DailyAttendanceService } from '../../services/dailyAttendanceService';
@@ -10,200 +9,221 @@ import { TimeService } from '../../services/timeService';
 import { hasRecordedCheckout, isStaffCheckout } from '../../utils/attendanceCheckout';
 import type { AttendanceRecord } from '../../types';
 import { uniqueToast } from '../../utils/toastUtils';
-import {
-  CheckCircleIcon,
-  TodayIcon,
-  LoginIcon,
-  LogoutIcon,
-} from '../Common/Icons';
+import { CalendarDays, Clock, TrendingUp, CheckCircle } from 'lucide-react';
 
-const PageContainer = styled.div<{ isEmbedded?: boolean }>`
-  padding: ${props => props.isEmbedded ? '0' : theme.spacing.xl};
+const PageContainer = styled.div`
+  padding: ${theme.spacing.xl};
   width: 100%;
-  min-height: 100vh;
-  background: ${theme.colors.backgroundSecondary};
-  
+  background: transparent;
+
   @media (max-width: ${theme.breakpoints.tablet}) {
-    padding: ${props => props.isEmbedded ? '0' : theme.spacing.lg};
+    padding: ${theme.spacing.lg};
   }
-  
+
   @media (max-width: ${theme.breakpoints.mobile}) {
-    padding: ${props => props.isEmbedded ? '0' : theme.spacing.md};
+    padding: ${theme.spacing.md};
   }
 `;
 
-const ContentWrapper = styled.div<{ isEmbedded?: boolean }>`
-  padding: ${props => props.isEmbedded ? theme.spacing.lg : '0'};
-  
-  @media (max-width: ${theme.breakpoints.tablet}) {
-    padding: ${props => props.isEmbedded ? theme.spacing.md : '0'};
-  }
-  
-  @media (max-width: ${theme.breakpoints.mobile}) {
-    padding: ${props => props.isEmbedded ? theme.spacing.sm : '0'};
-  }
+const ContentWrapper = styled.div`
+  max-width: 1100px;
+  margin: 0 auto;
 `;
 
-const Header = styled.div`
+const HeaderSection = styled.div`
+  margin-bottom: 24px;
+`;
+
+const HeaderTitle = styled.h1`
+  font-size: 22px;
+  font-weight: 800;
+  color: ${theme.colors.textPrimary};
+  margin: 0;
+  letter-spacing: -0.03em;
+`;
+
+const HeaderSub = styled.p`
+  font-size: 14px;
+  color: ${theme.colors.textSecondary};
+  margin: 4px 0 0;
+`;
+
+const FilterRow = styled.div`
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: ${theme.spacing.xl};
-  padding-bottom: ${theme.spacing.lg};
-  border-bottom: 2px solid ${theme.colors.primary};
-  gap: ${theme.spacing.md};
-  
-  @media (max-width: ${theme.breakpoints.tablet}) {
-    flex-direction: column;
-    align-items: stretch;
-    gap: ${theme.spacing.lg};
-  }
-  
-  @media (max-width: ${theme.breakpoints.mobile}) {
-    margin-bottom: ${theme.spacing.lg};
-    padding-bottom: ${theme.spacing.md};
-  }
+  justify-content: center;
+  margin-bottom: 24px;
 `;
 
-const HeaderTitle = styled.div`
-  h1 {
-    font-family: ${theme.fonts.heading};
-    font-size: ${theme.fontSizes['3xl']};
-    font-weight: ${theme.fontWeights.bold};
-    color: ${theme.colors.textPrimary};
-    margin: 0 0 ${theme.spacing.sm} 0;
-    line-height: 1.2;
-  }
-  
-  p {
-    color: ${theme.colors.textSecondary};
-    margin: 0;
-    font-size: ${theme.fontSizes.lg};
+const FilterGroup = styled.div`
+  display: inline-flex;
+  background: #f1f5f9;
+  border-radius: 12px;
+  padding: 4px;
+  gap: 4px;
+`;
+
+const FilterBtn = styled.button<{ $active?: boolean }>`
+  padding: 8px 24px;
+  border: none;
+  border-radius: 10px;
+  background: ${({ $active }) => ($active ? '#ffffff' : 'transparent')};
+  color: ${({ $active }) => ($active ? theme.colors.primary : theme.colors.textSecondary)};
+  font-weight: ${({ $active }) => ($active ? 700 : 600)};
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: ${({ $active }) => ($active ? '0 1px 3px rgba(0,0,0,0.08)' : 'none')};
+
+  &:hover {
+    color: ${theme.colors.primary};
   }
 `;
 
 const StatsGrid = styled.div`
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: ${theme.spacing.lg};
-  margin-bottom: ${theme.spacing.xl};
-  
-  @media (max-width: ${theme.breakpoints.tablet}) {
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: ${theme.spacing.md};
-  }
-  
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+
   @media (max-width: ${theme.breakpoints.mobile}) {
     grid-template-columns: 1fr;
-    gap: ${theme.spacing.sm};
   }
 `;
 
-const StatCard = styled.div`
-  background: linear-gradient(135deg, ${theme.colors.primary} 0%, ${theme.colors.primaryDark} 100%);
-  color: ${theme.colors.white};
-  padding: ${theme.spacing.lg};
-  border-radius: ${theme.borderRadius.lg};
-  box-shadow: ${theme.shadows.md};
+const StatCard = styled.div<{ $accent?: string; $highlight?: boolean }>`
+  background: ${({ $highlight }) => ($highlight ? 'linear-gradient(135deg, #0052CC, #003D99)' : '#ffffff')};
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: ${({ $highlight }) => ($highlight ? '0 4px 20px rgba(0, 82, 204, 0.2)' : '0 1px 3px rgba(0,0,0,0.04)')};
+  border: ${({ $highlight }) => ($highlight ? 'none' : '1px solid rgba(0, 82, 204, 0.06)')};
   text-align: center;
+  position: relative;
+  overflow: hidden;
+
+  ${({ $highlight }) =>
+    $highlight &&
+    `
+    &::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      right: -30%;
+      width: 200px;
+      height: 200px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.05);
+    }
+  `}
 `;
 
-const StatValue = styled.div`
-  font-size: ${theme.fontSizes['3xl']};
-  font-weight: ${theme.fontWeights.bold};
-  margin-bottom: ${theme.spacing.xs};
+const StatIconWrap = styled.div<{ $bg: string }>`
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: ${({ $bg }) => $bg};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 12px;
 `;
 
-const StatLabel = styled.div`
-  font-size: ${theme.fontSizes.sm};
-  opacity: 0.9;
+const StatValue = styled.div<{ $color?: string; $light?: string }>`
+  font-size: ${({ $light }) => ($light ? '32px' : '28px')};
+  font-weight: 800;
+  color: ${({ $color, $light }) => $light || $color || theme.colors.textPrimary};
+  letter-spacing: -0.03em;
+  line-height: 1.1;
 `;
 
-const AttendanceHistory = styled.div`
-  background: ${theme.colors.white};
-  border-radius: ${theme.borderRadius.lg};
-  box-shadow: ${theme.shadows.md};
+const StatLabel = styled.div<{ $light?: boolean }>`
+  font-size: 12px;
+  font-weight: 600;
+  color: ${({ $light }) => ($light ? 'rgba(255,255,255,0.7)' : theme.colors.textSecondary)};
+  margin-top: 6px;
+`;
+
+const TableCard = styled.div`
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(0, 82, 204, 0.06);
   overflow: hidden;
 `;
 
-const HistoryHeader = styled.div`
-  padding: ${theme.spacing.lg};
-  background: ${theme.colors.gray50};
-  border-bottom: 1px solid ${theme.colors.gray200};
-  
-  h3 {
-    margin: 0;
-    font-size: ${theme.fontSizes.xl};
-    font-weight: ${theme.fontWeights.semibold};
-    color: ${theme.colors.textPrimary};
+const TableHeader = styled.div`
+  padding: 20px 24px;
+  border-bottom: 1px solid rgba(0, 82, 204, 0.06);
+`;
+
+const TableTitle = styled.h3`
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0;
+  color: ${theme.colors.textPrimary};
+`;
+
+const Table = styled.table`
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+`;
+
+const THead = styled.thead`
+  background: #f8faff;
+`;
+
+const Th = styled.th`
+  padding: 12px 20px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: ${theme.colors.textSecondary};
+  border-bottom: 1px solid rgba(0, 82, 204, 0.06);
+`;
+
+const Td = styled.td`
+  padding: 14px 20px;
+  border-bottom: 1px solid rgba(0, 82, 204, 0.04);
+  color: ${theme.colors.textPrimary};
+`;
+
+const Tr = styled.tr`
+  &:hover {
+    background: #fafbff;
   }
-`;
-
-const HistoryList = styled.div`
-  max-height: 400px;
-  overflow-y: auto;
-`;
-
-const HistoryItem = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: ${theme.spacing.lg};
-  border-bottom: 1px solid ${theme.colors.gray100};
-  
-  &:last-child {
+  &:last-child td {
     border-bottom: none;
   }
-  
-  &:hover {
-    background: ${theme.colors.gray50};
-  }
 `;
 
-const HistoryDate = styled.div`
-  display: flex;
-  align-items: center;
-  gap: ${theme.spacing.sm};
-  
-  .date {
-    font-weight: ${theme.fontWeights.medium};
-    color: ${theme.colors.textPrimary};
-  }
-  
-  .day {
-    color: ${theme.colors.textSecondary};
-    font-size: ${theme.fontSizes.sm};
-  }
+const DurationBadge = styled.span`
+  font-weight: 700;
+  color: #F59E0B;
 `;
 
-const HistoryTimes = styled.div`
-  display: flex;
-  gap: ${theme.spacing.lg};
-  align-items: center;
-`;
-
-const TimeDisplay = styled.div`
-  display: flex;
-  align-items: center;
-  gap: ${theme.spacing.xs};
-  font-size: ${theme.fontSizes.sm};
-  color: ${theme.colors.textSecondary};
-  
-  .time {
-    font-weight: ${theme.fontWeights.medium};
-    color: ${theme.colors.textPrimary};
-  }
+const StaffTag = styled.span`
+  font-size: 11px;
+  color: ${theme.colors.textLight};
+  font-weight: 500;
 `;
 
 const EmptyState = styled.div`
   text-align: center;
-  padding: ${theme.spacing['3xl']};
-  color: ${theme.colors.textSecondary};
-  
+  padding: 60px 20px;
+  color: ${theme.colors.textLight};
+
   h3 {
-    font-size: ${theme.fontSizes.xl};
-    margin-bottom: ${theme.spacing.sm};
+    font-size: 16px;
+    font-weight: 700;
     color: ${theme.colors.textPrimary};
+    margin: 12px 0 4px;
+  }
+
+  p {
+    font-size: 13px;
+    margin: 0;
   }
 `;
 
@@ -224,7 +244,7 @@ export const MyAttendancePage: React.FC<MyAttendancePageProps> = ({ onBack, isEm
   });
   const [loading, setLoading] = useState(true);
   const [statsRange, setStatsRange] = useState<'week' | 'month' | 'custom'>('month');
-  const [customDays, setCustomDays] = useState(7);
+  const [customDays] = useState(7);
   const dataService = DataService.getInstance();
   const dailyAttendanceService = DailyAttendanceService.getInstance();
   const attendanceService = AttendanceService.getInstance();
@@ -261,11 +281,10 @@ export const MyAttendancePage: React.FC<MyAttendancePageProps> = ({ onBack, isEm
     fetchAttendanceStats();
   }, [fetchAttendanceStats]);
 
-
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return {
-      date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
       day: date.toLocaleDateString('en-US', { weekday: 'short' })
     };
   };
@@ -275,119 +294,129 @@ export const MyAttendancePage: React.FC<MyAttendancePageProps> = ({ onBack, isEm
     return ts.formatClockTime(date);
   };
 
+  const calculateTotalMinutes = (records: AttendanceRecord[]) => {
+    let totalMins = 0;
+    records.forEach(r => {
+      if (hasRecordedCheckout(r) && r.checkInTime && r.checkOutTime) {
+        const start = new Date(r.checkInTime).getTime();
+        const end = new Date(r.checkOutTime).getTime();
+        if (!isNaN(start) && !isNaN(end) && end > start) {
+          totalMins += Math.floor((end - start) / 60000);
+        }
+      }
+    });
+    return totalMins;
+  };
+
+  const totalMinutes = calculateTotalMinutes(attendanceHistory);
+  const totalHoursStr = totalMinutes > 0
+    ? `${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m`
+    : '0h 0m';
+
   return (
-    <PageContainer isEmbedded={isEmbedded}>
-      <ContentWrapper isEmbedded={isEmbedded}>
-        <Header>
-        <HeaderTitle>
-          <h1 style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: theme.spacing.lg,
-            margin: 0 
-          }}>
-            <UncommonLogo size="lg" showSubtitle={false} />
-            <span>My Attendance</span>
-          </h1>
-          <p>Track your attendance history and patterns</p>
-        </HeaderTitle>
-      </Header>
+    <PageContainer>
+      <ContentWrapper>
+        <HeaderSection>
+          <HeaderTitle>My Attendance Records</HeaderTitle>
+          <HeaderSub>Track your check-ins, check-outs, and total time spent</HeaderSub>
+        </HeaderSection>
 
-      <div style={{ display: 'flex', gap: 16, alignItems: 'center', marginBottom: 24 }}>
-        <span style={{ fontWeight: 500 }}>Attendance Stats for:</span>
-        <button
-          style={{ padding: '6px 12px', borderRadius: 6, border: 'none', background: statsRange === 'week' ? theme.colors.primary : theme.colors.gray200, color: statsRange === 'week' ? '#fff' : theme.colors.textPrimary, cursor: 'pointer' }}
-          onClick={() => setStatsRange('week')}
-        >
-          This Week
-        </button>
-        <button
-          style={{ padding: '6px 12px', borderRadius: 6, border: 'none', background: statsRange === 'month' ? theme.colors.primary : theme.colors.gray200, color: statsRange === 'month' ? '#fff' : theme.colors.textPrimary, cursor: 'pointer' }}
-          onClick={() => setStatsRange('month')}
-        >
-          This Month
-        </button>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <input
-            type="number"
-            min={1}
-            max={90}
-            value={statsRange === 'custom' ? customDays : ''}
-            onChange={e => { setCustomDays(Number(e.target.value)); setStatsRange('custom'); }}
-            style={{ width: 56, padding: 4, borderRadius: 4, border: '1px solid #ccc' }}
-            placeholder="N"
-          />
-          days
-        </label>
-      </div>
+        <FilterRow>
+          <FilterGroup>
+            <FilterBtn $active={statsRange === 'week'} onClick={() => setStatsRange('week')}>
+              Past 7 Days
+            </FilterBtn>
+            <FilterBtn $active={statsRange === 'month'} onClick={() => setStatsRange('month')}>
+              This Month
+            </FilterBtn>
+          </FilterGroup>
+        </FilterRow>
 
-      <StatsGrid>
-        <StatCard>
-          <StatValue>{stats.presentDays}</StatValue>
-          <StatLabel>Days Present</StatLabel>
-        </StatCard>
-        <StatCard>
-          <StatValue>{stats.attendanceRate}%</StatValue>
-          <StatLabel>Attendance Rate</StatLabel>
-        </StatCard>
-        <StatCard>
-          <StatValue>{stats.currentStreak}</StatValue>
-          <StatLabel>Current Streak</StatLabel>
-        </StatCard>
-        {/* Average Check-in Time not available in stats, so omitted */}
-      </StatsGrid>
+        <StatsGrid>
+          <StatCard $accent="#0052CC">
+            <StatIconWrap $bg="rgba(0, 82, 204, 0.1)">
+              <CalendarDays size={22} color="#0052CC" />
+            </StatIconWrap>
+            <StatValue $color="#0052CC">{loading ? '—' : stats.presentDays}</StatValue>
+            <StatLabel>Days Present</StatLabel>
+          </StatCard>
 
-      <AttendanceHistory>
-        <HistoryHeader>
-          <h3>Attendance History</h3>
-        </HistoryHeader>
-        
-        {loading ? (
-          <div style={{ padding: theme.spacing.xl, textAlign: 'center' }}>
-            Loading attendance history...
-          </div>
-        ) : attendanceHistory.length === 0 ? (
-          <EmptyState>
-            <CheckCircleIcon size={64} />
-            <h3>No Attendance Records</h3>
-            <p>Your attendance history will appear here once you start checking in.</p>
-          </EmptyState>
-        ) : (
-          <HistoryList>
-            {attendanceHistory.map((record) => {
-              const { date, day } = formatDate(record.date);
-              
-              return (
-                <HistoryItem key={record.id}>
-                  <HistoryDate>
-                    <TodayIcon size={16} />
-                    <div>
-                      <div className="date">{date}</div>
-                      <div className="day">{day}</div>
-                    </div>
-                  </HistoryDate>
-                  
-                  <HistoryTimes>
-                    <TimeDisplay>
-                      <LoginIcon size={14} />
-                      <span className="time">{formatTime(record.checkInTime)}</span>
-                    </TimeDisplay>
-                    
-                    <TimeDisplay>
-                      <LogoutIcon size={14} />
-                      <span className="time">
-                        {hasRecordedCheckout(record)
-                          ? `${formatTime(record.checkOutTime)}${isStaffCheckout(record) ? ' (staff)' : ''}`
-                          : '—'}
-                      </span>
-                    </TimeDisplay>
-                  </HistoryTimes>
-                </HistoryItem>
-              );
-            })}
-          </HistoryList>
-        )}
-      </AttendanceHistory>
+          <StatCard $highlight>
+            <StatIconWrap $bg="rgba(255,255,255,0.15)">
+              <Clock size={22} color="#fff" />
+            </StatIconWrap>
+            <StatValue $light="#fff">{loading ? '—' : totalHoursStr}</StatValue>
+            <StatLabel $light>Total Time Tracked</StatLabel>
+          </StatCard>
+
+          <StatCard $accent="#059669">
+            <StatIconWrap $bg="rgba(5, 150, 105, 0.1)">
+              <TrendingUp size={22} color="#059669" />
+            </StatIconWrap>
+            <StatValue $color="#059669">{loading ? '—' : stats.attendanceRate}%</StatValue>
+            <StatLabel>Attendance Rate</StatLabel>
+          </StatCard>
+        </StatsGrid>
+
+        <TableCard>
+          <TableHeader>
+            <TableTitle>Timesheet</TableTitle>
+          </TableHeader>
+
+          {loading ? (
+            <EmptyState><p>Loading attendance history...</p></EmptyState>
+          ) : attendanceHistory.length === 0 ? (
+            <EmptyState>
+              <CheckCircle size={48} strokeWidth={1} color="#d1d5db" />
+              <h3>No Attendance Records</h3>
+              <p>Your attendance history will appear here once you start checking in.</p>
+            </EmptyState>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <Table>
+                <THead>
+                  <tr>
+                    <Th>Date</Th>
+                    <Th>Day</Th>
+                    <Th>Check In</Th>
+                    <Th>Check Out</Th>
+                    <Th>Duration</Th>
+                  </tr>
+                </THead>
+                <tbody>
+                  {attendanceHistory.map((record, index) => {
+                    const { date, day } = formatDate(record.date);
+                    let duration = '—';
+                    if (hasRecordedCheckout(record) && record.checkInTime && record.checkOutTime) {
+                      const start = new Date(record.checkInTime).getTime();
+                      const end = new Date(record.checkOutTime).getTime();
+                      if (!isNaN(start) && !isNaN(end) && end > start) {
+                        const diffMins = Math.floor((end - start) / 60000);
+                        const h = Math.floor(diffMins / 60);
+                        const m = diffMins % 60;
+                        duration = h > 0 ? `${h}h ${m}m` : `${m}m`;
+                      }
+                    }
+
+                    return (
+                      <Tr key={record.id}>
+                        <Td style={{ fontWeight: 600 }}>{date}</Td>
+                        <Td style={{ color: theme.colors.textSecondary }}>{day}</Td>
+                        <Td>{formatTime(record.checkInTime)}</Td>
+                        <Td>
+                          {hasRecordedCheckout(record) ? (
+                            <>{formatTime(record.checkOutTime)}{isStaffCheckout(record) ? <StaffTag> (staff)</StaffTag> : ''}</>
+                          ) : '—'}
+                        </Td>
+                        <Td><DurationBadge>{duration}</DurationBadge></Td>
+                      </Tr>
+                    );
+                  })}
+                </tbody>
+              </Table>
+            </div>
+          )}
+        </TableCard>
       </ContentWrapper>
     </PageContainer>
   );

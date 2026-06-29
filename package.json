@@ -3,6 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@clerk/clerk-react": "^5.61.8",
+    "@radix-ui/react-avatar": "^1.2.0",
+    "@radix-ui/react-dialog": "^1.1.17",
+    "@radix-ui/react-dropdown-menu": "^2.1.18",
+    "@radix-ui/react-label": "^2.1.10",
+    "@radix-ui/react-select": "^2.3.1",
+    "@radix-ui/react-separator": "^1.1.10",
+    "@radix-ui/react-slot": "^1.3.0",
+    "@radix-ui/react-tabs": "^1.1.15",
+    "@radix-ui/react-toast": "^1.2.17",
     "@reduxjs/toolkit": "2.11.2",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.9.1",
@@ -14,10 +24,11 @@
     "@types/nodemailer": "^7.0.11",
     "@types/styled-components": "^5.1.34",
     "canvas-confetti": "^1.9.4",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "convex": "^1.41.0",
     "date-fns": "^4.1.0",
     "file-saver": "^2.0.5",
-    "firebase": "^12.4.0",
-    "firebase-admin": "^13.7.0",
     "framer-motion": "^12.38.0",
     "gsap": "^3.12.2",
     "jspdf": "^4.0.0",
@@ -29,6 +40,7 @@
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "react-icons": "^5.6.0",
+    "react-is": "^19.2.7",
     "react-redux": "9.2.0",
     "react-router-dom": "^7.9.4",
     "react-scripts": "5.0.1",
@@ -36,10 +48,13 @@
     "recharts": "^3.8.0",
     "simple-peer": "^9.11.1",
     "styled-components": "^6.1.19",
-    "typescript": "^4.9.5",
+    "tailwind-merge": "^3.6.0",
+    "tailwindcss-animate": "^1.0.7",
+    "typescript": "^5.9.3",
     "web-vitals": "^2.1.4"
   },
   "scripts": {
+    "dev": "concurrently \"npm start\" \"npx convex dev\"",
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
@@ -49,9 +64,8 @@
     "maintenance:refresh-browsers": "npx update-browserslist-db@latest",
     "maintenance:verify": "npm test -- --watchAll=false && npm run build",
     "maintenance:monthly": "npm run maintenance:outdated && npm run maintenance:audit && npm run maintenance:refresh-browsers && npm run maintenance:verify",
-    "seed:hubs": "npx ts-node firestore-seed-hubs.ts",
-    "provision:user": "node scripts/provision-user.mjs",
-    "functions:build": "npm --prefix functions run build"
+    "seed:hubs": "npx ts-node convex/seed-hubs.ts",
+    "provision:user": "node scripts/provision-user.mjs"
   },
   "eslintConfig": {
     "extends": [
@@ -90,6 +104,7 @@
     "@types/simple-peer": "^9.11.9",
     "@types/tough-cookie": "^4.0.5",
     "autoprefixer": "^10.4.20",
+    "concurrently": "^10.0.3",
     "http-proxy-middleware": "^2.0.9",
     "postcss": "^8.4.39",
     "tailwindcss": "^3.4.4"

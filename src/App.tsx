@@ -6,7 +6,6 @@ import { EventProvider } from './contexts/EventContext';
 import { AuthPage } from './components/Auth/AuthPage';
 import ResetPasswordPage from './components/Auth/ResetPasswordPage';
 import { HubSelectGate } from './components/Auth/HubSelectGate';
-import { GoogleRegisterGate } from './components/Auth/GoogleRegisterGate';
 import { StudentDashboard } from './components/Dashboard/StudentDashboard';
 import AdminDashboard from './components/Dashboard/AdminDashboard';
 import { AttendancePage } from './components/Admin/AttendancePage';
@@ -20,24 +19,57 @@ import { EventsPage } from './components/Events/EventsPage';
 import { Layout } from './components/Common/Layout';
 import { SimpleSplash } from './components/Common/SimpleSplash';
 import { ErrorBoundary } from './components/Common/ErrorBoundary';
-import { DirectAuthTest } from './components/Auth/DirectAuthTest';
+import { OfflineBanner } from './components/Common/OfflineBanner';
 import { GlobalStyles } from './styles/GlobalStyles';
 import { theme } from './styles/theme';
 import { AppUpdateNotifier } from './components/Common/AppUpdateNotifier';
 import { RankingsPage } from './pages/RankingsPage';
 import { ToastContainer } from 'react-toastify';
 import { uniqueToast } from './utils/toastUtils';
-import DataService from './services/DataService';
 import 'react-toastify/dist/ReactToastify.css';
-import styled from 'styled-components';
+import styled, { keyframes } from 'styled-components';
+
+const spin = keyframes`
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+`;
 
 const LoadingScreen = styled.div`
   display: flex;
+  flex-direction: column;
   justify-content: center;
   align-items: center;
   height: 100vh;
+  gap: 20px;
+  background: linear-gradient(135deg, #001466 0%, #0052CC 60%, #1a7fff 100%);
+`;
+
+const LoadingSpinner = styled.div`
+  width: 48px;
+  height: 48px;
+  border: 4px solid rgba(255, 255, 255, 0.2);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: ${spin} 0.8s linear infinite;
+`;
+
+const LoadingLogo = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+`;
+
+const LoadingTitle = styled.span`
+  color: #ffffff;
   font-size: 18px;
-  color: ${theme.colors.textSecondary};
+  font-weight: 700;
+  letter-spacing: 0.5px;
+`;
+
+const LoadingSubtitle = styled.span`
+  color: rgba(255,255,255,0.6);
+  font-size: 13px;
 `;
 
 const FallbackScreen = styled.div`
@@ -47,6 +79,18 @@ const FallbackScreen = styled.div`
   height: 100vh;
   flex-direction: column;
   gap: 16px;
+  background: linear-gradient(135deg, #001466 0%, #0052CC 60%, #1a7fff 100%);
+  padding: 24px;
+`;
+
+const FallbackCard = styled.div`
+  background: rgba(255,255,255,0.95);
+  border-radius: 20px;
+  padding: 40px 32px;
+  max-width: 420px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.3);
 `;
 
 const StyledToastContainer = styled(ToastContainer)`
@@ -54,13 +98,56 @@ const StyledToastContainer = styled(ToastContainer)`
 `;
 
 const AppRoutes: React.FC = () => {
-  const { user, loading } = useAuth();
+  const { user, loading, hubResolved, authError, logout } = useAuth();
 
   if (loading) {
     return (
       <LoadingScreen>
-        Loading...
+        <LoadingLogo>
+          <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+            <rect width="48" height="48" rx="14" fill="rgba(255,255,255,0.15)" />
+            <path d="M24 12L34 18V30L24 36L14 30V18L24 12Z" fill="white" opacity="0.9" />
+          </svg>
+          <LoadingTitle>Uncommon Attendance</LoadingTitle>
+          <LoadingSubtitle>Loading your session...</LoadingSubtitle>
+        </LoadingLogo>
+        <LoadingSpinner />
       </LoadingScreen>
+    );
+  }
+
+  if (authError) {
+    return (
+      <FallbackScreen>
+        <FallbackCard>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>⚠️</div>
+          <h2 style={{ color: '#1a1a2e', marginBottom: 8, fontSize: 20, fontWeight: 700 }}>
+            Sign-in Error
+          </h2>
+          <p style={{ color: '#6b7280', marginBottom: 4, fontSize: 14 }}>
+            {authError}
+          </p>
+          <p style={{ color: '#6b7280', marginBottom: 24, fontSize: 13 }}>
+            Try signing out and back in. If the problem persists, contact your administrator.
+          </p>
+          <button
+            onClick={() => logout()}
+            style={{
+              background: 'linear-gradient(135deg, #0052CC, #003D99)',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 12,
+              padding: '12px 28px',
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: 'pointer',
+              width: '100%',
+            }}
+          >
+            Sign Out
+          </button>
+        </FallbackCard>
+      </FallbackScreen>
     );
   }
 
@@ -68,12 +155,12 @@ const AppRoutes: React.FC = () => {
     return <AuthPage />;
   }
 
-  if (user.needsProfileCompletion) {
-    return <GoogleRegisterGate />;
-  }
-
+  // Only show HubSelectGate once the Convex profile read has settled (hubResolved).
+  // Without this guard, a race condition could show the gate to users who already have a hub.
   const needsHub =
-    (user.userType === 'attendee' || user.userType === 'instructor') && !user.hubId;
+    hubResolved &&
+    (user.userType === 'attendee' || user.userType === 'instructor') &&
+    !user.hubId;
 
   if (needsHub) {
     return <HubSelectGate />;
@@ -86,10 +173,7 @@ const AppRoutes: React.FC = () => {
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<StudentDashboard />} />
           <Route path="/attendance" element={<MyAttendancePage />} />
-          <Route path="/goals" element={<StudentGoalsBoard />} />
-          <Route path="/events" element={<EventsPage />} />
           <Route path="/profile" element={<StudentProfile />} />
-          <Route path="/rankings" element={<RankingsPage />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </Layout>
@@ -105,30 +189,45 @@ const AppRoutes: React.FC = () => {
           <Route path="/attendance" element={<AttendancePage />} />
           <Route path="/users" element={<UsersPage />} />
           <Route path="/staff" element={<StaffAccountsPage />} />
-          <Route path="/events" element={<EventsPage />} />
-          <Route
-            path="/goals"
-            element={
-              <StudentGoalsBoard
-                            hubScopeId={undefined}
-                            viewAllHubs={user.userType === 'admin' || user.userType === 'instructor'}
-              />
-            }
-          />
           <Route path="/profile" element={<AdminProfile />} />
-          <Route path="/rankings" element={<RankingsPage />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </Layout>
     );
   }
 
-  // Fallback for unknown roles
+  // Fallback for unknown roles — styled with sign-out
   return (
     <FallbackScreen>
-      <h1>Welcome, {user.displayName}!</h1>
-      <p>User Type: {user.userType}</p>
-      <p>Unknown state - please contact administrator</p>
+      <FallbackCard>
+        <div style={{ fontSize: 48, marginBottom: 16 }}>⚠️</div>
+        <h2 style={{ color: '#1a1a2e', marginBottom: 8, fontSize: 20, fontWeight: 700 }}>
+          Unknown Account State
+        </h2>
+        <p style={{ color: '#6b7280', marginBottom: 4, fontSize: 14 }}>
+          Welcome, <strong>{user.displayName}</strong>
+        </p>
+        <p style={{ color: '#6b7280', marginBottom: 24, fontSize: 13 }}>
+          Your account role (<code style={{ background: '#f3f4f6', padding: '2px 6px', borderRadius: 4 }}>{user.userType || 'unknown'}</code>) is not recognised.
+          Please contact your administrator.
+        </p>
+        <button
+          onClick={() => logout()}
+          style={{
+            background: 'linear-gradient(135deg, #0052CC, #003D99)',
+            color: '#fff',
+            border: 'none',
+            borderRadius: 12,
+            padding: '12px 28px',
+            fontSize: 14,
+            fontWeight: 600,
+            cursor: 'pointer',
+            width: '100%',
+          }}
+        >
+          Sign Out
+        </button>
+      </FallbackCard>
     </FallbackScreen>
   );
 };
@@ -155,48 +254,13 @@ const AppWithProviders: React.FC = () => {
 
 function App() {
   const [showSplash, setShowSplash] = useState(true);
-  const [showAuthTest, setShowAuthTest] = useState(false);
 
   useEffect(() => {
-    // Add keyboard shortcut to show auth test (Ctrl+Shift+T)
-    const handleKeyPress = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.shiftKey && e.key === 'T') {
-        setShowAuthTest(true);
-      }
-    };
-    
-    window.addEventListener('keydown', handleKeyPress);
-    
-    // Test Firebase connection on app startup (delayed to ensure Firebase is initialized)
-    const initializeBackend = async () => {
-      try {
-        // Add a small delay to ensure Firebase is fully initialized
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        const dataService = DataService.getInstance();
-        const isConnected = await dataService.testConnection();
-        
-        if (!isConnected && process.env.NODE_ENV === 'development') {
-          console.warn('[App] Backend connection failed, offline mode');
-        }
-      } catch (error) {
-        if (process.env.NODE_ENV === 'development') {
-          console.error('[App] Backend initialization:', error);
-        }
-      }
-    };
-    
-    // Delay initialization to avoid interfering with auth
-    const timer = setTimeout(initializeBackend, 2000);
-    
-    // Set up periodic cleanup of old toast entries
     const cleanupInterval = setInterval(() => {
       uniqueToast.cleanup();
-    }, 60000); // Clean up every minute
-    
+    }, 60000);
+
     return () => {
-      window.removeEventListener('keydown', handleKeyPress);
-      clearTimeout(timer);
       clearInterval(cleanupInterval);
     };
   }, []);
@@ -214,11 +278,11 @@ function App() {
         <ErrorBoundary>
           <AuthProvider>
             <AppUpdateNotifier />
+            <OfflineBanner />
             <AppWithProviders />
           </AuthProvider>
         </ErrorBoundary>
       )}
-      {showAuthTest && <DirectAuthTest />}
       <StyledToastContainer
         position="top-center"
         autoClose={4000}

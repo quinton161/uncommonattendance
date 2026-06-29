@@ -7,14 +7,371 @@ import { TimeService } from '../../services/timeService';
 import { hasRecordedCheckout, isStaffCheckout } from '../../utils/attendanceCheckout';
 import { LateCheckInReasonModal } from '../Student/LateCheckInReasonModal';
 import { CheckInDailyGoalModal } from '../Student/CheckInDailyGoalModal';
-
 import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
 import type { AttendanceRecord, LocationData } from '../../types';
-import { Button } from '../Common/Button';
 import { StudentPresenceBadge } from '../Recognition/StudentPresenceBadge';
 import TimeSyncStatus from '../Common/TimeSyncStatus';
+import styled from 'styled-components';
+import { theme } from '../../styles/theme';
+import { Clock, CalendarCheck, LogIn, LogOut, Timer, CheckCircle, XCircle } from 'lucide-react';
 
 const AttSvc = AttendanceService.getInstance();
+
+const Container = styled.div`
+  max-width: 1100px;
+  margin: 0 auto;
+`;
+
+const Space = styled.div<{ size?: string }>`
+  height: ${({ size }) => size || '20px'};
+`;
+
+const WelcomeCard = styled.div`
+  background: linear-gradient(135deg, #0052CC 0%, #003D99 100%);
+  border-radius: 20px;
+  padding: 28px 32px;
+  color: white;
+  position: relative;
+  overflow: hidden;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: -60%;
+    right: -20%;
+    width: 300px;
+    height: 300px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    bottom: -40%;
+    left: -10%;
+    width: 200px;
+    height: 200px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.04);
+  }
+`;
+
+const WelcomeEyebrow = styled.p`
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: rgba(255, 255, 255, 0.5);
+  margin: 0 0 6px;
+`;
+
+const WelcomeTitle = styled.h2`
+  font-size: 24px;
+  font-weight: 800;
+  margin: 0;
+  letter-spacing: -0.03em;
+  position: relative;
+  z-index: 1;
+`;
+
+const WelcomeRow = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 12px;
+  position: relative;
+  z-index: 1;
+`;
+
+const WelcomeDate = styled.p`
+  margin: 0;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.7);
+`;
+
+const WelcomeMeta = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+`;
+
+const TimeBadge = styled.span`
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(4px);
+  border-radius: 100px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  color: white;
+`;
+
+const StatsGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+
+  @media (max-width: ${theme.breakpoints.mobile}) {
+    grid-template-columns: 1fr;
+  }
+`;
+
+const StatCard = styled.div<{ $accent?: string; $bg?: string }>`
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 20px 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
+  border: 1px solid rgba(0, 82, 204, 0.06);
+  position: relative;
+  overflow: hidden;
+  text-align: center;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: ${({ $accent }) => $accent || '#0052CC'};
+  }
+`;
+
+const StatIconWrap = styled.div<{ $bg: string }>`
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: ${({ $bg }) => $bg};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 12px;
+`;
+
+const StatLabel = styled.div`
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: ${theme.colors.textSecondary};
+  margin-bottom: 6px;
+`;
+
+const StatValue = styled.div<{ $color?: string }>`
+  font-size: 28px;
+  font-weight: 800;
+  color: ${({ $color }) => $color || theme.colors.textPrimary};
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+`;
+
+const StatDetail = styled.p`
+  font-size: 12px;
+  color: ${theme.colors.textLight};
+  margin: 6px 0 0;
+`;
+
+const ErrorBar = styled.div`
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 12px;
+  padding: 12px 16px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: #dc2626;
+`;
+
+const ActionCard = styled.div`
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
+  border: 1px solid rgba(0, 82, 204, 0.06);
+`;
+
+const ActionTitle = styled.h3`
+  font-size: 16px;
+  font-weight: 700;
+  text-align: center;
+  margin: 0 0 16px;
+  color: ${theme.colors.textPrimary};
+`;
+
+const TimeInfoGrid = styled.div`
+  background: #f8faff;
+  border-radius: 12px;
+  padding: 14px 18px;
+  margin-bottom: 16px;
+`;
+
+const TimeInfoRow = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+
+  & + & {
+    border-top: 1px solid rgba(0, 82, 204, 0.06);
+  }
+`;
+
+const TimeInfoLabel = styled.span`
+  font-size: 13px;
+  color: ${theme.colors.textSecondary};
+  display: flex;
+  align-items: center;
+  gap: 8px;
+`;
+
+const TimeInfoValue = styled.span`
+  font-size: 13px;
+  font-weight: 700;
+  color: ${theme.colors.textPrimary};
+`;
+
+const HintText = styled.p`
+  font-size: 12px;
+  color: #d97706;
+  text-align: center;
+  margin: 0 0 12px;
+`;
+
+const ButtonRow = styled.div`
+  display: flex;
+  gap: 12px;
+
+  @media (max-width: 480px) {
+    flex-direction: column;
+  }
+`;
+
+const CheckInButton = styled.button<{ $disabled?: boolean }>`
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 24px;
+  border: none;
+  border-radius: 12px;
+  background: ${({ $disabled }) => ($disabled ? '#d1d5db' : 'linear-gradient(135deg, #7C3AED, #6D28D9)')};
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: ${({ $disabled }) => ($disabled ? 'not-allowed' : 'pointer')};
+  transition: all 0.2s ease;
+  box-shadow: ${({ $disabled }) => ($disabled ? 'none' : '0 4px 14px rgba(124, 58, 237, 0.3)')};
+
+  &:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(124, 58, 237, 0.35);
+  }
+`;
+
+const CheckOutButton = styled.button<{ $disabled?: boolean; $active?: boolean }>`
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 24px;
+  border: 2px solid ${({ $active }) => ($active ? '#F59E0B' : '#e5e7eb')};
+  border-radius: 12px;
+  background: ${({ $disabled }) => ($disabled ? '#f9fafb' : '#ffffff')};
+  color: ${({ $active }) => ($active ? '#111827' : '#9ca3af')};
+  font-size: 15px;
+  font-weight: 700;
+  cursor: ${({ $disabled }) => ($disabled ? 'not-allowed' : 'pointer')};
+  transition: all 0.2s ease;
+
+  &:hover:not(:disabled) {
+    border-color: #F59E0B;
+    background: #fffbeb;
+    color: #111827;
+  }
+`;
+
+const HistoryCard = styled.div`
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
+  border: 1px solid rgba(0, 82, 204, 0.06);
+  overflow: hidden;
+`;
+
+const HistoryHeader = styled.div`
+  padding: 20px 24px 16px;
+`;
+
+const HistoryTitle = styled.h3`
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0;
+  color: ${theme.colors.textPrimary};
+`;
+
+const HistorySub = styled.p`
+  font-size: 12px;
+  color: ${theme.colors.textLight};
+  margin: 4px 0 0;
+`;
+
+const Table = styled.table`
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+`;
+
+const THead = styled.thead`
+  background: #f8faff;
+`;
+
+const Th = styled.th`
+  padding: 12px 20px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: ${theme.colors.textSecondary};
+  border-bottom: 1px solid rgba(0, 82, 204, 0.06);
+`;
+
+const Td = styled.td`
+  padding: 14px 20px;
+  border-bottom: 1px solid rgba(0, 82, 204, 0.04);
+  color: ${theme.colors.textPrimary};
+`;
+
+const Tr = styled.tr`
+  &:hover {
+    background: #fafbff;
+  }
+
+  &:last-child td {
+    border-bottom: none;
+  }
+`;
+
+const DurationBadge = styled.span`
+  font-weight: 700;
+  color: #F59E0B;
+`;
+
+const EmptyState = styled.div`
+  text-align: center;
+  padding: 40px 20px;
+  color: ${theme.colors.textLight};
+  font-size: 14px;
+`;
 
 export function StudentDashboard(): React.ReactElement {
   const { user } = useAuth();
@@ -130,7 +487,6 @@ export function StudentDashboard(): React.ReactElement {
           userIp = ipData.ip || userIp;
         }
       } catch {
-        // Ignore IP failures
       }
 
       const locationData: LocationData = {
@@ -153,7 +509,7 @@ export function StudentDashboard(): React.ReactElement {
       const history = await AttSvc.getAttendanceHistory(user.uid, 10, studentHubId);
       setAttendanceHistory(history);
     } catch (err: any) {
-      console.error('❌ Check-in failed:', err);
+      console.error('Check-in failed:', err);
       setError(err?.message || 'Failed to check in');
       throw err;
     } finally {
@@ -176,7 +532,6 @@ export function StudentDashboard(): React.ReactElement {
         try {
           await runCheckIn(lateReason, existingGoal);
         } catch {
-          /* error surfaced via setError in runCheckIn */
         }
         return;
       }
@@ -228,13 +583,12 @@ export function StudentDashboard(): React.ReactElement {
       setCheckInGoalModalOpen(false);
       setLateReasonPendingForGoal(null);
     } catch {
-      /* error surfaced via setError in runCheckIn */
     }
   };
 
   const handleCheckOut = async () => {
     if (!user) return;
-    if (!window.confirm('Check out now? This completes today’s session.')) {
+    if (!window.confirm('Check out now? This completes today\'s session.')) {
       return;
     }
 
@@ -250,7 +604,6 @@ export function StudentDashboard(): React.ReactElement {
           userIp = ipData.ip || userIp;
         }
       } catch {
-        // Ignore IP failures
       }
 
       const locationData: LocationData = {
@@ -263,7 +616,7 @@ export function StudentDashboard(): React.ReactElement {
       const history = await AttSvc.getAttendanceHistory(user.uid, 10, studentHubId);
       setAttendanceHistory(history);
     } catch (err: any) {
-      console.error('❌ Check-out failed:', err);
+      console.error('Check-out failed:', err);
       setError(err?.message || 'Failed to check out');
     } finally {
       setLoading(false);
@@ -285,15 +638,14 @@ export function StudentDashboard(): React.ReactElement {
     return ts.formatClockTime(date);
   };
 
-  const formatDate = (dateString?: string) => {
+  const formatDateShort = (dateString?: string) => {
     if (!dateString) return 'Unknown date';
     const date = new Date(`${dateString}T12:00:00`);
     if (Number.isNaN(date.getTime())) return dateString;
     return date.toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
+      month: 'short',
       day: 'numeric',
+      year: 'numeric',
     });
   };
 
@@ -303,30 +655,36 @@ export function StudentDashboard(): React.ReactElement {
     !Number.isNaN(todayAttendance.checkInTime.getTime());
   const checkedOutToday = hasRecordedCheckout(todayAttendance ?? {});
   const staffCheckedOutToday = isStaffCheckout(todayAttendance ?? {});
-  const todayStatusLabel = checkedOutToday
-    ? staffCheckedOutToday
-      ? 'Checked out by staff'
-      : 'Day completed'
-    : checkedInToday
-      ? todayAttendance?.status === 'late'
-        ? 'Checked in late'
-        : 'Checked in'
-      : 'Not checked in';
   const displayCheckOutTime = checkedOutToday ? todayAttendance?.checkOutTime : undefined;
   const checkOutLabel = staffCheckedOutToday ? 'Check-out (staff)' : 'Check-out';
-  const nextActionLabel = status === 'checked-out' ? 'Check In' : 'Check Out';
-  const snapshot = {
-    total: attendanceHistory.length,
-    present: attendanceHistory.filter((record) => record.status === 'present' || record.status === 'completed' || (record.isPresent && record.status !== 'late')).length,
-    late: attendanceHistory.filter((record) => record.status === 'late').length,
-    absent: attendanceHistory.filter((record) => record.status === 'absent' || !record.isPresent).length,
-  };
-  const snapshotItems = [
-    { label: 'Records', value: snapshot.total, detail: 'Recent days', color: 'text-[#0052CC]', bg: 'bg-[#EEF4FF]' },
-    { label: 'On time', value: snapshot.present, detail: 'Present records', color: 'text-emerald-700', bg: 'bg-emerald-50' },
-    { label: 'Late', value: snapshot.late, detail: 'Needs attention', color: 'text-amber-700', bg: 'bg-amber-50' },
-    { label: 'Absent', value: snapshot.absent, detail: 'Missed days', color: 'text-red-700', bg: 'bg-red-50' },
-  ];
+
+  const timeTrackedToday = (() => {
+    if (checkedInToday && todayAttendance?.checkInTime) {
+      const start = new Date(todayAttendance.checkInTime).getTime();
+      const end = checkedOutToday && displayCheckOutTime
+        ? new Date(displayCheckOutTime).getTime()
+        : Date.now();
+      if (!isNaN(start) && !isNaN(end) && end > start) {
+        const diffMins = Math.floor((end - start) / 60000);
+        const h = Math.floor(diffMins / 60);
+        const m = diffMins % 60;
+        return h > 0 ? `${h}h ${m}m` : `${m}m`;
+      }
+    }
+    return '0h 0m';
+  })();
+
+  const daysThisMonth = attendanceHistory.filter(r => {
+    const d = new Date(r.date);
+    const now = new Date();
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear() && r.isPresent;
+  }).length;
+
+  const currentStatusDisplay = checkedOutToday
+    ? 'Checked Out'
+    : checkedInToday
+      ? 'Checked In'
+      : 'Not Checked In';
 
   return (
     <>
@@ -346,145 +704,172 @@ export function StudentDashboard(): React.ReactElement {
         onSubmit={handleCheckInGoalSubmit}
       />
 
-      <div className="space-y-5">
-        <div className="rounded-[20px] bg-gradient-to-br from-[#0052CC] to-[#003D99] p-6 text-white">
-          <p className="text-xs font-bold uppercase tracking-widest text-white/60">Student home</p>
-          <h2 className="mt-2 text-2xl font-bold">Welcome back, {user?.displayName || 'Student'}</h2>
+      <Container>
+        <WelcomeCard>
+          <WelcomeEyebrow>Student Home</WelcomeEyebrow>
+          <WelcomeTitle>Welcome back, {user?.displayName || 'Student'}</WelcomeTitle>
           {user?.uid && user?.hubId && (
-            <div className="mt-2">
+            <div style={{ marginTop: 12, position: 'relative', zIndex: 1 }}>
               <StudentPresenceBadge studentId={user.uid} hubId={user.hubId} />
             </div>
           )}
-          <p className="mt-1 text-sm text-blue-100">
-            {ts.formatDate(ts.getCurrentTime())}
-          </p>
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white">
-              School time: {harareClock || ts.formatClockTime(ts.getCurrentTime())} (Harare)
-            </span>
-            <TimeSyncStatus />
-          </div>
-        </div>
+          <WelcomeRow>
+            <WelcomeDate>{ts.formatDate(ts.getCurrentTime())}</WelcomeDate>
+            <WelcomeMeta>
+              <TimeBadge>
+                <Clock size={14} />
+                {harareClock || ts.formatClockTime(ts.getCurrentTime())} (Harare)
+              </TimeBadge>
+              <TimeSyncStatus />
+            </WelcomeMeta>
+          </WelcomeRow>
+        </WelcomeCard>
 
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          {snapshotItems.map((item) => (
-            <div key={item.label} className="card-white p-4 transition-colors">
-              <div className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider ${item.bg} ${item.color}`}>
-                {item.label}
-              </div>
-              <div className="mt-3 text-2xl font-bold text-gray-900">{loading ? '—' : item.value}</div>
-              <p className="mt-1 text-xs text-gray-400">{item.detail}</p>
-            </div>
-          ))}
-        </div>
+        <Space size="20px" />
+
+        <StatsGrid>
+          <StatCard $accent="#F59E0B">
+            <StatIconWrap $bg="rgba(245, 158, 11, 0.1)">
+              <Timer size={20} color="#F59E0B" />
+            </StatIconWrap>
+            <StatLabel>Time Tracked Today</StatLabel>
+            <StatValue $color="#D97706">{loading ? '—' : timeTrackedToday}</StatValue>
+            <StatDetail>Hours logged today</StatDetail>
+          </StatCard>
+
+          <StatCard $accent="#7C3AED">
+            <StatIconWrap $bg="rgba(124, 58, 237, 0.1)">
+              <CalendarCheck size={20} color="#7C3AED" />
+            </StatIconWrap>
+            <StatLabel>Days This Month</StatLabel>
+            <StatValue $color="#7C3AED">{loading ? '—' : daysThisMonth}</StatValue>
+            <StatDetail>Present records</StatDetail>
+          </StatCard>
+
+          <StatCard $accent={checkedInToday && !checkedOutToday ? '#059669' : checkedOutToday ? '#6B7280' : '#DC2626'}>
+            <StatIconWrap $bg={checkedInToday && !checkedOutToday ? 'rgba(5, 150, 105, 0.1)' : checkedOutToday ? 'rgba(107, 114, 128, 0.1)' : 'rgba(220, 38, 38, 0.1)'}>
+              {checkedInToday && !checkedOutToday ? (
+                <CheckCircle size={20} color="#059669" />
+              ) : checkedOutToday ? (
+                <LogOut size={20} color="#6B7280" />
+              ) : (
+                <XCircle size={20} color="#DC2626" />
+              )}
+            </StatIconWrap>
+            <StatLabel>Status</StatLabel>
+            <StatValue $color={checkedInToday && !checkedOutToday ? '#059669' : checkedOutToday ? '#6B7280' : '#DC2626'}>
+              {loading ? '—' : currentStatusDisplay}
+            </StatValue>
+            <StatDetail>Current state</StatDetail>
+          </StatCard>
+        </StatsGrid>
 
         {error && (
-          <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-center text-sm font-medium text-red-700">
-            {error}
-          </div>
+          <>
+            <Space size="16px" />
+            <ErrorBar>{error}</ErrorBar>
+          </>
         )}
 
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-          <div className="card-white p-6 lg:col-span-1">
-            <div className="flex flex-col items-center text-center">
-              <span className={`mb-3 rounded-full px-3 py-1 text-xs font-bold ${
-                checkedInToday ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'
-              }`}>
-                {todayStatusLabel}
-              </span>
-              <div
-                className={`mb-4 flex h-16 w-16 items-center justify-center rounded-2xl text-2xl font-bold text-white ${
-                  status === 'checked-in'
-                    ? 'bg-gradient-to-br from-emerald-500 to-[#0052CC]'
-                    : 'bg-gradient-to-br from-slate-300 to-slate-500'
-                }`}
-              >
-                {status === 'checked-in' ? '✓' : '○'}
-              </div>
+        <Space size="20px" />
 
-              <h3 className="text-lg font-bold text-gray-900">
-                {status === 'checked-in' ? 'You are currently checked in' : 'Ready for today'}
-              </h3>
+        <ActionCard>
+          <ActionTitle>Record Your Attendance</ActionTitle>
 
-              <div className="my-4 w-full rounded-2xl bg-[#F8FAFF] p-3 text-left text-sm text-gray-500">
-                <div className="mb-2 flex items-center justify-between gap-3 border-b border-gray-100 pb-2 text-xs">
-                  <span>Harare time</span>
-                  <span className="font-semibold text-gray-800">
-                    {harareClock || ts.formatClockTime(ts.getCurrentTime())}
-                  </span>
-                </div>
-                {checkInWindowHint ? (
-                  <p className="mb-2 text-xs font-medium text-amber-700">{checkInWindowHint}</p>
-                ) : null}
-                <div className="flex items-center justify-between gap-3">
-                  <span>Check-in</span>
-                  <span className="font-semibold text-gray-800">
-                    {todayAttendance?.checkInTime ? formatTime(todayAttendance.checkInTime) : 'Not yet'}
-                  </span>
-                </div>
-                <div className="mt-2 flex items-center justify-between gap-3">
-                  <span>{checkOutLabel}</span>
-                  <span className="font-semibold text-gray-800">
-                    {displayCheckOutTime ? formatTime(displayCheckOutTime) : 'Not yet'}
-                  </span>
-                </div>
-              </div>
+          <TimeInfoGrid>
+            <TimeInfoRow>
+              <TimeInfoLabel>
+                <LogIn size={14} />
+                Check-in
+              </TimeInfoLabel>
+              <TimeInfoValue>
+                {todayAttendance?.checkInTime ? formatTime(todayAttendance.checkInTime) : 'Not yet'}
+              </TimeInfoValue>
+            </TimeInfoRow>
+            <TimeInfoRow>
+              <TimeInfoLabel>
+                <LogOut size={14} />
+                {checkOutLabel}
+              </TimeInfoLabel>
+              <TimeInfoValue>
+                {displayCheckOutTime ? formatTime(displayCheckOutTime) : 'Not yet'}
+              </TimeInfoValue>
+            </TimeInfoRow>
+          </TimeInfoGrid>
 
-              <Button
-                variant={status === 'checked-out' ? 'primary' : 'secondary'}
-                size="lg"
-                fullWidth
-                onClick={status === 'checked-out' ? handleCheckIn : handleCheckOut}
-                loading={loading}
-                disabled={loading}
-              >
-                {nextActionLabel}
-              </Button>
+          {checkInWindowHint && <HintText>{checkInWindowHint}</HintText>}
+
+          <ButtonRow>
+            <CheckInButton
+              $disabled={loading || checkedInToday}
+              disabled={loading || checkedInToday}
+              onClick={handleCheckIn}
+            >
+              <LogIn size={16} />
+              {loading && status === 'checked-out' ? 'Checking in...' : 'Check In'}
+            </CheckInButton>
+            <CheckOutButton
+              $disabled={loading || checkedOutToday || !checkedInToday}
+              $active={checkedInToday && !checkedOutToday}
+              disabled={loading || checkedOutToday || !checkedInToday}
+              onClick={handleCheckOut}
+            >
+              <LogOut size={16} />
+              {loading && status === 'checked-in' ? 'Checking out...' : 'Check Out'}
+            </CheckOutButton>
+          </ButtonRow>
+        </ActionCard>
+
+        <Space size="20px" />
+
+        <HistoryCard>
+          <HistoryHeader>
+            <HistoryTitle>Recent Attendance</HistoryTitle>
+            <HistorySub>Your latest 5 sessions</HistorySub>
+          </HistoryHeader>
+
+          {attendanceHistory.length === 0 ? (
+            <EmptyState>No attendance history yet</EmptyState>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <Table>
+                <THead>
+                  <tr>
+                    <Th>Date</Th>
+                    <Th>Check In</Th>
+                    <Th>Check Out</Th>
+                    <Th>Duration</Th>
+                  </tr>
+                </THead>
+                <tbody>
+                  {attendanceHistory.slice(0, 5).map((record) => {
+                    let duration = '—';
+                    if (hasRecordedCheckout(record) && record.checkInTime && record.checkOutTime) {
+                      const start = new Date(record.checkInTime).getTime();
+                      const end = new Date(record.checkOutTime).getTime();
+                      if (!isNaN(start) && !isNaN(end)) {
+                        const diffMins = Math.floor((end - start) / 60000);
+                        const h = Math.floor(diffMins / 60);
+                        const m = diffMins % 60;
+                        duration = h > 0 ? `${h}h ${m}m` : `${m}m`;
+                      }
+                    }
+
+                    return (
+                      <Tr key={record.id}>
+                        <Td style={{ fontWeight: 600 }}>{formatDateShort(record.date)}</Td>
+                        <Td>{formatTime(record.checkInTime)}</Td>
+                        <Td>{hasRecordedCheckout(record) ? formatTime(record.checkOutTime) : '—'}</Td>
+                        <Td><DurationBadge>{duration}</DurationBadge></Td>
+                      </Tr>
+                    );
+                  })}
+                </tbody>
+              </Table>
             </div>
-          </div>
-
-          <div className="card-white p-6 lg:col-span-2">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div>
-                <h3 className="font-bold text-gray-900">Recent Attendance</h3>
-                <p className="text-xs text-gray-400">Your latest attendance records</p>
-              </div>
-              <span className="rounded-full bg-[#EEF4FF] px-3 py-1 text-xs font-bold text-[#0052CC]">
-                {attendanceHistory.length} records
-              </span>
-            </div>
-
-            {attendanceHistory.length === 0 ? (
-              <div className="rounded-2xl bg-[#F8FAFF] px-4 py-10 text-center text-sm text-gray-400">
-                No attendance history yet
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {attendanceHistory.map((record) => (
-                  <div
-                    key={record.id}
-                    className="flex flex-col gap-2 rounded-2xl border border-gray-100 bg-white p-4 sm:flex-row sm:items-center sm:justify-between"
-                  >
-                    <div className="font-semibold text-gray-900">
-                      {formatDate(record.date)}
-                    </div>
-                    <div className="flex flex-wrap gap-3 text-sm text-gray-500">
-                      <span>In: {formatTime(record.checkInTime)}</span>
-                      {hasRecordedCheckout(record) ? (
-                        <span>
-                          Out{isStaffCheckout(record) ? ' (staff)' : ''}:{' '}
-                          {formatTime(record.checkOutTime)}
-                        </span>
-                      ) : null}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+          )}
+        </HistoryCard>
+      </Container>
     </>
   );
 }
-

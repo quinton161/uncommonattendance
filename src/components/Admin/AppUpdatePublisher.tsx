@@ -93,7 +93,7 @@ export const AppUpdatePublisher: React.FC = () => {
     <Card>
       <Title>Notify all users</Title>
       <Hint>
-        Saves to Firebase. When someone opens the app and hasn&apos;t seen this version yet, they get a full-screen
+        Saves to Convex. When someone opens the app and hasn&apos;t seen this version yet, they get a full-screen
         scrollable note (not a small toast) with this title and message until they tap <strong>Got it</strong>. Each
         publish bumps the version so everyone sees the new note once.
       </Hint>

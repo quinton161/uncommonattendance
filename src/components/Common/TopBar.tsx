@@ -1,7 +1,7 @@
 import React from 'react';
 import styled from 'styled-components';
 import { useLocation } from 'react-router-dom';
-import { Bell } from 'lucide-react';
+import { Bell, Menu } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { theme } from '../../styles/theme';
 
@@ -18,68 +18,47 @@ const Bar = styled.header`
   align-items: center;
   justify-content: space-between;
   gap: ${theme.spacing.md};
-  padding: 0 20px;
+  padding: 0 28px;
   background: #ffffff;
-  border-bottom: 1px solid rgba(0, 82, 204, 0.08);
+  border-bottom: 1px solid rgba(0, 82, 204, 0.06);
   position: sticky;
   top: 0;
   z-index: ${theme.zIndex.sticky};
 
-  @media (min-width: ${theme.breakpoints.tablet}) {
-    padding: 0 24px;
+  @media (min-width: ${theme.breakpoints.laptop}) {
+    padding: 0 32px;
   }
 `;
 
 const Left = styled.div`
   display: flex;
   align-items: center;
-  gap: ${theme.spacing.md};
+  gap: 16px;
   min-width: 0;
 `;
 
 const MenuButton = styled.button`
-  width: 40px;
-  height: 40px;
+  width: 38px;
+  height: 38px;
   border: 0;
   border-radius: 10px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   background: #f8fafc;
-  color: ${theme.colors.gray700};
+  color: ${theme.colors.gray600};
   cursor: pointer;
-  border: 1px solid #e2e8f0;
-  box-shadow: none;
-  padding: 0;
-  transition: background 0.2s ease, color 0.2s ease;
+  border: 1px solid rgba(0, 82, 204, 0.08);
+  transition: all 0.2s ease;
 
   &:hover {
     background: #f1f5f9;
     color: ${theme.colors.textPrimary};
+    border-color: rgba(0, 82, 204, 0.15);
   }
 
-  &:focus-visible {
-    outline: 2px solid #93c5fd;
-    outline-offset: 2px;
-  }
-
-  svg {
-    color: currentColor;
-  }
-`;
-
-const HamburgerLines = styled.span`
-  display: flex;
-  width: 18px;
-  flex-direction: column;
-  gap: 4px;
-
-  span {
-    display: block;
-    width: 100%;
-    height: 2px;
-    border-radius: 2px;
-    background: currentColor;
+  @media (min-width: ${theme.breakpoints.laptop}) {
+    display: none;
   }
 `;
 
@@ -89,27 +68,24 @@ const TitleBlock = styled.div`
 
 const Title = styled.h1`
   margin: 0;
-  font-size: ${theme.fontSizes.base};
+  font-size: ${theme.fontSizes.lg};
   font-weight: 800;
   color: ${theme.colors.textPrimary};
   line-height: 1.2;
+  letter-spacing: -0.02em;
 `;
 
 const DateText = styled.p`
-  display: none;
   margin: 2px 0 0;
   color: ${theme.colors.textLight};
   font-size: ${theme.fontSizes.xs};
-
-  @media (min-width: ${theme.breakpoints.mobile}) {
-    display: block;
-  }
+  font-weight: 500;
 `;
 
 const Right = styled.div`
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 `;
 
 const PageHint = styled.p`
@@ -117,6 +93,7 @@ const PageHint = styled.p`
   margin: 0;
   color: ${theme.colors.textLight};
   font-size: ${theme.fontSizes.xs};
+  font-weight: 500;
 
   @media (min-width: ${theme.breakpoints.tablet}) {
     display: block;
@@ -125,34 +102,30 @@ const PageHint = styled.p`
 
 const BellButton = styled.button`
   position: relative;
-  width: 40px;
-  height: 40px;
+  width: 38px;
+  height: 38px;
   border: 0;
   border-radius: 10px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   background: #f8fafc;
-  color: ${theme.colors.gray700};
+  color: ${theme.colors.gray600};
   cursor: pointer;
-  border: 1px solid #e2e8f0;
-  padding: 0;
-  box-shadow: none;
+  border: 1px solid rgba(0, 82, 204, 0.08);
+  transition: all 0.2s ease;
 
   &:hover {
     background: #f1f5f9;
     color: ${theme.colors.textPrimary};
-  }
-
-  svg {
-    color: currentColor;
+    border-color: rgba(0, 82, 204, 0.15);
   }
 `;
 
 const Badge = styled.span`
   position: absolute;
-  top: 4px;
-  right: 4px;
+  top: 3px;
+  right: 3px;
   min-width: 16px;
   height: 16px;
   padding: 0 4px;
@@ -164,12 +137,13 @@ const Badge = styled.span`
   display: flex;
   align-items: center;
   justify-content: center;
+  box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3);
 `;
 
 const Avatar = styled.div`
   width: 38px;
   height: 38px;
-  border-radius: 8px;
+  border-radius: 10px;
   overflow: hidden;
   background: linear-gradient(135deg, #0052cc, #003d99);
   color: #ffffff;
@@ -178,7 +152,7 @@ const Avatar = styled.div`
   justify-content: center;
   font-size: ${theme.fontSizes.sm};
   font-weight: 800;
-  box-shadow: none;
+  box-shadow: 0 2px 8px rgba(0, 82, 204, 0.15);
 
   img {
     width: 100%;
@@ -237,11 +211,7 @@ export const TopBar: React.FC<TopBarProps> = ({
           aria-expanded={isMenuOpen}
           onClick={onMenuClick}
         >
-          <HamburgerLines aria-hidden="true">
-            <span />
-            <span />
-            <span />
-          </HamburgerLines>
+          <Menu size={18} />
         </MenuButton>
         <TitleBlock>
           <Title>{info.title}</Title>
@@ -253,7 +223,7 @@ export const TopBar: React.FC<TopBarProps> = ({
         <PageHint>{info.sub}</PageHint>
         {onNotificationsClick && (
           <BellButton type="button" data-ui="icon" aria-label="Notifications" onClick={onNotificationsClick}>
-            <Bell size={18} strokeWidth={2} />
+            <Bell size={18} strokeWidth={1.5} />
             {unreadCount > 0 && <Badge>{unreadCount > 99 ? '99+' : unreadCount}</Badge>}
           </BellButton>
         )}

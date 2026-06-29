@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { theme } from '../../styles/theme';
 import { Button } from '../Common/Button';
 import DataService from '../../services/DataService';
-import { effectiveStaffHubScope, initialStaffHubFilter, resolvedHubLabel, staffMayAccessHubForWrite } from '../../services/hubService';
+import { effectiveStaffHubScope, initialStaffHubFilter, staffMayAccessHubForWrite } from '../../services/hubService';
 import { AdminHubScopeSelect } from './AdminHubScopeSelect';
 import { AttendanceService } from '../../services/attendanceService';
 import { TimeService } from '../../services/timeService';
@@ -15,10 +15,10 @@ import {
   formatCsvDocument,
   buildAttendanceExportRows,
 } from '../../utils/attendanceCsv';
-import { AbsenceRecordModal } from './AbsenceRecordModal';
+
 import { useStaffAttendanceActions } from '../../hooks/useStaffAttendanceActions';
-import { CheckCircleIcon, LocationOnIcon } from '../Common/Icons';
 import { FiLogOut } from 'react-icons/fi';
+import { Search, Calendar, Filter, Download, Users, LogIn, LogOut } from 'lucide-react';
 
 function recordMatchesDate(a: any, dateStr: string, ts: TimeService): boolean {
   if (a.date === dateStr) return true;
@@ -32,269 +32,307 @@ function recordMatchesDate(a: any, dateStr: string, ts: TimeService): boolean {
   return ts.toHarareDateString(d) === dateStr;
 }
 
-function absenceReasonLabel(r?: string): string {
-  if (!r) return '—';
-  if (r === 'excused') return 'Excused';
-  if (r === 'unexcused') return 'Unexcused';
-  if (r === 'dropout') return 'Dropout';
-  return r;
-}
 
 const PageContainer = styled.div`
-  padding: ${theme.spacing.xl};
-  width: 100%;
-  min-height: 100vh;
-  background: ${theme.colors.backgroundSecondary};
-  
-  @media (max-width: ${theme.breakpoints.tablet}) {
-    padding: ${theme.spacing.lg};
-  }
-  
-  @media (max-width: ${theme.breakpoints.mobile}) {
-    padding: ${theme.spacing.md};
-  }
-  
-  @media (max-width: 420px) {
-    padding: ${theme.spacing.sm};
-  }
-  
-  @media (max-width: 360px) {
-    padding: ${theme.spacing.xs};
-  }
+  max-width: 1200px;
+  margin: 0 auto;
+`;
+
+const Space = styled.div<{ size?: string }>`
+  height: ${({ size }) => size || '16px'};
 `;
 
 const Header = styled.div`
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: ${theme.spacing.xl};
-  padding-bottom: ${theme.spacing.lg};
-  border-bottom: 2px solid ${theme.colors.primary};
-  gap: ${theme.spacing.md};
-  
+  align-items: center;
+  margin-bottom: 24px;
+  gap: 16px;
+
   @media (max-width: ${theme.breakpoints.tablet}) {
     flex-direction: column;
     align-items: stretch;
-    gap: ${theme.spacing.lg};
-  }
-  
-  @media (max-width: ${theme.breakpoints.mobile}) {
-    margin-bottom: ${theme.spacing.lg};
-    padding-bottom: ${theme.spacing.md};
-  }
-  
-  @media (max-width: 420px) {
-    margin-bottom: ${theme.spacing.md};
-    padding-bottom: ${theme.spacing.sm};
-    gap: ${theme.spacing.md};
-  }
-  
-  @media (max-width: 360px) {
-    margin-bottom: ${theme.spacing.sm};
-    gap: ${theme.spacing.sm};
   }
 `;
 
 const HeaderTitle = styled.div`
   h1 {
-    font-family: ${theme.fonts.heading};
-    font-size: ${theme.fontSizes['3xl']};
-    font-weight: ${theme.fontWeights.bold};
-    color: ${theme.colors.primary};
-    margin: 0 0 ${theme.spacing.sm} 0;
-    display: flex;
-    align-items: center;
-    gap: ${theme.spacing.md};
-    
-    @media (max-width: 420px) {
-      font-size: ${theme.fontSizes['2xl']};
-      gap: ${theme.spacing.sm};
-    }
-    
-    @media (max-width: 360px) {
-      font-size: ${theme.fontSizes.xl};
-      flex-direction: column;
-      align-items: flex-start;
-      gap: ${theme.spacing.xs};
-    }
-  }
-  
-  p {
-    color: ${theme.colors.textSecondary};
+    font-size: 22px;
+    font-weight: 800;
+    color: ${theme.colors.textPrimary};
     margin: 0;
-    font-size: ${theme.fontSizes.lg};
-    
-    @media (max-width: 420px) {
-      font-size: ${theme.fontSizes.base};
-    }
-    
-    @media (max-width: 360px) {
-      font-size: ${theme.fontSizes.sm};
-    }
+    letter-spacing: -0.03em;
   }
 `;
 
 const FilterSection = styled.div`
-  background: ${theme.colors.white};
-  padding: ${theme.spacing.lg};
-  border-radius: ${theme.borderRadius.lg};
-  margin-bottom: ${theme.spacing.lg};
-  box-shadow: ${theme.shadows.sm};
-  
+  background: #ffffff;
+  padding: 20px;
+  border-radius: 16px;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(0, 82, 204, 0.06);
+`;
+
+const FilterRow = styled.div`
   display: flex;
-  gap: ${theme.spacing.md};
+  gap: 12px;
   align-items: flex-end;
   flex-wrap: wrap;
-  
+
   @media (max-width: ${theme.breakpoints.tablet}) {
     flex-direction: column;
     align-items: stretch;
-    gap: ${theme.spacing.lg};
-    padding: ${theme.spacing.md};
-  }
-  
-  @media (max-width: ${theme.breakpoints.mobile}) {
-    padding: ${theme.spacing.sm};
-    gap: ${theme.spacing.md};
-  }
-  
-  @media (max-width: 420px) {
-    padding: ${theme.spacing.xs};
-    gap: ${theme.spacing.sm};
-    border-radius: ${theme.borderRadius.md};
-  }
-  
-  @media (max-width: 360px) {
-    margin-bottom: ${theme.spacing.md};
   }
 `;
 
 const FilterGroup = styled.div`
   display: flex;
   flex-direction: column;
-  gap: ${theme.spacing.xs};
+  gap: 4px;
   min-width: 140px;
-  
-  @media (max-width: ${theme.breakpoints.tablet}) {
-    min-width: unset;
-    width: 100%;
-  }
-  
+
   label {
-    font-size: ${theme.fontSizes.sm};
-    font-weight: ${theme.fontWeights.medium};
-    color: ${theme.colors.textPrimary};
-    
-    @media (max-width: ${theme.breakpoints.mobile}) {
-      font-size: ${theme.fontSizes.xs};
-    }
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: ${theme.colors.textSecondary};
+    display: flex;
+    align-items: center;
+    gap: 4px;
   }
-  
+
   select, input {
-    padding: ${theme.spacing.sm};
-    border: 1px solid ${theme.colors.gray300};
-    border-radius: ${theme.borderRadius.md};
-    font-size: ${theme.fontSizes.sm};
-    background: ${theme.colors.white};
+    padding: 8px 12px;
+    border: 1px solid rgba(0, 82, 204, 0.12);
+    border-radius: 10px;
+    font-size: 13px;
+    background: #ffffff;
     width: 100%;
     box-sizing: border-box;
-    
-    @media (max-width: ${theme.breakpoints.mobile}) {
-      padding: ${theme.spacing.md};
-      font-size: ${theme.fontSizes.base};
-      min-height: 44px;
-    }
-    
-    @media (max-width: 420px) {
-      padding: ${theme.spacing.md} ${theme.spacing.sm};
-      font-size: ${theme.fontSizes.base};
-      min-height: 48px;
-    }
-    
-    @media (max-width: 360px) {
-      padding: ${theme.spacing.lg} ${theme.spacing.sm};
-      font-size: ${theme.fontSizes.lg};
-      min-height: 52px;
-    }
-    
+    font-family: inherit;
+    transition: border-color 0.2s;
+
     &:focus {
       outline: none;
       border-color: ${theme.colors.primary};
-      box-shadow: 0 0 0 2px ${theme.colors.primary}20;
+      box-shadow: 0 0 0 3px rgba(0, 82, 204, 0.08);
     }
   }
 `;
 
-const StatsContainer = styled.div`
+const SearchInput = styled.input`
+  padding: 8px 12px 8px 36px;
+  border: 1px solid rgba(0, 82, 204, 0.12);
+  border-radius: 10px;
+  font-size: 13px;
+  background: #ffffff;
+  width: 100%;
+  box-sizing: border-box;
+  font-family: inherit;
+  transition: border-color 0.2s;
+
+  &:focus {
+    outline: none;
+    border-color: ${theme.colors.primary};
+    box-shadow: 0 0 0 3px rgba(0, 82, 204, 0.08);
+  }
+`;
+
+const SearchWrap = styled.div`
+  position: relative;
+  min-width: 180px;
+  flex: 1;
+
+  svg {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: ${theme.colors.textLight};
+    pointer-events: none;
+  }
+`;
+
+const StatsRow = styled.div`
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+
+  @media (max-width: 700px) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+`;
+
+const StatCard = styled.div<{ $color: string; $bg: string }>`
+  background: #ffffff;
+  border-radius: 14px;
+  padding: 16px 18px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(0, 82, 204, 0.06);
   display: flex;
-  gap: ${theme.spacing.lg};
   align-items: center;
-  font-size: ${theme.fontSizes.sm};
+  gap: 14px;
+  position: relative;
+  overflow: hidden;
+
+  &::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: ${({ $color }) => $color};
+    border-radius: 0 3px 3px 0;
+  }
+`;
+
+const StatIconWrap = styled.div<{ $bg: string }>`
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: ${({ $bg }) => $bg};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+`;
+
+const StatInfo = styled.div`
+  display: flex;
+  flex-direction: column;
+`;
+
+const StatValue = styled.span`
+  font-size: 20px;
+  font-weight: 800;
+  color: ${theme.colors.textPrimary};
+  line-height: 1.2;
+`;
+
+const StatLabel = styled.span`
+  font-size: 12px;
   color: ${theme.colors.textSecondary};
-  
-  @media (max-width: ${theme.breakpoints.tablet}) {
-    flex-direction: column;
-    align-items: stretch;
-    gap: ${theme.spacing.sm};
-    width: 100%;
-  }
-  
-  @media (max-width: ${theme.breakpoints.mobile}) {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: ${theme.spacing.sm};
-  }
-  
-  @media (max-width: 420px) {
-    grid-template-columns: 1fr;
-    gap: ${theme.spacing.xs};
-  }
+  font-weight: 500;
+  margin-top: 2px;
 `;
 
-const StatItem = styled.span`
-  font-weight: ${theme.fontWeights.medium};
-  padding: ${theme.spacing.xs} ${theme.spacing.sm};
-  background: ${theme.colors.gray50};
-  border-radius: ${theme.borderRadius.md};
-  
-  @media (max-width: ${theme.breakpoints.tablet}) {
-    text-align: center;
-    padding: ${theme.spacing.sm};
-  }
-  
-  @media (max-width: 420px) {
-    padding: ${theme.spacing.md};
-    font-size: ${theme.fontSizes.base};
-    font-weight: ${theme.fontWeights.semibold};
-  }
-  
-  @media (max-width: 360px) {
-    padding: ${theme.spacing.lg} ${theme.spacing.md};
-    font-size: ${theme.fontSizes.lg};
-  }
-`;
-
-const ActionButtonsContainer = styled.div`
+const ActionBar = styled.div`
   display: flex;
-  gap: ${theme.spacing.md};
-  margin-bottom: ${theme.spacing.lg};
+  justify-content: space-between;
   align-items: center;
-  
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 10px;
+
   @media (max-width: ${theme.breakpoints.tablet}) {
     flex-direction: column;
     align-items: stretch;
-    gap: ${theme.spacing.sm};
-  }
-  
-  @media (max-width: ${theme.breakpoints.mobile}) {
-    gap: ${theme.spacing.xs};
   }
 `;
 
-const AttendanceTableWrap = styled.div`
-  background: ${theme.colors.white};
-  border-radius: ${theme.borderRadius.lg};
-  box-shadow: ${theme.shadows.md};
+const ActionGroup = styled.div`
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+`;
+
+const ActionBtn = styled(Button)`
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 16px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 10px;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+
+  svg {
+    flex-shrink: 0;
+  }
+`;
+
+const CheckInBtn = styled(ActionBtn)`
+  background: linear-gradient(135deg, #059669, #047857);
+  border: none;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(5, 150, 105, 0.25);
+
+  &:hover:not(:disabled) {
+    background: linear-gradient(135deg, #047857, #065f46);
+    box-shadow: 0 4px 12px rgba(5, 150, 105, 0.35);
+    transform: translateY(-1px);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+`;
+
+const CheckOutBtn = styled(ActionBtn)`
+  background: linear-gradient(135deg, #d97706, #b45309);
+  border: none;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(217, 119, 6, 0.25);
+
+  &:hover:not(:disabled) {
+    background: linear-gradient(135deg, #b45309, #92400e);
+    box-shadow: 0 4px 12px rgba(217, 119, 6, 0.35);
+    transform: translateY(-1px);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+`;
+
+const GhostBtn = styled(ActionBtn)`
+  background: transparent;
+  border: 1px solid rgba(0, 82, 204, 0.12);
+  color: ${theme.colors.textSecondary};
+
+  &:hover:not(:disabled) {
+    background: #f8faff;
+    border-color: rgba(0, 82, 204, 0.2);
+    color: ${theme.colors.primary};
+  }
+`;
+
+const CsvBtn = styled(ActionBtn)`
+  background: #ffffff;
+  border: 1px solid rgba(0, 82, 204, 0.12);
+  color: ${theme.colors.primary};
+
+  &:hover:not(:disabled) {
+    background: #f0f5ff;
+    border-color: ${theme.colors.primary};
+  }
+`;
+
+const FixBtn = styled(ActionBtn)`
+  background: #ffffff;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  color: #dc2626;
+
+  &:hover:not(:disabled) {
+    background: #fef2f2;
+    border-color: #dc2626;
+  }
+`;
+
+const TableCard = styled.div`
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(0, 82, 204, 0.06);
   overflow: hidden;
 `;
 
@@ -303,141 +341,61 @@ const TableScroll = styled.div`
   -webkit-overflow-scrolling: touch;
 `;
 
-const AttendanceTable = styled.table`
+const Table = styled.table`
   width: 100%;
-  min-width: 920px;
+  min-width: 750px;
   border-collapse: collapse;
-  table-layout: fixed;
 `;
 
 const Th = styled.th`
-  padding: ${theme.spacing.md} ${theme.spacing.lg};
+  padding: 14px 20px;
   text-align: left;
-  font-size: ${theme.fontSizes.xs};
-  font-weight: ${theme.fontWeights.bold};
+  font-size: 11px;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.06em;
   color: ${theme.colors.textSecondary};
-  background: ${theme.colors.gray50};
-  border-bottom: 2px solid ${theme.colors.gray200};
-  vertical-align: middle;
+  background: #f8faff;
+  border-bottom: 1px solid rgba(0, 82, 204, 0.06);
+  position: sticky;
+  top: 0;
+  z-index: 10;
 `;
 
 const Td = styled.td`
-  padding: ${theme.spacing.md} ${theme.spacing.lg};
-  border-bottom: 1px solid ${theme.colors.gray100};
+  padding: 14px 20px;
+  border-bottom: 1px solid rgba(0, 82, 204, 0.04);
+  font-size: 13px;
+  color: ${theme.colors.textPrimary};
   vertical-align: middle;
-  font-size: ${theme.fontSizes.sm};
-  color: ${theme.colors.textPrimary};
 `;
 
-const BodyRow = styled.tr`
+const Tr = styled.tr`
   &:hover td {
-    background: ${theme.colors.gray50};
-  }
-
-  &:last-child td {
-    border-bottom: none;
-  }
-`;
-
-const TimeCell = styled.span`
-  display: block;
-  font-variant-numeric: tabular-nums;
-  font-size: ${theme.fontSizes.sm};
-  color: ${theme.colors.textPrimary};
-  font-weight: ${theme.fontWeights.medium};
-`;
-
-const SuccessButton = styled(Button)`
-  background-color: ${theme.colors.success};
-  border-color: ${theme.colors.success};
-`;
-
-const ActionTd = styled(Td)`
-  text-align: right;
-  width: 128px;
-`;
-
-const StatusSubtext = styled.div`
-  margin-top: 4px;
-  font-size: ${theme.fontSizes.xs};
-  color: ${theme.colors.textSecondary};
-  font-weight: ${theme.fontWeights.normal};
-  text-transform: none;
-  letter-spacing: normal;
-  line-height: 1.35;
-`;
-
-const AbsenceLink = styled.button`
-  margin-top: 4px;
-  padding: 0;
-  border: none;
-  background: none;
-  color: ${theme.colors.primary};
-  font-size: ${theme.fontSizes.xs};
-  cursor: pointer;
-  text-decoration: underline;
-
-  &:hover {
-    color: ${theme.colors.primaryDark};
+    background: #fafbff;
   }
 `;
 
 const StudentInfo = styled.div`
   display: flex;
   align-items: center;
-  gap: ${theme.spacing.md};
+  gap: 12px;
   min-width: 0;
-  
-  @media (max-width: ${theme.breakpoints.tablet}) {
-    margin-bottom: ${theme.spacing.md};
-    padding-bottom: ${theme.spacing.md};
-    border-bottom: 1px solid ${theme.colors.gray100};
-  }
-  
-  @media (max-width: 420px) {
-    gap: ${theme.spacing.sm};
-    margin-bottom: ${theme.spacing.sm};
-    padding-bottom: ${theme.spacing.sm};
-  }
-  
-  @media (max-width: 360px) {
-    gap: ${theme.spacing.xs};
-  }
 `;
 
 const StudentAvatar = styled.div`
-  width: 40px;
-  height: 40px;
-  border-radius: ${theme.borderRadius.full};
-  background: linear-gradient(135deg, ${theme.colors.primary} 0%, ${theme.colors.primaryLight} 100%);
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #0052CC, #0747A6);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: ${theme.colors.white};
-  font-weight: ${theme.fontWeights.semibold};
-  font-size: ${theme.fontSizes.sm};
-  box-shadow: 0 2px 8px ${theme.colors.primary}20;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 12px;
   flex-shrink: 0;
-  
-  @media (max-width: ${theme.breakpoints.tablet}) {
-    width: 44px;
-    height: 44px;
-    font-size: ${theme.fontSizes.base};
-  }
-  
-  @media (max-width: 420px) {
-    width: 48px;
-    height: 48px;
-    font-size: ${theme.fontSizes.lg};
-  }
-  
-  @media (max-width: 360px) {
-    width: 52px;
-    height: 52px;
-    font-size: ${theme.fontSizes.xl};
-  }
+  box-shadow: 0 2px 6px rgba(0, 82, 204, 0.15);
 `;
 
 const StudentDetails = styled.div`
@@ -445,123 +403,116 @@ const StudentDetails = styled.div`
   flex: 1;
 
   h4 {
-    margin: 0 0 2px 0;
-    font-size: ${theme.fontSizes.base};
-    font-weight: ${theme.fontWeights.semibold};
+    margin: 0;
+    font-size: 13px;
+    font-weight: 700;
     color: ${theme.colors.textPrimary};
     line-height: 1.3;
     word-break: break-word;
   }
 
   p {
-    margin: 0;
-    font-size: ${theme.fontSizes.sm};
+    margin: 2px 0 0;
+    font-size: 12px;
     color: ${theme.colors.textSecondary};
-    line-height: 1.35;
     word-break: break-word;
   }
 `;
 
 const ProfileIssueTag = styled.span`
   display: inline-flex;
-  align-items: center;
-  margin-left: ${theme.spacing.xs};
+  margin-left: 6px;
   padding: 2px 8px;
-  border-radius: ${theme.borderRadius.full};
-  background: rgba(245, 158, 11, 0.15);
+  border-radius: 100px;
+  background: rgba(245, 158, 11, 0.12);
   color: #b45309;
-  font-size: ${theme.fontSizes.xs};
-  font-weight: ${theme.fontWeights.semibold};
+  font-size: 10px;
+  font-weight: 700;
   vertical-align: middle;
 `;
-
-const StatusBadge = styled.div<{ status: 'present' | 'late' | 'absent' | 'completed' }>`
-  display: inline-flex;
-  align-items: center;
-  gap: ${theme.spacing.xs};
-  padding: ${theme.spacing.sm} ${theme.spacing.md};
-  border-radius: ${theme.borderRadius.full};
-  font-size: ${theme.fontSizes.xs};
-  font-weight: ${theme.fontWeights.semibold};
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  border: 1px solid;
-  transition: all 0.2s ease;
-  
-  ${props => {
-    switch (props.status) {
-      case 'present':
-        return `
-          background: rgba(34, 197, 94, 0.1);
-          color: #16a34a;
-          border-color: rgba(34, 197, 94, 0.2);
-        `;
-      case 'late':
-        return `
-          background: rgba(251, 191, 36, 0.1);
-          color: #d97706;
-          border-color: rgba(251, 191, 36, 0.2);
-        `;
-      case 'absent':
-        return `
-          background: rgba(239, 68, 68, 0.1);
-          color: #dc2626;
-          border-color: rgba(239, 68, 68, 0.2);
-        `;
-      case 'completed':
-        return `
-          background: rgba(59, 130, 246, 0.1);
-          color: #2563eb;
-          border-color: rgba(59, 130, 246, 0.2);
-        `;
-      default:
-        return `
-          background: ${theme.colors.gray100};
-          color: ${theme.colors.textSecondary};
-          border-color: ${theme.colors.gray200};
-        `;
-    }
-  }}
-  
-  @media (max-width: ${theme.breakpoints.tablet}) {
-    font-size: ${theme.fontSizes.sm};
-    padding: ${theme.spacing.sm} ${theme.spacing.lg};
-  }
-`;
-
-// NOTE: TimeInfo and LocationInfo were previously defined styled components
-// that are no longer used. They have been removed to satisfy CI lint rules.
 
 const HubCell = styled.span`
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: 12px;
+  color: ${theme.colors.textSecondary};
 `;
 
-const RowActionButton = styled(Button)`
-  min-width: 108px;
+const TimeCell = styled.span`
+  display: block;
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  font-weight: 600;
+  color: ${theme.colors.textPrimary};
+`;
+
+const DurationCell = styled.span`
+  font-weight: 700;
+  color: #F59E0B;
+`;
+
+const StatusBadge = styled.span<{ $status: string }>`
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  border-radius: 100px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  background: ${({ $status }) =>
+    $status === 'present' ? 'rgba(5, 150, 105, 0.1)' :
+    $status === 'late' ? 'rgba(245, 158, 11, 0.1)' :
+    'rgba(239, 68, 68, 0.1)'};
+  color: ${({ $status }) =>
+    $status === 'present' ? '#059669' :
+    $status === 'late' ? '#d97706' :
+    '#dc2626'};
+`;
+
+const StatusSubtext = styled.div`
+  margin-top: 4px;
+  font-size: 11px;
+  color: ${theme.colors.textSecondary};
+`;
+
+const ActionTd = styled(Td)`
+  text-align: right;
+  width: 120px;
+`;
+
+const RowActionBtn = styled(Button)`
+  min-width: 96px;
+  font-size: 12px;
+`;
+
+const EmptyState = styled.div`
+  text-align: center;
+  padding: 60px 20px;
+  color: ${theme.colors.textSecondary};
+
+  h3 {
+    font-size: 16px;
+    font-weight: 700;
+    color: ${theme.colors.textPrimary};
+    margin: 0 0 4px;
+  }
+
+  p {
+    margin: 0;
+    font-size: 13px;
+  }
 `;
 
 const LoadingState = styled.div`
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: ${theme.spacing['3xl']};
-  color: ${theme.colors.textSecondary};
-  font-size: ${theme.fontSizes.lg};
-`;
-
-const EmptyState = styled.div`
-  text-align: center;
-  padding: ${theme.spacing['3xl']};
-  color: ${theme.colors.textSecondary};
-  
-  h3 {
-    font-size: ${theme.fontSizes.xl};
-    margin-bottom: ${theme.spacing.sm};
-    color: ${theme.colors.textPrimary};
-  }
+  padding: 60px;
+  color: ${theme.colors.textLight};
+  font-size: 14px;
 `;
 
 interface AttendancePageProps {
@@ -585,19 +536,9 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [fixingLocations, setFixingLocations] = useState(false);
-  const [absenceModal, setAbsenceModal] = useState<{
-    userId: string;
-    userName: string;
-    studentHubId?: string;
-    initialReason?: 'excused' | 'unexcused' | 'dropout';
-    initialNotes?: string;
-  } | null>(null);
   const [csvLoading, setCsvLoading] = useState(false);
   const dataService = DataService.getInstance();
   const attendanceService = AttendanceService.getInstance();
-
-  // ...rest of hooks and logic...
-
 
   const loadAttendanceSummary = useCallback(async () => {
     try {
@@ -607,7 +548,6 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
       setAttendanceSummary(summary);
     } catch (error) {
       console.error('Error loading attendance summary:', error);
-      // TODO: Toast removed for CI build. error('Failed to load attendance data');
     } finally {
       setLoading(false);
     }
@@ -616,7 +556,6 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
   useEffect(() => {
     const today = timeService.getCurrentDateString();
 
-    // For today, use a real-time listener (feels “live” and avoids re-fetch loops).
     if (selectedDate === today) {
       setLoading(true);
       const unsubscribe = dataService.subscribeToTodayAttendance((summary) => {
@@ -626,7 +565,6 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
       return unsubscribe;
     }
 
-    // For non-today dates, do a one-time fetch.
     loadAttendanceSummary();
   }, [selectedDate, loadAttendanceSummary, effectiveHub, timeService]);
 
@@ -648,10 +586,9 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
 
   const getFilteredAttendance = () => {
     if (!attendanceSummary) return [];
-    
+
     let filtered = [...attendanceSummary.attendanceList];
 
-    // Apply search filter
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim();
       filtered = filtered.filter(record => {
@@ -679,9 +616,6 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
     return filtered;
   };
 
-  const profileMismatchCount = attendanceSummary
-    ? (attendanceSummary.attendanceList || []).filter((r: any) => r.profileMissing).length
-    : 0;
 
   const getInitials = (name: string) => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase();
@@ -689,48 +623,19 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
 
   const handleFixLocations = async () => {
     if (fixingLocations) return;
-    
+
     setFixingLocations(true);
     try {
-      // TODO: Toast removed for CI build. info('Fixing location records...', { autoClose: 2000 });
-      
       const result = await attendanceService.fixExistingLocationRecords();
-      
+
       if (result.updated > 0) {
-        // TODO: Toast removed for CI build.
-        // success(
-        //   `Successfully updated ${result.updated} location records!${
-        //     result.errors > 0 ? ` (${result.errors} errors)` : ''
-        //   }`,
-        //   { autoClose: 5000 }
-        // );
-        
-        // Reload the attendance data to show updated locations
         await loadAttendanceSummary();
-      } else {
-        // TODO: Toast removed for CI build. info('No location records needed updating.', { autoClose: 3000 });
       }
-      
     } catch (error) {
       console.error('Error fixing locations:', error);
-      // TODO: Toast removed for CI build. error('Failed to fix location records. Please try again.', { autoClose: 4000 });
     } finally {
       setFixingLocations(false);
     }
-  };
-
-  const handleOpenAbsenceModal = (record: any) => {
-    if (user?.userType === 'instructor' && !staffMayAccessHubForWrite(user, record.hubId)) {
-      uniqueToast.error('You can only edit absence records for students in your hub.');
-      return;
-    }
-    setAbsenceModal({
-      userId: record.userId,
-      userName: record.userName || 'Student',
-      studentHubId: record.hubId,
-      initialReason: record.absenceReason,
-      initialNotes: record.absenceNotes,
-    });
   };
 
   const handleDownloadAttendanceCsv = async () => {
@@ -760,13 +665,11 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
   if (user?.userType !== 'admin' && user?.userType !== 'instructor') {
     return (
       <PageContainer>
-        <div style={{ textAlign: 'center', padding: theme.spacing['3xl'] }}>
-          <h2>Access Denied</h2>
-          <p>Only administrators and instructors can access this page.</p>
+        <div style={{ textAlign: 'center', padding: '60px 20px' }}>
+          <h2 style={{ fontSize: 20, fontWeight: 700, color: theme.colors.textPrimary }}>Access Denied</h2>
+          <p style={{ color: theme.colors.textSecondary, marginTop: 8 }}>Only administrators and instructors can access this page.</p>
           {onBack && (
-            <Button variant="primary" onClick={onBack}>
-              Back to Dashboard
-            </Button>
+            <Space size="20px" />
           )}
         </div>
       </PageContainer>
@@ -777,17 +680,7 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
     <PageContainer>
       <Header>
         <HeaderTitle>
-          <h1 style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: theme.spacing.lg,
-            margin: 0 
-          }}>
-            Attendance Records</h1>
-          <p>
-            Check-in and check-out for the selected date (Africa/Harare). Staff can mark present after the
-            student window closes.
-          </p>
+          <h1>Attendance Records</h1>
         </HeaderTitle>
         {onBack && (
           <Button variant="outline" onClick={onBack}>
@@ -796,141 +689,172 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
         )}
       </Header>
 
+      {attendanceSummary && (
+        <StatsRow>
+          <StatCard $color="#0052CC" $bg="rgba(0, 82, 204, 0.1)">
+            <StatIconWrap $bg="rgba(0, 82, 204, 0.1)">
+              <Users size={18} color="#0052CC" />
+            </StatIconWrap>
+            <StatInfo>
+              <StatValue>{attendanceSummary.totalUsers}</StatValue>
+              <StatLabel>Total Students</StatLabel>
+            </StatInfo>
+          </StatCard>
+          <StatCard $color="#059669" $bg="rgba(5, 150, 105, 0.1)">
+            <StatIconWrap $bg="rgba(5, 150, 105, 0.1)">
+              <LogIn size={18} color="#059669" />
+            </StatIconWrap>
+            <StatInfo>
+              <StatValue>{attendanceSummary.presentCount}</StatValue>
+              <StatLabel>Present</StatLabel>
+            </StatInfo>
+          </StatCard>
+          <StatCard $color="#dc2626" $bg="rgba(220, 38, 38, 0.1)">
+            <StatIconWrap $bg="rgba(220, 38, 38, 0.1)">
+              <LogOut size={18} color="#dc2626" />
+            </StatIconWrap>
+            <StatInfo>
+              <StatValue>{attendanceSummary.absentCount}</StatValue>
+              <StatLabel>Absent</StatLabel>
+            </StatInfo>
+          </StatCard>
+          <StatCard $color="#d97706" $bg="rgba(217, 119, 6, 0.1)">
+            <StatIconWrap $bg="rgba(217, 119, 6, 0.1)">
+              <Calendar size={18} color="#d97706" />
+            </StatIconWrap>
+            <StatInfo>
+              <StatValue>{attendanceSummary.lateCount}</StatValue>
+              <StatLabel>Late</StatLabel>
+            </StatInfo>
+          </StatCard>
+        </StatsRow>
+      )}
+
       <FilterSection>
-        <FilterGroup>
-          <label>Search</label>
-          <input
-            type="text"
-            placeholder="Search by name or ID..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '14px' }}
+        <FilterRow>
+          <SearchWrap>
+            <Search size={15} />
+            <SearchInput
+              type="text"
+              placeholder="Search by name..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </SearchWrap>
+          <FilterGroup>
+            <label><Calendar size={12} />Date</label>
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+            />
+          </FilterGroup>
+          <FilterGroup>
+            <label><Filter size={12} />Status</label>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+            >
+              <option value="all">All</option>
+              <option value="present">Present (All)</option>
+              <option value="on-time">Present (On-Time)</option>
+              <option value="late">Present (Late)</option>
+              <option value="absent">Absent</option>
+            </select>
+          </FilterGroup>
+          <AdminHubScopeSelect
+            user={user}
+            value={adminHubFilter}
+            onChange={setAdminHubFilter}
+            id="attendance-page-hub-filter"
           />
-        </FilterGroup>
-        <FilterGroup>
-          <label>Date</label>
-          <input
-            type="date"
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-          />
-        </FilterGroup>
-        <FilterGroup>
-          <label>Status</label>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-          >
-            <option value="all">All</option>
-            <option value="present">Present (All)</option>
-            <option value="on-time">Present (On-Time)</option>
-            <option value="late">Present (Late)</option>
-            <option value="absent">Absent</option>
-          </select>
-        </FilterGroup>
-        <AdminHubScopeSelect
-          user={user}
-          value={adminHubFilter}
-          onChange={setAdminHubFilter}
-          id="attendance-page-hub-filter"
-        />
-        {attendanceSummary && (
-          <StatsContainer>
-            <StatItem>Total: {attendanceSummary.totalUsers}</StatItem>
-            <StatItem>Present: {attendanceSummary.presentCount}</StatItem>
-            <StatItem>Absent: {attendanceSummary.absentCount}</StatItem>
-            <StatItem>Late: {attendanceSummary.lateCount}</StatItem>
-            {profileMismatchCount > 0 && (
-              <StatItem title="Attendance rows that don't have a clean linked student profile">
-                Profile issues: {profileMismatchCount}
-              </StatItem>
-            )}
-          </StatsContainer>
-        )}
+        </FilterRow>
       </FilterSection>
-      
-      <ActionButtonsContainer>
-        {isToday && (
-          <>
-            <SuccessButton
-              variant="primary"
-              onClick={() => void staffActions.markAllPresent()}
-              disabled={
-                !hubScopeActive ||
-                !canWriteSelectedHub ||
-                loading ||
-                staffActions.checkoutAllLoading ||
-                staffActions.bulkLoading
-              }
-            >
-              <CheckCircleIcon size={18} /> Check in all
-            </SuccessButton>
-            <Button
-              variant="outline"
-              onClick={() => void staffActions.checkOutAllOpen()}
-              disabled={
-                !hubScopeActive ||
-                !canWriteSelectedHub ||
-                loading ||
-                staffActions.checkoutAllLoading ||
-                staffActions.bulkLoading
-              }
-            >
-              <FiLogOut size={18} style={{ marginRight: 8 }} />
-              {staffActions.checkoutAllLoading ? 'Checking out…' : 'Check out everyone'}
-            </Button>
-          </>
-        )}
-        <Button variant="outline" onClick={() => { setSelectedDate(''); setStatusFilter('all'); setSearchQuery(''); }}>
-          Clear Filters
-        </Button>
-        <Button
-          variant="secondary"
-          onClick={handleDownloadAttendanceCsv}
-          disabled={csvLoading || loading}
-        >
-          {csvLoading ? 'Preparing CSV…' : 'Download CSV (this date)'}
-        </Button>
-        {user?.userType === 'admin' && (
-          <Button 
-            variant="secondary" 
-            onClick={handleFixLocations}
-            disabled={fixingLocations}
+
+      <ActionBar>
+        <ActionGroup>
+          {isToday && (
+            <>
+              <CheckInBtn
+                onClick={() => void staffActions.markAllPresent()}
+                disabled={
+                  !hubScopeActive ||
+                  !canWriteSelectedHub ||
+                  loading ||
+                  staffActions.checkoutAllLoading ||
+                  staffActions.bulkLoading
+                }
+              >
+                <LogIn size={15} /> Check in all
+              </CheckInBtn>
+              <CheckOutBtn
+                onClick={() => void staffActions.checkOutAllOpen()}
+                disabled={
+                  !hubScopeActive ||
+                  !canWriteSelectedHub ||
+                  loading ||
+                  staffActions.checkoutAllLoading ||
+                  staffActions.bulkLoading
+                }
+              >
+                <LogOut size={15} />
+                {staffActions.checkoutAllLoading ? 'Checking out…' : 'Check out everyone'}
+              </CheckOutBtn>
+            </>
+          )}
+        </ActionGroup>
+        <ActionGroup>
+          <GhostBtn onClick={() => { setSelectedDate(''); setStatusFilter('all'); setSearchQuery(''); }}>
+            Clear Filters
+          </GhostBtn>
+          <CsvBtn
+            onClick={handleDownloadAttendanceCsv}
+            disabled={csvLoading || loading}
           >
-            <LocationOnIcon size={16} style={{ marginRight: theme.spacing.xs }} />
-            {fixingLocations ? 'Fixing Locations...' : 'Fix Location Records'}
-          </Button>
-        )}
-      </ActionButtonsContainer>
+            <Download size={15} />
+            {csvLoading ? 'Preparing CSV…' : 'Download CSV'}
+          </CsvBtn>
+          {user?.userType === 'admin' && (
+            <FixBtn
+              onClick={handleFixLocations}
+              disabled={fixingLocations}
+            >
+              {fixingLocations ? 'Fixing Locations...' : 'Fix Locations'}
+            </FixBtn>
+          )}
+        </ActionGroup>
+      </ActionBar>
 
       {loading ? (
         <LoadingState>
           Loading attendance records...
         </LoadingState>
       ) : getFilteredAttendance().length === 0 ? (
-        <EmptyState>
-          <h3>No Attendance Records</h3>
-          <p>No attendance records match your current filters.</p>
-        </EmptyState>
+        <TableCard>
+          <EmptyState>
+            <h3>No Attendance Records</h3>
+            <p>No attendance records match your current filters.</p>
+          </EmptyState>
+        </TableCard>
       ) : (
-        <AttendanceTableWrap>
+        <TableCard>
           <TableScroll>
-            <AttendanceTable>
+            <Table>
               <colgroup>
-                <col style={{ width: '30%' }} />
-                <col style={{ width: '14%' }} />
-                <col style={{ width: '16%' }} />
-                <col style={{ width: '11%' }} />
+                <col style={{ width: '26%' }} />
+                <col style={{ width: '13%' }} />
+                <col style={{ width: '13%' }} />
                 <col style={{ width: '13%' }} />
                 <col style={{ width: '16%' }} />
+                <col style={{ width: '19%' }} />
               </colgroup>
               <thead>
                 <tr>
                   <Th>Student</Th>
-                  <Th>Hub</Th>
+                  <Th>Check In</Th>
+                  <Th>Check Out</Th>
+                  <Th>Duration</Th>
                   <Th>Status</Th>
-                  <Th>Check-in</Th>
-                  <Th>Check-out</Th>
                   <Th style={{ textAlign: 'right' }}>Action</Th>
                 </tr>
               </thead>
@@ -941,24 +865,20 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
                     user?.userType === 'admin' ||
                     (user?.userType === 'instructor' && staffMayAccessHubForWrite(user, record.hubId));
                   const studentId = record.userId;
-                  const studentName = record.userName || 'Unknown Student';
-                  const hubLabel = resolvedHubLabel({
-                    hubId: (record as any).hubId,
-                    hubName: (record as any).hubName,
-                  });
+                  const studentName = record.userName || record.userEmail || 'User';
                   const statusKey =
-                    record.status === 'completed' ? 'completed' : record.status;
+                    record.status === 'completed' ? 'present' : record.status;
 
                   return (
-                    <BodyRow key={record.userId}>
+                    <Tr key={record.userId}>
                       <Td>
                         <StudentInfo>
                           <StudentAvatar>
-                            {getInitials(record.userName || 'Unknown')}
+                            {getInitials(record.userName || record.userEmail || 'User')}
                           </StudentAvatar>
                           <StudentDetails>
                             <h4>
-                              {record.userName || 'Unknown Student'}
+                              {record.userName || record.userEmail || 'User'}
                               {(record as any).profileMissing && (
                                 <ProfileIssueTag title="This attendance row could not be linked to a valid student profile.">
                                   Profile issue
@@ -969,41 +889,41 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
                           </StudentDetails>
                         </StudentInfo>
                       </Td>
-                      <Td title={hubLabel}>
-                        <HubCell>{hubLabel}</HubCell>
-                      </Td>
-                      <Td>
-                        <StatusBadge status={statusKey}>
-                          <CheckCircleIcon size={12} />
-                          {record.status === 'completed' ? 'present' : record.status}
-                        </StatusBadge>
-                        {record.status === 'absent' && (
-                          <StatusSubtext>
-                            {absenceReasonLabel(record.absenceReason)}
-                            {record.absenceNotes ? ` — ${record.absenceNotes}` : ''}
-                            {canWriteRow && (
-                              <>
-                                <br />
-                                <AbsenceLink type="button" onClick={() => handleOpenAbsenceModal(record)}>
-                                  {record.absenceReason ? 'Edit absence' : 'Record absence'}
-                                </AbsenceLink>
-                              </>
-                            )}
-                          </StatusSubtext>
-                        )}
-                        {(record.status === 'late' || record.isLate) && record.lateReason && (
-                          <StatusSubtext title={record.lateReason}>Late: {record.lateReason}</StatusSubtext>
-                        )}
-                      </Td>
                       <Td>
                         <TimeCell>{meta.checkInDisp}</TimeCell>
                       </Td>
                       <Td>
                         <TimeCell>{meta.checkOutDisp}</TimeCell>
                       </Td>
+                      <Td>
+                        <DurationCell>
+                          {(() => {
+                            if (meta.checkedOut && record.checkInTime && record.checkOutTime) {
+                              const start = new Date(record.checkInTime).getTime();
+                              const end = new Date(record.checkOutTime).getTime();
+                              if (!isNaN(start) && !isNaN(end) && end > start) {
+                                const diffMins = Math.floor((end - start) / 60000);
+                                const h = Math.floor(diffMins / 60);
+                                const m = diffMins % 60;
+                                return h > 0 ? `${h}h ${m}m` : `${m}m`;
+                              }
+                            }
+                            return '—';
+                          })()}
+                        </DurationCell>
+                      </Td>
+                      <Td>
+                        <StatusBadge $status={statusKey}>
+                          {statusKey === 'present' && <Users size={11} />}
+                          {statusKey}
+                        </StatusBadge>
+                        {(record.status === 'late' || record.isLate) && record.lateReason && (
+                          <StatusSubtext title={record.lateReason}>Late: {record.lateReason}</StatusSubtext>
+                        )}
+                      </Td>
                       <ActionTd>
                         {canWriteRow && isToday && !meta.hasIn && (
-                          <RowActionButton
+                          <RowActionBtn
                             variant="primary"
                             size="sm"
                             onClick={() =>
@@ -1011,10 +931,10 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
                             }
                           >
                             Check in
-                          </RowActionButton>
+                          </RowActionBtn>
                         )}
                         {canWriteRow && isToday && meta.hasIn && !meta.checkedOut && (
-                          <RowActionButton
+                          <RowActionBtn
                             variant="outline"
                             size="sm"
                             loading={staffActions.checkoutStudentId === studentId}
@@ -1023,45 +943,25 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ onBack }) => {
                               void staffActions.checkOutStudent(studentId, studentName, record.hubId)
                             }
                           >
-                            <FiLogOut size={14} /> Check out
-                          </RowActionButton>
+                            <FiLogOut size={12} style={{ marginRight: 4 }} /> Check out
+                          </RowActionBtn>
                         )}
                         {canWriteRow && isToday && meta.hasIn && meta.checkedOut && (
-                          <TimeCell style={{ color: theme.colors.textSecondary, fontWeight: 400 }}>
-                            Done
-                          </TimeCell>
+                          <span style={{ color: theme.colors.textLight, fontSize: 12 }}>Done</span>
                         )}
                         {(!canWriteRow || !isToday) && (
-                          <TimeCell style={{ color: theme.colors.textSecondary, fontWeight: 400 }}>
-                            —
-                          </TimeCell>
+                          <span style={{ color: theme.colors.textLight, fontSize: 12 }}>—</span>
                         )}
                       </ActionTd>
-                    </BodyRow>
+                    </Tr>
                   );
                 })}
               </tbody>
-            </AttendanceTable>
+            </Table>
           </TableScroll>
-        </AttendanceTableWrap>
+        </TableCard>
       )}
-      {absenceModal && user && (
-        <AbsenceRecordModal
-          open
-          onClose={() => setAbsenceModal(null)}
-          studentId={absenceModal.userId}
-          studentName={absenceModal.userName}
-          dateStr={selectedDate}
-          hubId={effectiveHub ?? absenceModal.studentHubId}
-          recordedByUid={user.uid}
-          recordedByName={user.displayName || user.email || 'Staff'}
-          initialReason={absenceModal.initialReason}
-          initialNotes={absenceModal.initialNotes}
-          onSaved={() => {
-            void refreshAttendance();
-          }}
-        />
-      )}
+
     </PageContainer>
   );
 };

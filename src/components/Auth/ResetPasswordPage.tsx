@@ -1,13 +1,11 @@
-import React, { useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useSignIn } from '@clerk/clerk-react';
 import styled from 'styled-components';
-import { confirmPasswordReset, verifyPasswordResetCode } from 'firebase/auth';
-import { auth } from '../../services/firebase';
 import { Button } from '../Common/Button';
 import { Input } from '../Common/Input';
 import { Card } from '../Common/Card';
 import { theme } from '../../styles/theme';
-import { getFirebaseAuthErrorMessage } from '../../utils/firebaseAuthErrors';
 import { FiCheckCircle, FiAlertTriangle } from 'react-icons/fi';
 
 const Wrap = styled.div`
@@ -39,123 +37,110 @@ const Sub = styled.p`
   line-height: 1.5;
 `;
 
-function extractOobCode(searchParams: URLSearchParams, hash: string): string | null {
-  let c = searchParams.get('oobCode');
-  if (c) return c;
-  if (hash) {
-    const q = hash.startsWith('#') ? hash.slice(1) : hash;
-    try {
-      const p = new URLSearchParams(q);
-      c = p.get('oobCode');
-      if (c) return c;
-    } catch {
-      /* ignore */
-    }
-  }
-  return null;
-}
+const ErrorRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${theme.spacing.sm};
+  color: #dc2626;
+  font-size: ${theme.fontSizes.sm};
+  margin-top: ${theme.spacing.md};
+`;
 
-function tryParseOobFromPasted(text: string): string | null {
-  const t = text.trim();
-  if (!t) return null;
-  if (/^[A-Za-z0-9_-]{20,}$/.test(t) && !t.includes('://')) {
-    return t;
-  }
-  try {
-    const u = new URL(t);
-    return u.searchParams.get('oobCode');
-  } catch {
-    return null;
-  }
-}
+const SuccessRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${theme.spacing.sm};
+  color: ${theme.colors.success};
+  margin-bottom: ${theme.spacing.lg};
+`;
+
+type Step = 'request' | 'verify' | 'done';
 
 /**
- * Public route: completes Firebase password reset using `oobCode` from the email link
- * (or pasted). Updates Auth password; Firestore user docs stay as-is.
+ * Password reset page powered by Clerk's native reset_password_email_code flow.
+ *
+ * Step 1 (request): user enters their email → Clerk sends a 6-digit code.
+ * Step 2 (verify):  user enters the code + new password → Clerk confirms the reset.
+ * Step 3 (done):    success screen with link back to sign-in.
  */
 export default function ResetPasswordPage(): React.ReactElement {
-  const [searchParams] = useSearchParams();
-  const [oobCode, setOobCode] = useState<string | null>(null);
-  const [emailHint, setEmailHint] = useState<string | null>(null);
+  const { signIn, isLoaded, setActive } = useSignIn();
+  const navigate = useNavigate();
+
+  const [step, setStep] = useState<Step>('request');
+  // Pre-fill email if coming from the login page "Forgot password?" flow
+  const [email, setEmail] = useState(() => {
+    try { return sessionStorage.getItem('resetEmail') || ''; } catch { return ''; }
+  });
+  const [code, setCode] = useState('');
   const [pwd, setPwd] = useState('');
   const [pwd2, setPwd2] = useState('');
-  const [paste, setPaste] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [verifying, setVerifying] = useState(false);
 
-  useEffect(() => {
-    const code = extractOobCode(searchParams, window.location.hash);
-    if (!code) {
-      return;
+  // If we arrived with a pre-filled email, skip straight to verify step
+  // (user already requested a code from the login page)
+  React.useEffect(() => {
+    const storedEmail = (() => { try { return sessionStorage.getItem('resetEmail'); } catch { return null; } })();
+    if (storedEmail) {
+      // Clear so it doesn't persist on refresh
+      try { sessionStorage.removeItem('resetEmail'); } catch {}
+      setEmail(storedEmail);
+      // Move to verify step — user already received the code
+      setStep('verify');
     }
-    let cancelled = false;
-    setVerifying(true);
-    setError(null);
-    verifyPasswordResetCode(auth, code)
-      .then((email) => {
-        if (!cancelled) {
-          setOobCode(code);
-          setEmailHint(email);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setError('This reset link or code is invalid or has expired. Request a new reset from the sign-in page.');
-          setOobCode(null);
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setVerifying(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [searchParams]);
+  }, []);
 
-  const applyPaste = () => {
-    const code = tryParseOobFromPasted(paste);
-    if (!code) {
-      setError('Could not find a reset code. Paste the full link from your email, or the long code by itself.');
-      return;
-    }
-    setError(null);
-    setVerifying(true);
-    verifyPasswordResetCode(auth, code)
-      .then((email) => {
-        setOobCode(code);
-        setEmailHint(email);
-      })
-      .catch(() => {
-        setError('Invalid or expired code. Request a new password reset email.');
-        setOobCode(null);
-      })
-      .finally(() => setVerifying(false));
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  /* ── Step 1: send reset email ── */
+  const handleRequest = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isLoaded || !signIn) return;
     setError(null);
-    if (!oobCode) {
-      setError('Missing reset code.');
-      return;
-    }
-    if (pwd.length < 6) {
-      setError('Password must be at least 6 characters.');
-      return;
-    }
-    if (pwd !== pwd2) {
-      setError('Passwords do not match.');
-      return;
-    }
     setLoading(true);
     try {
-      await confirmPasswordReset(auth, oobCode, pwd);
-      setSuccess(true);
-    } catch (err: unknown) {
-      const code = err && typeof err === 'object' && 'code' in err ? (err as { code?: string }).code : undefined;
-      setError(getFirebaseAuthErrorMessage(code, 'Could not reset password. Request a new email and try again.'));
+      await signIn.create({
+        identifier: email,
+        strategy: 'reset_password_email_code',
+      });
+      setStep('verify');
+    } catch (err: any) {
+      setError(
+        err?.errors?.[0]?.longMessage ||
+        err?.errors?.[0]?.message ||
+        'Could not send reset email. Check the address and try again.'
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /* ── Step 2: verify code + set new password ── */
+  const handleVerify = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isLoaded || !signIn) return;
+    if (pwd.length < 8) { setError('Password must be at least 8 characters.'); return; }
+    if (pwd !== pwd2) { setError('Passwords do not match.'); return; }
+    setError(null);
+    setLoading(true);
+    try {
+      const result = await signIn.attemptFirstFactor({
+        strategy: 'reset_password_email_code',
+        code,
+        password: pwd,
+      });
+      if (result.status === 'complete') {
+        // Log the user in with the new session
+        await setActive!({ session: result.createdSessionId });
+        setStep('done');
+      } else {
+        setError('Reset incomplete. Please try again.');
+      }
+    } catch (err: any) {
+      setError(
+        err?.errors?.[0]?.longMessage ||
+        err?.errors?.[0]?.message ||
+        'Invalid or expired code. Request a new reset email and try again.'
+      );
     } finally {
       setLoading(false);
     }
@@ -164,108 +149,143 @@ export default function ResetPasswordPage(): React.ReactElement {
   return (
     <Wrap>
       <StyledCard>
-        <Title>Set a new password</Title>
-        <Sub>
-          {success
-            ? 'Your password has been updated. You can sign in with your new password.'
-            : verifying
-              ? 'Checking your reset code…'
-              : emailHint
-                ? `Resetting password for ${emailHint}`
-                : 'Open the link in your password-reset email, or paste the full link (or the reset code) below.'}
-        </Sub>
-
-        {success ? (
+        {/* ── Done ── */}
+        {step === 'done' && (
           <>
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: theme.spacing.sm,
-                color: theme.colors.success,
-                marginBottom: theme.spacing.lg,
-              }}
-            >
+            <Title>Password updated!</Title>
+            <SuccessRow>
               <FiCheckCircle size={22} />
-              <span>Password updated successfully.</span>
-            </div>
-            <Link to="/">
-              <Button variant="primary" style={{ width: '100%' }}>
-                Back to sign in
-              </Button>
-            </Link>
+              <span>Your password has been changed successfully.</span>
+            </SuccessRow>
+            <Sub>You are now signed in. Head to the dashboard to continue.</Sub>
+            <Button
+              variant="primary"
+              style={{ width: '100%' }}
+              onClick={() => navigate('/')}
+            >
+              Go to dashboard
+            </Button>
           </>
-        ) : (
-          <form onSubmit={handleSubmit}>
-            {!emailHint && !verifying && (
-              <>
-                <label style={{ fontSize: theme.fontSizes.sm, fontWeight: 600, display: 'block', marginBottom: 6 }}>
-                  Paste link or code from email
-                </label>
-                <textarea
-                  value={paste}
-                  onChange={(e) => setPaste(e.target.value)}
-                  rows={3}
-                  placeholder="https://… or paste the long reset code"
-                  style={{
-                    width: '100%',
-                    marginBottom: theme.spacing.md,
-                    padding: theme.spacing.md,
-                    borderRadius: theme.borderRadius.md,
-                    border: `1px solid ${theme.colors.gray300}`,
-                    fontSize: theme.fontSizes.sm,
-                  }}
-                />
-                <Button type="button" variant="outline" onClick={applyPaste} disabled={verifying || !paste.trim()}>
-                  Continue with pasted link / code
-                </Button>
-              </>
-            )}
+        )}
 
-            {emailHint && oobCode && (
-              <>
-                <Input
-                  label="New password"
-                  type="password"
-                  value={pwd}
-                  onChange={(e) => setPwd(e.target.value)}
-                />
-                <div style={{ marginTop: theme.spacing.md }} />
-                <Input
-                  label="Confirm new password"
-                  type="password"
-                  value={pwd2}
-                  onChange={(e) => setPwd2(e.target.value)}
-                />
-              </>
-            )}
-
-            {error && (
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: theme.spacing.sm,
-                  color: '#dc2626',
-                  fontSize: theme.fontSizes.sm,
-                  marginTop: theme.spacing.md,
-                }}
+        {/* ── Step 1: request ── */}
+        {step === 'request' && (
+          <>
+            <Title>Reset your password</Title>
+            <Sub>
+              Enter the email address on your account and we'll send you a 6-digit
+              code to reset your password.
+            </Sub>
+            <form onSubmit={handleRequest}>
+              <Input
+                label="Email address"
+                type="email"
+                value={email}
+                onChange={(e) => { setEmail(e.target.value); setError(null); }}
+                placeholder="you@example.com"
+                required
+                fullWidth
+              />
+              {error && (
+                <ErrorRow>
+                  <FiAlertTriangle /> {error}
+                </ErrorRow>
+              )}
+              <Button
+                type="submit"
+                variant="primary"
+                loading={loading}
+                disabled={loading || !email}
+                style={{ marginTop: theme.spacing.lg, width: '100%' }}
               >
-                <FiAlertTriangle />
-                {error}
-              </div>
-            )}
-
-            {emailHint && oobCode && (
-              <Button type="submit" variant="primary" loading={loading} disabled={loading || verifying} style={{ marginTop: theme.spacing.lg, width: '100%' }}>
-                Update password
+                Send reset code
               </Button>
-            )}
-
+            </form>
             <p style={{ marginTop: theme.spacing.xl, fontSize: theme.fontSizes.sm, textAlign: 'center' }}>
               <Link to="/">← Back to sign in</Link>
             </p>
-          </form>
+          </>
+        )}
+
+        {/* ── Step 2: verify ── */}
+        {step === 'verify' && (
+          <>
+            <Title>Check your email</Title>
+            <Sub>
+              We sent a 6-digit code to <strong>{email}</strong>. Enter it below
+              along with your new password.
+            </Sub>
+            <form onSubmit={handleVerify}>
+              <input
+                type="text"
+                inputMode="numeric"
+                maxLength={6}
+                value={code}
+                onChange={(e) => { setCode(e.target.value.replace(/\D/g, '')); setError(null); }}
+                placeholder="• • • • • •"
+                required
+                style={{
+                  width: '100%',
+                  padding: '13px 16px',
+                  fontSize: '1.5rem',
+                  letterSpacing: '0.4em',
+                  textAlign: 'center',
+                  background: '#f1f5f9',
+                  border: '1.5px solid transparent',
+                  borderRadius: '12px',
+                  fontFamily: 'inherit',
+                  color: '#111827',
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                }}
+                onFocus={e => { e.target.style.borderColor = '#2563eb'; e.target.style.background = '#fff'; }}
+                onBlur={e => { e.target.style.borderColor = 'transparent'; e.target.style.background = '#f1f5f9'; }}
+              />
+              <div style={{ marginTop: theme.spacing.md }} />
+              <Input
+                label="New password"
+                type="password"
+                value={pwd}
+                onChange={(e) => { setPwd(e.target.value); setError(null); }}
+                placeholder="Min. 8 characters"
+                required
+                fullWidth
+              />
+              <div style={{ marginTop: theme.spacing.md }} />
+              <Input
+                label="Confirm new password"
+                type="password"
+                value={pwd2}
+                onChange={(e) => { setPwd2(e.target.value); setError(null); }}
+                placeholder="Repeat your password"
+                required
+                fullWidth
+              />
+              {error && (
+                <ErrorRow>
+                  <FiAlertTriangle /> {error}
+                </ErrorRow>
+              )}
+              <Button
+                type="submit"
+                variant="primary"
+                loading={loading}
+                disabled={loading || code.length < 6 || !pwd || !pwd2}
+                style={{ marginTop: theme.spacing.lg, width: '100%' }}
+              >
+                Set new password
+              </Button>
+            </form>
+            <p style={{ marginTop: theme.spacing.md, fontSize: theme.fontSizes.sm, textAlign: 'center' }}>
+              <button
+                type="button"
+                style={{ background: 'none', border: 'none', color: theme.colors.primary, cursor: 'pointer', fontSize: 'inherit' }}
+                onClick={() => { setStep('request'); setCode(''); setPwd(''); setPwd2(''); setError(null); }}
+              >
+                ← Re-enter email
+              </button>
+            </p>
+          </>
         )}
       </StyledCard>
     </Wrap>

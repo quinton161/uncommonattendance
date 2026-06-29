@@ -6,8 +6,7 @@ import { Event } from '../../types';
 import { Button } from '../Common/Button';
 import { CreateEventForm } from './CreateEventForm';
 import { theme } from '../../styles/theme';
-import { doc, setDoc, updateDoc, collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
-import { db } from '../../services/firebase';
+import { AttendanceService } from '../../services/attendanceService';
 import { TimeService } from '../../services/timeService';
 
 const DashboardContainer = styled.div`
@@ -300,22 +299,11 @@ export const EventDashboard: React.FC<EventDashboardProps> = ({ onNavigateToProf
       // Create attendance record
       const timeService = TimeService.getInstance();
       const today = timeService.getCurrentDateString();
-      const attendanceId = `${user.uid}_${today}`;
-      const attendanceData = {
-        id: attendanceId,
-        studentId: user.uid,
-        studentName: user.displayName,
-        checkInTime: new Date(),
-        location: {
-          latitude,
-          longitude,
-          address: 'Location captured'
-        },
-        date: today,
-        isPresent: true
-      };
-
-      await setDoc(doc(db, 'attendance', attendanceId), attendanceData);
+      await AttendanceService.getInstance().checkIn(
+        user.uid, user.displayName, undefined,
+        { latitude, longitude, timestamp: Date.now() },
+        false, 'manual', undefined, undefined, undefined
+      );
 
       setCheckedIn(true);
       setCheckInTime(new Date());
@@ -340,15 +328,11 @@ export const EventDashboard: React.FC<EventDashboardProps> = ({ onNavigateToProf
       // Update attendance record
       const timeService = TimeService.getInstance();
       const today = timeService.getCurrentDateString();
-      const attendanceId = `${user.uid}_${today}`;
-      await updateDoc(doc(db, 'attendance', attendanceId), {
-        checkOutTime: new Date(),
-        checkOutLocation: {
-          latitude,
-          longitude,
-          address: 'Location captured'
-        }
-      });
+      await AttendanceService.getInstance().checkOut(
+        user.uid,
+        { latitude, longitude, timestamp: Date.now() },
+        user.hubId
+      );
 
       setCheckedIn(false);
       setCheckInTime(null);
@@ -369,27 +353,10 @@ export const EventDashboard: React.FC<EventDashboardProps> = ({ onNavigateToProf
       try {
         const timeService = TimeService.getInstance();
         const today = timeService.getCurrentDateString();
-        const attendanceId = `${user.uid}_${today}`;
-        const attendanceDoc = await getDocs(
-          query(
-            collection(db, 'attendance'),
-            where('studentId', '==', user.uid),
-            where('date', '==', today),
-            orderBy('checkInTime', 'desc'),
-            limit(1)
-          )
-        );
-
-        if (!attendanceDoc.empty) {
-          const record = attendanceDoc.docs[0].data();
-          const hubOk =
-            !user.hubId ||
-            !record.hubId ||
-            record.hubId === user.hubId;
-          if (hubOk && record.checkInTime && !record.checkOutTime) {
-            setCheckedIn(true);
-            setCheckInTime(record.checkInTime.toDate());
-          }
+        const record = await AttendanceService.getInstance().getTodayAttendance(user.uid, user.hubId);
+        if (record?.checkInTime && !record.checkOutTime) {
+          setCheckedIn(true);
+          setCheckInTime(record.checkInTime);
         }
       } catch (error) {
         console.error('Error checking attendance:', error);

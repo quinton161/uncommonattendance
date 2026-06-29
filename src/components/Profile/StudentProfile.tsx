@@ -1,6 +1,4 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
-import { db } from '../../services/firebase';
 import styled from 'styled-components';
 import { motion, AnimatePresence } from 'framer-motion';
 import { StudentPresenceBadge } from '../Recognition/StudentPresenceBadge';
@@ -521,18 +519,13 @@ export const StudentProfile: React.FC = () => {
     };
     run();
 
-    const q = query(collection(db, 'attendance'), where('studentId', '==', user.uid));
-    const unsub = onSnapshot(
-      q,
-      () => {
-        if (!cancelled) void loadProfileAttendance();
-      },
-      (err) => console.error('Student profile attendance listener:', err)
-    );
+    const pollInterval = setInterval(() => {
+      if (!cancelled) void loadProfileAttendance();
+    }, 30000);
 
     return () => {
       cancelled = true;
-      unsub();
+      clearInterval(pollInterval);
     };
   }, [user?.uid, loadProfileAttendance]);
   

@@ -6,6 +6,49 @@
 
 :root {
   --app-font-sans: 'Chillax', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+  --background: 226 100% 97%;
+  --foreground: 222 47% 11%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 47% 11%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 47% 11%;
+  --primary: 217 100% 40%;
+  --primary-foreground: 210 40% 98%;
+  --secondary: 217 33% 95%;
+  --secondary-foreground: 217 100% 40%;
+  --muted: 217 33% 95%;
+  --muted-foreground: 215 16% 47%;
+  --accent: 217 33% 95%;
+  --accent-foreground: 217 100% 40%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 217 100% 40% / 0.1;
+  --input: 217 33% 92%;
+  --ring: 217 100% 40%;
+  --radius: 0.75rem;
+}
+
+.dark {
+  --background: 222 47% 11%;
+  --foreground: 210 40% 98%;
+  --card: 222 47% 11%;
+  --card-foreground: 210 40% 98%;
+  --popover: 222 47% 11%;
+  --popover-foreground: 210 40% 98%;
+  --primary: 217 100% 60%;
+  --primary-foreground: 222 47% 11%;
+  --secondary: 217 33% 18%;
+  --secondary-foreground: 210 40% 98%;
+  --muted: 217 33% 18%;
+  --muted-foreground: 215 20% 65%;
+  --accent: 217 33% 18%;
+  --accent-foreground: 210 40% 98%;
+  --destructive: 0 63% 31%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 217 33% 18%;
+  --input: 217 33% 18%;
+  --ring: 217 100% 60%;
 }
 
 * {
@@ -22,83 +65,63 @@ body {
 }
 
 code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
 }
 
-button[class*='bg-blue-'],
-button[class*='from-blue-'],
-button[class*='to-blue-'],
-button[class*='bg-[#0052CC]'],
-button[class*='from-[#0052CC]'],
-button[class*='to-[#0052CC]'],
-button[class*='bg-[#003D99]'],
-button[class*='from-[#003D99]'],
-button[class*='to-[#003D99]'],
-button[class*='bg-[#1a7fff]'],
-button[class*='from-[#1a7fff]'],
-button[class*='to-[#1a7fff]'],
-button[style*='background: #0052CC'],
-button[style*='background: #0052cc'],
-button[style*='background: rgb(0, 82, 204)'],
-button[style*='background: #003D99'],
-button[style*='background: #003d99'],
-button[style*='background: rgb(0, 61, 153)'],
-button[style*='background: #3b82f6'],
-button[style*='background: rgb(59, 130, 246)'],
-button[style*='background: #1e3a8a'],
-button[style*='background: rgb(30, 58, 138)'] {
-  color: #ffffff !important;
+/* ─────────────────────────────────────────────────────────────────
+   AUTH PAGE — complete isolation from all global button overrides
+   The auth page uses styled-components with `all: unset` on every
+   button, so we must NOT apply any background/border/padding here.
+───────────────────────────────────────────────────────────────── */
+[data-ui='auth-page'] button {
+  background: none !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
 }
 
-button[class*='bg-blue-'] *,
-button[class*='from-blue-'] *,
-button[class*='to-blue-'] *,
-button[class*='bg-[#0052CC]'] *,
-button[class*='from-[#0052CC]'] *,
-button[class*='to-[#0052CC]'] *,
-button[class*='bg-[#003D99]'] *,
-button[class*='from-[#003D99]'] *,
-button[class*='to-[#003D99]'] *,
-button[class*='bg-[#1a7fff]'] *,
-button[class*='from-[#1a7fff]'] *,
-button[class*='to-[#1a7fff]'] *,
-button[style*='background: #0052CC'] *,
-button[style*='background: #0052cc'] *,
-button[style*='background: rgb(0, 82, 204)'] *,
-button[style*='background: #003D99'] *,
-button[style*='background: #003d99'] *,
-button[style*='background: rgb(0, 61, 153)'] *,
-button[style*='background: #3b82f6'] *,
-button[style*='background: rgb(59, 130, 246)'] *,
-button[style*='background: #1e3a8a'] *,
-button[style*='background: rgb(30, 58, 138)'] * {
+/* ─────────────────────────────────────────────────────────────────
+   NON-AUTH pages — blue-background Tailwind buttons keep white children
+───────────────────────────────────────────────────────────────── */
+body:not(:has([data-ui='auth-page'])) button[class*='bg-blue-'] *,
+body:not(:has([data-ui='auth-page'])) button[class*='from-blue-'] *,
+body:not(:has([data-ui='auth-page'])) button[class*='to-blue-'] *,
+body:not(:has([data-ui='auth-page'])) button[class*='bg-[#0052CC]'] *,
+body:not(:has([data-ui='auth-page'])) button[class*='from-[#0052CC]'] *,
+body:not(:has([data-ui='auth-page'])) button[class*='to-[#0052CC]'] *,
+body:not(:has([data-ui='auth-page'])) button[class*='bg-[#003D99]'] *,
+body:not(:has([data-ui='auth-page'])) button[class*='from-[#003D99]'] *,
+body:not(:has([data-ui='auth-page'])) button[class*='to-[#003D99]'] *,
+body:not(:has([data-ui='auth-page'])) button[class*='bg-[#1a7fff]'] *,
+body:not(:has([data-ui='auth-page'])) button[class*='from-[#1a7fff]'] *,
+body:not(:has([data-ui='auth-page'])) button[class*='to-[#1a7fff]'] *,
+body:not(:has([data-ui='auth-page'])) button[style*='background: #0052CC'] *,
+body:not(:has([data-ui='auth-page'])) button[style*='background: #0052cc'] *,
+body:not(:has([data-ui='auth-page'])) button[style*='background: rgb(0, 82, 204)'] *,
+body:not(:has([data-ui='auth-page'])) button[style*='background: #003D99'] *,
+body:not(:has([data-ui='auth-page'])) button[style*='background: #003d99'] *,
+body:not(:has([data-ui='auth-page'])) button[style*='background: rgb(0, 61, 153)'] *,
+body:not(:has([data-ui='auth-page'])) button[style*='background: #3b82f6'] *,
+body:not(:has([data-ui='auth-page'])) button[style*='background: rgb(59, 130, 246)'] *,
+body:not(:has([data-ui='auth-page'])) button[style*='background: #1e3a8a'] *,
+body:not(:has([data-ui='auth-page'])) button[style*='background: rgb(30, 58, 138)'] * {
   color: inherit !important;
 }
 
-::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
-}
+/* ─── Scrollbar ─── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(0, 82, 204, 0.15); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(0, 82, 204, 0.3); }
 
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: rgba(0, 82, 204, 0.15);
-  border-radius: 10px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 82, 204, 0.3);
-}
-
+/* ─── Page backgrounds ─── */
 .page-bg {
   min-height: 100vh;
   background: #eef2ff;
 }
 
+/* ─── Cards ─── */
 .card-white {
   background: #ffffff;
   border: 1px solid rgba(0, 82, 204, 0.06);
@@ -109,96 +132,59 @@ button[style*='background: rgb(30, 58, 138)'] * {
 .card-hover-lift {
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
-
 .card-hover-lift:hover {
   transform: translateY(-1px);
   box-shadow: 0 2px 8px rgba(0, 82, 204, 0.06);
 }
 
-.chip-blue {
-  background: linear-gradient(135deg, #eef4ff, #dceeff);
-  color: #0052cc;
-}
+/* ─── Chips ─── */
+.chip-blue   { background: linear-gradient(135deg, #eef4ff, #dceeff); color: #0052cc; }
+.chip-green  { background: linear-gradient(135deg, #ecfdf5, #d1fae5); color: #059669; }
+.chip-orange { background: linear-gradient(135deg, #fffbeb, #fef3c7); color: #d97706; }
+.chip-red    { background: linear-gradient(135deg, #fff1f2, #ffe4e6); color: #dc2626; }
+.chip-purple { background: linear-gradient(135deg, #f5f3ff, #ede9fe); color: #7c3aed; }
 
-.chip-green {
-  background: linear-gradient(135deg, #ecfdf5, #d1fae5);
-  color: #059669;
-}
+/* ─── GSAP ─── */
+.gsap-target { will-change: transform, opacity; }
 
-.chip-orange {
-  background: linear-gradient(135deg, #fffbeb, #fef3c7);
-  color: #d97706;
-}
-
-.chip-red {
-  background: linear-gradient(135deg, #fff1f2, #ffe4e6);
-  color: #dc2626;
-}
-
-.chip-purple {
-  background: linear-gradient(135deg, #f5f3ff, #ede9fe);
-  color: #7c3aed;
-}
-
-.gsap-target {
-  will-change: transform, opacity;
-}
-
+/* ─── Shimmer skeleton ─── */
 @keyframes shimmer {
-  0% {
-    background-position: -200% 0;
-  }
-  100% {
-    background-position: 200% 0;
-  }
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
 }
-
 .shimmer {
   background: linear-gradient(90deg, #f0f4ff 25%, #e0eaff 50%, #f0f4ff 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
 }
 
+/* ─── Pulse dot ─── */
 @keyframes pulse-dot {
-  0%,
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.5;
-    transform: scale(0.8);
-  }
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.5; transform: scale(0.8); }
 }
+.pulse-dot { animation: pulse-dot 2s ease-in-out infinite; }
 
-.pulse-dot {
-  animation: pulse-dot 2s ease-in-out infinite;
-}
+/* ─── Utility ─── */
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
 
-.no-scrollbar {
-  scrollbar-width: none;
-}
-
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
-}
-
+/* ─── Toast ─── */
 .Toastify__toast {
   font-family: var(--app-font-sans) !important;
   border-radius: 14px !important;
   font-size: 0.875rem !important;
 }
 
-/* Nav / toolbar icon buttons — avoid global primary button styles */
+/* ─── Nav / toolbar icon buttons ─── */
 button[data-ui='icon'],
 button[data-ui='nav'] {
   box-shadow: none !important;
   transform: none !important;
 }
-
 button[data-ui='icon']:hover,
 button[data-ui='nav']:hover {
   transform: none !important;
 }
 
-/* Notification drawer — see GlobalStyles .notification-drawer + NotificationPanel styled cards */
+/* Notification drawer */

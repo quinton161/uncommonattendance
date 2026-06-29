@@ -1,11 +1,6 @@
-import {
-  collection, doc, getDoc, getDocs, setDoc, updateDoc,
-  query, where, orderBy, limit, addDoc,
-  Timestamp, deleteDoc, onSnapshot, serverTimestamp,
-} from 'firebase/firestore';
 import { format, parseISO, subDays } from 'date-fns';
-import { ref, deleteObject } from 'firebase/storage';
-import { db, storage } from './firebase';
+import { convex } from './convexClient';
+import { api } from '../convex/_generated/api';
 import { uniqueToast } from '../utils/toastUtils';
 import { TimeService } from './timeService';
 import { attendanceAnalyticsService } from './attendanceAnalyticsService';
@@ -13,33 +8,11 @@ import { hubIdMatchesScope, resolvedHubLabel, staffMayAccessHubForWrite } from '
 import { isUncommonOrgStaffEmail } from '../constants/staff';
 import { isAdminEmail } from '../constants/admin';
 import type { User } from '../types';
-import { deleteStudentAuthUserCallable } from './staffAuthCleanup';
 
 class DataService {
   private static instance: DataService;
-  private useFirebase = true;
   private usersCache: { rows: any[]; expiresAt: number } | null = null;
   private usersInFlight: Promise<any[]> | null = null;
-  private withTimeout = async <T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> => {
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const timeout = new Promise<never>((_, reject) => {
-      timer = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs);
-    });
-    try {
-      return await Promise.race([promise, timeout]);
-    } finally {
-      if (timer) clearTimeout(timer);
-    }
-  };
-  private async deleteDocsInChunks(
-    refs: Array<{ ref: { path: string } }>,
-    chunkSize = 30
-  ): Promise<void> {
-    for (let i = 0; i < refs.length; i += chunkSize) {
-      const chunk = refs.slice(i, i + chunkSize);
-      await Promise.all(chunk.map((d: any) => deleteDoc(d.ref)));
-    }
-  }
 
   static getInstance(): DataService {
     if (!DataService.instance) DataService.instance = new DataService();
@@ -51,59 +24,9 @@ class DataService {
     this.usersInFlight = null;
   }
 
-  private isStudent(u: any)    { const t = String(u?.userType || '').trim().toLowerCase(); return !t || t==='attendee'||t==='student'; }
+  private isStudent(u: any) { const t = String(u?.userType || '').trim().toLowerCase(); return !t || t==='attendee'||t==='student'; }
   private isInstructor(u: any) { return String(u?.userType || '').trim().toLowerCase()==='instructor'; }
 
-  /** Extract YYYY-MM-DD from a record (Harare calendar; matches attendance `date` field). */
-  private dateStr(record: any): string|undefined {
-    if (record.date && typeof record.date === 'string') return record.date;
-    const c = record.checkInTime;
-    if (!c) return undefined;
-    try {
-      const ts = TimeService.getInstance();
-      const d = c.toDate ? c.toDate() : c instanceof Date ? c : new Date(c);
-      if (Number.isNaN(d.getTime())) return undefined;
-      return ts.toHarareDateString(d);
-    } catch {
-      return undefined;
-    }
-  }
-
-  /** Is the check-in time late? (9:01 AM Harare or later ΓÇö see TimeService.isLate) */
-  private mapAttendanceSnapshotDoc(d: { id: string; data: () => any }): any {
-    const raw = d.data();
-    const ci = raw.checkInTime;
-    const co = raw.checkOutTime;
-    return {
-      id: d.id,
-      ...raw,
-      checkInTime:
-        typeof ci?.toDate === 'function' ? ci.toDate() : ci instanceof Date ? ci : ci,
-      checkOutTime:
-        typeof co?.toDate === 'function' ? co.toDate() : co instanceof Date ? co : co,
-    };
-  }
-
-  /** Merge two attendance arrays by document id (dedupe). */
-  private mergeAttendanceByDocId(a: any[], b: any[]): any[] {
-    const m = new Map<string, any>();
-    [...a, ...b].forEach((r) => {
-      if (r?.id) m.set(r.id, r);
-    });
-    return Array.from(m.values());
-  }
-
-  private calcIsLate(checkInTime: any): boolean {
-    if (!checkInTime) return false;
-    try {
-      const d = checkInTime instanceof Date ? checkInTime
-              : checkInTime.toDate ? checkInTime.toDate()
-              : new Date(checkInTime);
-      return TimeService.getInstance().isLate(d);
-    } catch { return false; }
-  }
-
-  /** Staff-scoped lists: Vincent Bohlen hub includes legacy rows with no `hubId`. */
   private attendanceMatchesHub(row: any, hubId?: string): boolean {
     return hubIdMatchesScope(row?.hubId, hubId);
   }
@@ -113,88 +36,58 @@ class DataService {
     return users.filter((u) => hubIdMatchesScope(u.hubId, hubId));
   }
 
-  async testConnection(): Promise<boolean> {
-    try {
-      await getDocs(query(collection(db,'events'), limit(1)));
-      this.useFirebase = true;
-      return true;
-    } catch {
-      this.useFirebase = false;
-      return false;
-    }
-  }
-
-  // ΓöÇΓöÇ Events ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // ── Events ──────────────────────────────────────────────────────────
 
   async getEvents(): Promise<any[]> {
     try {
-      const snap = await getDocs(query(collection(db,'events'), orderBy('createdAt','desc')));
-      return snap.docs.map(d => ({
-        id: d.id, ...d.data(),
-        startDate: d.data().startDate?.toDate(),
-        endDate:   d.data().endDate?.toDate(),
-        createdAt: d.data().createdAt?.toDate(),
-      }));
+      return await convex.query(api.events.getAllEvents as any) as any[];
     } catch { return []; }
   }
 
   async createEvent(eventData: any): Promise<string> {
-    const ref = await addDoc(collection(db,'events'), {
+    const id = await convex.mutation(api.events.createEvent as any, {
       ...eventData,
-      createdAt: Timestamp.now(),
-      startDate: Timestamp.fromDate(eventData.startDate),
-      endDate:   Timestamp.fromDate(eventData.endDate),
+      startDate: eventData.startDate.toISOString?.() ?? eventData.startDate,
+      endDate: eventData.endDate?.toISOString?.() ?? eventData.endDate,
     });
     uniqueToast.success('Event created!');
-    return ref.id;
+    return id;
   }
 
-  // ΓöÇΓöÇ Attendance ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // ── Attendance ──────────────────────────────────────────────────────
 
   async getAttendance(userId?: string, hubId?: string): Promise<any[]> {
     try {
-      const mapDoc = (d: { id: string; data: () => any }) => ({
-        id: d.id,
-        ...d.data(),
-        checkInTime: d.data().checkInTime?.toDate(),
-        checkOutTime: d.data().checkOutTime?.toDate(),
-      });
       if (userId) {
-        // Single-field equality avoids composite index (studentId + checkInTime).
-        const q = query(collection(db, 'attendance'), where('studentId', '==', userId));
-        let rows = (await getDocs(q)).docs.map(mapDoc);
-        if (hubId) {
-          rows = rows.filter((r: any) => hubIdMatchesScope(r.hubId, hubId));
-        }
-        rows.sort((a: any, b: any) => {
-          const ta = a.checkInTime instanceof Date ? a.checkInTime.getTime() : 0;
-          const tb = b.checkInTime instanceof Date ? b.checkInTime.getTime() : 0;
-          return tb - ta;
-        });
-        return rows;
+        const rows = await convex.query(api.attendance.getAttendanceHistory as any, {
+          studentId: userId as any,
+          limitCount: 500,
+        }) as any[];
+        let filtered = rows.map((r: any) => ({
+          ...r, id: r._id,
+          checkInTime: new Date(r.checkInTime),
+          checkOutTime: r.checkOutTime ? new Date(r.checkOutTime) : undefined,
+        }));
+        if (hubId) filtered = filtered.filter((r: any) => hubIdMatchesScope(r.hubId, hubId));
+        return filtered;
       }
-      // `orderBy('checkInTime')` omits staff-recorded absences (no check-in) ΓÇö merge them in.
-      const [snapCheckIns, snapStaffAbsent, snapReasonAbsent] = await Promise.all([
-        getDocs(query(collection(db, 'attendance'), orderBy('checkInTime', 'desc'))),
-        getDocs(query(collection(db, 'attendance'), where('method', '==', 'staff_absent'))),
-        // Legacy rows may have `absenceReason` without `method` (before it was standardized).
-        getDocs(
-          query(
-            collection(db, 'attendance'),
-            where('absenceReason', 'in', ['excused', 'unexcused', 'dropout'])
-          )
-        ),
-      ]);
-      const byId = new Map<string, any>();
-      snapCheckIns.docs.forEach((d) => byId.set(d.id, mapDoc(d)));
-      snapStaffAbsent.docs.forEach((d) => {
-        if (!byId.has(d.id)) byId.set(d.id, mapDoc(d));
-      });
-      snapReasonAbsent.docs.forEach((d) => {
-        if (!byId.has(d.id)) byId.set(d.id, mapDoc(d));
-      });
-      let rows = Array.from(byId.values());
+      const ts = TimeService.getInstance();
+      const endDate = ts.getCurrentDateString();
+      const startDate = format(subDays(parseISO(endDate), 365), 'yyyy-MM-dd');
+      let rows = await convex.query(api.attendance.getAttendanceByDateRange as any, {
+        startDate, endDate,
+      }) as any[];
+      rows = rows.map((r: any) => ({
+        ...r, id: r._id,
+        checkInTime: new Date(r.checkInTime),
+        checkOutTime: r.checkOutTime ? new Date(r.checkOutTime) : undefined,
+      }));
       if (hubId) rows = rows.filter((r: any) => this.attendanceMatchesHub(r, hubId));
+      rows.sort((a: any, b: any) => {
+        const ta = a.checkInTime instanceof Date ? a.checkInTime.getTime() : 0;
+        const tb = b.checkInTime instanceof Date ? b.checkInTime.getTime() : 0;
+        return tb - ta;
+      });
       return rows;
     } catch (e) {
       console.error('getAttendance error', e);
@@ -203,20 +96,26 @@ class DataService {
   }
 
   async recordAttendance(data: any): Promise<void> {
-    await setDoc(doc(db,'attendance',data.id), {
-      ...data,
-      checkInTime: Timestamp.fromDate(data.checkInTime),
-      status: 'present', createdAt: Timestamp.now(), updatedAt: Timestamp.now(),
+    const ts = TimeService.getInstance();
+    const today = ts.getCurrentDateString();
+    await convex.mutation(api.attendance.checkIn as any, {
+      studentId: data.studentId as any,
+      studentName: data.studentName || '',
+      date: today,
+      hubId: data.hubId,
+      status: 'present',
+      method: data.method || 'manual',
     });
   }
 
   async updateAttendance(id: string, data: any): Promise<void> {
-    const { checkOutTime: _ignoredCheckout, checkOutMethod: _ignoredMethod, ...rest } = data ?? {};
-    const payload: any = { ...rest, updatedAt: Timestamp.now() };
-    await updateDoc(doc(db,'attendance',id), payload);
+    await convex.mutation(api.events.updateEvent as any, {
+      eventId: id as any,
+      updates: { ...data, updatedAt: Date.now() },
+    });
   }
 
-  // ΓöÇΓöÇ Users ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // ── Users ───────────────────────────────────────────────────────────
 
   async getUsers(hubId?: string): Promise<any[]> {
     try {
@@ -228,29 +127,19 @@ class DataService {
         all = this.usersCache.rows;
       } else {
         if (!this.usersInFlight) {
-          this.usersInFlight = getDocs(collection(db, 'users'))
-            .then((snap) =>
-              snap.docs.map((d) => {
-                const data = d.data();
-                return {
-                  ...data,
-                  /** Document id ΓÇö must win over optional `id` field stored inside the document */
-                  id: d.id,
-                  uid: data.uid ?? d.id,
-                  createdAt: data.createdAt?.toDate(),
-                };
-              })
+          this.usersInFlight = convex.query(api.users.getAllUsers as any)
+            .then((snap: any) =>
+              (snap || []).map((d: any) => ({
+                ...d,
+                id: d._id,
+                uid: d._id,
+                createdAt: d.createdAt ? new Date(d.createdAt) : undefined,
+              }))
             )
-            .finally(() => {
-              this.usersInFlight = null;
-            });
+            .finally(() => { this.usersInFlight = null; });
         }
-
         all = await this.usersInFlight;
-        this.usersCache = {
-          rows: all,
-          expiresAt: Date.now() + cacheTtlMs,
-        };
+        this.usersCache = { rows: all, expiresAt: Date.now() + cacheTtlMs };
       }
 
       return this.usersForHub(all, hubId);
@@ -259,25 +148,24 @@ class DataService {
     }
   }
 
-  /** Case-normalized email for uniqueness (pair with Auth `fetchSignInMethodsForEmail`). */
   async isEmailLowerTaken(normalizedEmail: string, exceptUid?: string): Promise<boolean> {
     const key = normalizedEmail.trim().toLowerCase();
     if (!key) return false;
     try {
-      const snap = await getDocs(query(collection(db, 'users'), where('emailLower', '==', key)));
-      if (snap.empty) return false;
-      if (exceptUid && snap.docs.length === 1 && snap.docs[0].id === exceptUid) return false;
+      const users = await convex.query(api.users.getAllUsers as any) as any[];
+      const match = users.find((u: any) => u.emailLower === key);
+      if (!match) return false;
+      if (exceptUid && match._id === exceptUid) return false;
       return true;
-    } catch {
-      return false;
-    }
+    } catch { return false; }
   }
 
   async updateUser(userId: string, data: any, actingUser?: User | null): Promise<void> {
     if (actingUser?.userType === 'instructor') {
-      const snap = await getDoc(doc(db, 'users', userId));
-      if (!snap.exists()) throw new Error('User not found');
-      if (!staffMayAccessHubForWrite(actingUser, snap.data()?.hubId)) {
+      const users = await convex.query(api.users.getAllUsers as any) as any[];
+      const target = users.find((u: any) => u._id === userId);
+      if (!target) throw new Error('User not found');
+      if (!staffMayAccessHubForWrite(actingUser, target.hubId)) {
         throw new Error('You can only edit accounts in your hub.');
       }
       if (data?.userType === 'admin') {
@@ -287,15 +175,14 @@ class DataService {
     if (data?.userType === 'admin' && actingUser?.userType !== 'admin') {
       throw new Error('Only administrators can grant admin access.');
     }
-    await updateDoc(doc(db,'users',userId), data);
+    await convex.mutation(api.users.adminUpdateUser as any, {
+      userId: userId as any,
+      ...data,
+    });
     this.invalidateUsersCache();
     uniqueToast.success('User updated!');
   }
 
-  /**
-   * Grant or revoke full admin dashboard access (Firestore userType only).
-   * Only acting admins may call; bootstrap ADMIN_EMAIL cannot be demoted.
-   */
   async setUserRole(
     targetUserId: string,
     newRole: 'admin' | 'instructor' | 'attendee',
@@ -308,25 +195,24 @@ class DataService {
     const uid = targetUserId?.trim();
     if (!uid) throw new Error('Missing user id.');
 
-    const snap = await getDoc(doc(db, 'users', uid));
-    if (!snap.exists()) throw new Error('User not found.');
+    const users = await convex.query(api.users.getAllUsers as any) as any[];
+    const target = users.find((u: any) => u._id === uid);
+    if (!target) throw new Error('User not found.');
 
-    const current = snap.data() as Record<string, unknown>;
-    const currentType = String(current.userType || '').toLowerCase();
-    const email = String(current.email || '').trim();
+    const currentType = String(target.userType || '').toLowerCase();
+    const email = String(target.email || '').trim();
 
     if (newRole === 'admin') {
-      if (currentType === 'admin') {
-        throw new Error('This account already has admin access.');
-      }
+      if (currentType === 'admin') throw new Error('This account already has admin access.');
       if (currentType !== 'instructor' && currentType !== 'attendee') {
         throw new Error('Only instructors or students can be promoted to admin.');
       }
-      await updateDoc(doc(db, 'users', uid), { userType: 'admin' });
+      await convex.mutation(api.users.adminUpdateUser as any, {
+        userId: uid as any,
+        userType: 'admin',
+      });
       this.invalidateUsersCache();
-      uniqueToast.success(
-        'Admin access granted. Ask them to sign out and sign in again to refresh their session.'
-      );
+      uniqueToast.success('Admin access granted. Ask them to sign out and sign in again to refresh their session.');
       return;
     }
 
@@ -334,12 +220,12 @@ class DataService {
       if (isAdminEmail(email)) {
         throw new Error('The primary bootstrap admin account cannot be demoted.');
       }
-      const patch: { userType: string; hubId?: string; hubName?: string } = { userType: 'instructor' };
-      if (!current.hubId) {
+      const patch: Record<string, any> = { userType: 'instructor' };
+      if (!target.hubId) {
         patch.hubId = 'uncommon_victoriafalls';
         patch.hubName = resolvedHubLabel({ hubId: patch.hubId });
       }
-      await updateDoc(doc(db, 'users', uid), patch);
+      await convex.mutation(api.users.adminUpdateUser as any, { userId: uid as any, ...patch });
       this.invalidateUsersCache();
       uniqueToast.success('Admin access removed. They are an instructor again.');
       return;
@@ -350,126 +236,69 @@ class DataService {
 
   async deleteUser(
     userId: string,
-    opts?: { suppressToast?: boolean; actingUser?: User | null; requireAuthDelete?: boolean }
+    opts?: { suppressToast?: boolean; actingUser?: User | null }
   ): Promise<void> {
     const uid = userId?.trim();
-    if (!uid) {
-      throw new Error('Missing user id');
-    }
+    if (!uid) throw new Error('Missing user id');
 
     if (opts?.actingUser?.userType === 'instructor') {
-      const targetSnap = await getDoc(doc(db, 'users', uid));
-      if (!targetSnap.exists()) throw new Error('User not found');
-      if (!staffMayAccessHubForWrite(opts.actingUser, targetSnap.data()?.hubId)) {
+      const users = await convex.query(api.users.getAllUsers as any) as any[];
+      const target = users.find((u: any) => u._id === uid);
+      if (!target) throw new Error('User not found');
+      if (!staffMayAccessHubForWrite(opts.actingUser, target.hubId)) {
         throw new Error('You can only remove accounts registered in your hub.');
       }
     }
 
-    // Remove Firebase Auth so the same email can register again (requires Cloud Function deploy).
-    const acting = opts?.actingUser;
-    const canTryDeleteAuth =
-      acting &&
-      (acting.userType === 'admin' || acting.userType === 'instructor') &&
-      uid !== acting.uid;
+    const [attendRecords, regRecords] = await Promise.all([
+      convex.query(api.attendance.getAttendanceHistory as any, { studentId: uid as any, limitCount: 500 }) as any,
+      (async () => { try { return await convex.query(api.events.getUserRegistrations as any, { userId: uid as any }) as any[]; } catch { return []; } })(),
+    ]);
 
-    const requireAuthDelete = opts?.requireAuthDelete ?? false;
-    const authCleanupPromise = canTryDeleteAuth
-      ? this.withTimeout(
-          deleteStudentAuthUserCallable(uid),
-          12000,
-          'deleteStudentAuthUser callable'
-        ).catch((e) => {
-          const msg =
-            e instanceof Error ? e.message : 'unknown callable failure';
-          const detailed = new Error(
-            `Could not delete Firebase Auth user (admin console) for this account: ${msg}. ` +
-              'Deploy/enable function `deleteStudentAuthUser` and try again.'
-          );
-          if (requireAuthDelete) throw detailed;
-          console.warn(detailed.message);
-        })
-      : Promise.resolve();
+    const deletePromises: Promise<any>[] = [];
 
-    const attendanceQueryPromise = getDocs(
-      query(collection(db, 'attendance'), where('studentId', '==', uid))
-    );
-    const registrationsQueryPromise = getDocs(
-      query(collection(db, 'registrations'), where('studentId', '==', uid))
-    ).catch((e) => {
-      console.warn('deleteUser: registrations cleanup', e);
-      return null;
-    });
-    const conversationsQueryPromise = getDocs(
-      query(collection(db, 'conversations'), where('studentId', '==', uid))
-    ).catch((e) => {
-      // Conversation rules may block staff for rows where they are not participants.
-      console.warn('deleteUser: conversations cleanup skipped or partial', e);
-      return null;
-    });
-    const profilePhotoCleanupPromise = deleteObject(ref(storage, `profile-photos/${uid}/profile.jpg`)).catch(
-      () => {
-        /* no photo */
+    if (Array.isArray(attendRecords)) {
+      for (const r of attendRecords) {
+        deletePromises.push(convex.mutation(api.attendance.unmarkPresentForDate as any, {
+          studentId: uid as any,
+          date: r.date,
+        }));
       }
-    );
-
-    // Ensure Auth user deletion succeeds first (fast-fail if function is missing/unavailable).
-    await authCleanupPromise;
-
-    const [attendSnap, regSnap, convoSnap] = await this.withTimeout(
-      Promise.all([attendanceQueryPromise, registrationsQueryPromise, conversationsQueryPromise]),
-      15000,
-      'deleteUser query cleanup'
-    );
-
-    const refsToDelete = [
-      ...attendSnap.docs,
-      ...(regSnap ? regSnap.docs : []),
-      ...(convoSnap ? convoSnap.docs : []),
-    ];
-    if (refsToDelete.length > 0) {
-      await this.withTimeout(this.deleteDocsInChunks(refsToDelete), 15000, 'deleteUser related records');
     }
 
-    await this.withTimeout(profilePhotoCleanupPromise, 6000, 'deleteUser profile photo cleanup').catch(() => {
-      /* non-fatal */
-    });
+    if (Array.isArray(regRecords)) {
+      for (const r of regRecords) {
+        deletePromises.push(convex.mutation(api.events.cancelRegistration as any, { registrationId: r._id }));
+      }
+    }
 
-    await deleteDoc(doc(db, 'users', uid));
+    await Promise.all(deletePromises.slice(0, 100));
+    await convex.mutation(api.users.deleteUser as any, { userId: uid as any });
+
     this.invalidateUsersCache();
     if (!opts?.suppressToast) {
       uniqueToast.success('User deleted!');
     }
   }
 
-  /**
-   * Profiles that break policy: @uncommon.org email but stored as student (attendee / blank / student).
-   * Instructors and admins are excluded.
-   */
   async listUncommonOrgStudentProfiles(): Promise<
     Array<{ uid: string; email: string; displayName: string; userType: string }>
   > {
-    const snap = await getDocs(collection(db, 'users'));
+    const users = await convex.query(api.users.getAllUsers as any) as any[];
     const out: Array<{ uid: string; email: string; displayName: string; userType: string }> = [];
-    for (const d of snap.docs) {
-      const data = d.data();
-      const email = String(data.email || '').trim();
+    for (const d of users) {
+      const email = String(d.email || '').trim();
       if (!email || !isUncommonOrgStaffEmail(email)) continue;
       if (isAdminEmail(email)) continue;
-      const t = String(data.userType || '').toLowerCase();
+      const t = String(d.userType || '').toLowerCase();
       if (t === 'admin' || t === 'instructor') continue;
       if (t === 'attendee' || t === 'student' || !t) {
-        out.push({
-          uid: d.id,
-          email,
-          displayName: String(data.displayName || 'Unknown'),
-          userType: t || '(blank)',
-        });
+        out.push({ uid: d._id, email, displayName: String(d.displayName || 'Unknown'), userType: t || '(blank)' });
       }
     }
     return out;
   }
 
-  /** Deletes Firestore profile + related rows for each invalid Uncommon-as-student account (does not delete Firebase Auth). */
   async removeUncommonOrgInvalidStudentProfiles(): Promise<{ removed: number; uids: string[] }> {
     const list = await this.listUncommonOrgStudentProfiles();
     const uids: string[] = [];
@@ -484,123 +313,84 @@ class DataService {
     return { removed: uids.length, uids };
   }
 
-  // ΓöÇΓöÇ Dashboard stats ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // ── Dashboard stats ─────────────────────────────────────────────────
 
   async getDashboardStats(hubId?: string): Promise<any> {
     const [events, users] = await Promise.all([this.getEvents(), this.getUsers(hubId)]);
-    const students  = users.filter(u => this.isStudent(u));
-    const ts        = TimeService.getInstance();
-    const today     = ts.getCurrentDateString();
-    const { start, end } = ts.getHarareDayUtcBounds(today);
+    const students = users.filter(u => this.isStudent(u));
+    const ts = TimeService.getInstance();
+    const today = ts.getCurrentDateString();
 
-    const [byDateSnap, byRangeSnap] = await Promise.all([
-      getDocs(query(collection(db, 'attendance'), where('date', '==', today))),
-      getDocs(
-        query(
-          collection(db, 'attendance'),
-          where('checkInTime', '>=', Timestamp.fromDate(start)),
-          where('checkInTime', '<=', Timestamp.fromDate(end))
-        )
-      ),
-    ]);
-
-    let mergedDocs = this.mergeAttendanceByDocId(
-      byDateSnap.docs.map((d) => this.mapAttendanceSnapshotDoc(d)),
-      byRangeSnap.docs.map((d) => this.mapAttendanceSnapshotDoc(d))
-    );
-    if (hubId) {
-      mergedDocs = mergedDocs.filter((d) => this.attendanceMatchesHub(d, hubId));
-    }
+    const todayAttendance = await convex.query(api.attendance.getAllTodayAttendance as any, { date: today }) as any[];
+    let merged = (todayAttendance || []).map((r: any) => ({
+      ...r, id: r._id,
+      checkInTime: new Date(r.checkInTime),
+      checkOutTime: r.checkOutTime ? new Date(r.checkOutTime) : undefined,
+    }));
+    if (hubId) merged = merged.filter((r: any) => this.attendanceMatchesHub(r, hubId));
 
     return {
-      totalEvents:       events.length,
-      activeEvents:      events.filter(e => e.eventStatus==='published').length,
-      totalAttendees:    students.length,
-      totalInstructors:  users.filter(u => this.isInstructor(u)).length,
-      todayAttendance:   mergedDocs.length,
-      lateCount:         mergedDocs.filter((d) => this.calcIsLate(d.checkInTime)).length,
-      recentAttendance:  mergedDocs.slice(0, 10),
+      totalEvents: events.length,
+      activeEvents: events.filter((e: any) => e.eventStatus==='published').length,
+      totalAttendees: students.length,
+      totalInstructors: users.filter(u => this.isInstructor(u)).length,
+      todayAttendance: merged.length,
+      lateCount: merged.filter((d: any) => ts.isLate(d.checkInTime)).length,
+      recentAttendance: merged.slice(0, 10),
     };
   }
 
-  // ΓöÇΓöÇ Real-time summary ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
-  /**
-   * FIXED: Load users ONCE upfront ΓÇö never subscribe to the users collection.
-   * The old version subscribed to users, which fired with an empty array first,
-   * causing the summary to show 0 present every time a user doc changed.
-   */
+  // ── Real-time summary ───────────────────────────────────────────────
+
   subscribeToTodayAttendance(callback: (summary: any) => void, hubId?: string): () => void {
     const ts = TimeService.getInstance();
     const today = ts.getCurrentDateString();
-    const { start, end } = ts.getHarareDayUtcBounds(today);
-
     let users: any[] = [];
-    const usersReady = this.getUsers(hubId).then((u) => {
-      users = u;
-    });
-
-    let batchDate: any[] = [];
-    let batchRange: any[] = [];
+    let unsubscribes: (() => void)[] = [];
 
     const emit = async () => {
-      await usersReady;
-      let attendance = this.mergeAttendanceByDocId(batchDate, batchRange);
-      if (hubId) {
-        attendance = attendance.filter((r) => this.attendanceMatchesHub(r, hubId));
+      try {
+        const attendance = await convex.query(api.attendance.getAllTodayAttendance as any, { date: today }) as any[];
+        let merged = (attendance || []).map((r: any) => ({
+          ...r, id: r._id,
+          checkInTime: new Date(r.checkInTime),
+          checkOutTime: r.checkOutTime ? new Date(r.checkOutTime) : undefined,
+        }));
+        if (hubId) merged = merged.filter((r: any) => this.attendanceMatchesHub(r, hubId));
+        callback(this._buildSummary(today, users, merged));
+      } catch (e) {
+        console.error('subscribeToTodayAttendance emit error:', e);
       }
-      callback(this._buildSummary(today, users, attendance));
     };
 
-    // Do not `orderBy('checkInTime')` here ΓÇö staff absences have no check-in and would be excluded.
-    const qDate = query(collection(db, 'attendance'), where('date', '==', today));
-    const qRange = query(
-      collection(db, 'attendance'),
-      where('checkInTime', '>=', Timestamp.fromDate(start)),
-      where('checkInTime', '<=', Timestamp.fromDate(end)),
-      orderBy('checkInTime', 'desc')
-    );
+    this.getUsers(hubId).then((u) => {
+      users = u;
+      emit();
+    });
 
-    const unsubDate = onSnapshot(
-      qDate,
-      async (snap) => {
-        batchDate = snap.docs.map((d) => this.mapAttendanceSnapshotDoc(d));
-        await emit();
-      },
-      (err) => console.error('attendance listener (date):', err)
+    const watch = convex.watchQuery(
+      api.attendance.getAllTodayAttendance as any,
+      { date: today },
     );
+    const sub = watch.onUpdate(() => { emit(); });
+    unsubscribes.push(sub);
 
-    const unsubRange = onSnapshot(
-      qRange,
-      async (snap) => {
-        batchRange = snap.docs.map((d) => this.mapAttendanceSnapshotDoc(d));
-        await emit();
-      },
-      (err) => console.error('attendance listener (checkInTime range):', err)
-    );
+    const pollInterval = setInterval(emit, 30000);
+    unsubscribes.push(() => clearInterval(pollInterval));
 
-    return () => {
-      unsubDate();
-      unsubRange();
-    };
+    return () => { unsubscribes.forEach(fn => fn()); };
   }
 
   private _buildSummary(date: string, users: any[], attendance: any[]) {
-    // Deduplicate: keep newest record per student
     const byStudent = new Map<string, any>();
     attendance.forEach((r) => {
-      const sid = r.studentId || r.userId;
+      const sid = r.studentId;
       if (!sid) return;
       const ex = byStudent.get(sid);
-      if (!ex) {
-        byStudent.set(sid, r);
-        return;
-      }
+      if (!ex) { byStudent.set(sid, r); return; }
       const exIn = !!ex.checkInTime;
       const rIn = !!r.checkInTime;
-      if (rIn && !exIn) {
-        byStudent.set(sid, r);
-        return;
-      }
+      if (rIn && !exIn) { byStudent.set(sid, r); return; }
       if (exIn && !rIn) return;
       if (rIn && exIn) {
         const ta = ex.checkInTime instanceof Date ? ex.checkInTime.getTime() : 0;
@@ -611,12 +401,10 @@ class DataService {
       byStudent.set(sid, r);
     });
 
+    const ts = TimeService.getInstance();
     const list = users.filter(u => this.isStudent(u)).map(u => {
-      const uid = u.uid || u.id;
-      let rec = byStudent.get(uid);
-      if (!rec && u.uid && u.id && u.uid !== u.id) {
-        rec = byStudent.get(u.uid) || byStudent.get(u.id);
-      }
+      const uid = u.id || u._id;
+      const rec = byStudent.get(uid);
       let status: 'present'|'late'|'absent'|'completed' = 'absent';
       let checkInTime = null, checkOutTime = null, isLate = false;
       let absenceReason: string | undefined;
@@ -630,144 +418,82 @@ class DataService {
         const explicitAbsent = s === 'absent' || (!!rec.absenceReason && !rec.checkInTime);
         if (explicitAbsent) {
           status = 'absent';
-          checkInTime = null;
-          checkOutTime = null;
-          isLate = false;
           absenceReason = rec.absenceReason;
           absenceNotes = rec.absenceNotes;
           recordedByName = rec.recordedByName;
         } else if (rec.checkInTime) {
-          const recordedCheckout =
-            rec.checkOutTime &&
-            (rec.checkOutMethod === 'student' || rec.checkOutMethod === 'staff');
-          status = s === 'late'
-            ? 'late'
-            : recordedCheckout
-              ? 'completed'
-              : 'present';
-          checkInTime  = rec.checkInTime;
+          const recordedCheckout = rec.checkOutTime && (rec.checkOutMethod === 'student' || rec.checkOutMethod === 'staff');
+          status = s === 'late' ? 'late' : recordedCheckout ? 'completed' : 'present';
+          checkInTime = rec.checkInTime;
           checkOutTime = recordedCheckout ? rec.checkOutTime : null;
-          isLate = status==='late' || this.calcIsLate(rec.checkInTime);
+          isLate = status==='late' || ts.isLate(rec.checkInTime);
           lateReason = typeof rec.lateReason === 'string' && rec.lateReason.trim() ? rec.lateReason.trim() : undefined;
-          checkInGoal =
-            typeof rec.checkInGoal === 'string' && rec.checkInGoal.trim() ? rec.checkInGoal.trim() : undefined;
-        } else {
-          status = 'absent';
+          checkInGoal = typeof rec.checkInGoal === 'string' && rec.checkInGoal.trim() ? rec.checkInGoal.trim() : undefined;
         }
       }
 
       return {
         userId: uid,
-        userName:    u.displayName || 'Unknown',
-        userEmail:   u.email,
-        userType:    u.userType,
-        hubId:       u.hubId,
-        hubName:     resolvedHubLabel(u),
+        userName: u.displayName || 'Unknown',
+        userEmail: u.email,
+        userType: u.userType,
+        hubId: u.hubId,
+        hubName: resolvedHubLabel(u),
         status, checkInTime, checkOutTime, isLate,
-        attendanceId: rec?.id ?? null,
-        absenceReason,
-        absenceNotes,
-        recordedByName,
-        lateReason,
-        checkInGoal,
+        attendanceId: rec?._id ?? null,
+        absenceReason, absenceNotes, recordedByName, lateReason, checkInGoal,
         profileMissing: false,
       };
     });
 
-    // Include attendance rows that do not currently map to a student profile.
-    // This prevents real check-ins from disappearing in staff views when a user document
-    // is missing or has malformed student metadata.
     const listedIds = new Set<string>();
-    list.forEach((row) => {
-      if (row.userId) listedIds.add(String(row.userId).trim());
-    });
+    list.forEach((row) => { if (row.userId) listedIds.add(String(row.userId).trim()); });
 
     const orphanRows = Array.from(byStudent.entries())
       .filter(([sid]) => !listedIds.has(String(sid).trim()))
       .map(([sid, rec]) => {
+        // Look up the user in the original users array (they might be an admin/instructor)
+        const realUser = users.find(u => (u.id || u._id) === sid);
+        
         const s = String(rec?.status || '').toLowerCase();
         const explicitAbsent = s === 'absent' || (!!rec?.absenceReason && !rec?.checkInTime);
         const hasCheckIn = !!rec?.checkInTime;
-        const status: 'present'|'late'|'absent'|'completed' = explicitAbsent
-          ? 'absent'
-          : hasCheckIn
-            ? (s === 'late' ? 'late' : s === 'completed' ? 'completed' : 'present')
-            : 'absent';
-        const isLate = status === 'late' || this.calcIsLate(rec?.checkInTime);
-        const lateReason =
-          typeof rec?.lateReason === 'string' && rec.lateReason.trim()
-            ? rec.lateReason.trim()
-            : undefined;
-        const checkInGoal =
-          typeof rec?.checkInGoal === 'string' && rec.checkInGoal.trim()
-            ? rec.checkInGoal.trim()
-            : undefined;
-
+        const status: 'present'|'late'|'absent'|'completed' = explicitAbsent ? 'absent' : hasCheckIn ? (s === 'late' ? 'late' : s === 'completed' ? 'completed' : 'present') : 'absent';
+        const isLate = status === 'late' || ts.isLate(rec?.checkInTime);
+        
         return {
           userId: String(sid),
-          userName: rec?.studentName || 'Unknown student',
-          userEmail: rec?.studentEmail || '',
-          userType: 'student',
-          hubId: rec?.hubId,
-          hubName: resolvedHubLabel({ hubId: rec?.hubId, hubName: rec?.hubName }),
-          status,
-          checkInTime: hasCheckIn ? rec.checkInTime : null,
-          checkOutTime: rec?.checkOutTime ?? null,
-          isLate,
-          attendanceId: rec?.id ?? null,
-          absenceReason: rec?.absenceReason,
-          absenceNotes: rec?.absenceNotes,
-          recordedByName: rec?.recordedByName,
-          lateReason,
-          checkInGoal,
-          profileMissing: true,
+          userName: realUser?.displayName || realUser?.firstName || rec?.studentName || realUser?.email || 'User',
+          userEmail: realUser?.email || rec?.studentEmail || '',
+          userType: realUser?.userType || 'student',
+          hubId: realUser?.hubId || rec?.hubId,
+          hubName: resolvedHubLabel(realUser || { hubId: rec?.hubId, hubName: rec?.hubName }),
+          status, checkInTime: hasCheckIn ? rec.checkInTime : null, checkOutTime: rec?.checkOutTime ?? null, isLate,
+          attendanceId: rec?._id ?? null,
+          absenceReason: rec?.absenceReason, absenceNotes: rec?.absenceNotes, recordedByName: rec?.recordedByName,
+          lateReason: rec?.lateReason, checkInGoal: rec?.checkInGoal,
+          profileMissing: !realUser,
         };
       });
 
-    const combinedList = [...list, ...orphanRows];
-
     return {
-      date,
-      totalUsers:   combinedList.length,
-      presentCount: combinedList.filter(a => a.status!=='absent').length,
-      absentCount:  combinedList.filter(a => a.status==='absent').length,
-      lateCount:    combinedList.filter(a => a.isLate).length,
-      attendanceList: combinedList,
-      recentAttendance: Array.from(byStudent.values()).slice(0,10),
+      date, totalUsers: list.length + orphanRows.length,
+      presentCount: [...list, ...orphanRows].filter(a => a.status!=='absent').length,
+      absentCount: [...list, ...orphanRows].filter(a => a.status==='absent').length,
+      lateCount: [...list, ...orphanRows].filter(a => a.isLate).length,
+      attendanceList: [...list, ...orphanRows],
+      recentAttendance: Array.from(byStudent.values()).slice(0, 10),
     };
   }
 
-  // ΓöÇΓöÇ Per-student stats ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // ── Per-student stats ───────────────────────────────────────────────
 
-  /**
-   * Same definitions as the Analytics page: last ~30 Harare calendar days, weekdays only,
-   * rate = (present + late) / weekday count. Streaks use weekday sequence (not raw calendar days).
-   */
   async getStudentStats(userId: string, hubId?: string): Promise<any> {
     const range = attendanceAnalyticsService.getDefaultRange('student');
     const analytics = await attendanceAnalyticsService.getStudentAnalytics(userId, range);
-
     const all = await this.getAttendance(userId, hubId);
-    const byDate = new Map<string, any>();
-    all.forEach((r) => {
-      const d = this.dateStr(r);
-      if (!d) return;
-      const ex = byDate.get(d);
-      const rOut =
-        r.checkOutTime &&
-        (r.checkOutMethod === 'student' || r.checkOutMethod === 'staff');
-      const exOut =
-        ex?.checkOutTime &&
-        (ex?.checkOutMethod === 'student' || ex?.checkOutMethod === 'staff');
-      if (!ex || (rOut && !exOut)) byDate.set(d, r);
-    });
-    const unique = Array.from(byDate.values()).sort(
-      (a, b) =>
-        new Date(b.date || b.checkInTime).getTime() - new Date(a.date || a.checkInTime).getTime()
-    );
 
     const present = analytics.totals.present + analytics.totals.late;
-
     return {
       totalCheckIns: present,
       currentStreak: analytics.streak.current,
@@ -775,36 +501,23 @@ class DataService {
       attendanceRate: analytics.totals.attendanceRate,
       averageCheckInTime: '9:00 AM',
       lateCheckIns: analytics.totals.late,
-      recentActivity: unique.slice(0, 10).map((r) => ({ ...r, type: 'checkin' })),
+      recentActivity: all.slice(0, 10).map((r: any) => ({ ...r, type: 'checkin' })),
     };
   }
 
-  // ΓöÇΓöÇ Daily attendance summary (admin, date-filtered) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // ── Daily attendance summary ────────────────────────────────────────
 
   async getDailyAttendanceSummary(date?: string, hubId?: string): Promise<any> {
-    const ts  = TimeService.getInstance();
+    const ts = TimeService.getInstance();
     const tgt = date || ts.getCurrentDateString();
     const [users, all] = await Promise.all([this.getUsers(hubId), this.getAttendance(undefined, hubId)]);
-    const forDay = all.filter(r => this.dateStr(r)===tgt);
+    const forDay = all.filter((r: any) => r.date===tgt);
     return this._buildSummary(tgt, users, forDay);
   }
 
-  /**
-   * Students to flag on the admin home screen: low attendance over a recent window.
-   * Uses one attendance fetch + in-memory aggregation (same data model as analytics).
-   */
   async getAtRiskStudents(opts?: {
-    windowDays?: number;
-    maxRate?: number;
-    minMissedSchoolDays?: number;
-    limit?: number;
-    hubId?: string;
-  }): Promise<Array<{
-    studentId: string;
-    studentName: string;
-    attendanceRate: number;
-    absent: number;
-  }>> {
+    windowDays?: number; maxRate?: number; minMissedSchoolDays?: number; limit?: number; hubId?: string;
+  }): Promise<Array<{ studentId: string; studentName: string; attendanceRate: number; absent: number }>> {
     const windowDays = opts?.windowDays ?? 30;
     const maxRate = opts?.maxRate ?? 85;
     const minMissed = opts?.minMissedSchoolDays ?? 3;
@@ -819,97 +532,97 @@ class DataService {
     const students = users.filter(u => this.isStudent(u));
 
     const inRange = allAttendance.filter((r: any) => {
-      const d = r.date || this.dateStr(r);
+      const d = r.date;
       return d && d >= startDate && d <= endDate;
     });
 
     const schoolDays = TimeService.getInstance().eachHarareWeekdayInRange(startDate, endDate).length;
 
-    const tsAtRisk = TimeService.getInstance();
     const daysPresentByStudent = new Map<string, Set<string>>();
     inRange.forEach((r: any) => {
       const sid = r.studentId;
-      const day = r.date || this.dateStr(r);
+      const day = r.date;
       if (!sid || !day) return;
-      if (!tsAtRisk.isHarareWeekday(day)) return;
+      if (!ts.isHarareWeekday(day)) return;
       if (!daysPresentByStudent.has(sid)) daysPresentByStudent.set(sid, new Set());
       daysPresentByStudent.get(sid)!.add(day);
     });
 
     return students
-      .map((u) => {
-        const uid = u.uid || u.id;
+      .map((u: any) => {
+        const uid = u.id || u._id;
         const presentDays = daysPresentByStudent.get(uid)?.size ?? 0;
         const missed = Math.max(0, schoolDays - presentDays);
         const rate = schoolDays > 0 ? Math.round((presentDays / schoolDays) * 100) : 100;
-        return {
-          studentId: uid,
-          studentName: (u.displayName || u.email || 'Unknown') as string,
-          attendanceRate: rate,
-          absent: missed,
-        };
+        return { studentId: uid, studentName: (u.displayName || u.email || 'Unknown') as string, attendanceRate: rate, absent: missed };
       })
       .filter((r) => r.attendanceRate < maxRate || r.absent >= minMissed)
       .sort((a, b) => a.attendanceRate - b.attendanceRate || b.absent - a.absent)
       .slice(0, limitN);
   }
 
-  // ΓöÇΓöÇ Admin audit log ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // ── Admin audit log ─────────────────────────────────────────────────
 
   async logAdminAction(adminId: string, adminName: string, action: string, targetUserId: string, targetUserName: string, details: any): Promise<void> {
     try {
-      await addDoc(collection(db,'admin_actions'), {
-        actionType:'attendance', action, adminId, adminName,
-        targetUserId, targetUserName, details,
-        timestamp: serverTimestamp(),
+      await convex.mutation(api.adminActions.log as any, {
+        adminId, adminName, action, targetUserId, targetUserName, details,
         date: details.date || TimeService.getInstance().getCurrentDateString(),
       });
     } catch (e) { console.error('logAdminAction failed:', e); }
   }
 
-  // ΓöÇΓöÇ Master reset ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // ── Master reset ────────────────────────────────────────────────────
 
   async masterReset(): Promise<{ deletedUsers: number; deletedAttendance: number; preservedUsers: number }> {
     const ADMIN = 'quintonndlovu161@gmail.com';
-    const usersSnap = await getDocs(collection(db,'users'));
-    const all   = usersSnap.docs.map(d=>({id:d.id,...d.data()}));
-    const del   = all.filter((u:any)=>u.email?.toLowerCase()!==ADMIN.toLowerCase());
-    const keep  = all.filter((u:any)=>u.email?.toLowerCase()===ADMIN.toLowerCase());
+    const allUsers = await convex.query(api.users.getAllUsers as any) as any[];
+    const del = allUsers.filter((u: any) => u.email?.toLowerCase() !== ADMIN.toLowerCase());
+    const keep = allUsers.filter((u: any) => u.email?.toLowerCase() === ADMIN.toLowerCase());
 
-    await Promise.all(del.map((u:any) => deleteDoc(doc(db,'users',u.id))));
+    for (const u of del) {
+      await convex.mutation(api.users.adminUpdateUser as any, { userId: u._id, status: 'deleted' });
+    }
 
-    const [aSnap,rSnap,cSnap] = await Promise.all([
-      getDocs(collection(db,'attendance')),
-      getDocs(collection(db,'registrations')),
-      getDocs(collection(db,'conversations')),
-    ]);
-    await Promise.all([...aSnap.docs,...rSnap.docs,...cSnap.docs].map(d=>deleteDoc(d.ref)));
+    const ts = TimeService.getInstance();
+    const endDate = ts.getCurrentDateString();
+    const startDate = format(subDays(parseISO(endDate), 365), 'yyyy-MM-dd');
+    const allAttendance = await convex.query(api.attendance.getAttendanceByDateRange as any, { startDate, endDate }) as any[];
+    for (const r of allAttendance) {
+      await convex.mutation(api.attendance.unmarkPresentForDate as any, { studentId: r.studentId, date: r.date });
+    }
 
     this.invalidateUsersCache();
-    uniqueToast.success(`Reset complete: ${del.length} users, ${aSnap.size} attendance records deleted.`);
-    return { deletedUsers: del.length, deletedAttendance: aSnap.size, preservedUsers: keep.length };
+    uniqueToast.success(`Reset complete: ${del.length} users, ${allAttendance.length} attendance records deleted.`);
+    return { deletedUsers: del.length, deletedAttendance: allAttendance.length, preservedUsers: keep.length };
   }
 
   async getInstructors(): Promise<any[]> {
     try {
-      return (await getDocs(query(collection(db,'users'), where('userType','==','instructor')))).docs.map(d=>({id:d.id,...d.data()}));
+      return await convex.query(api.users.getUsersByType as any, { userType: 'instructor' }) as any[];
     } catch { return []; }
   }
 
-  /** Instructors and admins for the staff directory (admin role management). */
   async getStaffDirectory(): Promise<any[]> {
     try {
-      const [instSnap, adminSnap] = await Promise.all([
-        getDocs(query(collection(db, 'users'), where('userType', '==', 'instructor'))),
-        getDocs(query(collection(db, 'users'), where('userType', '==', 'admin'))),
+      const [instructors, admins] = await Promise.all([
+        convex.query(api.users.getUsersByType as any, { userType: 'instructor' }) as Promise<any[]>,
+        convex.query(api.users.getUsersByType as any, { userType: 'admin' }) as Promise<any[]>,
       ]);
       const byId = new Map<string, any>();
-      for (const d of [...instSnap.docs, ...adminSnap.docs]) {
-        byId.set(d.id, { id: d.id, ...d.data() });
+      for (const d of [...instructors, ...admins]) {
+        byId.set(d._id, { id: d._id, ...d });
       }
       return Array.from(byId.values());
+    } catch { return []; }
+  }
+
+  async testConnection(): Promise<boolean> {
+    try {
+      await convex.query(api.users.getAllUsers as any);
+      return true;
     } catch {
-      return [];
+      return false;
     }
   }
 }

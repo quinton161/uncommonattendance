@@ -1,16 +1,5 @@
-import {
-  addDoc,
-  arrayUnion,
-  collection,
-  doc,
-  limit,
-  onSnapshot,
-  orderBy,
-  query,
-  serverTimestamp,
-  updateDoc,
-} from 'firebase/firestore';
-import { db } from './firebase';
+import { convex } from './convexClient';
+import { api } from '../convex/_generated/api';
 import type { AppNotification, NotificationType } from '../types/notifications';
 import { hubIdMatchesScope } from './hubService';
 
@@ -24,25 +13,24 @@ export type CreateNotificationInput = {
   studentName?: string;
 };
 
-function mapDoc(id: string, data: Record<string, unknown>): AppNotification {
-  const created = data.createdAt as { toDate?: () => Date } | undefined;
+function mapDoc(d: any): AppNotification {
   return {
-    id,
-    type: (data.type as NotificationType) || 'announcement',
-    title: String(data.title || ''),
-    body: String(data.body || ''),
-    hubId: data.hubId as string | undefined,
-    hubName: data.hubName as string | undefined,
-    studentId: data.studentId as string | undefined,
-    studentName: data.studentName as string | undefined,
-    createdAt: created?.toDate?.() ?? new Date(),
-    readBy: Array.isArray(data.readBy) ? (data.readBy as string[]) : [],
+    id: d._id,
+    type: (d.type as NotificationType) || 'announcement',
+    title: String(d.title || ''),
+    body: String(d.body || ''),
+    hubId: d.hubId as string | undefined,
+    hubName: d.hubName as string | undefined,
+    studentId: d.studentId as string | undefined,
+    studentName: d.studentName as string | undefined,
+    createdAt: new Date(d.createdAt),
+    readBy: Array.isArray(d.readBy) ? d.readBy : [],
   };
 }
 
 export async function createNotification(input: CreateNotificationInput): Promise<string | null> {
   try {
-    const ref = await addDoc(collection(db, 'notifications'), {
+    return await convex.mutation(api.notifications.create as any, {
       type: input.type,
       title: input.title.trim(),
       body: input.body.trim(),
@@ -50,10 +38,7 @@ export async function createNotification(input: CreateNotificationInput): Promis
       hubName: input.hubName?.trim() || '',
       studentId: input.studentId?.trim() || '',
       studentName: input.studentName?.trim() || '',
-      createdAt: serverTimestamp(),
-      readBy: [],
     });
-    return ref.id;
   } catch (e) {
     if (process.env.NODE_ENV === 'development') {
       console.warn('[notificationFeedService] createNotification failed', e);
@@ -65,8 +50,9 @@ export async function createNotification(input: CreateNotificationInput): Promis
 export async function markNotificationRead(notificationId: string, uid: string): Promise<void> {
   if (!notificationId || !uid) return;
   try {
-    await updateDoc(doc(db, 'notifications', notificationId), {
-      readBy: arrayUnion(uid),
+    await convex.mutation(api.notifications.markRead as any, {
+      notificationId: notificationId as any,
+      uid,
     });
   } catch (e) {
     if (process.env.NODE_ENV === 'development') {
@@ -86,42 +72,39 @@ export function subscribeToNotifications(
   }
 ): () => void {
   const { hubId, limitCount = 40, uid, onData, onError, onNew } = opts;
-  /** Global feed only — avoids composite-index deploy/build issues; hub filter is client-side. */
-  const q = query(collection(db, 'notifications'), orderBy('createdAt', 'desc'), limit(limitCount));
 
   let first = true;
   let prevIds = new Set<string>();
 
-  const handleError = (err: Error) => {
-    if (process.env.NODE_ENV === 'development') {
-      console.warn('[notificationFeedService] subscribe failed', err);
-    }
-    onData([], 0);
-    onError?.(err);
-  };
+  const fetchAndNotify = async () => {
+    try {
+      let items = await convex.query(api.notifications.listRecent as any, { limitCount }) as any[];
+      const mapped = (items || []).map(mapDoc);
 
-  return onSnapshot(
-    q,
-    (snap) => {
-      let items = snap.docs.map((d) => mapDoc(d.id, d.data() as Record<string, unknown>));
+      let filtered = mapped;
       if (hubId) {
-        items = items.filter(
-          (n) => !n.hubId || hubIdMatchesScope(n.hubId, hubId)
-        );
+        filtered = mapped.filter((n) => !n.hubId || hubIdMatchesScope(n.hubId, hubId));
       }
-      const unreadCount = items.filter((n) => !n.readBy.includes(uid)).length;
+      const unreadCount = filtered.filter((n) => !n.readBy.includes(uid)).length;
 
       if (!first && onNew) {
-        items.forEach((n) => {
+        filtered.forEach((n) => {
           if (!prevIds.has(n.id)) onNew(n);
         });
       }
-      prevIds = new Set(items.map((n) => n.id));
+      prevIds = new Set(filtered.map((n) => n.id));
       first = false;
-      onData(items, unreadCount);
-    },
-    (err) => {
-      handleError(err);
+      onData(filtered, unreadCount);
+    } catch (err) {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('[notificationFeedService] subscribe failed', err);
+      }
+      onData([], 0);
+      onError?.(err instanceof Error ? err : new Error(String(err)));
     }
-  );
+  };
+
+  fetchAndNotify();
+  const interval = setInterval(fetchAndNotify, 20000);
+  return () => clearInterval(interval);
 }

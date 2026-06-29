@@ -1,26 +1,23 @@
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from './firebase';
+import { convex } from './convexClient';
+import { api } from '../convex/_generated/api';
 import { hubIdMatchesScope, resolvedHubLabel } from './hubService';
 
 export const NO_HUB_ASSIGNED_MSG =
   'No hub is assigned to this account. Ask your instructor or admin to set your hub before recording attendance.';
 
 export const HUB_MISMATCH_MSG =
-  'Attendance must be recorded for the student’s assigned hub only. Contact your hub admin if this looks wrong.';
+  'Attendance must be recorded for the student\u2019s assigned hub only. Contact your hub admin if this looks wrong.';
 
-/** Trim hub id; empty string means “unset” on the profile. */
 export function canonicalHubId(hubId?: string | null): string {
   return hubId != null ? String(hubId).trim() : '';
 }
 
-/** True when two hub ids refer to the same hub (including legacy empty ↔ Victoria Falls). */
 export function hubsAreSame(a?: string | null, b?: string | null): boolean {
   const left = a ?? undefined;
   const right = b ?? undefined;
   return hubIdMatchesScope(left, right) && hubIdMatchesScope(right, left);
 }
 
-/** Require a hub on the user profile before any attendance write. */
 export function requireProfileHubId(hubId?: string | null): string {
   const id = canonicalHubId(hubId);
   if (!id) throw new Error(NO_HUB_ASSIGNED_MSG);
@@ -33,21 +30,18 @@ export async function fetchStudentHubProfile(
   const sid = studentId?.trim();
   if (!sid) throw new Error('Student ID is required');
 
-  const snap = await getDoc(doc(db, 'users', sid));
-  if (!snap.exists()) throw new Error('Student profile not found.');
+  const user = await convex.query(api.users.getUserById as any, { userId: sid as any }) as any;
+  if (!user) {
+    throw new Error(
+      'Your profile was not found in the system. Please sign out and sign back in. ' +
+      'If this keeps happening, contact your instructor or administrator.'
+    );
+  }
 
-  const data = snap.data();
-  const hubId = requireProfileHubId(data?.hubId);
-  return {
-    hubId,
-    hubName: resolvedHubLabel({ hubId, hubName: data?.hubName }),
-  };
+  const hubId = requireProfileHubId(user?.hubId);
+  return { hubId, hubName: resolvedHubLabel({ hubId, hubName: user?.hubName }) };
 }
 
-/**
- * When the client sends a hub id (student dashboard), it must match the Firestore profile.
- * Staff should omit callerHubId and rely on the profile hub only.
- */
 export function assertCallerHubMatchesProfile(
   callerHubId: string | undefined,
   profileHubId: string

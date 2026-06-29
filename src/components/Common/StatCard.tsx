@@ -1,7 +1,5 @@
 import React from 'react';
-import styled, { css } from 'styled-components';
-import { theme } from '../../styles/theme';
-import { staggeredAnimation, respectMotionPreference } from '../../styles/animations';
+import { Card, CardContent } from '../UI/card';
 
 interface StatCardProps {
   icon?: React.ReactNode;
@@ -18,160 +16,27 @@ interface StatCardProps {
   animationDelay?: number;
 }
 
-const getAccentColor = (color?: string) => {
-  switch (color) {
-    case 'blue': return '#0052CC';
-    case 'green': return '#10B981';
-    case 'orange': return '#F59E0B';
-    case 'red': return '#EF4444';
-    case 'purple': return '#8B5CF6';
-    default: return undefined;
-  }
+const colorMap: Record<string, string> = {
+  blue: 'bg-blue-50 text-blue-600 border-blue-200',
+  green: 'bg-green-50 text-green-600 border-green-200',
+  orange: 'bg-orange-50 text-orange-600 border-orange-200',
+  red: 'bg-red-50 text-red-600 border-red-200',
+  purple: 'bg-purple-50 text-purple-600 border-purple-200',
 };
 
-const getVariantStyles = (variant: string) => {
-  switch (variant) {
-    case 'primary':
-      return css`
-        background: linear-gradient(135deg, ${theme.colors.primary} 0%, ${theme.colors.primaryDark} 100%);
-        color: ${theme.colors.white};
-        border: none;
-      `;
-    case 'accent':
-      return css`
-        background: linear-gradient(135deg, ${theme.colors.accent} 0%, #e67e22 100%);
-        color: ${theme.colors.white};
-        border: none;
-      `;
-    case 'success':
-      return css`
-        background: linear-gradient(135deg, ${theme.colors.success} 0%, #1e8449 100%);
-        color: ${theme.colors.white};
-        border: none;
-      `;
-    case 'warning':
-      return css`
-        background: linear-gradient(135deg, ${theme.colors.warning} 0%, #d68910 100%);
-        color: ${theme.colors.white};
-        border: none;
-      `;
-    default:
-      return css`
-        background: #ffffff;
-        border: 1px solid rgba(0, 82, 204, 0.08);
-        color: ${theme.colors.textPrimary};
-      `;
-  }
+const colorIconMap: Record<string, string> = {
+  blue: 'bg-[#0052CC]',
+  green: 'bg-[#10B981]',
+  orange: 'bg-[#F59E0B]',
+  red: 'bg-[#EF4444]',
+  purple: 'bg-[#8B5CF6]',
 };
 
-const StyledStatCard = styled.div<{ $variant: string; $delay: number; $accentColor?: string }>`
-  position: relative;
-  padding: ${theme.spacing.lg};
-  border-radius: 12px;
-  box-shadow: none;
-  overflow: hidden;
-  ${({ $delay }) => staggeredAnimation($delay)}
-  ${respectMotionPreference}
-  transition: border-color 0.2s ease, background 0.2s ease;
-  ${({ $variant }) => getVariantStyles($variant)}
-
-  &::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    pointer-events: none;
-  }
-
-  &:hover {
-    border-color: rgba(0, 82, 204, 0.14);
-  }
-
-  @media (max-width: ${theme.breakpoints.mobile}) {
-    padding: ${theme.spacing.md} ${theme.spacing.lg};
-  }
-`;
-
-const IconWrapper = styled.div<{ $accentColor?: string }>`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 10px;
-  background: ${({ $accentColor }) => $accentColor || theme.colors.primary};
-  color: ${theme.colors.white};
-  margin-bottom: ${theme.spacing.md};
-
-  svg {
-    width: 24px;
-    height: 24px;
-  }
-
-  @media (max-width: ${theme.breakpoints.mobile}) {
-    width: 40px;
-    height: 40px;
-
-    svg {
-      width: 20px;
-      height: 20px;
-    }
-  }
-`;
-
-const StatValue = styled.div`
-  font-size: ${theme.fontSizes['3xl']};
-  font-weight: ${theme.fontWeights.bold};
-  line-height: 1.1;
-  margin-bottom: ${theme.spacing.xs};
-  font-family: ${theme.fonts.heading};
-  color: ${({ color }) => color || 'inherit'};
-
-  @media (max-width: ${theme.breakpoints.mobile}) {
-    font-size: ${theme.fontSizes['2xl']};
-  }
-`;
-
-const StatLabel = styled.div`
-  font-size: ${theme.fontSizes.sm};
-  opacity: 0.9;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  font-weight: ${theme.fontWeights.medium};
-`;
-
-const StatSub = styled.div`
-  margin-top: ${theme.spacing.xs};
-  font-size: ${theme.fontSizes.sm};
-  color: ${theme.colors.textSecondary};
-`;
-
-const TrendBadge = styled.span<{ $direction: 'up' | 'down' | 'neutral' }>`
-  display: inline-flex;
-  align-items: center;
-  gap: ${theme.spacing.xs};
-  padding: ${theme.spacing.xs} ${theme.spacing.sm};
-  border-radius: ${theme.borderRadius.full};
-  font-size: ${theme.fontSizes.xs};
-  font-weight: ${theme.fontWeights.semibold};
-  margin-top: ${theme.spacing.sm};
-  background: ${({ $direction }) => {
-    switch ($direction) {
-      case 'up': return 'rgba(39, 174, 96, 0.2)';
-      case 'down': return 'rgba(231, 76, 60, 0.2)';
-      default: return 'rgba(255, 255, 255, 0.2)';
-    }
-  }};
-  color: ${({ $direction }) => {
-    switch ($direction) {
-      case 'up': return '#27ae60';
-      case 'down': return '#e74c3c';
-      default: return 'inherit';
-    }
-  }};
-`;
+const trendStyles: Record<string, string> = {
+  up: 'bg-green-100 text-green-700',
+  down: 'bg-red-100 text-red-700',
+  neutral: 'bg-gray-100 text-gray-600',
+};
 
 export const StatCard: React.FC<StatCardProps> = ({
   icon,
@@ -182,24 +47,57 @@ export const StatCard: React.FC<StatCardProps> = ({
   color,
   trend,
   className,
-  animationDelay = 0.1,
 }) => {
-  const accentColor = getAccentColor(color);
+  const isGradient = variant !== 'default';
 
   return (
-    <StyledStatCard $variant={variant} $delay={animationDelay} className={className}>
-      {icon && <IconWrapper $accentColor={accentColor}>{icon}</IconWrapper>}
-      <StatValue>{value}</StatValue>
-      <StatLabel>{label}</StatLabel>
-      {sub && <StatSub>{sub}</StatSub>}
-      {trend && (
-        <TrendBadge $direction={trend.direction}>
-          {trend.direction === 'up' && '↑'}
-          {trend.direction === 'down' && '↓'}
-          {trend.value}
-        </TrendBadge>
-      )}
-    </StyledStatCard>
+    <Card
+      className={`
+        ${isGradient ? 'text-white border-0' : ''}
+        ${variant === 'primary' ? 'bg-gradient-to-br from-[#0052CC] to-[#003D99]' : ''}
+        ${variant === 'accent' ? 'bg-gradient-to-br from-[#F59E0B] to-[#e67e22]' : ''}
+        ${variant === 'success' ? 'bg-gradient-to-br from-[#10B981] to-[#1e8449]' : ''}
+        ${variant === 'warning' ? 'bg-gradient-to-br from-[#F59E0B] to-[#d68910]' : ''}
+        transition-all duration-200 hover:border-[rgba(0,82,204,0.14)]
+        ${className ?? ''}
+      `}
+    >
+      <CardContent className="p-4 sm:p-6">
+        {icon && (
+          <div
+            className={`w-11 h-11 rounded-xl flex items-center justify-center text-white mb-3 ${
+              color ? colorIconMap[color] : isGradient ? 'bg-white/20' : 'bg-[#0052CC]'
+            }`}
+          >
+            {React.cloneElement(icon as React.ReactElement, {
+              className: 'w-5 h-5',
+            })}
+          </div>
+        )}
+        <div className={`text-3xl font-bold leading-tight font-['Chillax'] mb-0.5 ${color && !isGradient ? `text-${colorMap[color]?.split(' ')[1]}` : ''}`}>
+          {value}
+        </div>
+        <div className="text-sm uppercase tracking-wider opacity-90 font-medium">
+          {label}
+        </div>
+        {sub && (
+          <div className="text-sm text-muted-foreground mt-1">
+            {sub}
+          </div>
+        )}
+        {trend && (
+          <div
+            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold mt-2 ${
+              trendStyles[trend.direction] || trendStyles.neutral
+            }`}
+          >
+            {trend.direction === 'up' && '↑'}
+            {trend.direction === 'down' && '↓'}
+            {trend.value}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 };
 

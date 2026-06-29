@@ -1,72 +1,19 @@
 import React, { useState } from 'react';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../../services/firebase';
+import { useClerk } from '@clerk/clerk-react';
 
 export const DirectAuthTest: React.FC = () => {
-  const [email, setEmail] = useState('test@example.com');
-  const [password, setPassword] = useState('test123456');
+  const clerk = useClerk();
   const [result, setResult] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const testDirectLogin = async () => {
+  const testClerkLogin = async () => {
     setLoading(true);
-    setResult('Testing direct Firebase login...');
-    
+    setResult('Opening Clerk sign-in modal...');
     try {
-      console.log('🧪 Direct Firebase login test starting...');
-      console.log('Auth instance:', auth);
-      console.log('Attempting login with:', email);
-      
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      console.log('✅ Direct login successful:', userCredential.user);
-      
-      setResult(`✅ SUCCESS: Logged in as ${userCredential.user.email} (${userCredential.user.uid})`);
-      
+      await clerk.openSignIn();
+      setResult('✅ Clerk sign-in modal opened.');
     } catch (error: any) {
-      console.error('❌ Direct login failed:', error);
-      setResult(`❌ FAILED: ${error.code} - ${error.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const testDirectSignup = async () => {
-    setLoading(true);
-    const testEmail = `test-${Date.now()}@example.com`;
-    setResult(`Creating test account: ${testEmail}`);
-    
-    try {
-      console.log('🧪 Direct Firebase signup test starting...');
-      
-      const userCredential = await createUserWithEmailAndPassword(auth, testEmail, password);
-      console.log('✅ Direct signup successful:', userCredential.user);
-      
-      setResult(`✅ SUCCESS: Created account ${userCredential.user.email} (${userCredential.user.uid})`);
-      
-    } catch (error: any) {
-      console.error('❌ Direct signup failed:', error);
-      setResult(`❌ FAILED: ${error.code} - ${error.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const testExistingUser = async () => {
-    setLoading(true);
-    // Test with one of the existing users
-    const existingEmail = 'quintonndlovu161@gmail.com';
-    setResult(`Testing with existing user: ${existingEmail}`);
-    
-    try {
-      console.log('🧪 Testing with existing user...');
-      
-      // We can't test login without knowing the password, but we can test the auth flow
-      setResult(`Please enter the password for ${existingEmail} and click Test Login`);
-      setEmail(existingEmail);
-      
-    } catch (error: any) {
-      console.error('❌ Test failed:', error);
-      setResult(`❌ FAILED: ${error.code} - ${error.message}`);
+      setResult(`❌ FAILED: ${error.message || 'Unknown error'}`);
     } finally {
       setLoading(false);
     }
@@ -92,37 +39,11 @@ export const DirectAuthTest: React.FC = () => {
         maxWidth: '500px',
         width: '90%'
       }}>
-        <h2>🧪 Direct Firebase Auth Test</h2>
-        
-        <div style={{ marginBottom: '10px' }}>
-          <label>Email:</label>
-          <input 
-            type="email" 
-            value={email} 
-            onChange={(e) => setEmail(e.target.value)}
-            style={{ width: '100%', padding: '8px', margin: '5px 0' }}
-          />
-        </div>
-        
-        <div style={{ marginBottom: '10px' }}>
-          <label>Password:</label>
-          <input 
-            type="password" 
-            value={password} 
-            onChange={(e) => setPassword(e.target.value)}
-            style={{ width: '100%', padding: '8px', margin: '5px 0' }}
-          />
-        </div>
-        
+        <h2>🔐 Auth Test (Clerk)</h2>
+                
         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '10px' }}>
-          <button onClick={testDirectLogin} disabled={loading}>
-            Test Login
-          </button>
-          <button onClick={testDirectSignup} disabled={loading}>
-            Test Signup
-          </button>
-          <button onClick={testExistingUser} disabled={loading}>
-            Use Existing User
+          <button onClick={testClerkLogin} disabled={loading}>
+            Open Clerk Sign In
           </button>
         </div>
         
@@ -135,7 +56,7 @@ export const DirectAuthTest: React.FC = () => {
           minHeight: '60px',
           whiteSpace: 'pre-wrap'
         }}>
-          {loading ? 'Testing...' : result || 'Click a button to test Firebase Auth'}
+          {loading ? 'Testing...' : result || 'Click a button to test Clerk Auth'}
         </div>
         
         <button 

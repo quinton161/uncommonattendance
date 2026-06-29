@@ -1,33 +1,7 @@
-import {
-  collection,
-  doc,
-  setDoc,
-  getDoc,
-  getDocs,
-  query,
-  where,
-  Timestamp,
-} from 'firebase/firestore';
-import { db } from './firebase';
-import { AttendanceRecord } from '../types';
+import { convex } from './convexClient';
+import { api } from '../convex/_generated/api';
 import { TimeService } from './timeService';
 
-const DAILY_ATTENDANCE_PERMISSION_MSG =
-  'Could not save daily attendance. Ask your instructor to verify your hub and profile.';
-
-function mapDailyAttendanceWriteError(err: unknown, context: string): never {
-  const code =
-    err && typeof err === 'object' && 'code' in err
-      ? (err as { code?: string }).code
-      : undefined;
-  if (code === 'permission-denied') {
-    if (process.env.NODE_ENV === 'development') {
-      console.error(`[DailyAttendanceService] ${context} permission-denied`, err);
-    }
-    throw new Error(DAILY_ATTENDANCE_PERMISSION_MSG);
-  }
-  throw err instanceof Error ? err : new Error(String(err));
-}
 
 export interface DailyAttendanceStats {
   totalDays: number;
@@ -58,9 +32,6 @@ export class DailyAttendanceService {
     return DailyAttendanceService.instance;
   }
 
-  /**
-   * Mark a student as present for today when they check in
-   */
   async markPresentToday(
     studentId: string,
     studentName: string,
@@ -70,162 +41,77 @@ export class DailyAttendanceService {
     const timeService = TimeService.getInstance();
     const today = timeService.getCurrentDateString();
     
-    // Check if today is a weekend (Saturday=6, Sunday=0)
     const todayDate = new Date(today);
     const dayOfWeek = todayDate.getDay();
     if (dayOfWeek === 0 || dayOfWeek === 6) {
-      console.log('⚠️ Skipping weekend attendance for', studentName);
-      return; // Don't record attendance on weekends
+      return; 
     }
     
-    console.log('📅 markPresentToday - Using Harare date:', today);
-    const dailyRecordId = `${studentId}_${today}`;
-
-    const dailyRecord = {
-      id: dailyRecordId,
-      studentId,
+    await convex.mutation(api.dailyAttendance.markPresentToday as any, {
+      studentId: studentId as any,
       studentName,
-      hubId,
+      hubId: hubId as any,
       hubName,
       date: today,
-      isPresent: true,
-      markedAt: new Date(),
-      createdAt: new Date(),
-    };
-
-    try {
-      await setDoc(doc(db, 'dailyAttendance', dailyRecordId), {
-        ...dailyRecord,
-        markedAt: Timestamp.fromDate(dailyRecord.markedAt),
-        createdAt: Timestamp.fromDate(dailyRecord.createdAt),
-      });
-      console.log(`✅ Marked ${studentName} as present for ${today}`);
-    } catch (error: unknown) {
-      console.error(`❌ Failed to mark ${studentName} as present:`, error);
-      // Fallback: Try a minimal update if the full record fails
-      try {
-        await setDoc(doc(db, 'dailyAttendance', dailyRecordId), {
-          studentId,
-          hubId,
-          hubName,
-          date: today,
-          isPresent: true,
-          markedAt: Timestamp.now()
-        }, { merge: true });
-      } catch (innerError) {
-        console.error('❌ Fallback marking also failed:', innerError);
-        mapDailyAttendanceWriteError(innerError, `markPresentToday fallback dailyAttendance/${dailyRecordId}`);
-      }
-    }
+    });
   }
 
-  /**
-   * Check if student is marked present today
-   */
   async isPresentToday(studentId: string): Promise<boolean> {
     const timeService = TimeService.getInstance();
-    // CRITICAL FIX: Use consistent date from TimeService
     const today = timeService.getCurrentDateString();
-    console.log('📅 isPresentToday - Using Harare date:', today);
-    const dailyRecordId = `${studentId}_${today}`;
 
-    const docRef = doc(db, 'dailyAttendance', dailyRecordId);
-    const docSnap = await getDoc(docRef);
-
-    return docSnap.exists() && docSnap.data()?.isPresent === true;
+    const records = await convex.query(api.dailyAttendance.getDailyAttendance as any, {
+      studentId: studentId as any,
+    }) as any[];
+    
+    const record = records.find(r => r.date === today);
+    return record?.status === "present";
   }
 
-  /**
-   * Get attendance statistics for a student
-   */
-  private async getDailyRowsByDocIds(studentId: string, daysToCheck: number): Promise<any[]> {
-    const ts = TimeService.getInstance();
-    const todayStr = ts.getCurrentDateString();
-    const today = new Date(`${todayStr}T12:00:00`);
-    const dates: string[] = [];
-    for (let i = 0; i <= daysToCheck; i++) {
-      const d = new Date(today);
-      d.setDate(today.getDate() - i);
-      dates.push(ts.toHarareDateString(d));
-    }
+  private async getDailyRows(studentId: string, daysToCheck: number): Promise<any[]> {
+    const records = await convex.query(api.dailyAttendance.getDailyAttendance as any, {
+      studentId: studentId as any,
+    }) as any[];
 
-    const snaps = await Promise.all(
-      dates.map((dateStr) => getDoc(doc(db, 'dailyAttendance', `${studentId}_${dateStr}`)))
-    );
-
-    const out: any[] = [];
-    snaps.forEach((snap, idx) => {
-      if (!snap.exists()) return;
-      const data = snap.data();
-      out.push({
-        id: snap.id,
-        date: dates[idx],
-        isPresent: Boolean(data.isPresent),
-        markedAt: data.markedAt?.toDate ? data.markedAt.toDate() : undefined,
-      });
-    });
-
-    out.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-    return out;
+    return records.map(r => ({
+      id: r._id,
+      date: r.date,
+      isPresent: r.status === "present",
+      markedAt: new Date(r.createdAt),
+    })).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
   }
 
   async getAttendanceStats(studentId: string, daysToCheck: number = 30): Promise<DailyAttendanceStats> {
-    try {
-      console.log('📊 Getting attendance stats for:', studentId, 'days:', daysToCheck);
-      
-      const endDate = new Date();
-      const startDate = new Date();
-      startDate.setDate(endDate.getDate() - daysToCheck);
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(endDate.getDate() - daysToCheck);
 
-      const startDateStr = startDate.toISOString().split('T')[0];
-      const endDateStr = endDate.toISOString().split('T')[0];
+    const startDateStr = startDate.toISOString().split('T')[0];
+    const endDateStr = endDate.toISOString().split('T')[0];
 
-      console.log('📅 Date range:', startDateStr, 'to', endDateStr);
+    const records = (await this.getDailyRows(studentId, daysToCheck)).filter(
+      (r) => r.date >= startDateStr && r.date <= endDateStr
+    );
 
-      const records = (await this.getDailyRowsByDocIds(studentId, daysToCheck)).filter(
-        (r) => r.date >= startDateStr && r.date <= endDateStr
-      );
+    const presentDays = records.filter(r => r.isPresent).length;
+    const totalDays = Math.min(daysToCheck, this.getBusinessDaysCount(startDate, endDate));
+    const absentDays = totalDays - presentDays;
+    const attendanceRate = totalDays > 0 ? (presentDays / totalDays) * 100 : 0;
 
-      console.log('📋 Found', records.length, 'attendance records in range');
+    const { currentStreak, longestStreak } = this.calculateStreaks(records);
+    const lastAttendanceDate = records.find(r => r.isPresent)?.date || null;
 
-      // Calculate stats
-      const presentDays = records.filter(r => r.isPresent).length;
-      const totalDays = Math.min(daysToCheck, this.getBusinessDaysCount(startDate, endDate));
-      const absentDays = totalDays - presentDays;
-      const attendanceRate = totalDays > 0 ? (presentDays / totalDays) * 100 : 0;
-
-      // Calculate streaks
-      const { currentStreak, longestStreak } = this.calculateStreaks(records);
-
-      const lastAttendanceDate = records.find(r => r.isPresent)?.date || null;
-
-      console.log('📊 Calculated stats:', {
-        totalDays,
-        presentDays,
-        absentDays,
-        attendanceRate: Math.round(attendanceRate * 100) / 100,
-        currentStreak,
-        longestStreak
-      });
-
-      return {
-        totalDays,
-        presentDays,
-        absentDays,
-        currentStreak,
-        longestStreak,
-        attendanceRate: Math.round(attendanceRate * 100) / 100,
-        lastAttendanceDate,
-      };
-    } catch (error: any) {
-      console.error('❌ Error getting attendance stats:', error);
-      throw error;
-    }
+    return {
+      totalDays,
+      presentDays,
+      absentDays,
+      currentStreak,
+      longestStreak,
+      attendanceRate: Math.round(attendanceRate * 100) / 100,
+      lastAttendanceDate,
+    };
   }
 
-  /**
-   * Get attendance calendar for a month
-   */
   async getAttendanceCalendar(studentId: string, year: number, month: number): Promise<AttendanceCalendarDay[]> {
     const startDate = new Date(year, month - 1, 1);
     const endDate = new Date(year, month, 0);
@@ -233,21 +119,18 @@ export class DailyAttendanceService {
     const startDateStr = startDate.toISOString().split('T')[0];
     const endDateStr = endDate.toISOString().split('T')[0];
 
-    const q = query(collection(db, 'dailyAttendance'), where('studentId', '==', studentId));
-    const querySnapshot = await getDocs(q);
+    const allRecords = await this.getDailyRows(studentId, 365);
     const attendanceMap = new Map();
 
-    querySnapshot.forEach((docSnap) => {
-      const data = docSnap.data();
+    allRecords.forEach((data) => {
       if (data.date < startDateStr || data.date > endDateStr) return;
       attendanceMap.set(data.date, {
         isPresent: data.isPresent,
-        markedAt: data.markedAt?.toDate(),
+        markedAt: data.markedAt,
       });
     });
 
-    // Also get detailed attendance records for check-in/out times
-    const detailedRecords = await this.getDetailedAttendanceForMonth(studentId, year, month);
+    const detailedRecords = await convex.query(api.attendance.getAttendanceHistory as any, { studentId: studentId as any, limitCount: 100 }) as any[];
     const detailedMap = new Map();
     detailedRecords.forEach(record => {
       detailedMap.set(record.date, record);
@@ -266,8 +149,8 @@ export class DailyAttendanceService {
       calendar.push({
         date: dateStr,
         isPresent: attendance?.isPresent || false,
-        checkInTime: detailed?.checkInTime,
-        checkOutTime: detailed?.checkOutTime,
+        checkInTime: detailed?.checkInTime ? new Date(detailed.checkInTime) : undefined,
+        checkOutTime: detailed?.checkOutTime ? new Date(detailed.checkOutTime) : undefined,
         isToday: dateStr === today,
         isFuture: date > new Date(),
       });
@@ -276,47 +159,31 @@ export class DailyAttendanceService {
     return calendar;
   }
 
-  /**
-   * Get recent attendance activity
-   */
   async getRecentActivity(studentId: string, limitCount: number = 10): Promise<any[]> {
-    const activities = (await this.getDailyRowsByDocIds(studentId, Math.max(limitCount * 4, 45))).map((data) => ({
+    const activities = (await this.getDailyRows(studentId, Math.max(limitCount * 4, 45))).map((data) => ({
       date: data.date,
       isPresent: data.isPresent,
       markedAt: data.markedAt,
       type: data.isPresent ? 'present' : 'absent',
       description: data.isPresent ? 'Marked Present' : 'Marked Absent',
     }));
-    activities.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
     return activities.slice(0, limitCount);
   }
 
-  /**
-   * Calculate current and longest attendance streaks
-   */
   private calculateStreaks(records: any[]): { currentStreak: number; longestStreak: number } {
-    if (records.length === 0) {
-      return { currentStreak: 0, longestStreak: 0 };
-    }
+    if (records.length === 0) return { currentStreak: 0, longestStreak: 0 };
 
-    // Sort by date ascending for streak calculation
     const sortedRecords = records.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-
     let currentStreak = 0;
     let longestStreak = 0;
     let tempStreak = 0;
 
-    // Calculate current streak (from most recent backwards)
     const reversedRecords = [...sortedRecords].reverse();
     for (const record of reversedRecords) {
-      if (record.isPresent) {
-        currentStreak++;
-      } else {
-        break;
-      }
+      if (record.isPresent) currentStreak++;
+      else break;
     }
 
-    // Calculate longest streak
     for (const record of sortedRecords) {
       if (record.isPresent) {
         tempStreak++;
@@ -329,74 +196,22 @@ export class DailyAttendanceService {
     return { currentStreak, longestStreak };
   }
 
-  /**
-   * Get business days count between two dates (excluding weekends)
-   */
   private getBusinessDaysCount(startDate: Date, endDate: Date): number {
     let count = 0;
     const currentDate = new Date(startDate);
-
     while (currentDate <= endDate) {
       const dayOfWeek = currentDate.getDay();
-      if (dayOfWeek !== 0 && dayOfWeek !== 6) { // Not Sunday (0) or Saturday (6)
-        count++;
-      }
+      if (dayOfWeek !== 0 && dayOfWeek !== 6) count++;
       currentDate.setDate(currentDate.getDate() + 1);
     }
-
     return count;
   }
 
-  /**
-   * Get detailed attendance records for a specific month
-   */
-  private async getDetailedAttendanceForMonth(studentId: string, year: number, month: number): Promise<AttendanceRecord[]> {
-    const startDate = new Date(year, month - 1, 1);
-    const endDate = new Date(year, month, 0);
-    
-    const startDateStr = startDate.toISOString().split('T')[0];
-    const endDateStr = endDate.toISOString().split('T')[0];
-
-    const q = query(collection(db, 'attendance'), where('studentId', '==', studentId));
-    const querySnapshot = await getDocs(q);
-    const records: AttendanceRecord[] = [];
-
-    querySnapshot.forEach((docSnap) => {
-      const data = docSnap.data();
-      const d = (data as any).date;
-      if (!d || d < startDateStr || d > endDateStr) return;
-      records.push({
-        ...data,
-        checkInTime: data.checkInTime?.toDate(),
-        checkOutTime: data.checkOutTime?.toDate(),
-      } as AttendanceRecord);
-    });
-    records.sort((a, b) => ((a as any).date || '').localeCompare((b as any).date || ''));
-    return records;
-  }
-
-  /**
-   * Mark student as absent for a specific date (admin function)
-   */
   async markAbsent(studentId: string, studentName: string, date: string): Promise<void> {
-    const dailyRecordId = `${studentId}_${date}`;
-
-    const dailyRecord = {
-      id: dailyRecordId,
-      studentId,
+    await convex.mutation(api.dailyAttendance.markAbsent as any, {
+      studentId: studentId as any,
       studentName,
       date,
-      isPresent: false,
-      markedAt: new Date(),
-      createdAt: new Date(),
-    };
-
-    await setDoc(doc(db, 'dailyAttendance', dailyRecordId), {
-      ...dailyRecord,
-      markedAt: Timestamp.fromDate(dailyRecord.markedAt),
-      createdAt: Timestamp.fromDate(dailyRecord.createdAt),
     });
-
-    console.log(`❌ Marked ${studentName} as absent for ${date}`);
   }
 }

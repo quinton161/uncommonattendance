@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import styled, { keyframes } from 'styled-components';
 import { useAuth } from '../../contexts/AuthContext';
-import { getFirebaseAuthErrorMessage } from '../../utils/firebaseAuthErrors';
 import { Button } from '../Common/Button';
 import { Input } from '../Common/Input';
 import { Card } from '../Common/Card';
@@ -388,7 +387,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onToggleMode }) => {
         typeof err?.message === 'string' && err.message.trim()
           ? err.message
           : err?.code
-            ? getFirebaseAuthErrorMessage(err.code, 'Failed to create account.')
+            ? `Error ${err.code}`
             : 'Failed to create account.';
       setError(msg);
     } finally {

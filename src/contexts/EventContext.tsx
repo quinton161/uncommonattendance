@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useQuery, useMutation } from 'convex/react';
+import { api } from '../convex/_generated/api';
 import { Event, EventContextType, User } from '../types';
-import { EventService } from '../services/eventService';
 
 const EventContext = createContext<EventContextType | undefined>(undefined);
 
@@ -18,50 +19,41 @@ interface EventProviderProps {
 }
 
 export const EventProvider: React.FC<EventProviderProps> = ({ children, user }) => {
-  const [events, setEvents] = useState<Event[]>([]);
+  const [localEvents, setLocalEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(false);
-  const eventService = EventService.getInstance();
 
-  const loadPublicEvents = async () => {
-    try {
-      setLoading(true);
-      const publicEvents = await eventService.getPublicEvents();
-      setEvents(publicEvents);
-    } catch (error) {
-      console.error('Error loading public events:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Fallbacks using any because the generated types might not be ready
+  const publicEventsQuery = api?.events?.getPublicEvents;
+  const userEventsQuery = api?.events?.getUserEvents;
+  
+  const publicEvents = useQuery(publicEventsQuery as any) as Event[] | undefined;
+  // If we are an instructor, we might want to query their events
+  const instructorEvents = useQuery(userEventsQuery as any, user?.uid ? { instructorId: user.uid } : "skip") as Event[] | undefined;
 
-  // Load public events on mount
+  const createEventMut = useMutation(api?.events?.createEvent as any);
+  const updateEventMut = useMutation(api?.events?.updateEvent as any);
+  const deleteEventMut = useMutation(api?.events?.deleteEvent as any);
+
+  // Update local state based on reactive queries
   useEffect(() => {
-    // Intentionally run only once on mount; loadPublicEvents handles its own dependencies.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    loadPublicEvents();
-  }, []);
+    if (user && (user.userType === 'instructor' || user.userType === 'admin')) {
+      if (instructorEvents) setLocalEvents(instructorEvents);
+    } else {
+      if (publicEvents) setLocalEvents(publicEvents);
+    }
+  }, [publicEvents, instructorEvents, user]);
 
   const createEvent = async (eventData: Omit<Event, 'id' | 'createdAt' | 'instructor'>): Promise<string> => {
     if (!user) throw new Error('User must be logged in to create events');
-    
     try {
       setLoading(true);
-      const eventId = await eventService.createEvent({
+      const id = await createEventMut({
         ...eventData,
         instructorId: user.uid,
+        startDate: eventData.startDate.toISOString(),
+        endDate: eventData.endDate.toISOString(),
       });
-      
-      // Reload events to include the new one
-      if (user.userType === 'instructor' || user.userType === 'admin') {
-        await loadUserEvents();
-      } else {
-        await loadPublicEvents();
-      }
-      
-      return eventId;
-    } catch (error) {
-      console.error('Error creating event:', error);
-      throw error;
+      return id;
     } finally {
       setLoading(false);
     }
@@ -70,17 +62,10 @@ export const EventProvider: React.FC<EventProviderProps> = ({ children, user }) 
   const updateEvent = async (eventId: string, eventData: Partial<Event>): Promise<void> => {
     try {
       setLoading(true);
-      await eventService.updateEvent(eventId, eventData);
-      
-      // Update local state
-      setEvents(prevEvents => 
-        prevEvents.map(event => 
-          event.id === eventId ? { ...event, ...eventData } : event
-        )
-      );
-    } catch (error) {
-      console.error('Error updating event:', error);
-      throw error;
+      const updates = { ...eventData } as any;
+      if (updates.startDate) updates.startDate = updates.startDate.toISOString();
+      if (updates.endDate) updates.endDate = updates.endDate.toISOString();
+      await updateEventMut({ eventId, updates });
     } finally {
       setLoading(false);
     }
@@ -89,61 +74,30 @@ export const EventProvider: React.FC<EventProviderProps> = ({ children, user }) 
   const deleteEvent = async (eventId: string): Promise<void> => {
     try {
       setLoading(true);
-      await eventService.deleteEvent(eventId);
-      
-      // Remove from local state
-      setEvents(prevEvents => prevEvents.filter(event => event.id !== eventId));
-    } catch (error) {
-      console.error('Error deleting event:', error);
-      throw error;
+      await deleteEventMut({ eventId });
     } finally {
       setLoading(false);
     }
   };
 
   const getEvent = async (eventId: string): Promise<Event | null> => {
-    try {
-      return await eventService.getEvent(eventId);
-    } catch (error) {
-      console.error('Error getting event:', error);
-      throw error;
-    }
+    // Convex query is reactive, but components might call this as a Promise.
+    // Ideally we rewrite the components to useQuery. For now, we return from local state
+    // or return null as a stub if not found.
+    return localEvents.find(e => e.id === eventId) || null;
   };
 
   const getUserEvents = async (userId?: string): Promise<Event[]> => {
-    try {
-      const targetUserId = userId || user?.uid;
-      if (!targetUserId) throw new Error('User ID required');
-      
-      const userEvents = await eventService.getUserEvents(targetUserId);
-      setEvents(userEvents);
-      return userEvents;
-    } catch (error) {
-      console.error('Error getting user events:', error);
-      throw error;
-    }
-  };
-
-  const loadUserEvents = async () => {
-    if (user && (user.userType === 'instructor' || user.userType === 'admin')) {
-      await getUserEvents();
-    }
+    return instructorEvents || [];
   };
 
   const getPublicEvents = async (): Promise<Event[]> => {
-    try {
-      const publicEvents = await eventService.getPublicEvents();
-      setEvents(publicEvents);
-      return publicEvents;
-    } catch (error) {
-      console.error('Error getting public events:', error);
-      throw error;
-    }
+    return publicEvents || [];
   };
 
   const value: EventContextType = {
-    events,
-    loading,
+    events: localEvents,
+    loading: loading || (publicEvents === undefined && instructorEvents === undefined),
     createEvent,
     updateEvent,
     deleteEvent,
@@ -158,3 +112,4 @@ export const EventProvider: React.FC<EventProviderProps> = ({ children, user }) 
     </EventContext.Provider>
   );
 };
+

@@ -51,7 +51,7 @@ export class TimeService {
 
   /**
    * UTC instants for [start, end] of a calendar day in Africa/Harare (CAT, UTC+2).
-   * Used to query Firestore by `checkInTime` so records are found even if `date` is missing/wrong.
+   * Used to query Convex by `checkInTime` so records are found even if `date` is missing/wrong.
    */
   getHarareDayUtcBounds(yyyyMmDd: string): { start: Date; end: Date } {
     const start = new Date(`${yyyyMmDd}T00:00:00.000+02:00`);

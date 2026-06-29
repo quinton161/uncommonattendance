@@ -1,7 +1,7 @@
 import { format, parseISO, subDays, startOfMonth, endOfMonth } from 'date-fns';
 import { AttendanceRecord, AttendanceStatus } from '../types';
-import { db } from './firebase';
-import { collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
+import { convex } from './convexClient';
+import { api } from '../convex/_generated/api';
 import { TimeService } from './timeService';
 import { DEFAULT_HUBS, fetchHubs, hubIdMatchesScope, resolvedHubLabel } from './hubService';
 import type { HubMonthlyRankingRow, StudentLeaderboardRow } from '../types/notifications';
@@ -520,24 +520,11 @@ export class AttendanceAnalyticsService {
     opts?: { studentId?: string; totalStudents?: number; roster?: AdminAnalyticsRosterEntry[]; hubId?: string }
   ): Promise<AdminAnalytics> {
     try {
-      const startDateStr = range.startDate;
-      const endDateStr = range.endDate;
-
-      const attendanceRef = collection(db, 'attendance');
-      const q = query(
-        attendanceRef,
-        where('date', '>=', startDateStr),
-        where('date', '<=', endDateStr)
-      );
-
-      const snapshot = await getDocs(q);
-      let records = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      if (opts?.studentId) {
-        records = records.filter((r: any) => r.studentId === opts.studentId);
-      }
+      let records = await convex.query(api.attendance.getAttendanceByDateRange as any, {
+        startDate: range.startDate,
+        endDate: range.endDate,
+        studentId: opts?.studentId,
+      }) as any[];
       if (opts?.hubId) {
         records = records.filter((r: any) => hubIdMatchesScope(r.hubId, opts.hubId));
       }
@@ -560,22 +547,11 @@ export class AttendanceAnalyticsService {
   // Get student analytics (weekdays in range; absences = missing weekdays)
   async getStudentAnalytics(studentId: string, range: DateRange): Promise<StudentAnalytics> {
     try {
-      const startDateStr = range.startDate;
-      const endDateStr = range.endDate;
-
-      const attendanceRef = collection(db, 'attendance');
-      const q = query(
-        attendanceRef,
-        where('studentId', '==', studentId),
-        where('date', '>=', startDateStr),
-        where('date', '<=', endDateStr)
-      );
-
-      const snapshot = await getDocs(q);
-      const records = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
+      const records = await convex.query(api.attendance.getAttendanceByDateRange as any, {
+        startDate: range.startDate,
+        endDate: range.endDate,
+        studentId: studentId,
+      }) as any[];
 
       return buildStudentAnalyticsFromRecords(records, range);
     } catch (error) {
@@ -599,24 +575,15 @@ export class AttendanceAnalyticsService {
     callback: (data: AdminAnalytics) => void,
     opts?: { studentId?: string; totalStudents?: number; roster?: AdminAnalyticsRosterEntry[]; hubId?: string }
   ): () => void {
-    const startDateStr = range.startDate;
-    const endDateStr = range.endDate;
+    const watch = convex.watchQuery(api.attendance.getAttendanceByDateRange as any, {
+        startDate: range.startDate,
+        endDate: range.endDate,
+        studentId: opts?.studentId,
+      });
 
-    const attendanceRef = collection(db, 'attendance');
-    const q = query(
-      attendanceRef,
-      where('date', '>=', startDateStr),
-      where('date', '<=', endDateStr)
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      let records = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      if (opts?.studentId) {
-        records = records.filter((r: any) => r.studentId === opts.studentId);
-      }
+    const unsubscribe = watch.onUpdate(() => {
+      let records = watch.localQueryResult() as any[];
+      if (!records) return;
       if (opts?.hubId) {
         records = records.filter((r: any) => hubIdMatchesScope(r.hubId, opts.hubId));
       }
@@ -628,17 +595,6 @@ export class AttendanceAnalyticsService {
 
   // Subscribe to student analytics
   subscribeToStudentAnalytics(studentId: string, range: DateRange, callback: (data: StudentAnalytics) => void): () => void {
-    const startDateStr = range.startDate;
-    const endDateStr = range.endDate;
-
-    const attendanceRef = collection(db, 'attendance');
-    const q = query(
-      attendanceRef,
-      where('studentId', '==', studentId),
-      where('date', '>=', startDateStr),
-      where('date', '<=', endDateStr)
-    );
-
     const empty = (): StudentAnalytics => ({
       daily: [],
       totals: { present: 0, late: 0, absent: 0, totalDays: 0, attendanceRate: 0 },
@@ -650,20 +606,25 @@ export class AttendanceAnalyticsService {
       range: { startDate: range.startDate, endDate: range.endDate },
     });
 
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const records = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-        callback(buildStudentAnalyticsFromRecords(records, range));
+    const watch = convex.watchQuery(
+      api.attendance.getAttendanceByDateRange as any,
+      {
+        startDate: range.startDate,
+        endDate: range.endDate,
+        studentId: studentId,
       },
-      (err) => {
+    );
+
+    const unsubscribe = watch.onUpdate(() => {
+      try {
+        const records = watch.localQueryResult() as any[];
+        if (!records) return callback(empty());
+        callback(buildStudentAnalyticsFromRecords(records, range));
+      } catch (err) {
         console.error('subscribeToStudentAnalytics:', err);
         callback(empty());
       }
-    );
+    });
 
     return unsubscribe;
   }
@@ -703,23 +664,18 @@ export class AttendanceAnalyticsService {
     let students: any[] = [];
     let records: any[] = [];
     try {
-      const [usersSnap, attendanceSnap] = await Promise.all([
-        getDocs(collection(db, 'users')),
-        getDocs(
-          query(
-            collection(db, 'attendance'),
-            where('date', '>=', range.startDate),
-            where('date', '<=', range.endDate)
-          )
-        ),
-      ]);
-      students = usersSnap.docs
-        .map((d) => ({ id: d.id, ...d.data() }))
+      const usersSnap = await convex.query(api.users.getAllUsers as any) as any[];
+      const attendanceSnap = await convex.query(api.attendance.getAttendanceByDateRange as any, {
+        startDate: range.startDate,
+        endDate: range.endDate,
+      }) as any[];
+      
+      students = usersSnap
         .filter((u: any) => {
           const t = String(u.userType || '').toLowerCase();
           return t === 'attendee' || t === 'student';
         });
-      records = attendanceSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      records = attendanceSnap;
     } catch (e) {
       console.warn('getHubMonthlyRankings query failed:', e);
       return [];
@@ -794,17 +750,13 @@ export class AttendanceAnalyticsService {
     const userById = new Map<string, any>();
 
     try {
-      const [usersSnap, attendanceSnap] = await Promise.all([
-        getDocs(collection(db, 'users')),
-        getDocs(
-          query(
-            collection(db, 'attendance'),
-            where('date', '>=', range.startDate),
-            where('date', '<=', range.endDate)
-          )
-        ),
-      ]);
-      usersSnap.docs.forEach((d) => userById.set(d.id, { id: d.id, ...d.data() }));
+      const usersSnap = await convex.query(api.users.getAllUsers as any) as any[];
+      const attendanceSnap = await convex.query(api.attendance.getAttendanceByDateRange as any, {
+        startDate: range.startDate,
+        endDate: range.endDate,
+      }) as any[];
+
+      usersSnap.forEach((d) => userById.set(d._id, { id: d._id, uid: d._id, ...d }));
       students = Array.from(userById.values()).filter((u: any) => {
         const t = String(u.userType || '').toLowerCase();
         return t === 'attendee' || t === 'student';
@@ -812,7 +764,7 @@ export class AttendanceAnalyticsService {
       if (hubId) {
         students = students.filter((u: any) => hubIdMatchesScope(u.hubId, hubId));
       }
-      records = attendanceSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      records = attendanceSnap;
       if (hubId) {
         records = records.filter((r: any) => hubIdMatchesScope(r.hubId, hubId));
       }

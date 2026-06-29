@@ -101,8 +101,8 @@ export class AttendanceVerification {
     console.log('🧪 Testing attendance recording functionality...');
     
     try {
-      // Test connection to Firebase
-      console.log('1. Testing Firebase connection...');
+      // Test connection to backend
+      console.log('1. Testing backend connection...');
       
       // Test attendance service
       console.log('2. Testing AttendanceService...');

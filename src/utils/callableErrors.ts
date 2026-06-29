@@ -1,28 +1,13 @@
-import { getFirebaseAuthErrorMessage } from './firebaseAuthErrors';
-
-/** Extract Firebase / Cloud Functions error code from unknown thrown values. */
-export function getErrorCode(err: unknown): string | undefined {
-  if (err && typeof err === 'object' && 'code' in err) {
-    const code = (err as { code?: string }).code;
-    return code ? String(code) : undefined;
-  }
-  return undefined;
-}
-
-/** User-facing message for Auth + callable errors (password reset prep, etc.). */
-export function getAuthOrCallableErrorMessage(
-  err: unknown,
-  fallback = 'Something went wrong. Please try again.'
-): string {
-  const code = getErrorCode(err);
-  if (code === 'functions/resource-exhausted') {
-    return 'Too many reset attempts for this email. Wait about 15 minutes and try again.';
-  }
-  if (code === 'functions/unavailable' || code === 'functions/deadline-exceeded') {
-    return 'Password reset service is temporarily unavailable. Try again in a few minutes or ask your instructor.';
-  }
-  if (code === 'functions/internal' || code === 'functions/unknown') {
-    return 'Could not prepare password reset. Try again or contact support.';
-  }
-  return getFirebaseAuthErrorMessage(code, fallback);
+/**
+ * Returns a user-friendly error message from a Clerk or Convex callable error.
+ */
+export function getAuthOrCallableErrorMessage(error: unknown, fallbackMessage = 'An unknown error occurred.'): string {
+  if (!error) return fallbackMessage;
+  if (typeof error === 'string') return error;
+  if (error instanceof Error) return error.message;
+  const e = error as any;
+  if (e?.errors?.[0]?.longMessage) return e.errors[0].longMessage;
+  if (e?.errors?.[0]?.message) return e.errors[0].message;
+  if (e?.message) return e.message;
+  return fallbackMessage;
 }

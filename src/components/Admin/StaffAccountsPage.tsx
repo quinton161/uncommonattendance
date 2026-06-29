@@ -60,11 +60,10 @@ function isStaffActive(row: Record<string, unknown>, activeMinutes = 15): boolea
 const PageContainer = styled.div`
   padding: ${theme.spacing.xl};
   width: 100%;
-  max-width: 100%;
+  max-width: 1200px;
   min-width: 0;
   box-sizing: border-box;
-  min-height: 100vh;
-  background: ${theme.colors.backgroundSecondary};
+  margin: 0 auto;
 
   @media (max-width: ${theme.breakpoints.tablet}) {
     padding: ${theme.spacing.md};
@@ -76,29 +75,23 @@ const Header = styled.div`
   justify-content: space-between;
   align-items: flex-start;
   flex-wrap: wrap;
-  margin-bottom: ${theme.spacing.xl};
-  padding-bottom: ${theme.spacing.lg};
-  border-bottom: 2px solid ${theme.colors.primary};
+  margin-bottom: 24px;
   gap: ${theme.spacing.md};
 `;
 
 const HeaderTitle = styled.div`
   h1 {
-    font-family: ${theme.fonts.heading};
-    font-size: ${theme.fontSizes['3xl']};
-    font-weight: ${theme.fontWeights.bold};
-    color: ${theme.colors.primary};
-    margin: 0 0 ${theme.spacing.sm} 0;
-    display: flex;
-    align-items: center;
-    gap: ${theme.spacing.md};
+    font-size: 22px;
+    font-weight: 800;
+    color: ${theme.colors.textPrimary};
+    margin: 0 0 4px 0;
+    letter-spacing: -0.03em;
   }
 
   p {
     color: ${theme.colors.textSecondary};
     margin: 0;
-    font-size: ${theme.fontSizes.lg};
-    line-height: 1.5;
+    font-size: 14px;
   }
 `;
 
@@ -131,18 +124,18 @@ const SearchIconAbsolute = styled(SearchIcon)`
 `;
 
 const SearchInput = styled.input`
-  padding: ${theme.spacing.sm} ${theme.spacing.md} ${theme.spacing.sm} 40px;
-  border-radius: ${theme.borderRadius.lg};
-  border: 1px solid ${theme.colors.gray300};
-  font-size: ${theme.fontSizes.sm};
+  padding: 10px 14px 10px 40px;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 82, 204, 0.1);
+  font-size: 14px;
   width: 100%;
   box-sizing: border-box;
-  background: ${theme.colors.white};
+  background: #ffffff;
 
   &:focus {
     outline: none;
     border-color: ${theme.colors.primary};
-    box-shadow: 0 0 0 3px ${theme.colors.primary}20;
+    box-shadow: 0 0 0 3px rgba(0, 82, 204, 0.1);
   }
 `;
 
@@ -154,11 +147,11 @@ const StatsGrid = styled.div`
 `;
 
 const StatCard = styled.div`
-  background: ${theme.colors.white};
-  border-radius: ${theme.borderRadius.lg};
-  padding: ${theme.spacing.lg};
-  box-shadow: ${theme.shadows.sm};
-  border: 1px solid ${theme.colors.gray200};
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  border: 1px solid rgba(0, 82, 204, 0.06);
   text-align: center;
 `;
 
@@ -183,11 +176,11 @@ const StatLabel = styled.div`
 `;
 
 const UsersTable = styled.div`
-  background: ${theme.colors.white};
-  border-radius: ${theme.borderRadius.xl};
-  box-shadow: ${theme.shadows.lg};
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
   overflow: hidden;
-  border: 1px solid ${theme.colors.gray100};
+  border: 1px solid rgba(0, 82, 204, 0.06);
 `;
 
 const TableWrapper = styled.div`
@@ -205,13 +198,13 @@ const TableHeader = styled.div`
     minmax(200px, 1.25fr);
   gap: ${theme.spacing.md};
   padding: ${theme.spacing.md} ${theme.spacing.lg};
-  background: ${theme.colors.gray50};
-  border-bottom: 1px solid ${theme.colors.gray200};
-  font-weight: ${theme.fontWeights.bold};
+  background: #f8f9ff;
+  border-bottom: 1px solid rgba(0, 82, 204, 0.06);
+  font-weight: 700;
   color: ${theme.colors.textSecondary};
-  font-size: ${theme.fontSizes.xs};
+  font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: 1px;
+  letter-spacing: 0.5px;
   min-width: 900px;
 `;
 
@@ -225,13 +218,13 @@ const TableRow = styled.div`
     minmax(200px, 1.25fr);
   gap: ${theme.spacing.md};
   padding: ${theme.spacing.md} ${theme.spacing.lg};
-  border-bottom: 1px solid ${theme.colors.gray100};
+  border-bottom: 1px solid rgba(0, 82, 204, 0.04);
   align-items: center;
   min-width: 900px;
   min-height: 72px;
 
   &:hover {
-    background: ${theme.colors.gray50};
+    background: #fafbff;
   }
 
   &:last-child {

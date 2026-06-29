@@ -724,7 +724,7 @@ export function AdminAttendanceAnalytics(): React.ReactElement {
                     window.setTimeout(() => window.location.reload(), 600);
                   } catch (e) {
                     console.error(e);
-                    uniqueToast.error('Could not reset attendance. Check Firestore rules and your connection.');
+                    uniqueToast.error('Could not reset attendance. Check your connection.');
                     setResetLoading(false);
                   }
                 }}

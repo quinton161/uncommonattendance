@@ -4,7 +4,7 @@ export interface User {
   uid: string;
   displayName: string;
   email: string;
-  /** Lowercase copy for duplicate checks in Firestore */
+  /** Lowercase copy for duplicate checks in Convex */
   emailLower?: string;
   createdAt: Date;
   photoUrl?: string;
@@ -15,14 +15,9 @@ export interface User {
   /** Optional bootcamp roster ID (e.g. UN-2026-195) for exports */
   bootcampStudentId?: string;
   userType: 'instructor' | 'attendee' | 'admin';
-  /** Firestore `hubs` doc id — students/instructors work in one hub at a time */
+  /** Convex `hubs` doc id — students/instructors work in one hub at a time */
   hubId?: string;
   hubName?: string;
-  /**
-   * True when Firebase Auth has a Google user but no `users/{uid}` document yet.
-   * User must complete registration (role + hub) before using the app.
-   */
-  needsProfileCompletion?: boolean;
 }
 
 export interface Event {
@@ -39,6 +34,7 @@ export interface Event {
   imageUrl?: string;
   isPublic: boolean;
   eventStatus: 'draft' | 'published' | 'cancelled' | 'completed';
+  hubId?: string;
 }
 
 export interface TicketType {
@@ -144,6 +140,12 @@ export type HubSelection = { id: string; name: string };
 export interface AuthContextType {
   user: User | null;
   loading: boolean;
+  /** True once the Convex profile read has settled — prevents HubSelectGate flash on login. */
+  hubResolved: boolean;
+  /** Auth error message (e.g. Clerk-Convex integration issue, storeUser failure). */
+  authError: string | null;
+  /** Retry failed account creation. */
+  retryStoreUser?: () => Promise<void>;
   login: (email: string, password: string, hub?: HubSelection) => Promise<void>;
   register: (
     email: string,
@@ -159,14 +161,6 @@ export interface AuthContextType {
   loginWithGoogle: (hub?: HubSelection) => Promise<void>;
   /** Persist hub for students/instructors (e.g. first login or change hub). */
   setHub: (hub: HubSelection) => Promise<void>;
-  /** Create Firestore profile after first Google sign-in (no existing user doc). */
-  completeGoogleProfile: (
-    displayName: string,
-    userType: User['userType'],
-    hub?: HubSelection
-  ) => Promise<void>;
-  /** Sign out and abandon in-progress Google registration. */
-  cancelGoogleRegistration: () => Promise<void>;
 }
 
 export interface EventContextType {

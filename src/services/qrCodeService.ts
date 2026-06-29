@@ -1,12 +1,5 @@
-import { 
-  doc, 
-  setDoc, 
-  getDoc, 
-  onSnapshot,
-  serverTimestamp,
-  Timestamp
-} from 'firebase/firestore';
-import { db } from './firebase';
+import { convex } from './convexClient';
+import { api } from '../convex/_generated/api';
 import { TimeService } from './timeService';
 
 export interface DailyQRCode {
@@ -31,92 +24,51 @@ class QRCodeService {
     return QRCodeService.instance;
   }
 
-  private generateRandomCode(length: number = 8): string {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let result = '';
-    for (let i = 0; i < length; i++) {
-      result += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return result;
-  }
-
   async generateDailyCode(): Promise<string> {
     const today = this.timeService.getCurrentDateString();
-    const newCode = this.generateRandomCode();
-    const expiresAt = new Date(`${today}T23:59:59.999+02:00`);
-
-    const qrData: DailyQRCode = {
-      code: newCode,
-      createdAt: serverTimestamp(),
-      expiresAt: Timestamp.fromDate(expiresAt),
-      date: today,
-    };
-
-    await setDoc(doc(db, 'system_config', 'daily_qr_code'), qrData);
-    return newCode;
+    const result = await convex.mutation(api.qrCodes.getOrCreate as any, { today }) as any;
+    return result.code;
   }
 
   async ensureTodayCode(canWrite: boolean): Promise<DailyQRCode | null> {
     const today = this.timeService.getCurrentDateString();
-    const docRef = doc(db, 'system_config', 'daily_qr_code');
-    const docSnap = await getDoc(docRef);
+    const existing = await convex.query(api.qrCodes.getCurrent as any, { today }) as any;
 
-    if (docSnap.exists()) {
-      const data = docSnap.data() as DailyQRCode;
-      if (data.date === today) {
-        return data;
-      }
-    }
+    if (existing) return existing;
 
-    if (!canWrite) {
-      return null;
-    }
+    if (!canWrite) return null;
 
     try {
-      await this.generateDailyCode();
-      return this.getDailyCode();
+      const result = await this.generateDailyCode();
+      return { code: result, date: today, createdAt: Date.now(), expiresAt: null };
     } catch (err: unknown) {
       throw err;
     }
   }
 
   async getDailyCode(): Promise<DailyQRCode | null> {
-    const docRef = doc(db, 'system_config', 'daily_qr_code');
-    const docSnap = await getDoc(docRef);
-    
-    if (docSnap.exists()) {
-      const data = docSnap.data() as DailyQRCode;
-      const today = this.timeService.getCurrentDateString();
-      
-      // Only return if it's for today
-      if (data.date === today) {
-        return data;
-      }
-    }
-    return null;
+    const today = this.timeService.getCurrentDateString();
+    const result = await convex.query(api.qrCodes.getCurrent as any, { today }) as any;
+    return result || null;
   }
 
   subscribeToDailyCode(callback: (qrCode: DailyQRCode | null) => void) {
-    return onSnapshot(doc(db, 'system_config', 'daily_qr_code'), (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data() as DailyQRCode;
-        const today = this.timeService.getCurrentDateString();
-        if (data.date === today) {
-          callback(data);
-        } else {
-          callback(null);
-        }
-      } else {
-        callback(null);
-      }
+    const today = this.timeService.getCurrentDateString();
+    const watch = convex.watchQuery(
+      api.qrCodes.getCurrent as any,
+      { today },
+    );
+    const unsub = watch.onUpdate(() => {
+      const val = watch.localQueryResult() as any;
+      if (val && val.date === today) callback(val);
+      else callback(null);
     });
+    return unsub;
   }
 
   async validateCode(code: string): Promise<boolean> {
-    const currentCode = await this.getDailyCode();
-    if (!currentCode) return false;
-    
-    return currentCode.code.toUpperCase() === code.toUpperCase();
+    const today = this.timeService.getCurrentDateString();
+    return await convex.query(api.qrCodes.validate as any, { code, today });
   }
 }
 

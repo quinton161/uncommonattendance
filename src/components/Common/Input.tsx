@@ -1,6 +1,6 @@
 import React from 'react';
-import styled, { css } from 'styled-components';
-import { theme } from '../../styles/theme';
+import { Input as ShadcnInput } from '../UI/input';
+import { Label } from '../UI/label';
 
 interface InputProps {
   label?: string;
@@ -20,122 +20,12 @@ interface InputProps {
   icon?: React.ReactNode;
 }
 
-const InputContainer = styled.div<{ $fullWidth?: boolean }>`
-  display: flex;
-  flex-direction: column;
-  gap: ${theme.spacing.xs};
-
-  ${({ $fullWidth }) =>
-    $fullWidth &&
-    css`
-      width: 100%;
-    `}
-`;
-
-const InputWrapper = styled.div`
-  position: relative;
-  display: flex;
-  align-items: center;
-`;
-
-const IconContainer = styled.div<{ $position: 'left' | 'right' }>`
-  position: absolute;
-  ${({ $position }) => $position}: ${theme.spacing.sm};
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: ${theme.colors.textLight};
-  pointer-events: none;
-`;
-
-const Label = styled.label`
-  font-size: ${theme.fontSizes.sm};
-  font-weight: ${theme.fontWeights.medium};
-  color: ${theme.colors.textPrimary};
-`;
-
-const getSizeStyles = (inputSize: string) => {
-  switch (inputSize) {
-    case 'sm':
-      return css`
-        padding: ${theme.spacing.xs} ${theme.spacing.sm};
-        font-size: ${theme.fontSizes.sm};
-        min-height: 32px;
-      `;
-    case 'lg':
-      return css`
-        padding: ${theme.spacing.md} ${theme.spacing.md};
-        font-size: ${theme.fontSizes.lg};
-        min-height: 48px;
-      `;
-    default:
-      return css`
-        padding: ${theme.spacing.sm} ${theme.spacing.sm};
-        font-size: ${theme.fontSizes.base};
-        min-height: 40px;
-      `;
-  }
-};
-
-const StyledInput = styled.input<{ $hasError?: boolean; $inputSize?: string }>`
-  width: 100%;
-  border: 1px solid ${({ $hasError }) =>
-    $hasError ? theme.colors.danger : theme.colors.gray300};
-  border-radius: ${theme.borderRadius.md};
-  font-family: ${theme.fonts.primary};
-  color: ${theme.colors.textPrimary};
-  background-color: ${theme.colors.white};
-  transition: all 0.2s ease;
-
-  ${({ $inputSize = 'md' }) => getSizeStyles($inputSize)}
-
-  &::placeholder {
-    color: ${theme.colors.textLight};
-  }
-
-  &:focus {
-    outline: none;
-    border-color: ${({ $hasError }) =>
-      $hasError ? theme.colors.danger : theme.colors.primary};
-    box-shadow: 0 0 0 3px ${({ $hasError }) =>
-      $hasError ? `${theme.colors.danger}20` : `${theme.colors.primary}20`};
-  }
-
-  &:disabled {
-    background-color: ${theme.colors.gray100};
-    color: ${theme.colors.textLight};
-    cursor: not-allowed;
-  }
-`;
-
-const StyledInputWithIcon = styled(StyledInput)<{
-  $hasIcon: boolean;
-  $iconPosition: 'left' | 'right';
-}>`
-  ${({ $hasIcon, $iconPosition }) =>
-    $hasIcon &&
-    css`
-      padding-${$iconPosition}: 40px;
-    `}
-`;
-
-const HelperText = styled.span<{ $isError?: boolean }>`
-  font-size: ${theme.fontSizes.xs};
-  color: ${({ $isError }) =>
-    $isError ? theme.colors.danger : theme.colors.textSecondary};
-`;
-
-const RequiredIndicator = styled.span`
-  color: ${theme.colors.danger};
-  margin-left: 2px;
-`;
-
 export const Input: React.FC<InputProps> = ({
   label,
   error,
   helperText,
   fullWidth = false,
-  size = 'md',
+  size,
   required = false,
   id,
   name,
@@ -145,29 +35,35 @@ export const Input: React.FC<InputProps> = ({
   const inputId = id || name || `input-${Math.random().toString(36).substr(2, 9)}`;
 
   return (
-    <InputContainer $fullWidth={fullWidth}>
+    <div className={`flex flex-col gap-1.5 ${fullWidth ? 'w-full' : ''}`}>
       {label && (
         <Label htmlFor={inputId}>
           {label}
-          {required && <RequiredIndicator>*</RequiredIndicator>}
+          {required && <span className="text-destructive ml-0.5">*</span>}
         </Label>
       )}
-      <InputWrapper>
-        {icon && <IconContainer $position="left">{icon}</IconContainer>}
-        <StyledInputWithIcon
+      <div className="relative flex items-center">
+        {icon && (
+          <div className="absolute left-2.5 flex items-center justify-center text-muted-foreground pointer-events-none">
+            {icon}
+          </div>
+        )}
+        <ShadcnInput
           id={inputId}
           name={name}
-          $hasError={!!error}
-          $inputSize={size}
           required={required}
-          $hasIcon={!!icon}
-          $iconPosition="left"
+          className={`
+            ${icon ? 'pl-9' : ''}
+            ${error ? 'border-destructive focus-visible:ring-destructive' : ''}
+          `}
           {...props}
         />
-      </InputWrapper>
+      </div>
       {(error || helperText) && (
-        <HelperText $isError={!!error}>{error || helperText}</HelperText>
+        <span className={`text-xs ${error ? 'text-destructive' : 'text-muted-foreground'}`}>
+          {error || helperText}
+        </span>
       )}
-    </InputContainer>
+    </div>
   );
 };

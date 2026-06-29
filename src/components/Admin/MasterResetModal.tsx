@@ -177,7 +177,7 @@ export const MasterResetModal: React.FC<MasterResetModalProps> = ({
     setLoading(true);
     try {
       await onConfirm();
-      // Immediately reload the page to fetch fresh data from Firebase
+      // Immediately reload the page to fetch fresh data
       window.location.reload();
     } catch (error) {
       console.error('Master reset error:', error);

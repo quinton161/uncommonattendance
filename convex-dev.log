@@ -1,0 +1,37 @@
+▌ Developing against deployment:
+▌ [Development] quinton-ndlovu:uncommonattendance:dev/quinton-ndlovu (dev) (dashboard: https://dashboard.convex.dev/t/quinton-ndlovu/uncommonattendance/watchful-shark-289)
+▌ └─ https://watchful-shark-289.convex.cloud
+- Preparing Convex functions...
+
+[36mA minor update is available for Convex[39m [2m(1.41.0 → 1.42.0)[22m
+[2mChangelog:[22m [4mhttps://github.com/get-convex/convex-js/blob/main/CHANGELOG.md#changelog[24m
+[32m✔[39m 22:30:19 Convex functions ready! (5.48s)
+24/6/2026, 22:40:11 [CONVEX M(users:storeUser)] ArgumentValidationError: Object is missing the required field `clerkId`. Consider wrapping the field validator in `v.optional(...)` if this is expected.
+
+Object: {}
+Validator: v.object({clerkId: v.string(), displayName: v.optional(v.string()), email: v.string(), firstName: v.optional(v.string()), hubId: v.optional(v.string()), hubName: v.optional(v.string()), lastName: v.optional(v.string()), photoUrl: v.optional(v.string()), userType: v.optional(v.string())})
+
+
+24/6/2026, 22:40:32 [CONVEX M(users:storeUser)] ArgumentValidationError: Object is missing the required field `clerkId`. Consider wrapping the field validator in `v.optional(...)` if this is expected.
+
+Object: {}
+Validator: v.object({clerkId: v.string(), displayName: v.optional(v.string()), email: v.string(), firstName: v.optional(v.string()), hubId: v.optional(v.string()), hubName: v.optional(v.string()), lastName: v.optional(v.string()), photoUrl: v.optional(v.string()), userType: v.optional(v.string())})
+
+
+24/6/2026, 22:41:40 [CONVEX M(users:adminUpdateUser)] Uncaught Error: Unauthenticated
+    at handler (../src/convex/users.ts:123:28)
+
+Retrying request (attempt 3/6)...
+Retrying request (attempt 4/6)...
+25/6/2026, 07:39:19 [CONVEX Q(testQuery)] [LOG] 'Write and test your query function here!'
+Retrying request (attempt 3/6)...
+Retrying request (attempt 4/6)...
+- Preparing Convex functions...
+
+[32m✔[39m 11:42:18 Convex functions ready! (21.16s)
+- Preparing Convex functions...
+
+[32m✔[39m 13:31:22 Convex functions ready! (8.25s)
+Retrying request (attempt 3/6)...
+Retrying request (attempt 4/6)...
+Retrying request (attempt 5/6)...

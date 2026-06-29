@@ -200,7 +200,7 @@ export const DeleteUserModal: React.FC<DeleteUserModalProps> = ({ user, onClose,
           <p>
             <FiAlertTriangle style={{ color: theme.colors.error, marginRight: '8px' }} />
             This removes their profile from the app and deletes their attendance records tied to this account.
-            Their Firebase login may still exist until removed in the admin console.
+            Their Clerk account may still exist until removed in the Clerk dashboard.
           </p>
         </WarningBox>
 

@@ -1,18 +1,5 @@
-import { 
-  collection, 
-  doc, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  getDoc, 
-  getDocs, 
-  query, 
-  where, 
-  orderBy, 
-  limit,
-  Timestamp 
-} from 'firebase/firestore';
-import { db } from './firebase';
+import { convex } from './convexClient';
+import { api } from '../convex/_generated/api';
 import { Event, TicketType, Registration, EventResource, Feedback } from '../types';
 
 export class EventService {
@@ -25,16 +12,22 @@ export class EventService {
     return EventService.instance;
   }
 
-  // Event Management
   async createEvent(eventData: Omit<Event, 'id' | 'createdAt' | 'instructor'>): Promise<string> {
     try {
-      const docRef = await addDoc(collection(db, 'events'), {
-        ...eventData,
-        createdAt: Timestamp.now(),
-        startDate: Timestamp.fromDate(eventData.startDate),
-        endDate: Timestamp.fromDate(eventData.endDate),
+      const id = await convex.mutation(api.events.createEvent as any, {
+        title: eventData.title,
+        description: eventData.description,
+        startDate: eventData.startDate.toISOString(),
+        endDate: eventData.endDate?.toISOString(),
+        location: eventData.location,
+        instructorId: eventData.instructorId,
+        capacity: eventData.capacity,
+        imageUrl: eventData.imageUrl,
+        isPublic: eventData.isPublic,
+        eventStatus: eventData.eventStatus,
+        hubId: eventData.hubId,
       });
-      return docRef.id;
+      return id;
     } catch (error) {
       console.error('Error creating event:', error);
       throw error;
@@ -43,18 +36,14 @@ export class EventService {
 
   async updateEvent(eventId: string, eventData: Partial<Event>): Promise<void> {
     try {
-      const eventRef = doc(db, 'events', eventId);
-      const updateData: any = { ...eventData };
-      
-      // Convert dates to Timestamps if they exist
-      if (eventData.startDate) {
-        updateData.startDate = Timestamp.fromDate(eventData.startDate);
-      }
-      if (eventData.endDate) {
-        updateData.endDate = Timestamp.fromDate(eventData.endDate);
-      }
-      
-      await updateDoc(eventRef, updateData);
+      const updates: any = { ...eventData };
+      if (updates.startDate) updates.startDate = updates.startDate.toISOString();
+      if (updates.endDate) updates.endDate = updates.endDate.toISOString();
+      delete (updates as any).id;
+      await convex.mutation(api.events.updateEvent as any, {
+        eventId: eventId as any,
+        updates,
+      });
     } catch (error) {
       console.error('Error updating event:', error);
       throw error;
@@ -63,7 +52,7 @@ export class EventService {
 
   async deleteEvent(eventId: string): Promise<void> {
     try {
-      await deleteDoc(doc(db, 'events', eventId));
+      await convex.mutation(api.events.deleteEvent as any, { eventId: eventId as any });
     } catch (error) {
       console.error('Error deleting event:', error);
       throw error;
@@ -72,19 +61,15 @@ export class EventService {
 
   async getEvent(eventId: string): Promise<Event | null> {
     try {
-      const docRef = doc(db, 'events', eventId);
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        return {
-          id: docSnap.id,
-          ...data,
-          startDate: data.startDate.toDate(),
-          endDate: data.endDate.toDate(),
-          createdAt: data.createdAt.toDate(),
-        } as Event;
-      }
-      return null;
+      const result = await convex.query(api.events.getEvent as any, { eventId: eventId as any }) as any;
+      if (!result) return null;
+      return {
+        id: result._id || result.id,
+        ...result,
+        startDate: new Date(result.startDate),
+        endDate: result.endDate ? new Date(result.endDate) : undefined,
+        createdAt: new Date(result.createdAt),
+      } as Event;
     } catch (error) {
       console.error('Error getting event:', error);
       throw error;
@@ -93,19 +78,13 @@ export class EventService {
 
   async getUserEvents(userId: string): Promise<Event[]> {
     try {
-      const q = query(
-        collection(db, 'events'),
-        where('instructorId', '==', userId),
-        orderBy('createdAt', 'desc')
-      );
-      const querySnapshot = await getDocs(q);
-      
-      return querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        startDate: doc.data().startDate.toDate(),
-        endDate: doc.data().endDate.toDate(),
-        createdAt: doc.data().createdAt.toDate(),
+      const results = await convex.query(api.events.getUserEvents as any, { instructorId: userId }) as any[];
+      return results.map((r: any) => ({
+        id: r._id || r.id,
+        ...r,
+        startDate: new Date(r.startDate),
+        endDate: r.endDate ? new Date(r.endDate) : undefined,
+        createdAt: new Date(r.createdAt),
       })) as Event[];
     } catch (error) {
       console.error('Error getting user events:', error);
@@ -115,68 +94,30 @@ export class EventService {
 
   async getPublicEvents(): Promise<Event[]> {
     try {
-      // Try the optimized query first (requires index)
-      const q = query(
-        collection(db, 'events'),
-        where('isPublic', '==', true),
-        where('eventStatus', '==', 'published'),
-        orderBy('startDate', 'asc'),
-        limit(50)
-      );
-      const querySnapshot = await getDocs(q);
-      
-      return querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        startDate: doc.data().startDate.toDate(),
-        endDate: doc.data().endDate.toDate(),
-        createdAt: doc.data().createdAt.toDate(),
+      const results = await convex.query(api.events.getPublicEvents as any) as any[];
+      return results.map((r: any) => ({
+        id: r._id || r.id,
+        ...r,
+        startDate: new Date(r.startDate),
+        endDate: r.endDate ? new Date(r.endDate) : undefined,
+        createdAt: new Date(r.createdAt),
       })) as Event[];
     } catch (error) {
       console.error('Error getting public events:', error);
-      
-      // Fallback: Try without the compound index if it's still building
-      if (error instanceof Error && error.message.includes('requires an index')) {
-        console.log('🔄 Index still building, using fallback query...');
-        try {
-          const fallbackQ = query(
-            collection(db, 'events'),
-            where('isPublic', '==', true),
-            orderBy('startDate', 'asc'),
-            limit(50)
-          );
-          const fallbackSnapshot = await getDocs(fallbackQ);
-          
-          return fallbackSnapshot.docs
-            .map(doc => {
-              const data = doc.data() as any;
-              return {
-                id: doc.id,
-                ...data,
-                startDate: data.startDate.toDate(),
-                endDate: data.endDate.toDate(),
-                createdAt: data.createdAt.toDate(),
-              };
-            })
-            .filter(event => event.eventStatus === 'published') as Event[];
-        } catch (fallbackError) {
-          console.error('Fallback query also failed:', fallbackError);
-          throw fallbackError;
-        }
-      }
-      
       throw error;
     }
   }
 
-  // Ticket Type Management
   async createTicketType(ticketData: Omit<TicketType, 'id' | 'createdAt'>): Promise<string> {
     try {
-      const docRef = await addDoc(collection(db, 'ticketTypes'), {
-        ...ticketData,
-        createdAt: Timestamp.now(),
+      return await convex.mutation(api.events.createTicketType as any, {
+        eventId: ticketData.eventId as any,
+        name: ticketData.name,
+        price: ticketData.price,
+        quantity: ticketData.capacity,
+        description: ticketData.description,
+        accessLevel: ticketData.accessLevel,
       });
-      return docRef.id;
     } catch (error) {
       console.error('Error creating ticket type:', error);
       throw error;
@@ -185,16 +126,16 @@ export class EventService {
 
   async getEventTicketTypes(eventId: string): Promise<TicketType[]> {
     try {
-      const q = query(
-        collection(db, 'ticketTypes'),
-        where('eventId', '==', eventId)
-      );
-      const querySnapshot = await getDocs(q);
-      
-      return querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt.toDate(),
+      const results = await convex.query(api.events.getEventTicketTypes as any, { eventId: eventId as any }) as any[];
+      return results.map((r: any) => ({
+        id: r._id,
+        name: r.name,
+        price: r.price,
+        capacity: r.quantity,
+        eventId: r.eventId,
+        description: r.description,
+        accessLevel: r.accessLevel,
+        createdAt: new Date(r._creationTime),
       })) as TicketType[];
     } catch (error) {
       console.error('Error getting ticket types:', error);
@@ -202,24 +143,14 @@ export class EventService {
     }
   }
 
-  // Registration Management
-  async registerForEvent(
-    userId: string, 
-    eventId: string, 
-    ticketTypeId: string, 
-    notes?: string
-  ): Promise<string> {
+  async registerForEvent(userId: string, eventId: string, ticketTypeId: string, notes?: string): Promise<string> {
     try {
-      const docRef = await addDoc(collection(db, 'registrations'), {
-        userId,
-        eventId,
-        ticketTypeId,
-        notes: notes || '',
-        status: 'pending',
-        registrationDate: Timestamp.now(),
-        createdAt: Timestamp.now(),
+      return await convex.mutation(api.events.registerForEvent as any, {
+        userId: userId as any,
+        eventId: eventId as any,
+        ticketTypeId: ticketTypeId as any,
+        notes,
       });
-      return docRef.id;
     } catch (error) {
       console.error('Error registering for event:', error);
       throw error;
@@ -228,9 +159,7 @@ export class EventService {
 
   async cancelRegistration(registrationId: string): Promise<void> {
     try {
-      await updateDoc(doc(db, 'registrations', registrationId), {
-        status: 'cancelled'
-      });
+      await convex.mutation(api.events.cancelRegistration as any, { registrationId: registrationId as any });
     } catch (error) {
       console.error('Error cancelling registration:', error);
       throw error;
@@ -239,18 +168,16 @@ export class EventService {
 
   async getUserRegistrations(userId: string): Promise<Registration[]> {
     try {
-      const q = query(
-        collection(db, 'registrations'),
-        where('userId', '==', userId),
-        orderBy('createdAt', 'desc')
-      );
-      const querySnapshot = await getDocs(q);
-      
-      return querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        registrationDate: doc.data().registrationDate.toDate(),
-        createdAt: doc.data().createdAt.toDate(),
+      const results = await convex.query(api.events.getUserRegistrations as any, { userId: userId as any }) as any[];
+      return results.map((r: any) => ({
+        id: r._id,
+        userId: r.studentId,
+        eventId: r.eventId,
+        ticketTypeId: r.ticketTypeId,
+        status: r.status,
+        notes: r.notes,
+        registrationDate: new Date(r.createdAt),
+        createdAt: new Date(r.createdAt),
       })) as Registration[];
     } catch (error) {
       console.error('Error getting user registrations:', error);
@@ -260,18 +187,16 @@ export class EventService {
 
   async getEventRegistrations(eventId: string): Promise<Registration[]> {
     try {
-      const q = query(
-        collection(db, 'registrations'),
-        where('eventId', '==', eventId),
-        orderBy('createdAt', 'desc')
-      );
-      const querySnapshot = await getDocs(q);
-      
-      return querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        registrationDate: doc.data().registrationDate.toDate(),
-        createdAt: doc.data().createdAt.toDate(),
+      const results = await convex.query(api.events.getEventRegistrations as any, { eventId: eventId as any }) as any[];
+      return results.map((r: any) => ({
+        id: r._id,
+        userId: r.studentId,
+        eventId: r.eventId,
+        ticketTypeId: r.ticketTypeId,
+        status: r.status,
+        notes: r.notes,
+        registrationDate: new Date(r.createdAt),
+        createdAt: new Date(r.createdAt),
       })) as Registration[];
     } catch (error) {
       console.error('Error getting event registrations:', error);
@@ -279,22 +204,14 @@ export class EventService {
     }
   }
 
-  // Feedback Management
-  async submitFeedback(
-    userId: string,
-    eventId: string,
-    rating: number,
-    comment?: string
-  ): Promise<string> {
+  async submitFeedback(userId: string, eventId: string, rating: number, comment?: string): Promise<string> {
     try {
-      const docRef = await addDoc(collection(db, 'feedback'), {
-        userId,
-        eventId,
+      return await convex.mutation(api.events.submitFeedback as any, {
+        userId: userId as any,
+        eventId: eventId as any,
         rating,
-        comment: comment || '',
-        createdAt: Timestamp.now(),
+        comment,
       });
-      return docRef.id;
     } catch (error) {
       console.error('Error submitting feedback:', error);
       throw error;
@@ -303,17 +220,14 @@ export class EventService {
 
   async getEventFeedback(eventId: string): Promise<Feedback[]> {
     try {
-      const q = query(
-        collection(db, 'feedback'),
-        where('eventId', '==', eventId),
-        orderBy('createdAt', 'desc')
-      );
-      const querySnapshot = await getDocs(q);
-      
-      return querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt.toDate(),
+      const results = await convex.query(api.events.getEventFeedback as any, { eventId: eventId as any }) as any[];
+      return results.map((r: any) => ({
+        id: r._id,
+        userId: r.studentId,
+        eventId: r.eventId,
+        rating: r.rating,
+        comment: r.comment,
+        createdAt: new Date(r.createdAt),
       })) as Feedback[];
     } catch (error) {
       console.error('Error getting event feedback:', error);
@@ -321,14 +235,16 @@ export class EventService {
     }
   }
 
-  // Event Resources Management
   async addEventResource(resourceData: Omit<EventResource, 'id' | 'createdAt'>): Promise<string> {
     try {
-      const docRef = await addDoc(collection(db, 'eventResources'), {
-        ...resourceData,
-        createdAt: Timestamp.now(),
+      return await convex.mutation(api.events.addEventResource as any, {
+        eventId: resourceData.eventId as any,
+        title: resourceData.title,
+        resourceType: resourceData.resourceType,
+        url: resourceData.url,
+        description: resourceData.description,
+        accessLevel: resourceData.accessLevel,
       });
-      return docRef.id;
     } catch (error) {
       console.error('Error adding event resource:', error);
       throw error;
@@ -337,17 +253,16 @@ export class EventService {
 
   async getEventResources(eventId: string): Promise<EventResource[]> {
     try {
-      const q = query(
-        collection(db, 'eventResources'),
-        where('eventId', '==', eventId),
-        orderBy('createdAt', 'desc')
-      );
-      const querySnapshot = await getDocs(q);
-      
-      return querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt.toDate(),
+      const results = await convex.query(api.events.getEventResources as any, { eventId: eventId as any }) as any[];
+      return results.map((r: any) => ({
+        id: r._id,
+        eventId: r.eventId,
+        title: r.title,
+        resourceType: r.resourceType,
+        url: r.url,
+        description: r.description,
+        accessLevel: r.accessLevel,
+        createdAt: new Date(r.createdAt),
       })) as EventResource[];
     } catch (error) {
       console.error('Error getting event resources:', error);

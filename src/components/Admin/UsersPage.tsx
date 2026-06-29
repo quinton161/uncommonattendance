@@ -19,11 +19,10 @@ import { FiAlertTriangle } from 'react-icons/fi';
 const PageContainer = styled.div`
   padding: ${theme.spacing.xl};
   width: 100%;
-  max-width: 100%;
+  max-width: 1200px;
   min-width: 0;
   box-sizing: border-box;
-  min-height: 100vh;
-  background: ${theme.colors.backgroundSecondary};
+  margin: 0 auto;
   
   @media (max-width: ${theme.breakpoints.tablet}) {
     padding: ${theme.spacing.md};
@@ -39,20 +38,13 @@ const Header = styled.div`
   justify-content: space-between;
   align-items: flex-start;
   flex-wrap: wrap;
-  margin-bottom: ${theme.spacing.xl};
-  padding-bottom: ${theme.spacing.lg};
-  border-bottom: 2px solid ${theme.colors.primary};
+  margin-bottom: 24px;
   gap: ${theme.spacing.md};
   
   @media (max-width: ${theme.breakpoints.tablet}) {
     flex-direction: column;
     align-items: stretch;
     gap: ${theme.spacing.md};
-  }
-  
-  @media (max-width: ${theme.breakpoints.mobile}) {
-    margin-bottom: ${theme.spacing.lg};
-    padding-bottom: ${theme.spacing.md};
   }
 `;
 
@@ -92,20 +84,17 @@ const DesktopOnly = styled.div`
 
 const HeaderTitle = styled.div`
   h1 {
-    font-family: ${theme.fonts.heading};
-    font-size: ${theme.fontSizes['3xl']};
-    font-weight: ${theme.fontWeights.bold};
-    color: ${theme.colors.primary};
-    margin: 0 0 ${theme.spacing.sm} 0;
-    display: flex;
-    align-items: center;
-    gap: ${theme.spacing.md};
+    font-size: 22px;
+    font-weight: 800;
+    color: ${theme.colors.textPrimary};
+    margin: 0 0 4px 0;
+    letter-spacing: -0.03em;
   }
   
   p {
     color: ${theme.colors.textSecondary};
     margin: 0;
-    font-size: ${theme.fontSizes.lg};
+    font-size: 14px;
   }
 `;
 
@@ -122,24 +111,19 @@ const TableRow = styled.div`
   grid-template-columns: minmax(200px, 2fr) minmax(120px, 1.2fr) 100px minmax(100px, auto);
   gap: ${theme.spacing.md};
   padding: ${theme.spacing.md} ${theme.spacing.lg};
-  border-bottom: 1px solid ${theme.colors.gray100};
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  border-bottom: 1px solid rgba(0, 82, 204, 0.04);
+  transition: all 0.2s ease;
   align-items: center;
   min-width: 0;
   box-sizing: border-box;
   min-height: 72px;
-  border-left: 4px solid transparent;
 
   & > * {
     min-width: 0;
   }
   
   &:hover {
-    background: white;
-    transform: translateX(4px);
-    box-shadow: ${theme.shadows.md};
-    border-left: 4px solid ${theme.colors.primary};
-    z-index: 1;
+    background: #fafbff;
   }
   
   &:last-child {
@@ -209,11 +193,11 @@ const UserType = styled.div<{ type: string }>`
 `;
 
 const UsersTable = styled.div`
-  background: ${theme.colors.white};
-  border-radius: ${theme.borderRadius.xl};
-  box-shadow: ${theme.shadows.lg};
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
   overflow: hidden;
-  border: 1px solid ${theme.colors.gray100};
+  border: 1px solid rgba(0, 82, 204, 0.06);
 `;
 
 const TableWrapper = styled.div`
@@ -478,17 +462,17 @@ const MobileUserCard = styled.div`
   
   @media (max-width: ${theme.breakpoints.tablet}) {
     display: block;
-    background: ${theme.colors.white};
-    border-radius: ${theme.borderRadius.lg};
+    background: #ffffff;
+    border-radius: 14px;
     padding: ${theme.spacing.lg};
     margin-bottom: ${theme.spacing.md};
-    box-shadow: ${theme.shadows.sm};
-    border: 1px solid ${theme.colors.gray200};
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    border: 1px solid rgba(0, 82, 204, 0.06);
   }
   
   @media (max-width: ${theme.breakpoints.mobile}) {
     padding: ${theme.spacing.md};
-    border-radius: ${theme.borderRadius.md};
+    border-radius: 12px;
   }
 `;
 
@@ -528,11 +512,11 @@ const StatsGrid = styled.div`
 `;
 
 const StatCard = styled.div`
-  background: ${theme.colors.white};
-  border-radius: ${theme.borderRadius.lg};
-  padding: ${theme.spacing.lg};
-  box-shadow: ${theme.shadows.sm};
-  border: 1px solid ${theme.colors.gray200};
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  border: 1px solid rgba(0, 82, 204, 0.06);
   text-align: center;
   
   @media (max-width: ${theme.breakpoints.tablet}) {
@@ -758,7 +742,7 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
             <AlertBody>
               <AlertHeading>Policy: @uncommon.org cannot be students</AlertHeading>
               <AlertText>
-                New signups are blocked. Use the button below to remove old Firestore profiles that incorrectly have Uncommon emails as attendees. This deletes their app profile and linked attendance rows; Firebase Authentication accounts are unchanged (remove those in the Firebase Console if they should register again).
+                New signups are blocked. Use the button below to remove old profiles that incorrectly have Uncommon emails as attendees. This deletes their app profile and linked attendance rows; Clerk accounts are unchanged (remove those in the Clerk dashboard if they should register again).
               </AlertText>
               <DangerOutlineButton
                 type="button"
@@ -779,7 +763,7 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
                     const more = found.length > 8 ? `\n… and ${found.length - 8} more` : '';
                     if (
                       !window.confirm(
-                        `Remove ${found.length} profile(s) from Firestore?\n\n${summary}${more}\n\nTheir Firebase login will still exist until deleted in Authentication.`
+                        `Remove ${found.length} profile(s)?\n\n${summary}${more}\n\nTheir Clerk account will still exist until deleted in the Clerk dashboard.`
                       )
                     ) {
                       return;
@@ -793,7 +777,7 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onBack, onChat }) => {
                     await loadData();
                   } catch (e) {
                     console.error(e);
-                    uniqueToast.error('Cleanup failed. Check the console and Firestore rules.');
+                    uniqueToast.error('Cleanup failed. Check the console.');
                   } finally {
                     setInvalidUncommonLoading(false);
                   }

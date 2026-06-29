@@ -1,7 +1,6 @@
 import React from 'react';
-import styled, { css } from 'styled-components';
-import { theme } from '../../styles/theme';
-import { buttonHover, respectMotionPreference } from '../../styles/animations';
+import { Loader2 } from 'lucide-react';
+import { Button as ShadcnButton } from '../UI/button';
 
 interface ButtonProps {
   variant?: 'primary' | 'secondary' | 'danger' | 'outline' | 'ghost';
@@ -15,174 +14,19 @@ interface ButtonProps {
   style?: React.CSSProperties;
 }
 
-const getVariantStyles = (variant: string) => {
-  switch (variant) {
-    case 'primary':
-      return css`
-        background: linear-gradient(135deg, ${theme.colors.primary}, ${theme.colors.primaryDark});
-        color: ${theme.colors.white};
-        border: 1px solid ${theme.colors.primary};
-
-        &:hover:not(:disabled) {
-          background: linear-gradient(135deg, ${theme.colors.primaryDark}, ${theme.colors.primary});
-          color: ${theme.colors.white};
-          border-color: ${theme.colors.primaryDark};
-        }
-      `;
-    case 'secondary':
-      return css`
-        background-color: ${theme.colors.secondary};
-        color: ${theme.colors.white};
-        border: 1px solid ${theme.colors.secondary};
-
-        &:hover:not(:disabled) {
-          background-color: ${theme.colors.secondaryDark};
-          color: ${theme.colors.white};
-          border-color: ${theme.colors.secondaryDark};
-        }
-      `;
-    case 'danger':
-      return css`
-        background-color: ${theme.colors.danger};
-        color: ${theme.colors.white};
-        border: 1px solid ${theme.colors.danger};
-
-        &:hover:not(:disabled) {
-          background-color: ${theme.colors.dangerDark};
-          color: ${theme.colors.white};
-          border-color: ${theme.colors.dangerDark};
-        }
-      `;
-    case 'outline':
-      return css`
-        background-color: ${theme.colors.white};
-        color: ${theme.colors.primary};
-        border: 1px solid ${theme.colors.gray200};
-
-        &:hover:not(:disabled) {
-          background-color: ${theme.colors.gray50};
-          border-color: ${theme.colors.gray300};
-        }
-      `;
-    case 'ghost':
-      return css`
-        background-color: ${theme.colors.gray50};
-        color: ${theme.colors.textPrimary};
-        border: 1px solid ${theme.colors.gray200};
-
-        &:hover:not(:disabled) {
-          background-color: ${theme.colors.gray200};
-        }
-      `;
-    default:
-      return css`
-        background-color: ${theme.colors.primary};
-        color: ${theme.colors.white};
-        border: 1px solid ${theme.colors.primary};
-      `;
-  }
+const variantMap: Record<string, 'default' | 'secondary' | 'destructive' | 'outline' | 'ghost'> = {
+  primary: 'default',
+  secondary: 'secondary',
+  danger: 'destructive',
+  outline: 'outline',
+  ghost: 'ghost',
 };
 
-const getSizeStyles = (size: string) => {
-  switch (size) {
-    case 'sm':
-      return css`
-        padding: ${theme.spacing.xs} ${theme.spacing.sm};
-        font-size: ${theme.fontSizes.sm};
-        min-height: 32px;
-        
-        @media (max-width: ${theme.breakpoints.mobile}) {
-          padding: ${theme.spacing.xs} ${theme.spacing.xs};
-          font-size: ${theme.fontSizes.xs};
-          min-height: 36px;
-        }
-      `;
-    case 'lg':
-      return css`
-        padding: ${theme.spacing.md} ${theme.spacing.xl};
-        font-size: ${theme.fontSizes.lg};
-        min-height: 48px;
-        
-        @media (max-width: ${theme.breakpoints.mobile}) {
-          padding: ${theme.spacing.sm} ${theme.spacing.lg};
-          font-size: ${theme.fontSizes.base};
-          min-height: 44px;
-        }
-      `;
-    default:
-      return css`
-        padding: ${theme.spacing.sm} ${theme.spacing.md};
-        font-size: ${theme.fontSizes.base};
-        min-height: 40px;
-        
-        @media (max-width: ${theme.breakpoints.mobile}) {
-          padding: ${theme.spacing.xs} ${theme.spacing.sm};
-          font-size: ${theme.fontSizes.sm};
-          min-height: 44px;
-        }
-      `;
-  }
+const sizeMap: Record<string, 'default' | 'sm' | 'lg'> = {
+  sm: 'sm',
+  md: 'default',
+  lg: 'lg',
 };
-
-type StyledButtonProps = {
-  $variant: NonNullable<ButtonProps['variant']>;
-  $size: NonNullable<ButtonProps['size']>;
-  $fullWidth?: boolean;
-};
-
-const StyledButton = styled.button<StyledButtonProps>`
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  border-radius: ${theme.borderRadius.md};
-  font-family: ${theme.fonts.primary};
-  font-weight: ${theme.fontWeights.medium};
-  gap: ${theme.spacing.xs};
-  box-shadow: none;
-  cursor: pointer;
-  text-decoration: none;
-  white-space: nowrap;
-  ${buttonHover}
-  ${respectMotionPreference}
-  
-  ${({ $variant = 'primary' }) => getVariantStyles($variant)}
-  ${({ $size = 'md' }) => getSizeStyles($size)}
-  
-  ${({ $fullWidth }) =>
-    $fullWidth &&
-    css`
-      width: 100%;
-    `}
-
-  &:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-    
-    &:hover {
-      transform: none !important;
-      box-shadow: none !important;
-    }
-  }
-
-  &:focus {
-    outline: 2px solid ${theme.colors.primary};
-    outline-offset: 2px;
-  }
-
-  svg {
-    color: inherit;
-  }
-`;
-
-const LoadingSpinner = styled.div`
-  width: 16px;
-  height: 16px;
-  border: 2px solid transparent;
-  border-top: 2px solid currentColor;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-`;
 
 export const Button: React.FC<ButtonProps> = ({
   children,
@@ -192,19 +36,21 @@ export const Button: React.FC<ButtonProps> = ({
   variant = 'primary',
   size = 'md',
   fullWidth,
-  ...rest
+  onClick,
+  style,
 }) => {
   return (
-    <StyledButton
+    <ShadcnButton
       type={type}
       disabled={disabled || loading}
-      $variant={variant}
-      $size={size}
-      $fullWidth={fullWidth}
-      {...rest}
+      variant={variantMap[variant]}
+      size={sizeMap[size]}
+      className={fullWidth ? 'w-full' : ''}
+      onClick={onClick}
+      style={style}
     >
-      {loading && <LoadingSpinner />}
+      {loading && <Loader2 className="h-4 w-4 animate-spin" />}
       {children}
-    </StyledButton>
+    </ShadcnButton>
   );
 };
