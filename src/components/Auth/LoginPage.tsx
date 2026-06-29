@@ -400,6 +400,30 @@ const SignInForm: React.FC<SignInFormProps> = ({ onSwitchToRegister }) => {
         } else {
           setError('Additional verification required. Please contact support.');
         }
+      } else if ((result.status as string) === 'needs_client_trust') {
+        const emailCodeFactor = result.supportedFirstFactors?.find(
+          (f: any) => f.strategy === 'email_code'
+        ) as any;
+        const emailLinkFactor = result.supportedFirstFactors?.find(
+          (f: any) => f.strategy === 'email_link'
+        ) as any;
+
+        if (emailCodeFactor) {
+          await signIn!.prepareFirstFactor({
+            strategy: 'email_code',
+            emailAddressId: emailCodeFactor.emailAddressId,
+          });
+          setVerifyStep(true);
+        } else if (emailLinkFactor) {
+          await signIn!.prepareFirstFactor({
+            strategy: 'email_link',
+            emailAddressId: emailLinkFactor.emailAddressId,
+            redirectUrl: window.location.origin + '/',
+          });
+          setError('A sign-in link has been sent to your email. Click it to continue.');
+        } else {
+          setError('Additional verification required. Please contact support.');
+        }
       } else if (result.status === 'needs_second_factor') {
         setError('Two-factor authentication is required. Please use the Clerk modal to complete sign-in.');
       } else {
