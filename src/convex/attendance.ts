@@ -116,23 +116,30 @@ export const getAttendanceHistory = query({
 });
 
 export const getAllTodayAttendance = query({
-  args: { date: v.string() },
+  args: { date: v.string(), hubId: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    return await ctx.db
+    let records = await ctx.db
       .query("attendance")
       .withIndex("by_date", (q) => q.eq("date", args.date))
       .order("desc")
       .collect();
+    if (args.hubId) {
+      records = records.filter((r) => r.hubId === args.hubId);
+    }
+    return records;
   },
 });
 
 export const getCurrentlyPresentStudents = query({
-  args: { date: v.string() },
+  args: { date: v.string(), hubId: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    const records = await ctx.db
+    let records = await ctx.db
       .query("attendance")
       .withIndex("by_date", (q) => q.eq("date", args.date))
       .collect();
+    if (args.hubId) {
+      records = records.filter((r) => r.hubId === args.hubId);
+    }
     return records.filter((r) => r.checkInTime && !r.checkOutTime);
   },
 });
@@ -204,7 +211,7 @@ export const recordStaffAbsent = mutation({
 });
 
 export const getAttendanceByDateRange = query({
-  args: { startDate: v.string(), endDate: v.string(), studentId: v.optional(v.string()) },
+  args: { startDate: v.string(), endDate: v.string(), studentId: v.optional(v.string()), hubId: v.optional(v.string()) },
   handler: async (ctx, args) => {
     let records = await ctx.db
       .query("attendance")
@@ -215,6 +222,9 @@ export const getAttendanceByDateRange = query({
       .collect();
     if (args.studentId) {
       records = records.filter((r) => r.studentId === args.studentId);
+    }
+    if (args.hubId) {
+      records = records.filter((r) => r.hubId === args.hubId);
     }
     return records;
   },

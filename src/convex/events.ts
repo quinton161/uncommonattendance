@@ -49,22 +49,26 @@ export const getEvent = query({
 });
 
 export const getUserEvents = query({
-  args: { instructorId: v.string() },
+  args: { instructorId: v.string(), hubId: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    const events = await ctx.db.query("events").collect();
+    let events = await ctx.db.query("events").collect();
+    events = events.filter((e) => e.instructorId === args.instructorId);
+    if (args.hubId) {
+      events = events.filter((e) => e.hubId === args.hubId);
+    }
     return events
-      .filter((e) => e.instructorId === args.instructorId)
       .sort((a, b) => b.createdAt - a.createdAt)
       .map((e) => ({ ...e, id: e._id }));
   },
 });
 
 export const getPublicEvents = query({
-  args: {},
-  handler: async (ctx) => {
-    const events = await ctx.db.query("events").collect();
+  args: { hubId: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    let events = await ctx.db.query("events").collect();
+    events = events.filter((e) => e.isPublic && e.eventStatus === "published");
+    // Public events are visible across hubs — only filter if hubId is explicitly provided
     return events
-      .filter((e) => e.isPublic && e.eventStatus === "published")
       .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
       .slice(0, 50)
       .map((e) => ({ ...e, id: e._id }));
@@ -72,9 +76,12 @@ export const getPublicEvents = query({
 });
 
 export const getAllEvents = query({
-  args: {},
-  handler: async (ctx) => {
-    const events = await ctx.db.query("events").order("desc").collect();
+  args: { hubId: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    let events = await ctx.db.query("events").order("desc").collect();
+    if (args.hubId) {
+      events = events.filter((e) => e.hubId === args.hubId);
+    }
     return events.map((e) => ({ ...e, id: e._id }));
   },
 });

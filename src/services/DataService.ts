@@ -38,9 +38,9 @@ class DataService {
 
   // ── Events ──────────────────────────────────────────────────────────
 
-  async getEvents(): Promise<any[]> {
+  async getEvents(hubId?: string): Promise<any[]> {
     try {
-      return await convex.query(api.events.getAllEvents as any) as any[];
+      return await convex.query(api.events.getAllEvents as any, { hubId }) as any[];
     } catch { return []; }
   }
 
@@ -75,14 +75,13 @@ class DataService {
       const endDate = ts.getCurrentDateString();
       const startDate = format(subDays(parseISO(endDate), 365), 'yyyy-MM-dd');
       let rows = await convex.query(api.attendance.getAttendanceByDateRange as any, {
-        startDate, endDate,
+        startDate, endDate, hubId,
       }) as any[];
       rows = rows.map((r: any) => ({
         ...r, id: r._id,
         checkInTime: new Date(r.checkInTime),
         checkOutTime: r.checkOutTime ? new Date(r.checkOutTime) : undefined,
       }));
-      if (hubId) rows = rows.filter((r: any) => this.attendanceMatchesHub(r, hubId));
       rows.sort((a: any, b: any) => {
         const ta = a.checkInTime instanceof Date ? a.checkInTime.getTime() : 0;
         const tb = b.checkInTime instanceof Date ? b.checkInTime.getTime() : 0;
@@ -316,18 +315,17 @@ class DataService {
   // ── Dashboard stats ─────────────────────────────────────────────────
 
   async getDashboardStats(hubId?: string): Promise<any> {
-    const [events, users] = await Promise.all([this.getEvents(), this.getUsers(hubId)]);
+    const [events, users] = await Promise.all([this.getEvents(hubId), this.getUsers(hubId)]);
     const students = users.filter(u => this.isStudent(u));
     const ts = TimeService.getInstance();
     const today = ts.getCurrentDateString();
 
-    const todayAttendance = await convex.query(api.attendance.getAllTodayAttendance as any, { date: today }) as any[];
+    const todayAttendance = await convex.query(api.attendance.getAllTodayAttendance as any, { date: today, hubId }) as any[];
     let merged = (todayAttendance || []).map((r: any) => ({
       ...r, id: r._id,
       checkInTime: new Date(r.checkInTime),
       checkOutTime: r.checkOutTime ? new Date(r.checkOutTime) : undefined,
     }));
-    if (hubId) merged = merged.filter((r: any) => this.attendanceMatchesHub(r, hubId));
 
     return {
       totalEvents: events.length,
@@ -350,13 +348,12 @@ class DataService {
 
     const emit = async () => {
       try {
-        const attendance = await convex.query(api.attendance.getAllTodayAttendance as any, { date: today }) as any[];
+        const attendance = await convex.query(api.attendance.getAllTodayAttendance as any, { date: today, hubId }) as any[];
         let merged = (attendance || []).map((r: any) => ({
           ...r, id: r._id,
           checkInTime: new Date(r.checkInTime),
           checkOutTime: r.checkOutTime ? new Date(r.checkOutTime) : undefined,
         }));
-        if (hubId) merged = merged.filter((r: any) => this.attendanceMatchesHub(r, hubId));
         callback(this._buildSummary(today, users, merged));
       } catch (e) {
         console.error('subscribeToTodayAttendance emit error:', e);

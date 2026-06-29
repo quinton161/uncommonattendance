@@ -9,6 +9,7 @@ import { AttendanceRecord } from '../../types';
 import { hasRecordedCheckout } from '../../utils/attendanceCheckout';
 import { theme } from '../../styles/theme';
 
+
 const DashboardContainer = styled.div`
   padding: ${theme.spacing.xl} 0;
   min-height: calc(100vh - 64px);
@@ -173,13 +174,14 @@ const LogoutButton = styled(Button)`
 type FilterType = 'all' | 'present' | 'absent';
 
 export const AdminDashboard: React.FC = () => {
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const [todayAttendance, setTodayAttendance] = useState<AttendanceRecord[]>([]);
   const [currentlyPresent, setCurrentlyPresent] = useState<AttendanceRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<FilterType>('all');
 
   const attendanceService = AttendanceService.getInstance();
+  const effectiveHub = user?.userType === 'instructor' ? user.hubId || 'uncommon_victoriafalls' : undefined;
 
   useEffect(() => {
     loadData();
@@ -187,13 +189,13 @@ export const AdminDashboard: React.FC = () => {
     // Set up auto-refresh every 30 seconds
     const interval = setInterval(loadData, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [effectiveHub]);
 
   const loadData = async () => {
     try {
       const [todayData, presentData] = await Promise.all([
-        attendanceService.getAllTodayAttendance(),
-        attendanceService.getCurrentlyPresentStudents(),
+        attendanceService.getAllTodayAttendance(effectiveHub),
+        attendanceService.getCurrentlyPresentStudents(effectiveHub),
       ]);
       
       setTodayAttendance(todayData);

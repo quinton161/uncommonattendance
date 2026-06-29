@@ -293,15 +293,17 @@ export const EventsPage: React.FC<EventsPageProps> = ({ onBack }) => {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const dataService = DataService.getInstance();
 
+  const effectiveHub = user?.userType === 'admin' ? undefined : (user?.hubId || 'uncommon_victoriafalls');
+
   useEffect(() => {
     loadEvents();
-  }, []);
+  }, [effectiveHub]);
 
   const loadEvents = async () => {
     try {
       setLoading(true);
       await dataService.testConnection();
-      const eventsData = await dataService.getEvents();
+      const eventsData = await dataService.getEvents(effectiveHub);
       setEvents(eventsData);
     } catch (error) {
       console.error('Error loading events:', error);

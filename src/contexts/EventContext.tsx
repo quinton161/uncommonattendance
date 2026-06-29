@@ -28,7 +28,8 @@ export const EventProvider: React.FC<EventProviderProps> = ({ children, user }) 
   
   const publicEvents = useQuery(publicEventsQuery as any) as Event[] | undefined;
   // If we are an instructor, we might want to query their events
-  const instructorEvents = useQuery(userEventsQuery as any, user?.uid ? { instructorId: user.uid } : "skip") as Event[] | undefined;
+  const effectiveHub = user?.userType === 'admin' ? undefined : (user?.hubId || 'uncommon_victoriafalls');
+  const instructorEvents = useQuery(userEventsQuery as any, user?.uid ? { instructorId: user.uid, hubId: effectiveHub } : "skip") as Event[] | undefined;
 
   const createEventMut = useMutation(api?.events?.createEvent as any);
   const updateEventMut = useMutation(api?.events?.updateEvent as any);

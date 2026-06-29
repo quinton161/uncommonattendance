@@ -245,9 +245,9 @@ export class AttendanceService {
     return { ...(await this.getCurrentAttendanceState(studentId, hubId)), isNewDay: false };
   }
 
-  async getAllTodayAttendance(): Promise<AttendanceRecord[]> {
+  async getAllTodayAttendance(hubId?: string): Promise<AttendanceRecord[]> {
     const today = this.timeService.getCurrentDateString();
-    const results = await convex.query(api.attendance.getAllTodayAttendance as any, { date: today }) as any[];
+    const results = await convex.query(api.attendance.getAllTodayAttendance as any, { date: today, hubId }) as any[];
     return results.map(r => ({ ...r, checkInTime: new Date(r.checkInTime), checkOutTime: r.checkOutTime ? new Date(r.checkOutTime) : undefined }));
   }
 
@@ -257,16 +257,13 @@ export class AttendanceService {
   }
 
   async getAttendanceByDateRange(startDate: string, endDate: string, studentId?: string, hubId?: string): Promise<AttendanceRecord[]> {
-    // Basic fallback since this query is complex.
-    if (studentId) {
-      return await this.getAttendanceHistory(studentId, 100);
-    }
-    return [];
+    const results = await convex.query(api.attendance.getAttendanceByDateRange as any, { startDate, endDate, studentId: studentId as any, hubId }) as any[];
+    return results.map(r => ({ ...r, checkInTime: new Date(r.checkInTime), checkOutTime: r.checkOutTime ? new Date(r.checkOutTime) : undefined }));
   }
 
-  async getCurrentlyPresentStudents(): Promise<AttendanceRecord[]> {
+  async getCurrentlyPresentStudents(hubId?: string): Promise<AttendanceRecord[]> {
     const today = this.timeService.getCurrentDateString();
-    const results = await convex.query(api.attendance.getCurrentlyPresentStudents as any, { date: today }) as any[];
+    const results = await convex.query(api.attendance.getCurrentlyPresentStudents as any, { date: today, hubId }) as any[];
     return results.map(r => ({ ...r, checkInTime: new Date(r.checkInTime), checkOutTime: r.checkOutTime ? new Date(r.checkOutTime) : undefined }));
   }
 
