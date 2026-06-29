@@ -15,7 +15,7 @@ export const WelcomeNotification: React.FC = () => {
       shownRef.current = true;
       const name = user.displayName || 'there';
       uniqueToast.success(
-        `Welcome to Uncommon Attendance, ${name}! 🎉`,
+        `Welcome to Uncommon Attendance, ${name}!`,
         { labelOverride: 'Welcome' }
       );
       clearFirstVisit();
