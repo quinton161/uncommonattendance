@@ -68,18 +68,7 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
 }
 
-/* ─────────────────────────────────────────────────────────────────
-   AUTH PAGE — complete isolation from all global button overrides
-   The auth page uses styled-components with `all: unset` on every
-   button, so we must NOT apply any background/border/padding here.
-───────────────────────────────────────────────────────────────── */
-[data-ui='auth-page'] button {
-  background: none !important;
-  border: none !important;
-  border-radius: 0 !important;
-  box-shadow: none !important;
-  padding: 0 !important;
-}
+
 
 /* ─────────────────────────────────────────────────────────────────
    NON-AUTH pages — blue-background Tailwind buttons keep white children
