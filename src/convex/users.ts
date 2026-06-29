@@ -75,6 +75,7 @@ export const storeUser = mutation({
       hubId: args.hubId,
       hubName: args.hubName,
       createdAt: Date.now(),
+      firstVisit: true,
     });
   },
 });
@@ -131,6 +132,21 @@ export const adminUpdateUser = mutation({
     }
     const { userId, ...updates } = args;
     await ctx.db.patch(userId, updates);
+  },
+});
+
+export const clearFirstVisit = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return;
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerkId", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+    if (user && user.firstVisit) {
+      await ctx.db.patch(user._id, { firstVisit: false });
+    }
   },
 });
 

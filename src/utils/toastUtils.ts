@@ -11,6 +11,7 @@ const DEBOUNCE_TIME = 1000;
 interface CustomToastOptions extends ToastOptions {
   preventDuplicate?: boolean;
   debounceTime?: number;
+  labelOverride?: string;
 }
 
 const createUniqueToast = (
@@ -18,7 +19,7 @@ const createUniqueToast = (
   type: 'success' | 'error' | 'info' | 'warning',
   options: CustomToastOptions = {}
 ): Id | null => {
-  const { preventDuplicate = true, debounceTime = DEBOUNCE_TIME, ...toastOptions } = options;
+  const { preventDuplicate = true, debounceTime = DEBOUNCE_TIME, labelOverride, ...toastOptions } = options;
   
   // Create a unique key for this message
   const toastKey = `${type}-${message}`;
@@ -38,7 +39,7 @@ const createUniqueToast = (
     activeToasts.delete(toastKey);
   }
   
-  const body = React.createElement(UncommonToastBody, { variant: type, message });
+  const body = React.createElement(UncommonToastBody, { variant: type, message, labelOverride });
   const onClose = () => {
     if (preventDuplicate) {
       activeToasts.delete(toastKey);

@@ -4,6 +4,7 @@ import { theme } from '../../styles/theme';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
 import { NotificationPanel } from './NotificationPanel';
+import { WelcomeNotification } from './WelcomeNotification';
 import { useAuth } from '../../contexts/AuthContext';
 import { subscribeToNotifications } from '../../services/notificationFeedService';
 import { notificationService } from '../../services/notificationService';
@@ -181,6 +182,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   return (
     <LayoutWrapper>
+      <WelcomeNotification />
       <Sidebar isOpen={mobileOpen} onClose={() => setMobileOpen(false)} />
       <ContentColumn>
         <TopBar

@@ -103,10 +103,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
              photoUrl: convexUser.profileImageUrl,
              hubId: convexUser.hubId,
              hubName: convexUser.hubName,
-             bio: convexUser.bio,
-             course: convexUser.course,
-             profession: convexUser.profession,
-           } as any);
+              bio: convexUser.bio,
+              course: convexUser.course,
+              profession: convexUser.profession,
+              firstVisit: convexUser.firstVisit,
+            } as any);
          setHubResolved(true);
       } else {
          setLocalUser(null);

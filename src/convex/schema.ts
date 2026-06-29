@@ -20,6 +20,7 @@ export default defineSchema({
     updatedAt: v.optional(v.number()),
     profileImageUrl: v.optional(v.string()),
     fileId: v.optional(v.id("_storage")),
+    firstVisit: v.optional(v.boolean()),
   }).index("by_clerkId", ["clerkId"]).index("by_emailLower", ["emailLower"]),
 
   weeklyGoals: defineTable({

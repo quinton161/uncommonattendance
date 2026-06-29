@@ -18,6 +18,7 @@ export interface User {
   /** Convex `hubs` doc id — students/instructors work in one hub at a time */
   hubId?: string;
   hubName?: string;
+  firstVisit?: boolean;
 }
 
 export interface Event {
