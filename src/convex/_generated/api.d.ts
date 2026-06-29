@@ -19,6 +19,7 @@ import type * as hubs from "../hubs.js";
 import type * as monthlyAwards from "../monthlyAwards.js";
 import type * as notifications from "../notifications.js";
 import type * as qrCodes from "../qrCodes.js";
+import type * as resend from "../resend.js";
 import type * as seed from "../seed.js";
 import type * as users from "../users.js";
 import type * as weeklyGoals from "../weeklyGoals.js";
@@ -41,6 +42,7 @@ declare const fullApi: ApiFromModules<{
   monthlyAwards: typeof monthlyAwards;
   notifications: typeof notifications;
   qrCodes: typeof qrCodes;
+  resend: typeof resend;
   seed: typeof seed;
   users: typeof users;
   weeklyGoals: typeof weeklyGoals;

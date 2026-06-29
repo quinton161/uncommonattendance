@@ -46,6 +46,7 @@
     "react-scripts": "5.0.1",
     "react-toastify": "^11.0.5",
     "recharts": "^3.8.0",
+    "resend": "^6.16.0",
     "simple-peer": "^9.11.1",
     "styled-components": "^6.1.19",
     "tailwind-merge": "^3.6.0",
