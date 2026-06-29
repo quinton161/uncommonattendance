@@ -403,7 +403,7 @@ const SignInForm: React.FC<SignInFormProps> = ({ onSwitchToRegister }) => {
       } else if (result.status === 'needs_second_factor') {
         setError('Two-factor authentication is required. Please use the Clerk modal to complete sign-in.');
       } else {
-        console.error('SignIn unexpected status:', result.status, result);
+        console.error('SIGNIN_UNEXPECTED_STATUS:', result.status, JSON.stringify(result));
         setError(`Sign in incomplete (${result.status}). Please try again.`);
       }
     } catch (err: any) {
