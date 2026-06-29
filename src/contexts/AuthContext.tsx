@@ -153,6 +153,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       userId: localUser.uid as any,
       displayName: data.displayName,
       bio: data.bio,
+      photoUrl: data.photoUrl,
     });
   };
 

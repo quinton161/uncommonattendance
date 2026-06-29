@@ -46,7 +46,7 @@ export const storeUser = mutation({
           email: args.email,
           emailLower: args.email.toLowerCase(),
           displayName: args.displayName || dupEmail.displayName,
-          profileImageUrl: args.photoUrl,
+          profileImageUrl: dupEmail.profileImageUrl || args.photoUrl,
           updatedAt: Date.now(),
           firstVisit: false,
         });
@@ -59,7 +59,7 @@ export const storeUser = mutation({
         email: args.email,
         emailLower: args.email.toLowerCase(),
         displayName: args.displayName || existingUser.displayName,
-        profileImageUrl: args.photoUrl,
+        profileImageUrl: existingUser.profileImageUrl || args.photoUrl,
         updatedAt: Date.now(),
       };
       
