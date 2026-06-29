@@ -179,7 +179,7 @@ const Tab = styled.button<{ $active: boolean }>`
   font-family: 'Chillax', 'Inter', sans-serif;
   transition: background 0.2s, color 0.2s, box-shadow 0.2s;
   ${p => p.$active
-    ? css`background: #ffffff !important; color: #111827 !important; box-shadow: 0 1px 5px rgba(0,0,0,0.1);`
+    ? css`background: #2563eb !important; color: #fff !important; box-shadow: 0 2px 8px rgba(37,99,235,0.3);`
     : css`background: transparent !important; color: #64748b !important;`
   }
 `;
@@ -463,9 +463,12 @@ const SignInForm: React.FC<SignInFormProps> = ({ onSwitchToRegister }) => {
             value={verifyCode} onChange={e => { setVerifyCode(e.target.value.replace(/\D/g,'')); clear(); }} required
             style={{ letterSpacing:'0.4em', fontSize:'1.4rem', textAlign:'center', paddingLeft:'16px' }}
           />
+          <p style={{ color:'#6b7280', fontSize:'0.8rem', textAlign:'center', margin:'8px 0 0', fontFamily:"'Chillax','Inter',sans-serif" }}>
+            Enter the code, then tap <strong>Continue</strong>
+          </p>
         </Field>
         <SubmitBtn type="submit" disabled={loading || verifyCode.length < 6}>
-          {loading ? 'Verifying…' : 'Verify & Sign In'}
+          {loading ? 'Verifying…' : 'Continue'}
         </SubmitBtn>
       </form>
       <FooterNote><PlainLink onClick={() => { setVerifyStep(false); setVerifyCode(''); setError(''); }}>← Back</PlainLink></FooterNote>
@@ -672,9 +675,12 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin }) => {
             value={code} onChange={e => { setCode(e.target.value.replace(/\D/g,'')); clear(); }} required
             style={{ letterSpacing:'0.4em', fontSize:'1.4rem', textAlign:'center', paddingLeft:'16px' }}
           />
+          <p style={{ color:'#6b7280', fontSize:'0.8rem', textAlign:'center', margin:'8px 0 0', fontFamily:"'Chillax','Inter',sans-serif" }}>
+            Enter the code, then tap <strong>Continue</strong>
+          </p>
         </Field>
         <SubmitBtn type="submit" disabled={loading || code.length < 6}>
-          {loading ? 'Verifying…' : 'Verify & Continue'}
+          {loading ? 'Verifying…' : 'Continue'}
         </SubmitBtn>
       </form>
       <FooterNote>Wrong email? <PlainLink onClick={() => setPendingVerification(false)}>Go back</PlainLink></FooterNote>
