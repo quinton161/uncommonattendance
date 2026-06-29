@@ -833,7 +833,7 @@ export const LoginPage: React.FC = () => {
             }
           </div>
         </FormArea>
-        {/* Required for Clerk bot protection CAPTCHA */}
+        {/* Clerk CAPTCHA */}
         <div id="clerk-captcha" />
       </RightPanel>
     </Wrapper>
