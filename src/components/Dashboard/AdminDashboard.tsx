@@ -554,7 +554,10 @@ export const AdminDashboard: React.FC = () => {
   useEffect(() => {
     loadHub(selectedHub);
     return () => {
-      if (unsubRef.current) unsubRef.current();
+      if (unsubRef.current) {
+        unsubRef.current();
+        unsubRef.current = null;
+      }
     };
   }, [selectedHub, loadHub]);
 
