@@ -9,6 +9,9 @@ import {
   hubIdMatchesScope,
   initialStaffHubFilter,
   resolvedHubLabel,
+  DEFAULT_HUBS,
+  fetchHubs,
+  type Hub,
 } from '../../services/hubService';
 import { AdminHubScopeSelect } from './AdminHubScopeSelect';
 import { DeleteUserModal } from './DeleteUserModal';
@@ -383,6 +386,32 @@ const AccessDeniedWrapper = styled.div`
   padding: ${theme.spacing['3xl']};
 `;
 
+const HubSelectCell = styled.div`
+  min-width: 140px;
+`;
+
+const HubSelect = styled.select`
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 82, 204, 0.1);
+  font-size: 13px;
+  background: #ffffff;
+  color: ${theme.colors.textPrimary};
+  cursor: pointer;
+  max-width: 160px;
+
+  &:focus {
+    outline: none;
+    border-color: ${theme.colors.primary};
+    box-shadow: 0 0 0 3px rgba(0, 82, 204, 0.1);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+`;
+
 interface StaffAccountsPageProps {
   onBack?: () => void;
 }
@@ -399,6 +428,12 @@ export const StaffAccountsPage: React.FC<StaffAccountsPageProps> = ({ onBack }) 
   const [adminHubFilter, setAdminHubFilter] = useState(() => initialStaffHubFilter(user));
   const effectiveHub = useMemo(() => effectiveStaffHubScope(user, adminHubFilter), [user, adminHubFilter]);
   const dataService = DataService.getInstance();
+  const [allHubs, setAllHubs] = useState<Hub[]>(DEFAULT_HUBS);
+  const [changingHubUid, setChangingHubUid] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchHubs().then((h) => { if (h.length > 0) setAllHubs(h); }).catch(() => {});
+  }, []);
 
   const loadStaff = useCallback(async () => {
     if (!user) return;
@@ -519,6 +554,24 @@ export const StaffAccountsPage: React.FC<StaffAccountsPageProps> = ({ onBack }) 
     }
     setUserToDelete(target);
     setShowDeleteModal(true);
+  };
+
+  const handleChangeHub = async (uid: string, newHubId: string) => {
+    if (!uid || !user) return;
+    setChangingHubUid(uid);
+    try {
+      const hub = allHubs.find((h) => h.id === newHubId);
+      await dataService.updateUser(uid, {
+        hubId: newHubId,
+        hubName: hub?.name || resolvedHubLabel({ hubId: newHubId }),
+      }, user);
+      uniqueToast.success('Hub updated!');
+      await loadStaff();
+    } catch (e: unknown) {
+      uniqueToast.error(e instanceof Error ? e.message : 'Failed to update hub.');
+    } finally {
+      setChangingHubUid(null);
+    }
   };
 
   const handleConfirmDelete = async () => {
@@ -646,7 +699,24 @@ export const StaffAccountsPage: React.FC<StaffAccountsPageProps> = ({ onBack }) 
                       <UserEmail>{String(row.email || '')}</UserEmail>
                     </UserDetails>
                   </UserInfo>
-                  <ValueTextSmall>{resolvedHubLabel(row)}</ValueTextSmall>
+                  {user?.userType === 'admin' ? (
+                    <HubSelectCell>
+                      <HubSelect
+                        value={String(row.hubId || '')}
+                        onChange={(e) => handleChangeHub(uid, e.target.value)}
+                        disabled={changingHubUid === uid}
+                      >
+                        <option value="">Select hub</option>
+                        {allHubs.map((h) => (
+                          <option key={h.id} value={h.id}>
+                            {h.name}
+                          </option>
+                        ))}
+                      </HubSelect>
+                    </HubSelectCell>
+                  ) : (
+                    <ValueTextSmall>{resolvedHubLabel(row)}</ValueTextSmall>
+                  )}
                   <LastLoginCell>
                     {isStaffActive(row) && <ActiveDot title="Active recently" aria-label="Staff active recently" />}
                     <ValueTextSmall>{formatInstructorLastLogin(row)}</ValueTextSmall>
