@@ -636,7 +636,7 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin }) => {
       const baseUsername = form.email.split('@')[0].replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase();
       const username = `${baseUsername}_${Math.floor(Math.random() * 900 + 100)}`;
 
-      await signUp!.create({
+      const result = await signUp!.create({
         emailAddress: form.email,
         password: form.password,
         firstName: form.name.split(' ')[0] || form.name,
@@ -648,6 +648,10 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin }) => {
           hubName: role === 'admin' ? undefined : (hubs.find(h => h.id === hubId)?.name || ''),
         },
       });
+      if (result.status === 'complete') {
+        await setActive!({ session: result.createdSessionId });
+        return;
+      }
       await signUp!.prepareEmailAddressVerification({ strategy: 'email_code' });
       setPendingVerification(true);
     } catch (err: any) {
