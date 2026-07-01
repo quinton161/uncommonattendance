@@ -17,4 +17,23 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
       },
     }),
   ],
+  callbacks: {
+    createOrUpdateUser: async (ctx, args) => {
+      if (args.existingUserId) {
+        await ctx.db.patch(args.existingUserId, {
+          ...args.profile,
+          updatedAt: Date.now(),
+        });
+        return args.existingUserId;
+      }
+      const email = args.profile.email as string | undefined;
+      return await ctx.db.insert("users", {
+        email,
+        emailLower: email?.toLowerCase(),
+        userType: email?.toLowerCase().endsWith("@uncommon.org") ? "admin" : "attendee",
+        createdAt: Date.now(),
+        firstVisit: true,
+      });
+    },
+  },
 });

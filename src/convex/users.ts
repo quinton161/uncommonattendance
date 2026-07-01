@@ -26,9 +26,6 @@ export const storeUser = mutation({
     userType: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Unauthenticated");
-
     const existingUser = await ctx.db
       .query("users")
       .withIndex("by_emailLower", (q) => q.eq("emailLower", args.email.toLowerCase()))
