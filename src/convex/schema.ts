@@ -18,11 +18,11 @@ export default defineSchema({
     course: v.optional(v.string()),
     profession: v.optional(v.string()),
     status: v.optional(v.string()),
-    createdAt: v.number(),
     updatedAt: v.optional(v.number()),
     profileImageUrl: v.optional(v.string()),
     fileId: v.optional(v.id("_storage")),
     firstVisit: v.optional(v.boolean()),
+    createdAt: v.optional(v.number()),
   }).index("email", ["email"]).index("by_emailLower", ["emailLower"]),
 
   weeklyGoals: defineTable({
