@@ -23,7 +23,7 @@ export default defineSchema({
     profileImageUrl: v.optional(v.string()),
     fileId: v.optional(v.id("_storage")),
     firstVisit: v.optional(v.boolean()),
-  }).index("by_emailLower", ["emailLower"]),
+  }).index("email", ["email"]).index("by_emailLower", ["emailLower"]),
 
   weeklyGoals: defineTable({
     userId: v.id("users"),
