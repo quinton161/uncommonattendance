@@ -6,6 +6,11 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
   providers: [
     Email({
       from: "Uncommon Attendance <noreply@uncommon.org>",
+      maxAge: 10 * 60,
+      generateVerificationToken: async () => {
+        const digits = Math.floor(100000 + Math.random() * 900000).toString();
+        return digits;
+      },
       sendVerificationRequest: async ({ identifier: email, token }) => {
         const resend = new Resend(process.env.RESEND_API_KEY!);
         await resend.emails.send({
