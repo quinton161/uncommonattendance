@@ -186,3 +186,44 @@ export const getUsersByType = query({
     return users.filter((u) => u.userType === args.userType);
   },
 });
+
+export const debugAuth = query({
+  args: { email: v.string() },
+  handler: async (ctx, args) => {
+    const authAccounts = await ctx.db
+      .query("authAccounts")
+      .filter((q) => q.eq(q.field("providerAccountId"), args.email))
+      .collect();
+    const users = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("email"), args.email))
+      .collect();
+    const verificationCodes = await ctx.db.query("authVerificationCodes").collect();
+    return {
+      email: args.email,
+      authAccounts: authAccounts.map((a) => ({
+        _id: a._id,
+        provider: a.provider,
+        providerAccountId: a.providerAccountId,
+        userId: a.userId,
+        emailVerified: (a as any).emailVerified,
+      })),
+      users: users.map((u) => ({
+        _id: u._id,
+        email: u.email,
+        userType: u.userType,
+        createdAt: u.createdAt,
+        firstVisit: u.firstVisit,
+      })),
+      verificationCodes: verificationCodes.map((c) => ({
+        _id: c._id,
+        provider: c.provider,
+        accountId: c.accountId,
+        expirationTime: c.expirationTime,
+        emailVerified: (c as any).emailVerified,
+      })),
+    };
+  },
+});
+
+
