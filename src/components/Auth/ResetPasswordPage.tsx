@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useSignIn } from '@clerk/clerk-react';
+import { Link } from 'react-router-dom';
+import { useAuthActions } from '@convex-dev/auth/react';
 import styled from 'styled-components';
 import { Button } from '../Common/Button';
 import { Input } from '../Common/Input';
@@ -56,91 +56,40 @@ const SuccessRow = styled.div`
 
 type Step = 'request' | 'verify' | 'done';
 
-/**
- * Password reset page powered by Clerk's native reset_password_email_code flow.
- *
- * Step 1 (request): user enters their email → Clerk sends a 6-digit code.
- * Step 2 (verify):  user enters the code + new password → Clerk confirms the reset.
- * Step 3 (done):    success screen with link back to sign-in.
- */
 export default function ResetPasswordPage(): React.ReactElement {
-  const { signIn, isLoaded, setActive } = useSignIn();
-  const navigate = useNavigate();
+  const { signIn } = useAuthActions();
 
   const [step, setStep] = useState<Step>('request');
-  // Pre-fill email if coming from the login page "Forgot password?" flow
-  const [email, setEmail] = useState(() => {
-    try { return sessionStorage.getItem('resetEmail') || ''; } catch { return ''; }
-  });
+  const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
-  const [pwd, setPwd] = useState('');
-  const [pwd2, setPwd2] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // If we arrived with a pre-filled email, skip straight to verify step
-  // (user already requested a code from the login page)
-  React.useEffect(() => {
-    const storedEmail = (() => { try { return sessionStorage.getItem('resetEmail'); } catch { return null; } })();
-    if (storedEmail) {
-      // Clear so it doesn't persist on refresh
-      try { sessionStorage.removeItem('resetEmail'); } catch {}
-      setEmail(storedEmail);
-      // Move to verify step — user already received the code
-      setStep('verify');
-    }
-  }, []);
-
-  /* ── Step 1: send reset email ── */
   const handleRequest = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isLoaded || !signIn) return;
+    if (!email) return;
     setError(null);
     setLoading(true);
     try {
-      await signIn.create({
-        identifier: email,
-        strategy: 'reset_password_email_code',
-      });
+      await signIn("email", { email });
       setStep('verify');
     } catch (err: any) {
-      setError(
-        err?.errors?.[0]?.longMessage ||
-        err?.errors?.[0]?.message ||
-        'Could not send reset email. Check the address and try again.'
-      );
+      setError(err?.message || 'Could not send reset code. Check the address and try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  /* ── Step 2: verify code + set new password ── */
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isLoaded || !signIn) return;
-    if (pwd.length < 8) { setError('Password must be at least 8 characters.'); return; }
-    if (pwd !== pwd2) { setError('Passwords do not match.'); return; }
+    if (code.length < 6) return;
     setError(null);
     setLoading(true);
     try {
-      const result = await signIn.attemptFirstFactor({
-        strategy: 'reset_password_email_code',
-        code,
-        password: pwd,
-      });
-      if (result.status === 'complete') {
-        // Log the user in with the new session
-        await setActive!({ session: result.createdSessionId });
-        setStep('done');
-      } else {
-        setError('Reset incomplete. Please try again.');
-      }
+      await signIn("email", { email, code });
+      setStep('done');
     } catch (err: any) {
-      setError(
-        err?.errors?.[0]?.longMessage ||
-        err?.errors?.[0]?.message ||
-        'Invalid or expired code. Request a new reset email and try again.'
-      );
+      setError(err?.message || 'Invalid or expired code. Request a new one.');
     } finally {
       setLoading(false);
     }
@@ -149,32 +98,30 @@ export default function ResetPasswordPage(): React.ReactElement {
   return (
     <Wrap>
       <StyledCard>
-        {/* ── Done ── */}
         {step === 'done' && (
           <>
-            <Title>Password updated!</Title>
+            <Title>Signed in!</Title>
             <SuccessRow>
               <FiCheckCircle size={22} />
-              <span>Your password has been changed successfully.</span>
+              <span>You've been signed in successfully.</span>
             </SuccessRow>
-            <Sub>You are now signed in. Head to the dashboard to continue.</Sub>
+            <Sub>Head to the dashboard to continue.</Sub>
             <Button
               variant="primary"
               style={{ width: '100%' }}
-              onClick={() => navigate('/')}
+              onClick={() => window.location.href = '/'}
             >
               Go to dashboard
             </Button>
           </>
         )}
 
-        {/* ── Step 1: request ── */}
         {step === 'request' && (
           <>
             <Title>Reset your password</Title>
             <Sub>
-              Enter the email address on your account and we'll send you a 6-digit
-              code to reset your password.
+              Enter your email and we'll send you a sign-in code.
+              Once signed in, you can update your password from your profile.
             </Sub>
             <form onSubmit={handleRequest}>
               <Input
@@ -198,7 +145,7 @@ export default function ResetPasswordPage(): React.ReactElement {
                 disabled={loading || !email}
                 style={{ marginTop: theme.spacing.lg, width: '100%' }}
               >
-                Send reset code
+                Send sign-in code
               </Button>
             </form>
             <p style={{ marginTop: theme.spacing.xl, fontSize: theme.fontSizes.sm, textAlign: 'center' }}>
@@ -207,13 +154,11 @@ export default function ResetPasswordPage(): React.ReactElement {
           </>
         )}
 
-        {/* ── Step 2: verify ── */}
         {step === 'verify' && (
           <>
             <Title>Check your email</Title>
             <Sub>
-              We sent a 6-digit code to <strong>{email}</strong>. Enter it below
-              along with your new password.
+              We sent a code to <strong>{email}</strong>. Enter it below to sign in.
             </Sub>
             <form onSubmit={handleVerify}>
               <input
@@ -241,26 +186,6 @@ export default function ResetPasswordPage(): React.ReactElement {
                 onFocus={e => { e.target.style.borderColor = '#2563eb'; e.target.style.background = '#fff'; }}
                 onBlur={e => { e.target.style.borderColor = 'transparent'; e.target.style.background = '#f1f5f9'; }}
               />
-              <div style={{ marginTop: theme.spacing.md }} />
-              <Input
-                label="New password"
-                type="password"
-                value={pwd}
-                onChange={(e) => { setPwd(e.target.value); setError(null); }}
-                placeholder="Min. 8 characters"
-                required
-                fullWidth
-              />
-              <div style={{ marginTop: theme.spacing.md }} />
-              <Input
-                label="Confirm new password"
-                type="password"
-                value={pwd2}
-                onChange={(e) => { setPwd2(e.target.value); setError(null); }}
-                placeholder="Repeat your password"
-                required
-                fullWidth
-              />
               {error && (
                 <ErrorRow>
                   <FiAlertTriangle /> {error}
@@ -270,17 +195,17 @@ export default function ResetPasswordPage(): React.ReactElement {
                 type="submit"
                 variant="primary"
                 loading={loading}
-                disabled={loading || code.length < 6 || !pwd || !pwd2}
+                disabled={loading || code.length < 6}
                 style={{ marginTop: theme.spacing.lg, width: '100%' }}
               >
-                Set new password
+                Sign in
               </Button>
             </form>
             <p style={{ marginTop: theme.spacing.md, fontSize: theme.fontSizes.sm, textAlign: 'center' }}>
               <button
                 type="button"
                 style={{ background: 'none', border: 'none', color: theme.colors.primary, cursor: 'pointer', fontSize: 'inherit' }}
-                onClick={() => { setStep('request'); setCode(''); setPwd(''); setPwd2(''); setError(null); }}
+                onClick={() => { setStep('request'); setCode(''); setError(null); }}
               >
                 ← Re-enter email
               </button>

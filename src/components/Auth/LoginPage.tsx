@@ -1,10 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { gsap } from 'gsap';
-import { useSignIn, useSignUp } from '@clerk/clerk-react';
+import { useAuthActions } from '@convex-dev/auth/react';
 import styled, { keyframes, css } from 'styled-components';
-import { Zap as FiZap, User as FiUser, Mail as FiMail, Lock as FiLock, Eye as FiEye, EyeOff as FiEyeOff, MapPin as FiMapPin, CheckCircle as FiCheckCircle } from 'lucide-react';
+import { Zap as FiZap, User as FiUser, Mail as FiMail, MapPin as FiMapPin, CheckCircle as FiCheckCircle } from 'lucide-react';
 import { fetchHubs, hubLabel, type Hub, DEFAULT_HUBS } from '../../services/hubService';
 import { isUncommonOrgStaffEmail } from '../../constants/staff';
+import { useMutation } from 'convex/react';
+import { api } from '../../convex/_generated/api';
 
 type View = 'login' | 'register';
 
@@ -119,7 +121,6 @@ const BottomLinks = styled.div`
   span { color: rgba(255,255,255,0.28); }
 `;
 
-/* ── Right panel ── */
 const RightPanel = styled.div`
   flex: 1;
   display: flex;
@@ -161,7 +162,6 @@ const FormTitle = styled.h2`
   font-family: 'Chillax', 'Inter', sans-serif;
 `;
 
-/* ── Tabs ── */
 const TabBar = styled.div`
   display: flex;
   background: #f1f5f9;
@@ -184,7 +184,6 @@ const Tab = styled.button<{ $active: boolean }>`
   }
 `;
 
-/* ── Form elements ── */
 const Field = styled.div`
   display: flex; flex-direction: column; gap: 6px; margin-bottom: 1rem;
 `;
@@ -223,15 +222,6 @@ const StyledInput = styled.input`
     background: #ffffff;
     outline: none;
   }
-`;
-
-const PasswordToggle = styled.button`
-  all: unset;
-  position: absolute; right: 14px;
-  display: flex; align-items: center;
-  color: #9ca3af !important; cursor: pointer; font-size: 16px;
-  transition: color 0.2s;
-  &:hover { color: #6b7280 !important; }
 `;
 
 const StyledSelect = styled.select`
@@ -325,20 +315,6 @@ const PlainLink = styled.button`
   &:hover { text-decoration: underline !important; }
 `;
 
-const ForgotLink = styled.button`
-  all: unset !important;
-  color: #2563eb !important;
-  font-size: 0.8rem !important; font-weight: 600 !important;
-  cursor: pointer !important;
-  font-family: 'Chillax', 'Inter', sans-serif !important;
-  background: none !important;
-  border: none !important;
-  padding: 0 !important;
-  box-shadow: none !important;
-  border-radius: 0 !important;
-  &:hover { text-decoration: underline !important; }
-`;
-
 const HelperNote = styled.p`
   font-size: 0.8rem; color: #10b981;
   font-family: 'Chillax', 'Inter', sans-serif;
@@ -346,128 +322,40 @@ const HelperNote = styled.p`
   display: flex; align-items: center; gap: 5px;
 `;
 
-/* ══════════════════════════════════════════════════════════════
-   SIGN-IN FORM
-══════════════════════════════════════════════════════════════ */
-interface SignInFormProps { onSwitchToRegister: () => void; }
-
-const SignInForm: React.FC<SignInFormProps> = ({ onSwitchToRegister }) => {
-  const { signIn, isLoaded, setActive } = useSignIn();
+const SignInForm: React.FC<{ onSwitchToRegister: () => void }> = ({ onSwitchToRegister }) => {
+  const { signIn } = useAuthActions();
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [forgotMode, setForgotMode] = useState(false);
-  const [resetSent, setResetSent] = useState(false);
-  // Email verification code step (when Clerk requires email_code factor on login)
-  const [verifyStep, setVerifyStep] = useState(false);
-  const [verifyCode, setVerifyCode] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
+  const [code, setCode] = useState('');
 
   const clear = () => { if (error) setError(''); };
 
-  const handleSignIn = async (e: React.FormEvent) => {
+  const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isLoaded || loading) return;
+    if (loading || !email) return;
     setLoading(true); setError('');
     try {
-      const result = await signIn!.create({ identifier: email, password });
-      if (result.status === 'complete') {
-        await setActive!({ session: result.createdSessionId });
-      } else if (result.status === 'needs_first_factor') {
-        // Clerk requires an additional email verification step
-        // Find the email_code or email_link strategy
-        const emailCodeFactor = result.supportedFirstFactors?.find(
-          (f: any) => f.strategy === 'email_code'
-        ) as any;
-        const emailLinkFactor = result.supportedFirstFactors?.find(
-          (f: any) => f.strategy === 'email_link'
-        ) as any;
-
-        if (emailCodeFactor) {
-          await signIn!.prepareFirstFactor({
-            strategy: 'email_code',
-            emailAddressId: emailCodeFactor.emailAddressId,
-          });
-          setVerifyStep(true);
-        } else if (emailLinkFactor) {
-          await signIn!.prepareFirstFactor({
-            strategy: 'email_link',
-            emailAddressId: emailLinkFactor.emailAddressId,
-            redirectUrl: window.location.origin + '/',
-          });
-          setError('A sign-in link has been sent to your email. Click it to continue.');
-        } else {
-          setError('Additional verification required. Please contact support.');
-        }
-      } else if ((result.status as string) === 'needs_client_trust') {
-        const emailCodeFactor = result.supportedFirstFactors?.find(
-          (f: any) => f.strategy === 'email_code'
-        ) as any;
-        const emailLinkFactor = result.supportedFirstFactors?.find(
-          (f: any) => f.strategy === 'email_link'
-        ) as any;
-
-        if (emailCodeFactor) {
-          await signIn!.prepareFirstFactor({
-            strategy: 'email_code',
-            emailAddressId: emailCodeFactor.emailAddressId,
-          });
-          setVerifyStep(true);
-        } else if (emailLinkFactor) {
-          await signIn!.prepareFirstFactor({
-            strategy: 'email_link',
-            emailAddressId: emailLinkFactor.emailAddressId,
-            redirectUrl: window.location.origin + '/',
-          });
-          setError('A sign-in link has been sent to your email. Click it to continue.');
-        } else {
-          setError('Additional verification required. Please contact support.');
-        }
-      } else if (result.status === 'needs_second_factor') {
-        setError('Two-factor authentication is required. Please use the Clerk modal to complete sign-in.');
-      } else {
-        console.error('SIGNIN_UNEXPECTED_STATUS:', result.status, JSON.stringify(result));
-        setError(`Sign in incomplete (${result.status}). Please try again.`);
-      }
+      await signIn("email", { email });
+      setOtpSent(true);
     } catch (err: any) {
-      console.error('SignIn error:', err);
-      setError(err?.errors?.[0]?.longMessage || err?.errors?.[0]?.message || 'Sign in failed.');
+      setError(err?.message || 'Failed to send code. Try again.');
     } finally { setLoading(false); }
   };
 
   const handleVerifyCode = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isLoaded || loading) return;
+    if (loading || code.length < 6) return;
     setLoading(true); setError('');
     try {
-      const result = await signIn!.attemptFirstFactor({
-        strategy: 'email_code',
-        code: verifyCode,
-      });
-      if (result.status === 'complete') {
-        await setActive!({ session: result.createdSessionId });
-      } else {
-        setError(`Verification incomplete (Status: ${result.status}). Please try again or contact support.`);
-      }
+      await signIn("email", { email, code });
     } catch (err: any) {
-      setError(err?.errors?.[0]?.longMessage || err?.errors?.[0]?.message || 'Invalid code.');
+      setError(err?.message || 'Invalid code. Try again.');
     } finally { setLoading(false); }
   };
 
-  const handleForgot = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!isLoaded || loading || !email) return;
-    setLoading(true); setError('');
-    try {
-      await signIn!.create({ identifier: email, strategy: 'reset_password_email_code' });
-      setResetSent(true);
-    } catch (err: any) {
-      setError(err?.errors?.[0]?.longMessage || err?.errors?.[0]?.message || 'Failed to send reset email.');
-    } finally { setLoading(false); }
-  };
-
-  if (verifyStep) return (
+  if (otpSent) return (
     <div>
       <div style={{ display:'flex', justifyContent:'center', marginBottom:'1.25rem' }}>
         <div style={{ width:64, height:64, borderRadius:'50%', background:'#eff6ff', border:'2px solid #93c5fd', display:'flex', alignItems:'center', justifyContent:'center' }}>
@@ -476,7 +364,7 @@ const SignInForm: React.FC<SignInFormProps> = ({ onSwitchToRegister }) => {
       </div>
       <FormTitle style={{ textAlign:'center', fontSize:'1.4rem' }}>Check your email</FormTitle>
       <p style={{ color:'#6b7280', fontSize:'0.9rem', textAlign:'center', marginBottom:'1.5rem', fontFamily:"'Chillax','Inter',sans-serif", lineHeight:1.6 }}>
-        We sent a 6-digit sign-in code to <strong style={{ color:'#111827' }}>{email}</strong>.
+        We sent a sign-in code to <strong style={{ color:'#111827' }}>{email}</strong>.
       </p>
       {error && <ErrorBox>{error}</ErrorBox>}
       <form onSubmit={handleVerifyCode}>
@@ -484,67 +372,22 @@ const SignInForm: React.FC<SignInFormProps> = ({ onSwitchToRegister }) => {
           <Label>Verification Code</Label>
           <StyledInput
             type="text" inputMode="numeric" maxLength={6} placeholder="• • • • • •"
-            value={verifyCode} onChange={e => { setVerifyCode(e.target.value.replace(/\D/g,'')); clear(); }} required
+            value={code} onChange={e => { setCode(e.target.value.replace(/\D/g,'')); clear(); }} required
             style={{ letterSpacing:'0.4em', fontSize:'1.4rem', textAlign:'center', paddingLeft:'16px' }}
           />
           <p style={{ color:'#6b7280', fontSize:'0.8rem', textAlign:'center', margin:'8px 0 0', fontFamily:"'Chillax','Inter',sans-serif" }}>
             Enter the code, then tap <strong>Continue</strong>
           </p>
         </Field>
-        <SubmitBtn type="submit" disabled={loading || verifyCode.length < 6}>
-          {loading ? 'Verifying…' : 'Continue'}
+        <SubmitBtn type="submit" disabled={loading || code.length < 6}>
+          {loading ? 'Signing in…' : 'Continue'}
         </SubmitBtn>
       </form>
-      <FooterNote><PlainLink onClick={() => { setVerifyStep(false); setVerifyCode(''); setError(''); }}>← Back</PlainLink></FooterNote>
-    </div>
-  );
-
-  if (resetSent) return (
-    <div>
-      <div style={{ display:'flex', justifyContent:'center', marginBottom:'1.25rem' }}>
-        <div style={{ width:64, height:64, borderRadius:'50%', background:'#f0fdf4', border:'2px solid #86efac', display:'flex', alignItems:'center', justifyContent:'center' }}>
-          <FiCheckCircle size={28} color="#16a34a" />
-        </div>
-      </div>
-      <FormTitle style={{ textAlign:'center', fontSize:'1.4rem' }}>Check your email</FormTitle>
-      <p style={{ color:'#6b7280', fontSize:'0.9rem', textAlign:'center', marginBottom:'1rem', fontFamily:"'Chillax','Inter',sans-serif", lineHeight:1.6 }}>
-        We sent a 6-digit reset code to <strong style={{ color:'#111827' }}>{email}</strong>.
-        Open the <strong>/reset-password</strong> page and enter the code there.
-      </p>
-      <SubmitBtn
-        type="button"
-        onClick={() => {
-          // Store email so reset page can pre-fill it
-          try { sessionStorage.setItem('resetEmail', email); } catch {}
-          window.location.href = '/reset-password';
-        }}
-      >
-        Go to Reset Password →
-      </SubmitBtn>
-      <FooterNote><PlainLink onClick={() => { setForgotMode(false); setResetSent(false); }}>← Back to Sign In</PlainLink></FooterNote>
-    </div>
-  );
-
-  if (forgotMode) return (
-    <div>
-      <FormTitle>Reset password</FormTitle>
-      <p style={{ color:'#6b7280', fontSize:'0.9rem', marginBottom:'1.5rem', fontFamily:"'Chillax','Inter',sans-serif", lineHeight:1.6 }}>
-        Enter your email and we'll send you a 6-digit reset code.
-      </p>
-      {error && <ErrorBox>{error}</ErrorBox>}
-      <form onSubmit={handleForgot}>
-        <Field>
-          <Label>Email Address</Label>
-          <InputWrap>
-            <InputIcon><FiMail /></InputIcon>
-            <StyledInput type="email" placeholder="Enter your email" value={email} onChange={e => { setEmail(e.target.value); clear(); }} required />
-          </InputWrap>
-        </Field>
-        <SubmitBtn type="submit" disabled={loading || !email}>
-          {loading ? 'Sending…' : 'Send Reset Code'}
-        </SubmitBtn>
-      </form>
-      <FooterNote><PlainLink onClick={() => setForgotMode(false)}>← Back to Sign In</PlainLink></FooterNote>
+      <FooterNote>
+        <PlainLink onClick={() => { setOtpSent(false); setCode(''); setError(''); }}>← Back</PlainLink>
+        <span style={{ color:'#9ca3af', margin:'0 8px' }}>|</span>
+        <PlainLink onClick={() => { setOtpSent(false); setCode(''); setError(''); setLoading(false); handleSendOTP({ preventDefault: () => {} } as any); }}>Resend code</PlainLink>
+      </FooterNote>
     </div>
   );
 
@@ -552,7 +395,7 @@ const SignInForm: React.FC<SignInFormProps> = ({ onSwitchToRegister }) => {
     <div>
       <FormTitle>Welcome back</FormTitle>
       {error && <ErrorBox>{error}</ErrorBox>}
-      <form onSubmit={handleSignIn}>
+      <form onSubmit={handleSendOTP}>
         <Field>
           <Label>Email Address</Label>
           <InputWrap>
@@ -560,25 +403,8 @@ const SignInForm: React.FC<SignInFormProps> = ({ onSwitchToRegister }) => {
             <StyledInput type="email" placeholder="Enter your email" value={email} onChange={e => { setEmail(e.target.value); clear(); }} required autoComplete="email" />
           </InputWrap>
         </Field>
-        <Field>
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-            <Label>Password</Label>
-            <ForgotLink type="button" onClick={() => setForgotMode(true)}>Forgot password?</ForgotLink>
-          </div>
-          <InputWrap>
-            <InputIcon><FiLock /></InputIcon>
-            <StyledInput
-              type={showPw ? 'text' : 'password'} placeholder="Enter your password"
-              value={password} onChange={e => { setPassword(e.target.value); clear(); }}
-              required autoComplete="current-password" style={{ paddingRight:'44px' }}
-            />
-            <PasswordToggle type="button" onClick={() => setShowPw(v => !v)}>
-              {showPw ? <FiEyeOff /> : <FiEye />}
-            </PasswordToggle>
-          </InputWrap>
-        </Field>
-        <SubmitBtn type="submit" disabled={loading || !email || !password}>
-          {loading ? 'Verifying…' : 'Continue'}
+        <SubmitBtn type="submit" disabled={loading || !email}>
+          {loading ? 'Sending code…' : 'Send sign-in code'}
         </SubmitBtn>
       </form>
       <FooterNote>
@@ -588,22 +414,16 @@ const SignInForm: React.FC<SignInFormProps> = ({ onSwitchToRegister }) => {
   );
 };
 
-/* ══════════════════════════════════════════════════════════════
-   SIGN-UP FORM
-══════════════════════════════════════════════════════════════ */
-interface RegisterFormProps { onSwitchToLogin: () => void; }
-
-const RegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin }) => {
-  const { signUp, isLoaded, setActive } = useSignUp();
+const RegisterForm: React.FC<{ onSwitchToLogin: () => void }> = ({ onSwitchToLogin }) => {
+  const { signIn } = useAuthActions();
+  const storeUser = useMutation(api.users.storeUser as any);
   const [role, setRole] = useState<'student' | 'admin'>('student');
   const [hubs, setHubs] = useState<Hub[]>(() => [...DEFAULT_HUBS]);
   const [hubId, setHubId] = useState('');
-  const [form, setForm] = useState({ name:'', email:'', password:'', confirmPassword:'' });
-  const [showPw, setShowPw] = useState(false);
-  const [showCPw, setShowCPw] = useState(false);
+  const [form, setForm] = useState({ name:'', email:'' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [pendingVerification, setPendingVerification] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
   const [code, setCode] = useState('');
 
   useEffect(() => {
@@ -617,73 +437,46 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin }) => {
     setForm(f => ({ ...f, [e.target.name]: e.target.value })); clear();
   };
   const handleRoleChange = (r: 'student' | 'admin') => {
-    setRole(r); setForm({ name:'', email:'', password:'', confirmPassword:'' }); setHubId(''); setError('');
+    setRole(r); setForm({ name:'', email:'' }); setHubId(''); setError('');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isLoaded || loading) return;
-    if (form.password !== form.confirmPassword) { setError('Passwords do not match.'); return; }
-    if (form.password.length < 8) { setError('Password must be at least 8 characters.'); return; }
+    if (loading) return;
     if (role === 'student' && isUncommonOrgStaffEmail(form.email)) { setError('@uncommon.org emails cannot register as students. Switch to Admin.'); return; }
     if (role === 'admin' && !isUncommonOrgStaffEmail(form.email)) { setError('Admin accounts must use an @uncommon.org email address.'); return; }
-    // Only students/instructors need a hub; admins (@uncommon.org) do not
     if (role === 'student' && !hubId) { setError('Please select your hub.'); return; }
 
     setLoading(true); setError('');
     try {
-      // Generate a username from email (e.g. "john.doe@gmail.com" → "john.doe123")
-      const baseUsername = form.email.split('@')[0].replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase();
-      const username = `${baseUsername}_${Math.floor(Math.random() * 900 + 100)}`;
-
-      const result = await signUp!.create({
-        emailAddress: form.email,
-        password: form.password,
+      await storeUser({
+        email: form.email,
+        displayName: form.name,
+        userType: role === 'admin' ? 'admin' : 'attendee',
+        hubId: role === 'admin' ? undefined : hubId,
+        hubName: role === 'admin' ? undefined : (hubs.find(h => h.id === hubId)?.name || ''),
         firstName: form.name.split(' ')[0] || form.name,
-        lastName: form.name.split(' ').slice(1).join(' ') || form.name.split(' ')[0] || form.name,
-        username,
-        unsafeMetadata: {
-          userType: role === 'admin' ? 'admin' : 'attendee',
-          hubId: role === 'admin' ? undefined : hubId,
-          hubName: role === 'admin' ? undefined : (hubs.find(h => h.id === hubId)?.name || ''),
-        },
+        lastName: form.name.split(' ').slice(1).join(' ') || '',
       });
-      if (result.status === 'complete') {
-        await setActive!({ session: result.createdSessionId });
-        return;
-      }
-      await signUp!.prepareEmailAddressVerification({ strategy: 'email_code' });
-      setPendingVerification(true);
+      await signIn("email", { email: form.email });
+      setOtpSent(true);
     } catch (err: any) {
-      setError(err?.errors?.[0]?.longMessage || err?.errors?.[0]?.message || err?.message || 'Registration failed.');
+      setError(err?.message || 'Registration failed.');
     } finally { setLoading(false); }
   };
 
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isLoaded || loading) return;
+    if (loading || code.length < 6) return;
     setLoading(true); setError('');
     try {
-      const result = await signUp!.attemptEmailAddressVerification({ code });
-      if (result.status === 'complete') {
-        await setActive!({ session: result.createdSessionId });
-      } else {
-        // Show the actual Clerk status and missing fields for debugging
-        const clerkErr = (result as any)?.errors?.[0];
-        if (clerkErr) {
-          setError(clerkErr.longMessage || clerkErr.message || `Sign-up incomplete (${result.status})`);
-        } else {
-          const missing = (result as any).missingFields ? (result as any).missingFields.join(', ') : 'none';
-          const unverified = (result as any).unverifiedFields ? (result as any).unverifiedFields.join(', ') : 'none';
-          setError(`Sign-up incomplete. Status: "${result.status}". Missing: ${missing}. Unverified: ${unverified}.`);
-        }
-      }
+      await signIn("email", { email: form.email, code });
     } catch (err: any) {
-      setError(err?.errors?.[0]?.longMessage || err?.errors?.[0]?.message || 'Invalid verification code.');
+      setError(err?.message || 'Invalid verification code.');
     } finally { setLoading(false); }
   };
 
-  if (pendingVerification) return (
+  if (otpSent) return (
     <div>
       <div style={{ display:'flex', justifyContent:'center', marginBottom:'1.25rem' }}>
         <div style={{ width:64, height:64, borderRadius:'50%', background:'#eff6ff', border:'2px solid #93c5fd', display:'flex', alignItems:'center', justifyContent:'center' }}>
@@ -692,7 +485,7 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin }) => {
       </div>
       <FormTitle style={{ textAlign:'center', fontSize:'1.4rem' }}>Verify your email</FormTitle>
       <p style={{ color:'#6b7280', fontSize:'0.9rem', textAlign:'center', marginBottom:'1.5rem', fontFamily:"'Chillax','Inter',sans-serif", lineHeight:1.6 }}>
-        We sent a 6-digit code to <strong style={{ color:'#111827' }}>{form.email}</strong>
+        We sent a code to <strong style={{ color:'#111827' }}>{form.email}</strong>
       </p>
       {error && <ErrorBox>{error}</ErrorBox>}
       <form onSubmit={handleVerify}>
@@ -711,7 +504,7 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin }) => {
           {loading ? 'Verifying…' : 'Continue'}
         </SubmitBtn>
       </form>
-      <FooterNote>Wrong email? <PlainLink onClick={() => setPendingVerification(false)}>Go back</PlainLink></FooterNote>
+      <FooterNote>Wrong email? <PlainLink onClick={() => setOtpSent(false)}>Go back</PlainLink></FooterNote>
     </div>
   );
 
@@ -748,7 +541,7 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin }) => {
           <Label>Email Address</Label>
           <InputWrap>
             <InputIcon><FiMail /></InputIcon>
-            <StyledInput name="email" type="email" placeholder={role === 'admin' ? 'username@uncommon.org' : 'Enter your email'} value={form.email} onChange={handleChange} required />      
+            <StyledInput name="email" type="email" placeholder={role === 'admin' ? 'username@uncommon.org' : 'Enter your email'} value={form.email} onChange={handleChange} required />
           </InputWrap>
         </Field>
 
@@ -765,26 +558,8 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin }) => {
           </Field>
         )}
 
-        <Field>
-          <Label>Password</Label>
-          <InputWrap>
-            <InputIcon><FiLock /></InputIcon>
-            <StyledInput name="password" type={showPw ? 'text' : 'password'} placeholder="Create a password (min. 8 chars)" value={form.password} onChange={handleChange} required style={{ paddingRight:'44px' }} />
-            <PasswordToggle type="button" onClick={() => setShowPw(v => !v)}>{showPw ? <FiEyeOff /> : <FiEye />}</PasswordToggle>
-          </InputWrap>
-        </Field>
-
-        <Field>
-          <Label>Confirm Password</Label>
-          <InputWrap>
-            <InputIcon><FiLock /></InputIcon>
-            <StyledInput name="confirmPassword" type={showCPw ? 'text' : 'password'} placeholder="Repeat your password" value={form.confirmPassword} onChange={handleChange} required style={{ paddingRight:'44px' }} />
-            <PasswordToggle type="button" onClick={() => setShowCPw(v => !v)}>{showCPw ? <FiEyeOff /> : <FiEye />}</PasswordToggle>
-          </InputWrap>
-        </Field>
-
-        <SubmitBtn type="submit" disabled={loading || (role === 'student' && !hubId) || !form.name || !form.email || !form.password || !form.confirmPassword}>
-          {loading ? 'Creating account…' : 'Continue'}
+        <SubmitBtn type="submit" disabled={loading || (role === 'student' && !hubId) || !form.name || !form.email}>
+          {loading ? 'Creating account…' : 'Create account'}
         </SubmitBtn>
       </form>
 
@@ -795,9 +570,6 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin }) => {
   );
 };
 
-/* ══════════════════════════════════════════════════════════════
-   MAIN PAGE
-══════════════════════════════════════════════════════════════ */
 export const LoginPage: React.FC = () => {
   const [view, setView] = useState<View>('login');
   const leftRef  = useRef<HTMLDivElement>(null);
@@ -816,7 +588,6 @@ export const LoginPage: React.FC = () => {
 
   return (
     <Wrapper data-ui="auth-page">
-      {/* LEFT */}
       <LeftPanel ref={leftRef}>
         <Blob top="-80px" left="-80px" size="300px" />
         <Blob bottom="-60px" right="60px" size="220px" />
@@ -840,7 +611,6 @@ export const LoginPage: React.FC = () => {
         </BottomLinks>
       </LeftPanel>
 
-      {/* RIGHT */}
       <RightPanel ref={rightRef}>
         <MobileTop>
           <div style={{ width:64, height:64, borderRadius:'50%', background:'rgba(255,255,255,0.18)', border:'2px solid rgba(255,255,255,0.35)', display:'flex', alignItems:'center', justifyContent:'center', marginBottom:'0.75rem' }}>
@@ -861,8 +631,6 @@ export const LoginPage: React.FC = () => {
             }
           </div>
         </FormArea>
-        {/* Clerk CAPTCHA */}
-        <div id="clerk-captcha" />
       </RightPanel>
     </Wrapper>
   );

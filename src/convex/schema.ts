@@ -1,7 +1,9 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
+import { authTables } from "@convex-dev/auth/server";
 
 export default defineSchema({
+  ...authTables,
   users: defineTable({
     clerkId: v.optional(v.string()),
     email: v.string(),
@@ -21,7 +23,7 @@ export default defineSchema({
     profileImageUrl: v.optional(v.string()),
     fileId: v.optional(v.id("_storage")),
     firstVisit: v.optional(v.boolean()),
-  }).index("by_clerkId", ["clerkId"]).index("by_emailLower", ["emailLower"]),
+  }).index("by_emailLower", ["emailLower"]),
 
   weeklyGoals: defineTable({
     userId: v.id("users"),

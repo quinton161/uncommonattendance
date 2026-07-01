@@ -11,10 +11,12 @@
 import type * as adminActions from "../adminActions.js";
 import type * as appUpdates from "../appUpdates.js";
 import type * as attendance from "../attendance.js";
+import type * as auth from "../auth.js";
 import type * as checkoutReflections from "../checkoutReflections.js";
 import type * as dailyAttendance from "../dailyAttendance.js";
 import type * as dailyGoals from "../dailyGoals.js";
 import type * as events from "../events.js";
+import type * as http from "../http.js";
 import type * as hubs from "../hubs.js";
 import type * as monthlyAwards from "../monthlyAwards.js";
 import type * as notifications from "../notifications.js";
@@ -34,10 +36,12 @@ declare const fullApi: ApiFromModules<{
   adminActions: typeof adminActions;
   appUpdates: typeof appUpdates;
   attendance: typeof attendance;
+  auth: typeof auth;
   checkoutReflections: typeof checkoutReflections;
   dailyAttendance: typeof dailyAttendance;
   dailyGoals: typeof dailyGoals;
   events: typeof events;
+  http: typeof http;
   hubs: typeof hubs;
   monthlyAwards: typeof monthlyAwards;
   notifications: typeof notifications;

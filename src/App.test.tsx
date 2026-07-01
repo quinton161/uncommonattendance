@@ -25,14 +25,6 @@ jest.mock('./contexts/EventContext', () => ({
   EventProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
-jest.mock('@clerk/clerk-react', () => ({
-  ClerkProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  SignIn: () => <h1>Sign In</h1>,
-  SignUp: () => <h1>Sign Up</h1>,
-  useAuth: () => ({ isLoaded: true, userId: null }),
-  useUser: () => ({ isLoaded: true, user: null }),
-  useClerk: () => ({ openSignIn: jest.fn(), signOut: jest.fn() }),
-}));
 
 jest.mock('./components/Common/SimpleSplash', () => {
   const R = require('react');

@@ -8,7 +8,7 @@ export const current = query({
     if (!identity) return null;
     const user = await ctx.db
       .query("users")
-      .withIndex("by_clerkId", (q) => q.eq("clerkId", identity.subject))
+      .withIndex("by_emailLower", (q) => q.eq("emailLower", identity.email!.toLowerCase()))
       .unique();
     return user;
   },
@@ -16,7 +16,6 @@ export const current = query({
 
 export const storeUser = mutation({
   args: {
-    clerkId: v.string(),
     email: v.string(),
     firstName: v.optional(v.string()),
     lastName: v.optional(v.string()),
@@ -27,32 +26,13 @@ export const storeUser = mutation({
     userType: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthenticated");
+
     const existingUser = await ctx.db
       .query("users")
-      .withIndex("by_clerkId", (q) => q.eq("clerkId", args.clerkId))
+      .withIndex("by_emailLower", (q) => q.eq("emailLower", args.email.toLowerCase()))
       .unique();
-
-    // Prevent duplicate accounts: if another user with this email already exists
-    // under a different Clerk ID, merge the Clerk IDs or reject.
-    if (!existingUser) {
-      const dupEmail = await ctx.db
-        .query("users")
-        .withIndex("by_emailLower", (q) => q.eq("emailLower", args.email.toLowerCase()))
-        .unique();
-      if (dupEmail) {
-        // Attach this Clerk ID to the existing account instead of creating a duplicate
-        await ctx.db.patch(dupEmail._id, {
-          clerkId: args.clerkId,
-          email: args.email,
-          emailLower: args.email.toLowerCase(),
-          displayName: args.displayName || dupEmail.displayName,
-          profileImageUrl: dupEmail.profileImageUrl || args.photoUrl,
-          updatedAt: Date.now(),
-          firstVisit: false,
-        });
-        return dupEmail._id;
-      }
-    }
 
     if (existingUser) {
       const patch: any = {
@@ -62,18 +42,14 @@ export const storeUser = mutation({
         profileImageUrl: existingUser.profileImageUrl || args.photoUrl,
         updatedAt: Date.now(),
       };
-      
-      // If they had no hub previously but provided one now (e.g. from signup metadata)
+
       if (!existingUser.hubId && args.hubId) {
         patch.hubId = args.hubId;
         patch.hubName = args.hubName;
       }
-      // If they had no userType previously or want to apply their selected role
       if (!existingUser.userType && args.userType) {
         patch.userType = args.userType;
       }
-      
-      // Force admin role for uncommon emails
       if (args.email.toLowerCase().endsWith("@uncommon.org")) {
         patch.userType = "admin";
       }
@@ -88,7 +64,6 @@ export const storeUser = mutation({
     }
 
     return await ctx.db.insert("users", {
-      clerkId: args.clerkId,
       email: args.email,
       emailLower: args.email.toLowerCase(),
       displayName: args.displayName,
@@ -119,7 +94,7 @@ export const updateProfile = mutation({
     if (!identity) throw new Error("Unauthenticated");
 
     const user = await ctx.db.get(args.userId);
-    if (!user || user.clerkId !== identity.subject) {
+    if (!user || user.email.toLowerCase() !== identity.email!.toLowerCase()) {
       throw new Error("Unauthorized");
     }
 
@@ -147,7 +122,7 @@ export const adminUpdateUser = mutation({
     if (!identity) throw new Error("Unauthenticated");
     const adminUser = await ctx.db
       .query("users")
-      .withIndex("by_clerkId", (q) => q.eq("clerkId", identity.subject))
+      .withIndex("by_emailLower", (q) => q.eq("emailLower", identity.email!.toLowerCase()))
       .unique();
     if (!adminUser || (adminUser.userType !== "admin" && adminUser.userType !== "instructor")) {
       throw new Error("Unauthorized");
@@ -164,7 +139,7 @@ export const clearFirstVisit = mutation({
     if (!identity) return;
     const user = await ctx.db
       .query("users")
-      .withIndex("by_clerkId", (q) => q.eq("clerkId", identity.subject))
+      .withIndex("by_emailLower", (q) => q.eq("emailLower", identity.email!.toLowerCase()))
       .unique();
     if (user && user.firstVisit) {
       await ctx.db.patch(user._id, { firstVisit: false });
@@ -181,14 +156,13 @@ export const deleteUser = mutation({
     if (!identity) throw new Error("Unauthenticated");
     const adminUser = await ctx.db
       .query("users")
-      .withIndex("by_clerkId", (q) => q.eq("clerkId", identity.subject))
+      .withIndex("by_emailLower", (q) => q.eq("emailLower", identity.email!.toLowerCase()))
       .unique();
     if (!adminUser) throw new Error("Unauthorized");
-    // Only the main admin (quinton.ndlovu@uncommon.org) can delete users
     if (adminUser.email.toLowerCase() !== "quinton.ndlovu@uncommon.org") {
       throw new Error("Only the main administrator can delete accounts.");
     }
-    
+
     await ctx.db.delete(args.userId);
   },
 });

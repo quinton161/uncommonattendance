@@ -1,9 +1,9 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
-import { useUser, useClerk, useAuth as useClerkAuth } from '@clerk/clerk-react';
 import { useQuery, useMutation, useConvexAuth } from 'convex/react';
 import { api } from '../convex/_generated/api';
 import { User, AuthContextType, HubSelection } from '../types';
 import { uniqueToast } from '../utils/toastUtils';
+import { useAuthActions } from '@convex-dev/auth/react';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -14,9 +14,7 @@ export const useAuth = () => {
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user: clerkUser, isLoaded: clerkLoaded } = useUser();
-  const { signOut } = useClerkAuth();
-  const clerk = useClerk();
+  const { signOut: convexSignOut, signIn } = useAuthActions();
   const convexAuth = useConvexAuth();
 
   const currentQuery = api?.users?.current;
@@ -33,93 +31,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const storeUserAttemptedRef = useRef(false);
 
   useEffect(() => {
-    if (clerkLoaded && clerkUser && storeUser && !storeUserAttemptedRef.current) {
+    if (convexAuth.isAuthenticated && convexUser && !storeUserAttemptedRef.current) {
       storeUserAttemptedRef.current = true;
       setStoreUserError(null);
-      // Reload the user to get the latest unsafeMetadata from Clerk
-      clerkUser.reload().then(() => {
-        const meta = clerkUser.unsafeMetadata as any;
-        const email = clerkUser.primaryEmailAddress?.emailAddress || '';
-        // Derive userType: always admin for @uncommon.org
-        let userType = meta?.userType || undefined;
-        if (email.toLowerCase().endsWith('@uncommon.org')) {
-          userType = 'admin';
-        }
-        storeUser({
-          clerkId: clerkUser.id,
-          email,
-          firstName: clerkUser.firstName || undefined,
-          lastName: clerkUser.lastName || undefined,
-          displayName: clerkUser.fullName || undefined,
-          photoUrl: clerkUser.imageUrl,
-          hubId: meta?.hubId || undefined,
-          hubName: meta?.hubName || undefined,
-          userType,
-        }).catch((err: any) => {
-          const msg = err?.message || err?.errors?.[0]?.message || 'Failed to create user record';
-          console.error('storeUser error:', err);
-          setStoreUserError(msg);
-        });
-      }).catch(() => {
-        // Fallback if reload fails — use existing metadata
-        const meta = clerkUser.unsafeMetadata as any;
-        const email = clerkUser.primaryEmailAddress?.emailAddress || '';
-        let userType = meta?.userType || undefined;
-        if (email.toLowerCase().endsWith('@uncommon.org')) {
-          userType = 'admin';
-        }
-        storeUser({
-          clerkId: clerkUser.id,
-          email,
-          firstName: clerkUser.firstName || undefined,
-          lastName: clerkUser.lastName || undefined,
-          displayName: clerkUser.fullName || undefined,
-          photoUrl: clerkUser.imageUrl,
-          hubId: meta?.hubId || undefined,
-          hubName: meta?.hubName || undefined,
-          userType,
-        }).catch((err: any) => {
-          const msg = err?.message || err?.errors?.[0]?.message || 'Failed to create user record';
-          console.error('storeUser error:', err);
-          setStoreUserError(msg);
-        });
-      });
     }
-  }, [clerkLoaded, clerkUser, storeUser]);
+  }, [convexAuth.isAuthenticated, convexUser, storeUser]);
 
   useEffect(() => {
-    if (clerkLoaded && clerkUser && convexUser !== undefined) {
+    if (convexAuth.isAuthenticated && convexUser !== undefined) {
       if (convexUser) {
-           const email = convexUser.email || '';
-           const isUncommonAdmin = email.toLowerCase().endsWith('@uncommon.org');
-           setLocalUser({
-             uid: convexUser._id,
-             clerkId: clerkUser.id,
-             email: convexUser.email,
-             emailLower: convexUser.emailLower,
-             displayName: convexUser.displayName || clerkUser.fullName || "User",
-             userType: (isUncommonAdmin ? 'admin' : (convexUser.userType || 'attendee')) as any,
-             createdAt: new Date(convexUser.createdAt),
-             photoUrl: convexUser.profileImageUrl,
-             hubId: convexUser.hubId,
-             hubName: convexUser.hubName,
-              bio: convexUser.bio,
-              course: convexUser.course,
-              profession: convexUser.profession,
-              firstVisit: convexUser.firstVisit,
-            } as any);
-         setHubResolved(true);
+        const email = convexUser.email || '';
+        const isUncommonAdmin = email.toLowerCase().endsWith('@uncommon.org');
+        setLocalUser({
+          uid: convexUser._id,
+          email: convexUser.email,
+          emailLower: convexUser.emailLower,
+          displayName: convexUser.displayName || "User",
+          userType: (isUncommonAdmin ? 'admin' : (convexUser.userType || 'attendee')) as any,
+          createdAt: new Date(convexUser.createdAt),
+          photoUrl: convexUser.profileImageUrl,
+          hubId: convexUser.hubId,
+          hubName: convexUser.hubName,
+          bio: convexUser.bio,
+          course: convexUser.course,
+          profession: convexUser.profession,
+          firstVisit: convexUser.firstVisit,
+        } as any);
+        setHubResolved(true);
       } else {
-         setLocalUser(null);
-         setHubResolved(false);
+        setLocalUser(null);
+        setHubResolved(false);
       }
-    } else if (clerkLoaded && !clerkUser) {
+    } else if (!convexAuth.isAuthenticated && !convexAuth.isLoading) {
       setLocalUser(null);
       setHubResolved(false);
     }
-  }, [clerkLoaded, clerkUser, convexUser]);
+  }, [convexAuth.isAuthenticated, convexAuth.isLoading, convexUser]);
 
-  // Clear any stale auth error when Convex auth successfully recovers
   useEffect(() => {
     if (convexAuth.isAuthenticated && storeUserError) {
       setStoreUserError(null);
@@ -127,26 +75,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [convexAuth.isAuthenticated, storeUserError]);
 
-  // Show loading spinner while:
-  //  1. Clerk hasn't resolved yet
-  //  2. Clerk user is logged in but convexUser is still undefined (query in flight)
-  //  3. Clerk user is logged in and convexUser is null (storeUser mutation in flight — first login)
   const loading =
-    !clerkLoaded ||
-    (!!clerkUser &&
-      convexUser === undefined) ||
-    (!!clerkUser &&
-      convexUser === null &&
-      !storeUserError &&
-      convexAuth.isLoading);
+    convexAuth.isLoading ||
+    (convexAuth.isAuthenticated &&
+      convexUser === undefined);
 
-  const login = async () => clerk.openSignIn();
-  const register = async () => clerk.openSignUp();
+  const login = async (email: string) => {
+    await signIn("email", { email });
+  };
+
+  const register = async (
+    email: string,
+    _password: string,
+    displayName: string,
+    userType: User['userType'],
+    hub?: HubSelection
+  ) => {
+    await storeUser({
+      email,
+      displayName,
+      userType,
+      hubId: hub?.id,
+      hubName: hub?.name,
+      firstName: displayName?.split(' ')[0],
+      lastName: displayName?.split(' ').slice(1).join(' '),
+    }).catch((err: any) => {
+      const msg = err?.message || 'Failed to create user record';
+      console.error('storeUser error:', err);
+      setStoreUserError(msg);
+    });
+    await signIn("email", { email });
+  };
+
   const logout = async () => {
-    await signOut();
+    await convexSignOut();
     uniqueToast.info('Logged out. See you next time!');
   };
-  
+
   const updateProfile = async (data: Partial<User>) => {
     if (!localUser || !updateProfileMutation) return;
     await updateProfileMutation({
@@ -165,11 +130,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   };
 
-  const resetPassword = async () => clerk.openSignIn();
-  const loginWithGoogle = async () => clerk.openSignIn();
-  const deleteAccount = async () => {
-    await clerkUser?.delete();
+  const resetPassword = async (_email?: string) => {
+    uniqueToast.info('With OTP sign-in, just sign in again with your email.');
   };
+
+  const loginWithGoogle = async () => {
+    uniqueToast.info('Google sign-in is not available with email OTP.');
+  };
+
+  const deleteAccount = async () => { };
 
   const value: AuthContextType = {
     user: localUser,
