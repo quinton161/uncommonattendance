@@ -5,10 +5,11 @@ export const current = query({
   args: {},
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return null;
+    const email = identity?.email;
+    if (!email) return null;
     const user = await ctx.db
       .query("users")
-      .withIndex("by_emailLower", (q) => q.eq("emailLower", identity.email!.toLowerCase()))
+      .withIndex("by_emailLower", (q) => q.eq("emailLower", email.toLowerCase()))
       .unique();
     return user;
   },

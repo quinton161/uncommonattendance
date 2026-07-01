@@ -25,8 +25,9 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
   callbacks: {
     createOrUpdateUser: async (ctx, args) => {
       if (args.existingUserId) {
+        const { emailVerified, phoneVerified, ...safeProfile } = args.profile;
         await ctx.db.patch(args.existingUserId, {
-          ...args.profile,
+          ...safeProfile,
           updatedAt: Date.now(),
         });
         return args.existingUserId;
