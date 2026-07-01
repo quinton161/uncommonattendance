@@ -5,11 +5,11 @@ import { Resend } from "resend";
 export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
   providers: [
     Email({
-      from: "Uncommon Attendance <onboarding@resend.dev>",
+      from: "Uncommon Attendance <noreply@uncommon.org>",
       sendVerificationRequest: async ({ identifier: email, token }) => {
         const resend = new Resend(process.env.RESEND_API_KEY!);
         await resend.emails.send({
-          from: "Uncommon Attendance <onboarding@resend.dev>",
+          from: "Uncommon Attendance <noreply@uncommon.org>",
           to: [email],
           subject: "Your Uncommon Attendance sign-in code",
           html: `<p>Your sign-in code is: <strong>${token}</strong></p><p>This code expires in 10 minutes.</p><p>If you didn't request this code, you can safely ignore this email.</p>`,
