@@ -43,10 +43,20 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
         return args.existingUserId;
       }
       const email = args.profile.email as string | undefined;
+      if (!email) {
+        throw new Error("Email is required for user creation");
+      }
+      const existingUser = await ctx.db
+        .query("users")
+        .withIndex("by_emailLower", (q) => q.eq("emailLower", email.toLowerCase()))
+        .first();
+      if (existingUser) {
+        return existingUser._id;
+      }
       return await ctx.db.insert("users", {
         email,
-        emailLower: email?.toLowerCase(),
-        userType: email?.toLowerCase().endsWith("@uncommon.org") ? "admin" : "attendee",
+        emailLower: email.toLowerCase(),
+        userType: email.toLowerCase().endsWith("@uncommon.org") ? "admin" : "attendee",
         createdAt: Date.now(),
         firstVisit: true,
       });

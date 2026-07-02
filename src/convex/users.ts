@@ -192,36 +192,53 @@ export const debugAuth = query({
   handler: async (ctx, args) => {
     const authAccounts = await ctx.db
       .query("authAccounts")
-      .filter((q) => q.eq(q.field("providerAccountId"), args.email))
+      .withIndex("providerAndAccountId", (q) => q.eq("provider", "resend-otp").eq("providerAccountId", args.email))
+      .collect();
+    const oldAuthAccounts = await ctx.db
+      .query("authAccounts")
+      .withIndex("providerAndAccountId", (q) => q.eq("provider", "email").eq("providerAccountId", args.email))
       .collect();
     const users = await ctx.db
       .query("users")
-      .filter((q) => q.eq(q.field("email"), args.email))
+      .withIndex("by_emailLower", (q) => q.eq("emailLower", args.email.toLowerCase()))
       .collect();
     const verificationCodes = await ctx.db.query("authVerificationCodes").collect();
+    const rateLimits = await ctx.db
+      .query("authRateLimits")
+      .withIndex("identifier", (q) => q.eq("identifier", args.email))
+      .collect();
     return {
       email: args.email,
-      authAccounts: authAccounts.map((a) => ({
+      authAccounts: [...authAccounts, ...oldAuthAccounts].map((a) => ({
         _id: a._id,
         provider: a.provider,
         providerAccountId: a.providerAccountId,
         userId: a.userId,
-        emailVerified: (a as any).emailVerified,
       })),
       users: users.map((u) => ({
         _id: u._id,
         email: u.email,
         userType: u.userType,
+        displayName: u.displayName,
         createdAt: u.createdAt,
         firstVisit: u.firstVisit,
+        updatedAt: u.updatedAt,
       })),
-      verificationCodes: verificationCodes.map((c) => ({
+      duplicateUsers: users.length > 1,
+      verificationCodes: verificationCodes.filter((c) => {
+        const acc = [...authAccounts, ...oldAuthAccounts].find((a) => a._id === c.accountId);
+        return acc !== undefined;
+      }).map((c) => ({
         _id: c._id,
         provider: c.provider,
         accountId: c.accountId,
         expirationTime: c.expirationTime,
-        emailVerified: (c as any).emailVerified,
+        remainingMs: c.expirationTime - Date.now(),
       })),
+      rateLimited: rateLimits.length > 0 ? {
+        attemptsLeft: rateLimits[0].attemptsLeft,
+        lastAttemptTime: new Date(rateLimits[0].lastAttemptTime).toISOString(),
+      } : null,
     };
   },
 });
