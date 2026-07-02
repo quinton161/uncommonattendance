@@ -71,7 +71,7 @@ export default function ResetPasswordPage(): React.ReactElement {
     setError(null);
     setLoading(true);
     try {
-      await signIn("email", { email });
+      await signIn("resend-otp", { email });
       setStep('verify');
     } catch (err: any) {
       setError(err?.message || 'Could not send reset code. Check the address and try again.');
@@ -86,7 +86,7 @@ export default function ResetPasswordPage(): React.ReactElement {
     setError(null);
     setLoading(true);
     try {
-      await signIn("email", { email, code });
+      await signIn("resend-otp", { email, code });
       setStep('done');
     } catch (err: any) {
       setError(err?.message || 'Invalid or expired code. Request a new one.');

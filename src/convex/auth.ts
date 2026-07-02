@@ -5,6 +5,7 @@ import { Resend } from "resend";
 export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
   providers: [
     Email({
+      id: "resend-otp",
       from: "Uncommon Attendance <noreply@uncommon.org>",
       maxAge: 10 * 60,
       generateVerificationToken: async () => {
@@ -17,7 +18,16 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
           from: "Uncommon Attendance <noreply@uncommon.org>",
           to: [email],
           subject: "Your Uncommon Attendance sign-in code",
-          html: `<p>Your sign-in code is: <strong>${token}</strong></p><p>This code expires in 10 minutes.</p><p>If you didn't request this code, you can safely ignore this email.</p>`,
+          html: `
+            <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px">
+              <h2 style="color:#1e40af;margin-bottom:8px">Your sign-in code</h2>
+              <p style="color:#374151;margin-bottom:24px">Use the code below to sign in to Uncommon Attendance.</p>
+              <div style="background:#eff6ff;border:2px solid #93c5fd;border-radius:12px;padding:24px;text-align:center">
+                <span style="font-size:2.5rem;font-weight:bold;letter-spacing:0.4em;color:#1e40af">${token}</span>
+              </div>
+              <p style="color:#6b7280;font-size:0.85rem;margin-top:16px">This code expires in 10 minutes. If you didn't request this, you can safely ignore this email.</p>
+            </div>
+          `,
         });
       },
     }),

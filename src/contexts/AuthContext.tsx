@@ -81,7 +81,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       convexUser === undefined);
 
   const login = async (email: string) => {
-    await signIn("email", { email });
+    await signIn("resend-otp", { email });
   };
 
   const register = async (
@@ -104,7 +104,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error('storeUser error:', err);
       setStoreUserError(msg);
     });
-    await signIn("email", { email });
+    await signIn("resend-otp", { email });
   };
 
   const logout = async () => {

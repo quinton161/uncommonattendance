@@ -337,7 +337,7 @@ const SignInForm: React.FC<{ onSwitchToRegister: () => void }> = ({ onSwitchToRe
     if (loading || !email) return;
     setLoading(true); setError('');
     try {
-      await signIn("email", { email });
+      await signIn("resend-otp", { email });
       setOtpSent(true);
     } catch (err: any) {
       setError(err?.message || 'Failed to send code. Try again.');
@@ -349,7 +349,7 @@ const SignInForm: React.FC<{ onSwitchToRegister: () => void }> = ({ onSwitchToRe
     if (loading || code.length < 6) return;
     setLoading(true); setError('');
     try {
-      await signIn("email", { email, code });
+      await signIn("resend-otp", { email, code });
     } catch (err: any) {
       setError(err?.message || 'Invalid code. Try again.');
     } finally { setLoading(false); }
@@ -371,8 +371,8 @@ const SignInForm: React.FC<{ onSwitchToRegister: () => void }> = ({ onSwitchToRe
         <Field>
           <Label>Verification Code</Label>
           <StyledInput
-            type="text" inputMode="numeric" maxLength={6} placeholder="• • • • • •"
-            value={code} onChange={e => { setCode(e.target.value.replace(/\D/g,'')); clear(); }} required
+            type="text" inputMode="numeric" placeholder="• • • • • •"
+            value={code} onChange={e => { setCode(e.target.value.replace(/\D/g,'').slice(0,6)); clear(); }} required
             style={{ letterSpacing:'0.4em', fontSize:'1.4rem', textAlign:'center', paddingLeft:'16px' }}
           />
           <p style={{ color:'#6b7280', fontSize:'0.8rem', textAlign:'center', margin:'8px 0 0', fontFamily:"'Chillax','Inter',sans-serif" }}>
@@ -458,7 +458,7 @@ const RegisterForm: React.FC<{ onSwitchToLogin: () => void }> = ({ onSwitchToLog
         firstName: form.name.split(' ')[0] || form.name,
         lastName: form.name.split(' ').slice(1).join(' ') || '',
       });
-      await signIn("email", { email: form.email });
+      await signIn("resend-otp", { email: form.email });
       setOtpSent(true);
     } catch (err: any) {
       setError(err?.message || 'Registration failed.');
@@ -470,7 +470,7 @@ const RegisterForm: React.FC<{ onSwitchToLogin: () => void }> = ({ onSwitchToLog
     if (loading || code.length < 6) return;
     setLoading(true); setError('');
     try {
-      await signIn("email", { email: form.email, code });
+      await signIn("resend-otp", { email: form.email, code });
     } catch (err: any) {
       setError(err?.message || 'Invalid verification code.');
     } finally { setLoading(false); }
@@ -492,8 +492,8 @@ const RegisterForm: React.FC<{ onSwitchToLogin: () => void }> = ({ onSwitchToLog
         <Field>
           <Label>Verification Code</Label>
           <StyledInput
-            type="text" inputMode="numeric" maxLength={6} placeholder="• • • • • •"
-            value={code} onChange={e => { setCode(e.target.value.replace(/\D/g,'')); clear(); }} required
+            type="text" inputMode="numeric" placeholder="• • • • • •"
+            value={code} onChange={e => { setCode(e.target.value.replace(/\D/g,'').slice(0,6)); clear(); }} required
             style={{ letterSpacing:'0.4em', fontSize:'1.4rem', textAlign:'center', paddingLeft:'16px' }}
           />
           <p style={{ color:'#6b7280', fontSize:'0.8rem', textAlign:'center', margin:'8px 0 0', fontFamily:"'Chillax','Inter',sans-serif" }}>
