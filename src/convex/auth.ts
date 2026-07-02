@@ -46,9 +46,9 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
       if (!email) {
         throw new Error("Email is required for user creation");
       }
-      const existingUser = await ctx.db
+      const existingUser = await (ctx.db as any)
         .query("users")
-        .withIndex("by_emailLower", (q) => q.eq("emailLower", email.toLowerCase()))
+        .withIndex("by_emailLower", (q: any) => q.eq("emailLower", email.toLowerCase()))
         .first();
       if (existingUser) {
         return existingUser._id;
