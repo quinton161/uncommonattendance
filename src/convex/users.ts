@@ -10,7 +10,7 @@ export const current = query({
     const user = await ctx.db
       .query("users")
       .withIndex("by_emailLower", (q) => q.eq("emailLower", email.toLowerCase()))
-      .unique();
+      .first();
     return user;
   },
 });
@@ -30,7 +30,7 @@ export const storeUser = mutation({
     const existingUser = await ctx.db
       .query("users")
       .withIndex("by_emailLower", (q) => q.eq("emailLower", args.email.toLowerCase()))
-      .unique();
+      .first();
 
     if (existingUser) {
       const patch: any = {
